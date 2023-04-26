@@ -83,7 +83,7 @@ envoy_cc_library(
         "//envoy/server:drain_manager_interface",
         "//envoy/server:instance_interface",
         "//envoy/ssl:context_manager_interface",
-        "//envoy/tracing:tracer_interface",
+        "//envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:random_generator_lib",

@@ -10,7 +10,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
 

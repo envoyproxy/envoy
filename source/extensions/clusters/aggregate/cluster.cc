@@ -12,12 +12,15 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+Cluster::Cluster(Server::Configuration::ServerFactoryContext& server_context,
+                 const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-                 Upstream::ClusterFactoryContext& context)
-    : Upstream::ClusterImplBase(cluster, context), cluster_manager_(context.clusterManager()),
-      runtime_(context.serverFactoryContext().runtime()),
-      random_(context.serverFactoryContext().api().randomGenerator()),
+                 Upstream::ClusterFactoryContext& factory_context,
+                 Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
+                 Random::RandomGenerator& random, bool added_via_api)
+    : Upstream::ClusterImplBase(server_context, cluster, factory_context, runtime, added_via_api,
+                                factory_context.mainThreadDispatcher().timeSource()),
+      cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
 AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
@@ -205,10 +208,13 @@ AggregateClusterLoadBalancer::lifetimeCallbacks() {
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
-  auto new_cluster = std::make_shared<Cluster>(cluster, proto_config, context);
+  auto new_cluster = std::make_shared<Cluster>(
+      server_context, cluster, proto_config, context, context.clusterManager(), context.runtime(),
+      context.api().randomGenerator(), context.addedViaApi());
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

@@ -9,7 +9,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"

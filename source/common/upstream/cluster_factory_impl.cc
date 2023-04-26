@@ -15,10 +15,11 @@ namespace Envoy {
 namespace Upstream {
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    Server::Configuration::ServerFactoryContext& server_context, ClusterManager& cm,
-    LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
+    Stats::Store& stats, LazyCreateDnsResolver dns_resolver_fn,
+    Ssl::ContextManager& ssl_context_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -58,9 +59,10 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(server_context, cm, dns_resolver_fn, ssl_context_manager,
-                                    std::move(outlier_event_logger), added_via_api);
-  return factory->create(cluster, context);
+  ClusterFactoryContextImpl context(server_context, cluster_manager, stats, dns_resolver_fn,
+                                    ssl_context_manager, std::move(outlier_event_logger),
+                                    added_via_api, validation_visitor);
+  return factory->create(server_context, cluster, context);
 }
 
 Network::DnsResolverSharedPtr
@@ -81,22 +83,20 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(cluster, typed_dns_resolver_config);
-    auto& server_context = context.serverFactoryContext();
-    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
-                                                  server_context.api(), typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(context.mainThreadDispatcher(), context.api(),
+                                                  typed_dns_resolver_config);
   }
 
   return context.dnsResolver();
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
+ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& server_context,
+                               const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context);
-
-  auto& server_context = context.serverFactoryContext();
+      createClusterImpl(server_context, cluster, context);
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
@@ -104,16 +104,15 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       throw EnvoyException("Multiple health checks not supported");
     } else {
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster_pair.first, server_context.runtime(),
-          server_context.mainThreadDispatcher(), server_context.accessLogManager(),
-          context.messageValidationVisitor(), server_context.api()));
+          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
+          context.mainThreadDispatcher(), context.logManager(), context.messageValidationVisitor(),
+          context.api()));
     }
   }
 
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
-      server_context.runtime(), context.outlierEventLogger(),
-      server_context.api().randomGenerator()));
+      *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
+      context.outlierEventLogger(), context.api().randomGenerator()));
 
   return new_cluster_pair;
 }

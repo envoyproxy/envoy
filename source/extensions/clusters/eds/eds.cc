@@ -13,13 +13,16 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                               ClusterFactoryContext& cluster_context)
-    : BaseDynamicClusterImpl(cluster, cluster_context),
+EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                               const envoy::config::cluster::v3::Cluster& cluster,
+                               ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                               bool added_via_api)
+    : BaseDynamicClusterImpl(server_context, cluster, cluster_context, runtime, added_via_api,
+                             cluster_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster_context.messageValidationVisitor(), "cluster_name"),
-      local_info_(cluster_context.serverFactoryContext().localInfo()) {
-  Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
+      local_info_(cluster_context.localInfo()) {
+  Event::Dispatcher& dispatcher = cluster_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   if (Config::SubscriptionFactory::isPathBasedConfigSource(
@@ -370,13 +373,16 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+EdsClusterFactory::createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                                     const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context) {
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);
+  return std::make_pair(std::make_unique<EdsClusterImpl>(server_context, cluster, context,
+                                                         context.runtime(), context.addedViaApi()),
+                        nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {
