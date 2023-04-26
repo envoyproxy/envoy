@@ -47,11 +47,11 @@ java_library(
         "JvmKeyValueStoreContext.java",
         "JvmStringAccessorContext.java",
         "VirtualClusterConfig.java",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib_srcs",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
-        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib_srcs",
         "@maven//:com_google_code_findbugs_jsr305",
     ],
 )
