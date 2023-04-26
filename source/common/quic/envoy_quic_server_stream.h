@@ -122,8 +122,6 @@ private:
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 #endif
-  // True if a :path header has been seen before.
-  bool saw_path_{false};
 };
 
 } // namespace Quic

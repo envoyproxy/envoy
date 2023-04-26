@@ -786,7 +786,7 @@ downstreamLocalAddress()
 
   streamInfo:downstreamLocalAddress()
 
-Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream remote address <envoy/stream_info/stream_info.h>`
 used by the current request.
 
 downstreamDirectRemoteAddress()

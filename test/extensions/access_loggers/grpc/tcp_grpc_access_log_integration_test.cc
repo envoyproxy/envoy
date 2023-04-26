@@ -107,9 +107,7 @@ public:
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
 
-      tcp_proxy_config.mutable_access_log_options()
-          ->mutable_access_log_flush_interval()
-          ->set_seconds(1); // 1s
+      tcp_proxy_config.mutable_access_log_flush_interval()->set_seconds(1); // 1s
 
       tcp_proxy->PackFrom(tcp_proxy_config);
     });

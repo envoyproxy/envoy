@@ -401,8 +401,6 @@ Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& jso
   return Json::Factory::loadFromString(substitute(json, version));
 }
 
-// This function is not used for Envoy Mobile tests, and ::system() is not supported on iOS.
-#ifndef TARGET_OS_IOS
 void TestEnvironment::exec(const std::vector<std::string>& args) {
   std::stringstream cmd;
   // Symlinked args[0] can confuse Python when importing module relative, so we let Python know
@@ -417,7 +415,6 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false, "");
   }
 }
-#endif
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents,

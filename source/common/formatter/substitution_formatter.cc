@@ -87,6 +87,15 @@ SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Pr
   return DefaultUnspecifiedValueString;
 }
 
+const absl::optional<std::reference_wrapper<const std::string>>
+SubstitutionFormatUtils::streamStateToString(
+    const absl::optional<StreamInfo::StreamState>& stream_state) {
+  if (stream_state) {
+    return StreamInfo::Utility::getStreamStateString(stream_state.value());
+  }
+  return absl::nullopt;
+}
+
 const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
@@ -150,13 +159,8 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   const ProtobufWkt::Struct output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-#ifdef ENVOY_ENABLE_YAML
   const std::string log_line =
-      MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
-#else
-  IS_ENVOY_BUG("Json support compiled out");
-  const std::string log_line = "";
-#endif
+      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -1083,7 +1087,16 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoDurationFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.currentDuration();
+                                    return stream_info.requestComplete();
+                                  });
+                            }}},
+                          {"STREAM_STATE",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return SubstitutionFormatUtils::streamStateToString(
+                                        stream_info.streamState());
                                   });
                             }}},
                           {"RESPONSE_FLAGS",
@@ -1902,16 +1915,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-#ifdef ENVOY_ENABLE_YAML
-    ProtobufUtil::StatusOr<std::string> json_or_error =
-        MessageUtil::getJsonStringFromMessage(value, false, true);
-    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
-    if (json_or_error.ok()) {
-      str = json_or_error.value();
-    }
-#else
-    IS_ENVOY_BUG("Json support compiled out");
-#endif
+    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
   }
   truncate(str, max_length_);
   return str;
@@ -2106,12 +2110,10 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
     return unspecifiedValue();
   }
 
-#ifdef ENVOY_ENABLE_YAML
   ProtobufWkt::Value val;
   if (MessageUtil::jsonConvertValue(*proto, val)) {
     return val;
   }
-#endif
   return unspecifiedValue();
 }
 

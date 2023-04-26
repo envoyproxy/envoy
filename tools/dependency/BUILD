@@ -25,9 +25,9 @@ envoy_entry_point(
 )
 
 envoy_entry_point(
-    name = "dependatool",
+    name = "pip_check",
     args = ["--path=%s" % PATH],
-    pkg = "dependatool",
+    pkg = "envoy.dependency.pip_check",
 )
 
 py_binary(

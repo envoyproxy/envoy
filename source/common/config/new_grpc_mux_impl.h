@@ -36,7 +36,6 @@ public:
                  Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
                  CustomConfigValidatorsPtr&& config_validators,
-                 JitteredExponentialBackOffStrategyPtr backoff_strategy,
                  XdsConfigTrackerOptRef xds_config_tracker);
 
   ~NewGrpcMuxImpl() override;

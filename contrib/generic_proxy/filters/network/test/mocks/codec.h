@@ -10,21 +10,19 @@ namespace GenericProxy {
 
 class MockRequestDecoderCallback : public RequestDecoderCallback {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (RequestPtr request, ExtendedOptions));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestPtr request));
   MOCK_METHOD(void, onDecodingFailure, ());
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
 };
 
 class MockResponseDecoderCallback : public ResponseDecoderCallback {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response, ExtendedOptions));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response));
   MOCK_METHOD(void, onDecodingFailure, ());
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
 };
 
 class MockRequestEncoderCallback : public RequestEncoderCallback {
 public:
-  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool expect_response));
 };
 
 /**
@@ -32,7 +30,7 @@ public:
  */
 class MockResponseEncoderCallback : public ResponseEncoderCallback {
 public:
-  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool close_connection));
 };
 
 class MockRequestDecoder : public RequestDecoder {
@@ -71,7 +69,6 @@ public:
   MOCK_METHOD(RequestEncoderPtr, requestEncoder, (), (const));
   MOCK_METHOD(ResponseEncoderPtr, responseEncoder, (), (const));
   MOCK_METHOD(MessageCreatorPtr, messageCreator, (), (const));
-  MOCK_METHOD(ProtocolOptions, protocolOptions, (), (const));
 };
 
 class MockProxyFactory : public ProxyFactory {

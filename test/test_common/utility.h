@@ -390,6 +390,25 @@ public:
   }
 
   /**
+   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
+   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
+   * properties (values), but the positions may be different.
+   *
+   * @param lhs JSON string on LHS.
+   * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
+   * @return bool indicating whether the JSON strings are equal.
+   */
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
+  }
+
+  /**
    * Symmetrically pad a string with '=' out to a desired length.
    * @param to_pad the string being padded around.
    * @param desired_length the length we want the padding to bring the string up to.
@@ -496,6 +515,17 @@ public:
 #endif
   }
 
+  /**
+   * Return typed proto message object for YAML.
+   * @param yaml YAML string.
+   * @return MessageType parsed from yaml.
+   */
+  template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
+    MessageType message;
+    TestUtility::loadFromYaml(yaml, message);
+    return message;
+  }
+
   // Allows pretty printed test names.
   static std::string http1ParserImplToString(Http1ParserImpl impl) {
     switch (impl) {
@@ -597,9 +627,32 @@ public:
    */
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
+  // Strict variants of Protobuf::MessageUtil
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+    MessageUtil::loadFromJson(json, message);
+  }
+
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+  }
+
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     return MessageUtil::anyConvert<MessageType>(message);
+  }
+
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType>
@@ -611,6 +664,29 @@ public:
   static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
     return MessageUtil::downcastAndValidate<MessageType>(
         config, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
+    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
+    // convenience.
+    ProtobufWkt::Struct tmp;
+    MessageUtil::jsonConvert(source, tmp);
+    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
+  }
+
+  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
+    return message;
   }
 
   /**
@@ -709,84 +785,6 @@ public:
       PANIC("reached unexpected code");
     }
   }
-
-#ifdef ENVOY_ENABLE_YAML
-  /**
-   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
-   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
-   * properties (values), but the positions may be different.
-   *
-   * @param lhs JSON string on LHS.
-   * @param rhs JSON string on RHS.
-   * @param support_root_array Whether to support parsing JSON arrays.
-   * @return bool indicating whether the JSON strings are equal.
-   */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
-                              bool support_root_array = false) {
-    if (!support_root_array) {
-      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
-    }
-
-    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
-  }
-
-  /**
-   * Return typed proto message object for YAML.
-   * @param yaml YAML string.
-   * @return MessageType parsed from yaml.
-   */
-  template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
-    MessageType message;
-    TestUtility::loadFromYaml(yaml, message);
-    return message;
-  }
-
-  // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
-    MessageUtil::loadFromJson(json, message);
-  }
-
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
-  }
-
-  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
-    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
-    // convenience.
-    ProtobufWkt::Struct tmp;
-    MessageUtil::jsonConvert(source, tmp);
-    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
-  }
-
-  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
-    ProtobufWkt::Struct message;
-    MessageUtil::loadFromJson(json, message);
-    return message;
-  }
-
-  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
-    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
-    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
-
-    ProtobufWkt::Struct message;
-    MessageUtil::loadFromJson(root_message, message);
-    return message;
-  }
-
-  template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
-    MessageUtil::loadFromYamlAndValidate(yaml, message,
-                                         ProtobufMessage::getStrictValidationVisitor());
-  }
-#endif
 };
 
 /**
@@ -1283,7 +1281,6 @@ MATCHER_P(Percent, rhs, "") {
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
-#ifdef ENVOY_ENABLE_YAML
 MATCHER_P(JsonStringEq, expected, "") {
   const bool equal = TestUtility::jsonStringEqual(arg, expected);
   if (!equal) {
@@ -1297,6 +1294,5 @@ MATCHER_P(JsonStringEq, expected, "") {
   }
   return equal;
 }
-#endif
 
 } // namespace Envoy

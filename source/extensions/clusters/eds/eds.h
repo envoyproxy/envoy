@@ -30,8 +30,10 @@ class EdsClusterImpl
     : public BaseDynamicClusterImpl,
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                 ClusterFactoryContext& cluster_context);
+  EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                 const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
+                 Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -54,10 +56,6 @@ private:
                               const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
-  const std::string& edsServiceName() const {
-    const std::string& name = info_->edsServiceName();
-    return !name.empty() ? name : info_->name();
-  }
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
@@ -89,7 +87,9 @@ private:
   };
 
   Config::SubscriptionPtr subscription_;
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context_;
   const LocalInfo::LocalInfo& local_info_;
+  const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
@@ -113,9 +113,11 @@ public:
   EdsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.eds") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 } // namespace Upstream

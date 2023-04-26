@@ -68,24 +68,24 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansLocalCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(MessageUtil::sanitizeUtf8String(ssl->subjectLocalCertificate()));
+          peer.set_principal(ssl->subjectLocalCertificate());
         } else {
-          peer.set_principal(MessageUtil::sanitizeUtf8String(dns_sans[0]));
+          peer.set_principal(dns_sans[0]);
         }
       } else {
-        peer.set_principal(MessageUtil::sanitizeUtf8String(uri_sans[0]));
+        peer.set_principal(uri_sans[0]);
       }
     } else {
       const auto uri_sans = ssl->uriSanPeerCertificate();
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansPeerCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(MessageUtil::sanitizeUtf8String(ssl->subjectPeerCertificate()));
+          peer.set_principal(ssl->subjectPeerCertificate());
         } else {
-          peer.set_principal(MessageUtil::sanitizeUtf8String(dns_sans[0]));
+          peer.set_principal(dns_sans[0]);
         }
       } else {
-        peer.set_principal(MessageUtil::sanitizeUtf8String(uri_sans[0]));
+        peer.set_principal(uri_sans[0]);
       }
       if (include_certificate) {
         peer.set_certificate(ssl->urlEncodedPemEncodedPeerCertificate());
@@ -94,7 +94,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   }
 
   if (!service.empty()) {
-    peer.set_service(MessageUtil::sanitizeUtf8String(service));
+    peer.set_service(service);
   }
 }
 
@@ -102,7 +102,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
   if (entry) {
     // TODO(jmarantz): plumb absl::string_view further here; there's no need
     // to allocate a temp string in the local uses.
-    return MessageUtil::sanitizeUtf8String(entry->value().getStringView());
+    return std::string(entry->value().getStringView());
   }
   return EMPTY_STRING;
 }
@@ -138,21 +138,17 @@ void CheckRequestUtils::setHttpRequest(
   headers.iterate([request_header_matchers, mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
-      const std::string sanitized_value =
-          MessageUtil::sanitizeUtf8String(e.value().getStringView());
-
       const std::string key(e.key().getStringView());
 
       if (request_header_matchers == nullptr || request_header_matchers->matches(key)) {
         if (mutable_headers->find(key) == mutable_headers->end()) {
-          (*mutable_headers)[key] = sanitized_value;
+          (*mutable_headers)[key] = std::string(e.value().getStringView());
         } else {
           // Merge duplicate headers.
-          (*mutable_headers)[key].append(",").append(sanitized_value);
+          (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
         }
       }
     }
-
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
 
@@ -168,7 +164,7 @@ void CheckRequestUtils::setHttpRequest(
     if (pack_as_bytes) {
       httpreq.set_raw_body(std::move(data));
     } else {
-      httpreq.set_body(MessageUtil::sanitizeUtf8String(data));
+      httpreq.set_body(std::move(data));
     }
 
     // Add in a header to detect when a partial body is used.

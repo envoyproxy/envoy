@@ -20,7 +20,6 @@ envoy_cc_library(
     deps = [
         ":rds_lib",
         ":route_lib",
-        ":upstream_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:proxy_config_interface",
         "//contrib/generic_proxy/filters/network/source/router:router_lib",
@@ -114,20 +113,5 @@ envoy_cc_library(
         "//envoy/rds:rds_interface",
         "//source/common/rds:rds_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "upstream_lib",
-    srcs = [
-        "upstream.cc",
-    ],
-    hdrs = [
-        "upstream.h",
-    ],
-    deps = [
-        "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
-        "//envoy/network:connection_interface",
-        "//envoy/upstream:thread_local_cluster_interface",
     ],
 )

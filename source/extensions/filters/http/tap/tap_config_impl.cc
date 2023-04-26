@@ -6,7 +6,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,8 +20,7 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
   return [output](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     auto& new_header = *output->Add();
     new_header.set_key(std::string(header.key().getStringView()));
-    new_header.set_value(MessageUtil::sanitizeUtf8String(header.value().getStringView()));
-
+    new_header.set_value(std::string(header.value().getStringView()));
     return Http::HeaderMap::Iterate::Continue;
   };
 }

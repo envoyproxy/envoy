@@ -26,7 +26,8 @@ message GcpAuthnFilterConfig {
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
   config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
-  // Retry policy for fetching tokens. This field is optional.
+  // Retry policy for fetching tokens.
+  // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
   config.core.v3.RetryPolicy retry_policy = 2;
 
   // Token cache configuration. This field is optional.

@@ -13,11 +13,12 @@ class IntegrationTest
 public:
   IntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
-        http1_implementation_(std::get<1>(GetParam())) {
+        ip_version_(std::get<0>(GetParam())), http1_implementation_(std::get<1>(GetParam())) {
     setupHttp1ImplOverrides(http1_implementation_);
   }
 
 protected:
+  const Network::Address::IpVersion ip_version_;
   const Http1ParserImpl http1_implementation_;
 };
 
@@ -33,11 +34,12 @@ public:
                   Network::Test::getLoopbackAddressString(std::get<0>(GetParam())), 0);
             },
             std::get<0>(GetParam())),
-        http1_implementation_(std::get<1>(GetParam())) {
+        ip_version_(std::get<0>(GetParam())), http1_implementation_(std::get<1>(GetParam())) {
     setupHttp1ImplOverrides(http1_implementation_);
   }
 
 protected:
+  const Network::Address::IpVersion ip_version_;
   const Http1ParserImpl http1_implementation_;
 };
 } // namespace Envoy

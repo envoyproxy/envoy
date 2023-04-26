@@ -48,8 +48,7 @@ git clone git@github.com:envoyproxy/envoy-website "${CHECKOUT_DIR}" -b "${DOCS_M
 if [[ -e "$PUBLISH_DIR" ]]; then
     # Defense against the unexpected.
     echo 'Docs version already exists, not continuing!.'
-    exit 0
-    # exit 1
+    exit 1
 fi
 
 mkdir -p "$PUBLISH_DIR"

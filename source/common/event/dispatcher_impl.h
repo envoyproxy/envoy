@@ -89,7 +89,7 @@ public:
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
-  void post(PostCb callback) override;
+  void post(std::function<void()> callback) override;
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
@@ -169,7 +169,7 @@ private:
 
   SchedulableCallbackPtr post_cb_;
   Thread::MutexBasicLockable post_lock_;
-  std::list<PostCb> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
 
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;

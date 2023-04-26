@@ -638,7 +638,7 @@ public:
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
   MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
   MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());
-  MOCK_METHOD(Tracing::TracerSharedPtr, tracer, ());
+  MOCK_METHOD(Tracing::HttpTracerSharedPtr, tracer, ());
   MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
   MOCK_METHOD(bool, proxy100Continue, (), (const));
   MOCK_METHOD(bool, streamErrorOnInvalidHttpMessaging, (), (const));

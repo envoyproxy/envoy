@@ -861,7 +861,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   uint32_t i = 0;
 
   absl::BlockingCounter workers_waiting_to_run(workers_.size());
-  std::function<void()> worker_started_running = [&workers_waiting_to_run]() {
+  Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
     workers_waiting_to_run.DecrementCount();
   };
 

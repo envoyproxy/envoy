@@ -279,11 +279,7 @@ tag_image () {
 
     if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
         echo "..."
-        docker "${docker_tag_args[@]}" || {
-            echo "Retry Docker tag in 5s ..." >&2
-            sleep 5
-            docker "${docker_tag_args[@]}"
-        }
+        docker "${docker_tag_args[@]}"
     fi
 }
 

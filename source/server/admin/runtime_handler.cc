@@ -72,7 +72,7 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
   (*fields)["layers"] = ValueUtil::listValue(layer_names);
   (*fields)["entries"] = ValueUtil::structValue(layer_entries);
 
-  response.add(MessageUtil::getJsonStringFromMessageOrError(runtime, true, true));
+  response.add(MessageUtil::getJsonStringFromMessageOrDie(runtime, true, true));
   return Http::Code::OK;
 }
 

@@ -208,7 +208,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       resource->PackFrom(listener);
     }
     TestEnvironment::writeStringToFileForTest(
-        lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
+        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.

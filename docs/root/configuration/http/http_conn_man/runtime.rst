@@ -29,7 +29,8 @@ tracing.global_enabled
 
 tracing.random_sampling
   % of requests that will be randomly traced. See :ref:`here <arch_overview_tracing>` for more
-  information. Defaults to 100.
+  information. This runtime control is specified in the range 0-10000 and defaults to 10000. Thus,
+  trace sampling can be specified in 0.01% increments.
 
 .. _config_http_conn_man_runtime_path_with_escaped_slashes_action:
 

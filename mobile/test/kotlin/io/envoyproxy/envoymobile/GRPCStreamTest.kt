@@ -76,6 +76,24 @@ class GRPCStreamTest {
   }
 
   @Test
+  fun `close is called with empty data frame`() {
+    var closedData: ByteBuffer? = null
+    val streamClient = MockStreamClient { stream ->
+      stream.onRequestData = { data, endStream ->
+        assertThat(endStream).isTrue()
+        closedData = data
+      }
+    }
+
+    GRPCClient(streamClient)
+      .newGRPCStreamPrototype()
+      .start(Executor {})
+      .close()
+
+    assertThat(closedData).isEqualTo(ByteBuffer.allocate(0))
+  }
+
+  @Test
   fun `cancel calls a stream callback`() {
     val countDownLatch = CountDownLatch(1)
     val streamClient = MockStreamClient { stream ->

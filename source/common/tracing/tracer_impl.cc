@@ -99,16 +99,13 @@ void TracerUtility::finalizeSpan(Span& span, const TraceContext& trace_context,
     span.setTag(Tracing::Tags::get().PeerAddress, remote_address->asStringView());
   }
 
-  // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
-  }
-
   // Upstream info.
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster,
+                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName,
+                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
+
     auto upstream_address = stream_info.upstreamInfo()->upstreamHost()->address();
 
     span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());

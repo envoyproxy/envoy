@@ -164,8 +164,7 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 #endif
 }
 
-// https://github.com/envoyproxy/envoy/issues/26711
-TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
+TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
   public:
     AdderThread(int* value, int increment)

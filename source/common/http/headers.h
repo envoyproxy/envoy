@@ -68,7 +68,6 @@ public:
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
-  const LowerCaseString CacheStatus{"cache-status"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ConnectAcceptEncoding{"connect-accept-encoding"};

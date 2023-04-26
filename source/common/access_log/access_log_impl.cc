@@ -114,13 +114,13 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                               const Http::ResponseHeaderMap&,
                               const Http::ResponseTrailerMap&) const {
-  absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
-  if (!duration.has_value()) {
+  absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
+  if (!final.has_value()) {
     return false;
   }
 
   return compareAgainstValue(
-      std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
+      std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config,

@@ -115,9 +115,11 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
     cluster_status.set_observability_name(cluster_info->observabilityName());
-    if (const auto& name = cluster_info->edsServiceName(); !name.empty()) {
-      cluster_status.set_eds_service_name(name);
+    const auto& eds_service_name = cluster_info->edsServiceName();
+    if (eds_service_name.has_value()) {
+      cluster_status.set_eds_service_name(*eds_service_name);
     }
+
     addCircuitBreakerSettingsAsJson(
         envoy::config::core::v3::RoutingPriority::DEFAULT,
         cluster.info()->resourceManager(Upstream::ResourcePriority::Default), cluster_status);
@@ -214,8 +216,9 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
-    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
-      response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, name));
+    const auto& eds_service_name = cluster.info()->edsServiceName();
+    if (eds_service_name.has_value()) {
+      response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, *eds_service_name));
     }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {

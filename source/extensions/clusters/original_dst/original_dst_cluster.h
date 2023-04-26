@@ -46,8 +46,10 @@ using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
  */
 class OriginalDstCluster : public ClusterImplBase {
 public:
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context);
+  OriginalDstCluster(Server::Configuration::ServerFactoryContext& server_context,
+                     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
+                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
+                     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -157,9 +159,11 @@ public:
   OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 } // namespace Upstream

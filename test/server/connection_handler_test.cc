@@ -265,7 +265,6 @@ public:
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
     MOCK_METHOD(void, setRejectFraction, (UnitFloat));
-    MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
@@ -500,9 +499,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
 
   // Fake a balancer posting a connection to us.
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
-    post_cb = std::move(cb);
-  });
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   current_handler->incNumConnections();
 #ifndef NDEBUG

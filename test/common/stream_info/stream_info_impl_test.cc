@@ -37,8 +37,8 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 824 || sizeof(stream_info) == 840 ||
-                sizeof(stream_info) == 872)
+    ASSERT_TRUE(sizeof(stream_info) == 832 || sizeof(stream_info) == 848 ||
+                sizeof(stream_info) == 880)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -311,6 +311,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
+  s2.setStreamState(StreamState::Ended);
   s2.setFrom(s1, &headers2);
 
   // Copied by setFromForRecreateStream
@@ -387,6 +388,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  stream_info.setStreamState(StreamState::InProgress);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -395,8 +397,23 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     std::string state = out.str();
     EXPECT_TRUE(absl::StartsWith(state, prefix));
     EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    EXPECT_THAT(state, testing::HasSubstr("stream_state_: 2"));
     prefix = prefix + "  ";
   }
+}
+
+TEST_F(StreamInfoImplTest, StreamStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  EXPECT_EQ(absl::nullopt, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::Started);
+  EXPECT_EQ(StreamState::Started, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::InProgress);
+  EXPECT_EQ(StreamState::InProgress, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::Ended);
+  EXPECT_EQ(StreamState::Ended, stream_info.streamState());
 }
 
 TEST_F(StreamInfoImplTest, RequestHeadersTest) {

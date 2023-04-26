@@ -115,12 +115,10 @@ private:
                                              last_filter_in_current_config);
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
         {factory->name(), callback}, proto_config.name());
-#ifdef ENVOY_ENABLE_YAML
     ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
     ENVOY_LOG(debug, "    config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-#endif
     filter_factories.push_back(std::move(filter_config_provider));
   }
 

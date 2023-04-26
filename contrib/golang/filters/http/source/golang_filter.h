@@ -15,7 +15,6 @@
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
-#include "contrib/golang/filters/http/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,8 +27,7 @@ namespace Golang {
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-               Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
-               Server::Configuration::FactoryContext& context);
+               Dso::HttpFilterDsoPtr dso_lib);
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
@@ -37,16 +35,12 @@ public:
   const std::string& soPath() const { return so_path_; }
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
-  GolangFilterStats& stats() { return stats_; }
 
 private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
-
-  GolangFilterStats stats_;
-
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
@@ -100,10 +94,6 @@ enum class EnvoyValue {
   ResponseCode,
   ResponseCodeDetails,
   AttemptCount,
-  DownstreamLocalAddress,
-  DownstreamRemoteAddress,
-  UpstreamHostAddress,
-  UpstreamClusterName,
 };
 
 struct httpRequestInternal;
@@ -163,8 +153,6 @@ public:
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  CAPIStatus sendPanicReply(absl::string_view details);
-
   CAPIStatus getHeader(absl::string_view key, GoString* go_value);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
   CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
@@ -176,7 +164,7 @@ public:
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
-  CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
+  CAPIStatus log(uint32_t level, absl::string_view message);
 
 private:
   ProcessorState& getProcessorState();
@@ -200,9 +188,6 @@ private:
   void sendLocalReplyInternal(Http::Code response_code, absl::string_view body_text,
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
-
-  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
-                                  const absl::string_view& buf);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
@@ -242,13 +227,6 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
-};
-
-class FilterLogger : Logger::Loggable<Logger::Id::http> {
-public:
-  FilterLogger() = default;
-
-  void log(uint32_t level, absl::string_view message) const;
 };
 
 } // namespace Golang

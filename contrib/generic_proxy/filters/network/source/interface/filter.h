@@ -65,62 +65,6 @@ public:
    * @return const Tracing::Config& the tracing configuration.
    */
   virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
-
-  /**
-   * @return absl::optional<ExtendedOptions> the extended options from downstream request.
-   */
-  virtual absl::optional<ExtendedOptions> requestOptions() const PURE;
-
-  /**
-   * @return absl::optional<ExtendedOptions> the extended options from upstream response.
-   */
-  virtual absl::optional<ExtendedOptions> responseOptions() const PURE;
-};
-
-class UpstreamBindingCallback {
-public:
-  virtual ~UpstreamBindingCallback() = default;
-
-  virtual void onBindFailure(ConnectionPool::PoolFailureReason reason,
-                             absl::string_view transport_failure_reason,
-                             Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  virtual void onBindSuccess(Network::ClientConnection& conn,
-                             Upstream::HostDescriptionConstSharedPtr host) PURE;
-};
-
-class PendingResponseCallback : public ResponseDecoderCallback {
-public:
-  virtual void onConnectionClose(Network::ConnectionEvent event) PURE;
-};
-
-/**
- * The upstream manager is used to manage the upstream connection and the registered upstream
- * or response callbacks.
- */
-class UpstreamManager {
-public:
-  virtual ~UpstreamManager() = default;
-
-  /**
-   * @param callbacks supplies the callback to be called when the upstream connection is ready.
-   */
-  virtual void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) PURE;
-
-  /**
-   * @param stream_id supplies the stream id of request.
-   */
-  virtual void unregisterUpstreamCallback(uint64_t stream_id) PURE;
-
-  /**
-   * @param cb supplies the callback to be called when the upstream response is ready.
-   */
-  virtual void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) PURE;
-
-  /**
-   * @param stream_id supplies the stream id of request.
-   */
-  virtual void unregisterResponseCallback(uint64_t stream_id) PURE;
 };
 
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
@@ -129,21 +73,9 @@ public:
 
   virtual void continueDecoding() PURE;
 
-  virtual void upstreamResponse(ResponsePtr response, ExtendedOptions options) PURE;
+  virtual void upstreamResponse(ResponsePtr response) PURE;
 
   virtual void completeDirectly() PURE;
-
-  /**
-   * Try to create a new upstream connection and bind it to the current downstream connection.
-   * This should be called only once for each downstream connection.
-   * @param tcp_pool_data supplies the upstream connection pool.
-   */
-  virtual void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) PURE;
-
-  /**
-   * @return OptRef<UpstreamManager> the upstream manager for the current downstream connection.
-   */
-  virtual OptRef<UpstreamManager> boundUpstreamConn() PURE;
 };
 
 class EncoderFilterCallback : public virtual StreamFilterCallbacks {

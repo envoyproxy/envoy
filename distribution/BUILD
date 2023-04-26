@@ -12,35 +12,16 @@ exports_files(glob([
     "custom/envoy*",
 ]))
 
-# Configurable binary flags
+genrule(
+    name = "envoy-bin",
+    srcs = ["//source/exe:envoy-static"],
+    outs = ["envoy"],
+    cmd = "strip $(location //source/exe:envoy-static) -o $@",
+)
+
 label_flag(
     name = "envoy-binary",
-    build_setting_default = "//source/exe:envoy-static",
-)
-
-label_flag(
-    name = "envoy-binary-stripped",
-    build_setting_default = "//source/exe:envoy-static.stripped",
-)
-
-label_flag(
-    name = "envoy-dwarf",
-    build_setting_default = "//source/exe:envoy-static.dwp",
-)
-
-label_flag(
-    name = "envoy-contrib-binary",
-    build_setting_default = "//contrib/exe:envoy-static",
-)
-
-label_flag(
-    name = "envoy-contrib-binary-stripped",
-    build_setting_default = "//contrib/exe:envoy-static.stripped",
-)
-
-label_flag(
-    name = "envoy-contrib-dwarf",
-    build_setting_default = "//contrib/exe:envoy-static.dwp",
+    build_setting_default = ":envoy-bin",
 )
 
 envoy_pkg_distros(

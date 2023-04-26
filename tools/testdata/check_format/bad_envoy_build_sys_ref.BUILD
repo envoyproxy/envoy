@@ -10,5 +10,5 @@ envoy_package()
 
 envoy_cc_binary(
     name = "envoy-static",
-    stamp = 0,
+    stamped = True,
 )

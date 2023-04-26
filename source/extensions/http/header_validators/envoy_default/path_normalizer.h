@@ -15,7 +15,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  using PathNormalizationResult = ::Envoy::Http::HeaderValidator::HeadersTransformationResult;
+  using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult;
 
   /*
    * Normalize the path component of the :path header and update the header value. This method does
@@ -80,11 +80,6 @@ private:
    */
   std::tuple<absl::string_view, absl::string_view>
   splitPathAndQueryParams(absl::string_view path_and_query_params) const;
-  /**
-   * Translate backslash to forward slash. Enabled by the
-   * envoy.reloadable_features.uhv_translate_backslash_to_slash flag.
-   */
-  void translateBackToForwardSlashes(std::string& path) const;
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

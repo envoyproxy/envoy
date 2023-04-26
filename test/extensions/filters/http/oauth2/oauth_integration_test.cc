@@ -282,7 +282,7 @@ typed_config:
     oauth_response.mutable_access_token()->set_value("bar");
     oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
     upstream_request_->encodeData(buffer, true);
 
     // We should get an immediate redirect back.
@@ -480,28 +480,6 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
   };
   initialize();
   doAuthenticationFlow("token_secret", "hmac_secret");
-}
-
-// Verify the behavior when the callback param is missing the state query param.
-TEST_P(OauthIntegrationTest, MissingStateParam) {
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
-  };
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/callback"}, {":scheme", "http"}, {":authority", "authority"}};
-  auto encoder_decoder = codec_client_->startRequest(headers);
-
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // We should get an 401 back since the request looked like a redirect request but did not
-  // contain the state param.
-  response->waitForHeaders();
-  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 } // namespace

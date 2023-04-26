@@ -52,23 +52,15 @@ var protocolsIdToName = map[uint64]string{
 	3: HTTP30,
 }
 
-type panicInfo struct {
-	paniced bool
-	details string
-}
 type httpRequest struct {
 	req        *C.httpRequest
 	httpFilter api.StreamFilter
-	pInfo      panicInfo
+	paniced    bool
 }
 
-func (r *httpRequest) pluginName() string {
-	return C.GoStringN(r.req.plugin_name.data, C.int(r.req.plugin_name.len))
-}
-
-func (r *httpRequest) sendPanicReply(details string) {
+func (r *httpRequest) safeReplyPanic() {
 	defer r.RecoverPanic()
-	cAPI.HttpSendPanicReply(unsafe.Pointer(r.req), details)
+	r.SendLocalReply(500, "error happened in Golang filter\r\n", map[string]string{}, 0, "")
 }
 
 func (r *httpRequest) RecoverPanic() {
@@ -81,10 +73,7 @@ func (r *httpRequest) RecoverPanic() {
 		case errNotInGo:
 			// We can not send local reply now, since not in go now,
 			// will delay to the next time entering Go.
-			r.pInfo = panicInfo{
-				paniced: true,
-				details: fmt.Sprint(e),
-			}
+			r.paniced = true
 
 		default:
 			// The following safeReplyPanic should only may get errRequestFinished,
@@ -92,7 +81,7 @@ func (r *httpRequest) RecoverPanic() {
 
 			// errInvalidPhase, or other panic, not from not-ok C return status.
 			// It's safe to try send a local reply with 500 status.
-			r.sendPanicReply(fmt.Sprint(e))
+			r.safeReplyPanic()
 		}
 	}
 }
@@ -112,7 +101,7 @@ func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers 
 func (r *httpRequest) Log(level api.LogType, message string) {
 	// TODO performance optimization points:
 	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
-	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
+	cAPI.HttpLog(unsafe.Pointer(r.req), level, message)
 }
 
 func (r *httpRequest) StreamInfo() api.StreamInfo {
@@ -163,36 +152,4 @@ func (s *streamInfo) ResponseCodeDetails() (string, bool) {
 func (s *streamInfo) AttemptCount() uint32 {
 	count, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueAttemptCount)
 	return uint32(count)
-}
-
-type dynamicMetadata struct {
-	request *httpRequest
-}
-
-func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
-	return &dynamicMetadata{
-		request: s.request,
-	}
-}
-
-func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
-	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
-}
-
-func (s *streamInfo) DownstreamLocalAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
-	return address
-}
-
-func (s *streamInfo) DownstreamRemoteAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
-	return address
-}
-
-func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamHostAddress)
-}
-
-func (s *streamInfo) UpstreamClusterName() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
 }

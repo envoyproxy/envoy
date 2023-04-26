@@ -334,7 +334,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 
   // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

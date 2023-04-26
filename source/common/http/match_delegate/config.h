@@ -87,8 +87,6 @@ private:
 
   Envoy::Http::StreamDecoderFilterSharedPtr decoder_filter_;
   Envoy::Http::StreamEncoderFilterSharedPtr encoder_filter_;
-  Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  Envoy::Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Envoy::Http::StreamFilterBase* base_filter_{};
 };
 

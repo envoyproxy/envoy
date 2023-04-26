@@ -119,7 +119,8 @@ void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
   // Because this method gets executed in poller thread, we need to pass the data through
   // dispatcher.
-  dispatcher_.post([this, memento]() -> void { processDelivery(memento); });
+  const Event::PostCb callback = [this, memento]() -> void { processDelivery(memento); };
+  dispatcher_.post(callback);
 }
 
 // We got the delivery data.

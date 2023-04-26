@@ -16,7 +16,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/service/auth/v3/attribute_context.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"

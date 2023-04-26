@@ -12,63 +12,6 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
- * Extended options from request or response to control the behavior of the
- * generic proxy filter.
- * All these options are optional for the simple ping-pong use case.
- */
-class ExtendedOptions {
-public:
-  ExtendedOptions(absl::optional<uint64_t> stream_id, bool wait_response, bool drain_close,
-                  bool is_heartbeat)
-      : stream_id_(stream_id.value_or(0)), has_stream_id_(stream_id.has_value()),
-        wait_response_(wait_response), drain_close_(drain_close), is_heartbeat_(is_heartbeat) {}
-  ExtendedOptions() = default;
-
-  /**
-   * @return the stream id of the request or response. This is used to match the
-   * downstream request with the upstream response.
-
-   * NOTE: In most cases, the stream id is not needed and will be ignored completely.
-   * The stream id is only used when we can't match the downstream request
-   * with the upstream response by the active stream instance self directly.
-   * For example, when the multiple downstream requests are multiplexed into one
-   * upstream connection.
-   */
-  absl::optional<uint64_t> streamId() const {
-    return has_stream_id_ ? absl::optional<uint64_t>(stream_id_) : absl::nullopt;
-  }
-
-  /**
-   * @return whether the current request requires an upstream response.
-   * NOTE: This is only used for the request.
-   */
-  bool waitResponse() const { return wait_response_; }
-
-  /**
-   * @return whether the downstream/upstream connection should be drained after
-   * current active requests are finished.
-   * NOTE: This is only used for the response.
-   */
-  bool drainClose() const { return drain_close_; }
-
-  /**
-   * @return whether the current request/response is a heartbeat request/response.
-   * NOTE: It would be better to handle heartbeat request/response by another L4
-   * filter. Then the generic proxy filter can be used for the simple ping-pong
-   * use case.
-   */
-  bool isHeartbeat() const { return is_heartbeat_; }
-
-private:
-  uint64_t stream_id_{0};
-  bool has_stream_id_{false};
-
-  bool wait_response_{true};
-  bool drain_close_{false};
-  bool is_heartbeat_{false};
-};
-
-/**
  * Decoder callback of request.
  */
 class RequestDecoderCallback {
@@ -78,24 +21,13 @@ public:
   /**
    * If request decoding success then this method will be called.
    * @param request request from decoding.
-   * @param options extended options from request.
    */
-  virtual void onDecodingSuccess(RequestPtr request, ExtendedOptions options) PURE;
+  virtual void onDecodingSuccess(RequestPtr request) PURE;
 
   /**
    * If request decoding failure then this method will be called.
    */
   virtual void onDecodingFailure() PURE;
-
-  /**
-   * Write specified data to the downstream connection. This is could be used to write
-   * some raw binary to peer before the onDecodingSuccess()/onDecodingFailure() is
-   * called. By this way, when some special data is received from peer, the custom
-   * codec could handle it directly and write some reply to peer without notifying
-   * the generic proxy filter.
-   * @param buffer data to write.
-   */
-  virtual void writeToConnection(Buffer::Instance& buffer) PURE;
 };
 
 /**
@@ -108,24 +40,13 @@ public:
   /**
    * If response decoding success then this method will be called.
    * @param response response from decoding.
-   * @param options extended options from response.
    */
-  virtual void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) PURE;
+  virtual void onDecodingSuccess(ResponsePtr response) PURE;
 
   /**
    * If response decoding failure then this method will be called.
    */
   virtual void onDecodingFailure() PURE;
-
-  /**
-   * Write specified data to the upstream connection. This is could be used to write
-   * some raw binary to peer before the onDecodingSuccess()/onDecodingFailure() is
-   * called. By this way, when some special data is received from peer, the custom
-   * codec could handle it directly and write some reply to peer without notifying
-   * the generic proxy filter.
-   * @param buffer data to write.
-   */
-  virtual void writeToConnection(Buffer::Instance& buffer) PURE;
 };
 
 /**
@@ -138,8 +59,9 @@ public:
   /**
    * If request encoding success then this method will be called.
    * @param buffer encoding result buffer.
+   * @param expect_response whether the current request requires an upstream response.
    */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer) PURE;
+  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) PURE;
 };
 
 /**
@@ -152,8 +74,9 @@ public:
   /**
    * If response encoding success then this method will be called.
    * @param buffer encoding result buffer.
+   * @param close_connection whether the downstream connection should be closed.
    */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer) PURE;
+  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) PURE;
 };
 
 } // namespace GenericProxy

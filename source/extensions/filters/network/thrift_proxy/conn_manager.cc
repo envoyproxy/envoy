@@ -839,36 +839,16 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     ASSERT(upgrade_handler_ != nullptr);
   }
 
-  FilterStatus result = FilterStatus::StopIteration;
-  absl::optional<std::string> error;
-  try {
-    result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
-  } catch (const std::bad_function_call& e) {
-    error = std::string(e.what());
-  }
+  auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 
   const auto& route_ptr = route();
-  const std::string& cluster_name = route_ptr ? route_ptr->routeEntry()->clusterName() : "-";
-  const std::string& method = metadata->hasMethodName() ? metadata->methodName() : "-";
-  const int32_t frame_size =
-      metadata->hasFrameSize() ? static_cast<int32_t>(metadata->frameSize()) : -1;
-
-  if (error.has_value()) {
-    parent_.stats_.request_internal_error_.inc();
-    std::ostringstream oss;
-    parent_.read_callbacks_->connection().dumpState(oss, 0);
-    ENVOY_STREAM_LOG(error,
-                     "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
-                     "name: {}, downstream connection state {}, headers:\n{}",
-                     *this, error.value(), metadata_->sequenceId(), method, frame_size,
-                     cluster_name, oss.str(), metadata->requestHeaders());
-    throw EnvoyException(error.value());
-  }
 
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
-  fields_map["cluster"] = ValueUtil::stringValue(cluster_name);
-  fields_map["method"] = ValueUtil::stringValue(method);
+  fields_map["cluster"] =
+      ValueUtil::stringValue(route_ptr ? route_ptr->routeEntry()->clusterName() : "-");
+  fields_map["method"] =
+      ValueUtil::stringValue(metadata->hasMethodName() ? metadata->methodName() : "-");
   fields_map["passthrough"] = ValueUtil::stringValue(passthroughSupported() ? "true" : "false");
 
   auto& request_fields_map = *fields_map["request"].mutable_struct_value()->mutable_fields();
@@ -880,8 +860,10 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
   streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
-  ENVOY_STREAM_LOG(trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
-                   metadata_->sequenceId(), method, frame_size, metadata->requestHeaders());
+  ENVOY_STREAM_LOG(
+      trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
+      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
 
   return result;
 }

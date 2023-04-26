@@ -26,7 +26,7 @@ protected:
   absl::string_view sanitize(absl::string_view str) { return Envoy::Json::sanitize(buffer_, str); }
 
   absl::string_view protoSanitize(absl::string_view str) {
-    proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrError(
+    proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::stringValue(std::string(str)), false, true);
     return stripDoubleQuotes(proto_serialization_buffer_);
   }

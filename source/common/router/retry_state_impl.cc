@@ -467,9 +467,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     return RetryDecision::NoRetry;
   }
 
-  if (reset_reason == Http::StreamResetReason::LocalConnectionFailure ||
-      reset_reason == Http::StreamResetReason::RemoteConnectionFailure ||
-      reset_reason == Http::StreamResetReason::ConnectionTimeout) {
+  if (reset_reason == Http::StreamResetReason::ConnectionFailure) {
     if (http3_used != Http3Used::Unknown && clusterSupportsHttp3AndTcpFallback(cluster_)) {
       // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
       // immediately.

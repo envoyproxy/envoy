@@ -115,8 +115,9 @@ filter_chains:
     auto connection2 = createConnectionDriver(
         new_listener_port, "hello",
         [](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); });
-    connect_fail = !connection2->waitForConnection();
-    if (!connect_fail) {
+    connection2->waitForConnection();
+    if (connection2->connection().state() == Network::Connection::State::Closed) {
+      connect_fail = true;
       break;
     } else {
       connection2->close();

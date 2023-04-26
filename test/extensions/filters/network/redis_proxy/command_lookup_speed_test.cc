@@ -42,7 +42,6 @@ private:
 
 class NullRouterImpl : public Router {
   RouteSharedPtr upstreamPool(std::string&) override { return nullptr; }
-  void setReadFilterCallback(Network::ReadFilterCallbacks*) override{};
 };
 
 class CommandLookUpSpeedTest {

@@ -17,10 +17,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
-using ::Envoy::Http::RequestTrailerMap;
 using ::Envoy::Http::ResponseHeaderMap;
-using ::Envoy::Http::ResponseTrailerMap;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHttpHeaderValidator : public HeaderValidator {
@@ -31,34 +28,36 @@ public:
       Protocol protocol, HeaderValidatorStats& stats)
       : HeaderValidator(config, protocol, stats) {}
 
-  ValidationResult validateRequestHeaders(const RequestHeaderMap&) override {
-    return ValidationResult::success();
+  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
+                                                         const HeaderString&) override {
+    return HeaderEntryValidationResult::success();
   }
 
-  HeadersTransformationResult transformRequestHeaders(RequestHeaderMap&) override {
-    return HeadersTransformationResult::success();
+  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
+                                                          const HeaderString&) override {
+    return HeaderEntryValidationResult::success();
   }
 
-  ValidationResult validateResponseHeaders(const ResponseHeaderMap&) override {
-    return ValidationResult::success();
+  RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
+    return RequestHeaderMapValidationResult::success();
   }
 
-  ValidationResult validateRequestTrailers(const RequestTrailerMap&) override {
-    return ValidationResult::success();
+  ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
+    return ResponseHeaderMapValidationResult::success();
   }
 
-  TrailersTransformationResult transformRequestTrailers(RequestTrailerMap&) override {
-    return TrailersTransformationResult::success();
+  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
+    return TrailerValidationResult::success();
   }
 
-  ValidationResult validateResponseTrailers(const ResponseTrailerMap&) override {
-    return ValidationResult::success();
+  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
+    return TrailerValidationResult::success();
   }
 };
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
 
-class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
+class BaseHeaderValidatorTest : public HeaderValidatorTest {
 protected:
   BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -154,7 +153,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
+    if (testChar(kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -170,6 +169,15 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
+  HeaderString drop_underscore{"x_foo"};
+  auto uhv = createBase(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(drop_underscore);
+  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
@@ -191,7 +199,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
+    if (testChar(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);

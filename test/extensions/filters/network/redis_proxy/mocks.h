@@ -27,7 +27,6 @@ public:
   ~MockRouter() override;
 
   MOCK_METHOD(RouteSharedPtr, upstreamPool, (std::string & key));
-  MOCK_METHOD(void, setReadFilterCallback, (Network::ReadFilterCallbacks * callbacks));
   RouteSharedPtr route_;
 };
 
@@ -130,7 +129,7 @@ public:
                               Event::Dispatcher& dispatcher) override {
     return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher)};
   }
-  void setReadFilterCallback(Network::ReadFilterCallbacks*) override{};
+
   MOCK_METHOD(SplitRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
                Event::Dispatcher& dispatcher));

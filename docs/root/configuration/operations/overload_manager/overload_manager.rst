@@ -8,12 +8,8 @@ The :ref:`overload manager <arch_overview_overload_manager>` is configured in th
 field.
 
 An example configuration of the overload manager is shown below. It shows a
-configuration to drain HTTP/X connections when heap memory usage reaches 92%
-(configured via ``envoy.overload_actions.disable_http_keepalive``), to stop
-accepting requests when heap memory usage reaches 95% (configured via
-``envoy.overload_actions.stop_accepting_requests``) and to stop accepting new
-TCP connections when memory usage reaches 95% (configured via
-``envoy.load_shed_points.tcp_listener_accept``).
+configuration to drain HTTP/X connections when heap memory usage reaches 95%
+and to stop accepting requests when heap memory usage reaches 99%.
 
 .. code-block:: yaml
 
@@ -30,18 +26,12 @@ TCP connections when memory usage reaches 95% (configured via
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.92
+             value: 0.95
      - name: "envoy.overload_actions.stop_accepting_requests"
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.95
-    loadshed_points:
-      - name: "envoy.load_shed_points.tcp_listener_accept"
-        triggers:
-          - name: "envoy.resource_monitors.fixed_heap"
-            threshold:
-              value: 0.95
+             value: 0.99
 
 Resource monitors
 -----------------
@@ -111,45 +101,6 @@ The following overload actions are supported:
   * - envoy.overload_actions.reset_high_memory_stream
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
-
-
-Load Shed Points
-----------------
-
-Load Shed Points are similar to overload actions as they are dependent on a
-given trigger to activate which determines whether Envoy ends up shedding load at
-the given point in a connection or stream lifecycle.
-
-For a given request on a newly created connection, we can think of the
-configured load shed points as a decision tree at key junctions of a connection
-/ stream lifecycle. While a connection / stream might pass one junction, it
-is possible that later on the conditions might change causing Envoy to shed load
-at a later junction.
-
-In comparision to analogous overload actions, Load Shed Points are more
-reactive to changing conditions, especially in cases of large traffic spikes.
-Overload actions can be better suited in cases where Envoy is deciding to shed load
-but the worker threads aren't actively processing the connections or streams that
-Envoy wants to shed. For example
-``envoy.overload_actions.reset_high_memory_stream`` can reset streams that are
-using a lot of memory even if those streams aren't actively making progress.
-
-Compared to overload actions, Load Shed Points are also more flexible to
-integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
-has access to the Overload Manager to request the custom Load Shed Point.
-
-The following core load shed points are supported:
-
-.. list-table::
-  :header-rows: 1
-  :widths: 1, 2
-
-  * - Name
-    - Description
-
-  * - envoy.load_shed_points.tcp_listener_accept
-    - Envoy will reject (close) new TCP connections. This occurs before the
-      :ref:`Listener Filter Chain <life_of_a_request>` is created.
 
 .. _config_overload_manager_reducing_timeouts:
 

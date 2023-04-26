@@ -6291,9 +6291,7 @@ protected:
     TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
-    RouteConstSharedPtr owned_route = config.route(req_headers, 0);
-    const RouteEntry* route = owned_route->routeEntry();
-
+    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
     auto transforms = run_request_header_test ? route->requestHeaderTransforms(stream_info)
                                               : route->responseHeaderTransforms(stream_info);
     EXPECT_THAT(transforms.headers_to_append_or_add,
@@ -6525,8 +6523,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Http::TestResponseHeaderMapImpl resp_headers({{"x-remove-cluster1", "value"}});
-    RouteConstSharedPtr cached_route = config.route(headers, 0);
-    const RouteEntry* route = cached_route->routeEntry();
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("cluster1", route->clusterName());
 
     route->finalizeRequestHeaders(headers, stream_info, true);
@@ -6541,8 +6538,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Http::TestResponseHeaderMapImpl resp_headers({{"x-remove-cluster2", "value"}});
-    RouteConstSharedPtr cached_route = config.route(headers, 55);
-    const RouteEntry* route = cached_route->routeEntry();
+    const RouteEntry* route = config.route(headers, 55)->routeEntry();
     EXPECT_EQ("cluster2", route->clusterName());
 
     route->finalizeRequestHeaders(headers, stream_info, true);
@@ -7429,8 +7425,7 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/both", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto route = config.route(headers, 0);
-    auto* route_entry = route->routeEntry();
+    auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www1", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7444,8 +7439,7 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto route = config.route(headers, 0);
-    auto* route_entry = route->routeEntry();
+    auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www2", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7458,8 +7452,7 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/route-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto route = config.route(headers, 0);
-    auto* route_entry = route->routeEntry();
+    auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www3", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7472,8 +7465,7 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-passthrough", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto route = config.route(headers, 0);
-    auto* route_entry = route->routeEntry();
+    auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www4", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -10980,44 +10972,6 @@ virtual_hosts:
       },
       genHeaders("bat.com", "/", "GET"));
   EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
-}
-
-class CommonConfigImplTest : public testing::Test, public ConfigImplTestBase {};
-
-TEST_F(CommonConfigImplTest, TestCommonConfig) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/foo/bar/baz" }
-        route:
-          cluster: foo_bar_baz
-      - match: { prefix: "/foo/bar" }
-        route:
-          cluster: foo_bar
-      - match: { prefix: "/" }
-        route:
-          cluster: default
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "default"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  const auto& shared_config =
-      dynamic_cast<const CommonConfigImpl&>(config.route(genHeaders("bat.com", "/", "GET"), 0)
-                                                ->routeEntry()
-                                                ->virtualHost()
-                                                .routeConfig());
-
-  EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),
-            shared_config.mostSpecificHeaderMutationsWins());
-  EXPECT_EQ(config.maxDirectResponseBodySizeBytes(),
-            shared_config.maxDirectResponseBodySizeBytes());
-  EXPECT_EQ(&config.name(), &shared_config.name());
-  EXPECT_EQ(&config.shadowPolicies(), &shared_config.shadowPolicies());
-  EXPECT_EQ(config.ignorePathParametersInPathMatching(),
-            shared_config.ignorePathParametersInPathMatching());
 }
 
 } // namespace

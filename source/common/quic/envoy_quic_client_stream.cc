@@ -38,9 +38,6 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
-  // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
-
   if (write_side_closed()) {
     return absl::CancelledError("encodeHeaders is called on write-closed stream.");
   }
@@ -62,18 +59,12 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   } else if (headers.Method()) {
     spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
     if (headers.Method()->value() == "CONNECT") {
-      Http::RequestHeaderMapPtr modified_headers =
-          Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
-      modified_headers->remove(Http::Headers::get().Scheme);
-      modified_headers->remove(Http::Headers::get().Path);
-      modified_headers->remove(Http::Headers::get().Protocol);
-      spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
+      spdy_headers.erase(":scheme");
+      spdy_headers.erase(":path");
+      spdy_headers.erase(":protocol");
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
-  }
-  if (spdy_headers.empty()) {
-    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   }
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
@@ -212,7 +203,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
-  saw_regular_headers_ = false;
+
   quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(

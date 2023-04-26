@@ -41,7 +41,7 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(const Event::PostCb& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
   //
@@ -69,10 +69,9 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
-std::function<void()> InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
+Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb = std::move(cb),
-          index = index_]() mutable {
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb, index = index_] {
     // This duplicates logic in wrapCallback() (above). Using wrapCallback also
     // works, but incurs another indirection of lambda at runtime. As the
     // duplicated logic is only an if-statement and a bool function, it doesn't
@@ -83,8 +82,7 @@ std::function<void()> InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   };
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb,
-                                             const std::function<void()>& complete_cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
   parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
@@ -147,7 +145,7 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   });
 }
 
-void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
+void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
@@ -159,8 +157,7 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
   cb();
 }
 
-void InstanceImpl::runOnAllThreads(std::function<void()> cb,
-                                   std::function<void()> all_threads_complete_cb) {
+void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
@@ -168,11 +165,11 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb,
   // for programming simplicity here.
   cb();
 
-  std::shared_ptr<std::function<void()>> cb_guard(
-      new std::function<void()>(cb), [this, all_threads_complete_cb](std::function<void()>* cb) {
-        main_thread_dispatcher_->post(all_threads_complete_cb);
-        delete cb;
-      });
+  Event::PostCbSharedPtr cb_guard(new Event::PostCb(cb),
+                                  [this, all_threads_complete_cb](Event::PostCb* cb) {
+                                    main_thread_dispatcher_->post(all_threads_complete_cb);
+                                    delete cb;
+                                  });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });

@@ -63,3 +63,5 @@ if ! brew link --overwrite bazelisk; then
 fi
 
 bazel version
+
+pip3 install virtualenv

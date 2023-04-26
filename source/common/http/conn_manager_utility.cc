@@ -289,19 +289,11 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
-    // Headers to be stripped from edge requests, i.e. to sanitize so
-    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
-      request_headers.removeEnvoyOriginalPath();
-    }
   }
 
-  // Headers to be stripped from edge *and* intermediate-hop external requests.
-  // TODO: some of these should only be stripped at edge, i.e. moved into
-  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();

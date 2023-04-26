@@ -5,7 +5,6 @@ GCP Authentication Filter
 This filter is used to fetch authentication tokens from `Google Compute Engine(GCE) metadata server <https://cloud.google.com/compute/docs/metadata/overview>`_.
 In a multiple services architecture where the services need to communicate with each other,
 `authenticating service-to-service <https://cloud.google.com/run/docs/authenticating/service-to-service>`_ is needed where services are private and require credentials for access.
-If there is no authentication token retrieved from the authentication server, the request will be sent to destination service and will be rejected if authenticated token is required.
 
 Configuration
 -------------
@@ -15,7 +14,7 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 
 * ``http_uri`` specifies the HTTP URI for fetching the from `Google Compute Engine(GCE) Metadata Server <https://cloud.google.com/compute/docs/metadata/overview>`_. The URL format is ``http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]``. The ``AUDIENCE`` field is provided by configuration, please see more details below.
 
-* ``retry_policy`` specifies the retry policy if fetching tokens failed. This field is optional.
+* ``retry_policy`` specifies the retry policy if fetching tokens failed. This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
 
 * ``cache_config`` specifies the configuration for the token cache which is used to avoid duplicated queries to GCE metadata server for the same request.
 
@@ -32,16 +31,16 @@ Resource configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 35-71
+   :lines: 37-73
    :linenos:
-   :lineno-start: 35
+   :lineno-start: 37
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
 
 HTTP filter configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 8-34
+   :lines: 8-38
    :linenos:
    :lineno-start: 8
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`

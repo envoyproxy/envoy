@@ -205,6 +205,26 @@ struct ResponseCodeDetailValues {
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
+struct StreamStateStringValues {
+  const std::string StreamStarted = "Started";
+  const std::string StreamInProgress = "InProgress";
+  const std::string StreamEnded = "Ended";
+};
+
+using StreamStateStrings = ConstSingleton<StreamStateStringValues>;
+
+/**
+ * For TCP protocol, 'Started' means that an upstream connection has been
+ * successfully established. For HTTP protocol, 'Started' means that downstream
+ * request headers have been received by the HTTP connection manager, but it does
+ * not indicate that a connection was made with the upstream.
+ * For both TCP and HTTP protocols, 'InProgress' means that the stream has been
+ * successfully establiahed with the upstream, and it is currently active.
+ * For both protocols, 'Ended' means that the upstream stream has ended,
+ * regardless if it was successful or not.
+ */
+enum StreamState { Started = 0x1, InProgress = 0x2, Ended = 0x4 };
+
 /**
  * Constants for the locally closing a connection. This is used in response code
  * details field of StreamInfo for details sent by core (non-extension) code.
@@ -255,7 +275,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the request was sent upstream.
+   * Sets the time when the first byte of the response is received from upstream.
    */
   void onLastUpstreamTxByteSent(TimeSource& time_source) {
     ASSERT(!last_upstream_tx_byte_sent_);
@@ -263,7 +283,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the first byte of the response is received from upstream.
+   * Sets the time when the last byte of the response is received from upstream.
    */
   void onFirstUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!first_upstream_rx_byte_received_);
@@ -271,7 +291,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the response is received from upstream.
+   * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_upstream_rx_byte_received_);
@@ -581,6 +601,16 @@ public:
   virtual uint64_t bytesReceived() const PURE;
 
   /**
+   * @return the stream's state.
+   */
+  virtual absl::optional<StreamState> streamState() const PURE;
+
+  /**
+   * @param protocol the stream's state.
+   */
+  virtual void setStreamState(StreamState stream_state) PURE;
+
+  /**
    * @return the protocol of the request.
    */
   virtual absl::optional<Http::Protocol> protocol() const PURE;
@@ -626,11 +656,6 @@ public:
    */
   virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
-
-  /**
-   * @return the current duration of the request, or the total duration of the request, if ended.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> currentDuration() const PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)

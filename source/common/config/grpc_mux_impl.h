@@ -43,7 +43,6 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
               const std::string& target_xds_authority);

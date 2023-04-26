@@ -21,7 +21,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
@@ -318,7 +318,7 @@ private:
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+      Stage stage, Event::PostCb completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 

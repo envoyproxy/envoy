@@ -18,21 +18,21 @@ services:
 
   http-upstream1:
     build:
-      dockerfile: ../shared/echo2/Dockerfile
+      dockerfile: Dockerfile-echo
     hostname: http-upstream1
     environment:
     - HTTPS_PORT=0
 
   http-upstream2:
     build:
-      dockerfile: ../shared/echo2/Dockerfile
+      dockerfile: Dockerfile-echo
     hostname: http-upstream2
     environment:
     - HTTPS_PORT=0
 
   https-upstream3:
     build:
-      dockerfile: ../shared/echo2/Dockerfile
+      dockerfile: Dockerfile-echo
     hostname: https-upstream3
     environment:
     - HTTP_PORT=0

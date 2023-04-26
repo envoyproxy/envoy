@@ -15,6 +15,14 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+
+// TODO(htuch): Make this configurable.
+constexpr uint32_t RetryInitialDelayMs = 500;
+constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+
+} // namespace
+
 template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
 
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
@@ -27,12 +35,11 @@ public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
-             JitteredExponentialBackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
         control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
-        time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
+        time_source_(dispatcher.timeSource()),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
@@ -45,6 +52,9 @@ public:
         }
       });
     }
+
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
@@ -184,7 +194,7 @@ private:
 
     const uint64_t ms_since_first_close =
         std::chrono::duration_cast<std::chrono::milliseconds>(duration_since_first_close).count();
-    if (backoff_strategy_->isOverTimeLimit(ms_since_first_close)) {
+    if (ms_since_first_close > RetryMaxDelayMs) {
       // Warn if we are over the time limit.
       ENVOY_LOG(warn, "{} gRPC config stream to {} closed since {}s ago: {}, {}",
                 service_method_.name(), async_client_.destination(), seconds_since_first_close,
@@ -230,7 +240,7 @@ private:
   Event::TimerPtr retry_timer_;
   Random::RandomGenerator& random_;
   TimeSource& time_source_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
+  BackOffStrategyPtr backoff_strategy_;
 
   // Prevents the Envoy from making too many requests.
   TokenBucketPtr limit_request_;

@@ -67,9 +67,7 @@ TEST(CheckExtensionsAgainstRegistry, CorrectMetadata) {
         EXPECT_THAT(type_urls, ::testing::IsSupersetOf(expected_types->second))
             << "Mismatched type URLs: " << name;
       } else {
-        EXPECT_EQ(type_urls.size(), 0)
-            << std::accumulate(type_urls.begin(), type_urls.end(), std::string(""));
-        ;
+        EXPECT_EQ(type_urls.size(), 0);
       }
     }
   }

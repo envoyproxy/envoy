@@ -1,11 +1,12 @@
 #!/bin/bash -e
 
-BAZELRC_FILE="${BAZELRC_FILE:-./clang.bazelrc}"
+BAZEL_WORKSPACE="$(bazel info workspace)"
+BAZELRC_FILE="${BAZELRC_FILE:-${BAZEL_WORKSPACE}/clang.bazelrc}"
 
 LLVM_PREFIX=$1
 
 if [[ ! -e "${LLVM_PREFIX}/bin/llvm-config" ]]; then
-  echo "Error: cannot find local llvm-config in ${LLVM_PREFIX}."
+  echo "Error: cannot find llvm-config in ${LLVM_PREFIX}."
   exit 1
 fi
 

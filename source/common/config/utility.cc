@@ -284,11 +284,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
-#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
-#else
-        throw EnvoyException("Attempting to use JSON typed structs with JSON compiled out");
-#endif
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
@@ -299,62 +295,17 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
-#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
-#else
-        UNREFERENCED_PARAMETER(validation_visitor);
-        throw EnvoyException("Attempting to use legacy JSON structs with JSON compiled out");
-#endif
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
       MessageUtil::unpackTo(typed_config, out_proto);
     } else {
-#ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
-#else
-      throw EnvoyException("Attempting to use JSON structs with JSON compiled out");
-#endif
     }
   }
-}
-
-JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffStrategy(
-    absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
-    Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
-    absl::optional<const uint32_t> default_max_interval_ms) {
-  // BackoffStrategy config is specified
-  if (backoff != absl::nullopt) {
-    uint32_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
-    uint32_t max_interval_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
-
-    if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
-    }
-    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
-                                                                random);
-  }
-
-  // default_base_interval_ms must be greater than zero
-  if (default_base_interval_ms == 0) {
-    throw EnvoyException("default_base_interval_ms must be greater than zero");
-  }
-
-  // default maximum interval is specified
-  if (default_max_interval_ms != absl::nullopt) {
-    if (default_max_interval_ms.value() < default_base_interval_ms) {
-      throw EnvoyException(
-          "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
-    }
-    return std::make_unique<JitteredExponentialBackOffStrategy>(
-        default_base_interval_ms, default_max_interval_ms.value(), random);
-  }
-  // use default base interval
-  return std::make_unique<JitteredExponentialBackOffStrategy>(
-      default_base_interval_ms, default_base_interval_ms * 10, random);
 }
 
 } // namespace Config

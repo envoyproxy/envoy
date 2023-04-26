@@ -18,13 +18,12 @@ class CrashFilterConfig {
 public:
   CrashFilterConfig(bool crash_in_encode_headers, bool crash_in_encode_data,
                     bool crash_in_decode_headers, bool crash_in_decode_data,
-                    bool crash_in_decode_trailers, bool crash_in_decode_metadata)
+                    bool crash_in_decode_trailers)
       : crash_in_encode_headers_(crash_in_encode_headers),
         crash_in_encode_data_(crash_in_encode_data),
         crash_in_decode_headers_(crash_in_decode_headers),
         crash_in_decode_data_(crash_in_decode_data),
-        crash_in_decode_trailers_(crash_in_decode_trailers),
-        crash_in_decode_metadata_(crash_in_decode_metadata) {}
+        crash_in_decode_trailers_(crash_in_decode_trailers) {}
 
   const bool crash_in_encode_headers_;
   const bool crash_in_encode_data_;
@@ -32,7 +31,6 @@ public:
   const bool crash_in_decode_headers_;
   const bool crash_in_decode_data_;
   const bool crash_in_decode_trailers_;
-  const bool crash_in_decode_metadata_;
 };
 
 // A test filter that adds body data to a request/response without body payload.
@@ -53,11 +51,6 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     RELEASE_ASSERT(!config_->crash_in_decode_trailers_, "Crash in decodeTrailers");
     return Http::FilterTrailersStatus::Continue;
-  }
-
-  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
-    RELEASE_ASSERT(!config_->crash_in_decode_metadata_, "Crash in decodeMetadata");
-    return Http::FilterMetadataStatus::Continue;
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
@@ -86,7 +79,7 @@ private:
     auto filter_config = std::make_shared<CrashFilterConfig>(
         proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),
         proto_config.crash_in_decode_headers(), proto_config.crash_in_decode_data(),
-        proto_config.crash_in_decode_trailers(), proto_config.crash_in_decode_metadata());
+        proto_config.crash_in_decode_trailers());
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<CrashFilter>(filter_config));
     };

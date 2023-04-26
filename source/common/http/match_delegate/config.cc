@@ -180,7 +180,6 @@ void DelegatingStreamFilter::decodeComplete() {
 void DelegatingStreamFilter::setDecoderFilterCallbacks(
     Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
   match_state_.onStreamInfo(callbacks.streamInfo());
-  decoder_callbacks_ = &callbacks;
   decoder_filter_->setDecoderFilterCallbacks(callbacks);
 }
 
@@ -241,7 +240,6 @@ void DelegatingStreamFilter::encodeComplete() {
 void DelegatingStreamFilter::setEncoderFilterCallbacks(
     Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
   match_state_.onStreamInfo(callbacks.streamInfo());
-  encoder_callbacks_ = &callbacks;
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 

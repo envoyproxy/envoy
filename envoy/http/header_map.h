@@ -353,7 +353,7 @@ public:
   virtual void addReferenceKey(const LowerCaseString& key, uint64_t value) PURE;
 
   /**
-   * Add a header with a reference key to the map. The key MUST point to data that will
+   * Add a header with a reference key to the map. The key MUST point to point to data that will
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *

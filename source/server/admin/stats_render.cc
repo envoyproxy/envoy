@@ -164,7 +164,7 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
       histograms_obj_container_fields["histograms"].set_allocated_list_value(
           histogram_array_.release());
     }
-    auto str = MessageUtil::getJsonStringFromMessageOrError(
+    auto str = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
 
     // Protobuf json serialization can yield an empty string (printing an

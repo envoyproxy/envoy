@@ -693,10 +693,6 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 // This is multiple addresses version test for the above one.
 TEST_P(ListenerMultiAddressesIntegrationTest,
        MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
-// https://github.com/envoyproxy/envoy/issues/26336
-#if defined(__arm64__)
-  return;
-#endif
   on_server_init_function_ = [&]() {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
@@ -918,18 +914,16 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  while (true) {
-    auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-    // The socket are closed asynchronously, if the socket is connected directly, it means
-    // the listener socket isn't closed yet, we will try next connection.
-    if (codec->connected()) {
-      ASSERT_TRUE(codec->waitForDisconnect());
-      continue;
-    }
-    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
-    break;
-  }
+  auto codec1 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  // The socket are closed asynchronously, so waiting the connection closed here.
+  ASSERT_TRUE(codec1->waitForDisconnect());
+
+  // Test the connection again to ensure the socket is closed.
+  auto codec2 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  EXPECT_FALSE(codec2->connected());
+  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
@@ -1012,18 +1006,16 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  while (true) {
-    auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-    // The socket are closed asynchronously, if the socket is connected directly, it means
-    // the listener socket isn't closed yet, we will try next connection.
-    if (codec->connected()) {
-      ASSERT_TRUE(codec->waitForDisconnect());
-      continue;
-    }
-    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
-    break;
-  }
+  auto codec1 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  // The socket are closed asynchronously, so waiting the connection closed here.
+  ASSERT_TRUE(codec1->waitForDisconnect());
+
+  // Test the connection again to ensure the socket is closed.
+  auto codec2 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  EXPECT_FALSE(codec2->connected());
+  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
@@ -1559,7 +1551,6 @@ TEST_P(ListenerFilterIntegrationTest,
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
     listener_config_.set_name("listener_foo");
-    listener_config_.set_stat_prefix("listener_stat");
     listener_config_.mutable_enable_reuse_port()->set_value(false);
     ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
@@ -1592,7 +1583,6 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  test_server_->waitForGaugeEq("listener.listener_stat.downstream_cx_active", 0);
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);
@@ -1686,7 +1676,7 @@ public:
       connections.emplace_back();
       connections.back().client_conn_ =
           createConnectionAndWrite("dummy", connections.back().response_);
-      ASSERT_TRUE(connections.back().client_conn_->waitForConnection());
+      connections.back().client_conn_->waitForConnection();
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
       std::string data;
       EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
@@ -1719,7 +1709,7 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   initialize();
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
 
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {

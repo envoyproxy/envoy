@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_extension_package")
-load("@envoy_api//bazel:utils.bzl", "json_data")
+load("//bazel:utils.bzl", "json_data")
 load(":extensions_build_config.bzl", "EXTENSIONS")
 load(":all_extensions.bzl", "envoy_all_extensions")
 

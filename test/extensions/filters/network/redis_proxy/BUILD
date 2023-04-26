@@ -148,11 +148,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
-        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
-        "//test/mocks/network:connection_mocks",
-        "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

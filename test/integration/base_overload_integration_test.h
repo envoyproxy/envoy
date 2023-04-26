@@ -12,8 +12,6 @@ class BaseOverloadIntegrationTest {
 protected:
   void
   setupOverloadManagerConfig(const envoy::config::overload::v3::OverloadAction& overload_action);
-  void
-  setupOverloadManagerConfig(const envoy::config::overload::v3::LoadShedPoint& load_shed_point);
 
   void updateResource(double pressure) {
     auto* monitor = fake_resource_monitor_factory_.monitor();

@@ -15,48 +15,33 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  ValidationResult
-  validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override;
+  HeaderEntryValidationResult
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString& value) override;
 
-  HeadersTransformationResult
-  transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) override;
+  HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString& value) override;
 
-  ValidationResult
-  validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) override;
+  RequestHeaderMapValidationResult
+  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
 
-  ValidationResult
-  validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) override;
+  ResponseHeaderMapValidationResult
+  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
-  TrailersTransformationResult
-  transformRequestTrailers(::Envoy::Http::RequestTrailerMap& header_map) override;
+  TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
 
-  ValidationResult
-  validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map) override;
+  TrailerValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
 
-private:
   /*
    * Validate the Transfer-Encoding header.
    */
   HeaderValueValidationResult
   validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value) const;
 
-  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                                                         const ::Envoy::Http::HeaderString& value);
-
-  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                                                          const ::Envoy::Http::HeaderString& value);
-
-  /**
-   * Checks for presence of both Transfer-Encoding and Content-Length headers and
-   * removes the Content-Length header iff the http1_protocol_options.allow_chunked_length
-   * config options is true.
-   * If the http1_protocol_options.allow_chunked_length is false a request with both
-   * Transfer-Encoding and Content-Length headers is rejected in the validateRequestHeaders method.
-   * Additionally if request is CONNECT and Content-Length is 0, the Content-Length header is
-   * removed.
-   */
-  void sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map);
-
+private:
   const HeaderValidatorMap request_header_validator_map_;
 };
 

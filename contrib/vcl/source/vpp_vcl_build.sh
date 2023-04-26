@@ -29,7 +29,7 @@ else
 fi
 
 # Build
-pushd "${VPP_PATH}" > /dev/null
+pushd "${VPP_PATH}"
 mkdir _vcl
 cd _vcl
 
@@ -48,4 +48,4 @@ mv CMakeFiles/svm/libsvm.a "${DST_PATH}"
 mv CMakeFiles/vlibmemory/libvlibmemoryclient.a "${DST_PATH}"
 cp ../src/vcl/vppcom.h "${DST_PATH}"
 
-popd  > /dev/null
+popd

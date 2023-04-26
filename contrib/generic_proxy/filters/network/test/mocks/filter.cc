@@ -1,7 +1,5 @@
 #include "contrib/generic_proxy/filters/network/test/mocks/filter.h"
 
-#include <cstdint>
-
 #include "source/common/protobuf/protobuf.h"
 
 using testing::_;
@@ -42,48 +40,6 @@ MockEncoderFilter::MockEncoderFilter() {
 MockStreamFilter::MockStreamFilter() {
   ON_CALL(*this, onStreamEncoded(_)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, onStreamDecoded(_)).WillByDefault(Return(FilterStatus::Continue));
-}
-
-MockPendingResponseCallback::MockPendingResponseCallback() = default;
-
-MockUpstreamBindingCallback::MockUpstreamBindingCallback() = default;
-
-MockUpstreamManager::MockUpstreamManager() {
-  ON_CALL(*this, registerUpstreamCallback(_, _))
-      .WillByDefault(Invoke([this](uint64_t stream_id, UpstreamBindingCallback& cb) {
-        if (call_on_bind_success_immediately_) {
-          cb.onBindSuccess(upstream_conn_, upstream_host_);
-          return;
-        }
-
-        if (call_on_bind_failure_immediately_) {
-          cb.onBindFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
-                           upstream_host_);
-          return;
-        }
-        upstream_callbacks_[stream_id] = &cb;
-      }));
-  ON_CALL(*this, unregisterUpstreamCallback(_)).WillByDefault(Invoke([this](uint64_t stream_id) {
-    upstream_callbacks_.erase(stream_id);
-  }));
-
-  ON_CALL(*this, registerResponseCallback(_, _))
-      .WillByDefault(Invoke([this](uint64_t stream_id, PendingResponseCallback& cb) {
-        response_callbacks_[stream_id] = &cb;
-      }));
-
-  ON_CALL(*this, unregisterResponseCallback(_)).WillByDefault(Invoke([this](uint64_t stream_id) {
-    response_callbacks_.erase(stream_id);
-  }));
-}
-
-MockDecoderFilterCallback::MockDecoderFilterCallback() {
-  ON_CALL(*this, boundUpstreamConn()).WillByDefault(Invoke([this]() -> OptRef<UpstreamManager> {
-    if (has_upstream_manager_) {
-      return upstream_manager_;
-    }
-    return {};
-  }));
 }
 
 } // namespace GenericProxy

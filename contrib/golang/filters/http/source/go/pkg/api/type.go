@@ -112,11 +112,7 @@ type HeaderMap interface {
 
 type RequestHeaderMap interface {
 	HeaderMap
-	Protocol() string
-	Scheme() string
-	Method() string
-	Host() string
-	Path() string
+	// others
 }
 
 type RequestTrailerMap interface {
@@ -126,7 +122,7 @@ type RequestTrailerMap interface {
 
 type ResponseHeaderMap interface {
 	HeaderMap
-	Status() (int, bool)
+	// others
 }
 
 type ResponseTrailerMap interface {

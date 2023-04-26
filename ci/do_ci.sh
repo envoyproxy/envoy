@@ -216,28 +216,14 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
 
   setup_clang_toolchain
-
-  ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
-  mkdir -p "$ENVOY_BINARY_DIR"
-
-  # Run release tests
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal -c opt "${TEST_TARGETS[@]}"
 
-  # Build release binaries
-  # As the binary build package enforces `-c opt`, adding here to ensure the distribution build reuses
-  # any already compiled artefacts, the bundle itself will always be compiled `-c opt`
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution/binary:release
+  echo "bazel release build..."
+  bazel_envoy_binary_build release
 
-  # Copy release binaries to binary export directory
-  cp -a "bazel-bin/distribution/binary/release.tar.zst" "${ENVOY_BINARY_DIR}/release.tar.zst"
-
-  # Grab the schema_validator_tool
-  # TODO(phlax): bundle this with the release when #26390 is resolved
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel --stripopt=--strip-all -c opt //test/tools/schema_validator:schema_validator_tool.stripped
-
-  # Copy schema_validator_tool to binary export directory
-  cp -a bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped "${ENVOY_BINARY_DIR}/schema_validator_tool"
+  echo "bazel contrib release build..."
+  bazel_contrib_binary_build release
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
@@ -245,14 +231,13 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
 
   setup_clang_toolchain
 
-  # Extract the Envoy binary from the tarball
   mkdir -p distribution/custom
+
   if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-      ENVOY_RELEASE_TARBALL="/build/bazel.release/bin/release.tar.zst"
+      tar xfO "/build/bazel.release/envoy_binary.tar.gz" build_envoy_release_stripped/envoy > distribution/custom/envoy
   else
-      ENVOY_RELEASE_TARBALL="/build/bazel.release.arm64/bin/release.tar.zst"
+      tar xfO "/build/bazel.release.arm64/envoy_binary.tar.gz" build_envoy_release_stripped/envoy > distribution/custom/envoy
   fi
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
 
   # By default the packages will be signed by the first available key.
   # If there is no key available, a throwaway key is created
@@ -266,7 +251,6 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
           "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
 
-  # Build the packages
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
   if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
@@ -387,7 +371,6 @@ elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
-
   COMPILE_TIME_OPTIONS=(
     "--define" "admin_html=disabled"
     "--define" "signal_trace=disabled"
@@ -440,11 +423,6 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
-  echo "Run protoxform test"
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
-        //tools/protoprint:protoprint_test
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
   echo "Validate Golang protobuf generation..."
@@ -465,13 +443,12 @@ elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
-
   echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
 
   [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
   # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
@@ -479,12 +456,12 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
 
-  export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
-  export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
   export CLANG_TIDY_APPLY_FIXES=1
-  mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
+  mkdir -p "${TEST_TMPDIR}/lint-fixes"
   BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
-  NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
       if [[ -s "$FIX_YAML" ]]; then
           echo >&2
           echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
@@ -504,27 +481,28 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "format" ]]; then
   setup_clang_toolchain
-  "${ENVOY_SRCDIR}"/ci/format_pre.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-  "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
+  # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-  echo "Check proto format ..."
-  "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
-  exit 0
-elif [[ "$CI_TARGET" == "check_and_fix_proto_format" ]]; then
-  setup_clang_toolchain
-  echo "Check and fix proto format ..."
-  "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
+  echo "Run protoxform test"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   setup_clang_toolchain
+
   echo "generating docs..."
   # Build docs.
-  "${ENVOY_SRCDIR}"/docs/build.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
   setup_clang_toolchain
@@ -549,9 +527,9 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
         -- -v warn \
            -c cves release_dates releases
 
-  # Run dependabot tests
-  echo "Check dependabot ..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:dependatool
+  # Run pip requirements tests
+  echo "check pip..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
@@ -571,16 +549,14 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # create the tag/release from here
     version="$(cat VERSION.txt)"
     patch_version="$(echo "$version" | rev | cut -d. -f1)"
-    if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
-        if [[ "$patch_version" -eq 0 ]]; then
-            # It can take some time to get here in CI so the branch may have changed - create the release
-            # from the current commit (as this only happens on non-PRs we are safe from merges)
-            BUILD_SHA="$(git rev-parse HEAD)"
-            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
-            exit 0
-        fi
+    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
+        echo "Not creating a tag/release for ${version}"
+        exit 0
     fi
-    echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
+    # It can take some time to get here in CI so the branch may have changed - create the release
+    # from the current commit (as this only happens on non-PRs we are safe from merges)
+    BUILD_SHA="$(git rev-parse HEAD)"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

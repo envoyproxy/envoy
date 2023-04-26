@@ -473,7 +473,6 @@ public:
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, setRejectFraction, (UnitFloat));
-  MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
 };
 
 class MockConnectionHandler : public virtual ConnectionHandler {
@@ -598,7 +597,6 @@ public:
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, setRejectFraction, (UnitFloat), (override));
-  MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));

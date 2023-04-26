@@ -682,7 +682,8 @@ TEST_P(WasmCommonTest, VmCache) {
              remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
-  lifecycle_callback([] {});
+  Event::PostCb post_cb = [] {};
+  lifecycle_callback(post_cb);
 
   WasmHandleSharedPtr wasm_handle2;
   createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,

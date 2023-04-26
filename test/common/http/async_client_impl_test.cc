@@ -100,12 +100,6 @@ public:
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
-  AsyncClientImplTracingTest() {
-    ON_CALL(stream_info_, upstreamClusterInfo())
-        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
-            cm_.thread_local_cluster_.cluster_.info_)));
-  }
-
   Tracing::MockSpan parent_span_;
   const std::string child_span_name_{"Test Child Span Name"};
 
@@ -1846,6 +1840,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   const auto& route_config = route_entry->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
+  EXPECT_EQ(nullptr, route_config.route(headers_, stream_info_, 0));
   auto cluster_info = filter_callbacks->clusterInfo();
   ASSERT_NE(nullptr, cluster_info);
   EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
@@ -1875,7 +1870,7 @@ public:
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
   AsyncStreamImpl::NullVirtualHost vhost_;
-  AsyncStreamImpl::NullCommonConfig config_;
+  AsyncStreamImpl::NullConfig config_;
 
   void setupRouteImpl(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;

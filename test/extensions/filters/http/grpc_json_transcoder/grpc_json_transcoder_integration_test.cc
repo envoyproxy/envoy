@@ -149,12 +149,8 @@ typed_config:
       EXPECT_TRUE(upstream_request_->complete());
     }
 
-    if (expect_response_complete) {
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_TRUE(response->complete());
-    } else {
-      ASSERT_TRUE(codec_client_->waitForDisconnect());
-    }
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(response->complete(), expect_response_complete);
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
@@ -1142,7 +1138,7 @@ std::string createLargeJson(int level) {
     (*next->mutable_struct_value()->mutable_fields())["k"] = val;
     cur = next;
   }
-  return MessageUtil::getJsonStringFromMessageOrError(*cur, false, false);
+  return MessageUtil::getJsonStringFromMessageOrDie(*cur, false, false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {

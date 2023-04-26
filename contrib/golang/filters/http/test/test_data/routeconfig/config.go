@@ -35,10 +35,10 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
+func (p *parser) Parse(any *anypb.Any) interface{} {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	v := configStruct.Value
@@ -49,7 +49,7 @@ func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	if set, ok := v.AsMap()["set"].(string); ok {
 		conf.setHeader = set
 	}
-	return conf, nil
+	return conf
 }
 
 func (p *parser) Merge(parent interface{}, child interface{}) interface{} {

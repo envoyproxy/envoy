@@ -2,13 +2,44 @@
 
 #include <cstdint>
 
-#include "source/common/http/character_set_validation.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
+
+constexpr bool testChar(const uint32_t table[8], char c) {
+  uint8_t uc = static_cast<uint8_t>(c);
+  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
+}
+
+// Header name character table.
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
+//
+// SPELLCHECKER(off)
+// header-field   = field-name ":" OWS field-value OWS
+// field-name     = token
+// token          = 1*tchar
+//
+// tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+//                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+//                / DIGIT / ALPHA
+// SPELLCHECKER(on)
+constexpr uint32_t kGenericHeaderNameCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01011111001101101111111111000000,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100011,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111101010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
 
 // Header value character table.
 // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
@@ -24,7 +55,7 @@ namespace EnvoyDefault {
 // VCHAR          =  %x21-7E
 //                   ; visible (printing) characters
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kGenericHeaderValueCharTable = {
+constexpr uint32_t kGenericHeaderValueCharTable[] = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -49,7 +80,7 @@ inline constexpr std::array<uint32_t, 8> kGenericHeaderValueCharTable = {
 // tchar  = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
 //        /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kMethodHeaderCharTable = {
+constexpr uint32_t kMethodHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -88,7 +119,7 @@ inline constexpr std::array<uint32_t, 8> kMethodHeaderCharTable = {
 //
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kPathHeaderCharTable = {
+constexpr uint32_t kPathHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -108,7 +139,7 @@ inline constexpr std::array<uint32_t, 8> kPathHeaderCharTable = {
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
 //
 // unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
-inline constexpr std::array<uint32_t, 8> kUnreservedCharTable = {
+constexpr uint32_t kUnreservedCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -132,7 +163,7 @@ inline constexpr std::array<uint32_t, 8> kUnreservedCharTable = {
 // transfer-coding     = token *( OWS ";" OWS transfer-parameter )
 // transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kTransferEncodingHeaderCharTable = {
+constexpr uint32_t kTransferEncodingHeaderCharTable[] = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -151,7 +182,7 @@ inline constexpr std::array<uint32_t, 8> kTransferEncodingHeaderCharTable = {
 // An IPv6 address, excluding the surrounding "[" and "]" characters. This is based on RFC 3986,
 // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only allows hex digits and the
 // ":" separator.
-inline constexpr std::array<uint32_t, 8> kHostIPv6AddressCharTable = {
+constexpr uint32_t kHostIPv6AddressCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -173,13 +204,36 @@ inline constexpr std::array<uint32_t, 8> kHostIPv6AddressCharTable = {
 // SPELLCHECKER(off)
 // reg-name    = *( unreserved / pct-encoded / sub-delims )
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kHostRegNameCharTable = {
+constexpr uint32_t kHostRegNameCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b01001111111111101111111111010100,
     //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
     0b01111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+// A URI query and fragment character table. From RFC 3986:
+// https://datatracker.ietf.org/doc/html/rfc3986#section-3.4
+//
+// SPELLCHECKER(off)
+// query       = *( pchar / "/" / "?" )
+// fragment    = *( pchar / "/" / "?" )
+// SPELLCHECKER(on)
+constexpr uint32_t kUriQueryAndFragmentCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111111111111111110101,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111100001,
     //`abcdefghijklmnopqrstuvwxyz{|}~
     0b01111111111111111111111111100010,
     // extended ascii

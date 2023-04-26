@@ -239,7 +239,7 @@ protected:
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
     ConfigHelper helper(version_, *api_,
-                        MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+                        MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
     std::vector<uint32_t> ports;
     std::vector<uint32_t> zero;
     for (auto& upstream : fake_upstreams_) {

@@ -32,8 +32,10 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level);
+  OptionsImpl(
+      int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level,
+      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
@@ -42,8 +44,10 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level);
+  OptionsImpl(
+      std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level,
+      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
 
   // Default constructor; creates "reasonable" defaults, but desired values should be set
   // explicitly.
@@ -113,6 +117,8 @@ public:
 
   void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
 
+  void setListenerManager(absl::string_view manager) { listener_manager_ = std::string(manager); }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -164,6 +170,7 @@ public:
   }
   uint32_t count() const;
   const std::string& socketPath() const override { return socket_path_; }
+  const std::string& listenerManager() const override { return listener_manager_; }
   mode_t socketMode() const override { return socket_mode_; }
 
   /**
@@ -225,6 +232,7 @@ private:
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
   std::string socket_path_{"@envoy_domain_socket"};
+  std::string listener_manager_ = Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   mode_t socket_mode_{0};
 };
 

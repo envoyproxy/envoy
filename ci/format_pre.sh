@@ -12,8 +12,7 @@ BASH_ERR_PREFIX="##[error]: "
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format.diff}"
 
-read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 
 trap_errors () {
@@ -43,28 +42,26 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
-
 CURRENT=check
-# This test runs code check with:
-#   bazel run //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
-# see: /tools/code/BUILD
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
+time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
 
 CURRENT=configs
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=spelling
-"${ENVOY_SRCDIR}/tools/spelling/check_spelling_pedantic.py" --mark check
+"${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
 
 # TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
 if [[ -n "$AZP_BRANCH" ]]; then
     CURRENT=check_format_test
-    "${ENVOY_SRCDIR}/tools/code_format/check_format_test_helper.sh" --log=WARN
+    "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 fi
 
 CURRENT=check_format
-echo "Running ${ENVOY_SRCDIR}/tools/code_format/check_format.py"
-time "${ENVOY_SRCDIR}/tools/code_format/check_format.py" fix --fail_on_diff
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix --fail_on_diff
+
+CURRENT=check_format_go_code
+"${ENVOY_SRCDIR}"/tools/code_format/check_format_go_code.sh
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

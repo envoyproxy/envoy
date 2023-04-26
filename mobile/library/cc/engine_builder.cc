@@ -393,15 +393,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   api_service->add_domains("*");
   // Virtual clusters
   for (auto& cluster : virtual_clusters_) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
                               ProtobufMessage::getStrictValidationVisitor());
-#else
-    UNREFERENCED_PARAMETER(cluster);
-    IS_ENVOY_BUG("virtual clusters can not be added when YAML is compiled out.");
-#endif
   }
-
   for (auto& name_and_data : virtual_cluster_data_) {
     auto* virtual_cluster = api_service->add_virtual_clusters();
     virtual_cluster->set_name(name_and_data.first);
@@ -464,14 +458,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
-#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name((*filter).name_);
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
-#else
-    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
-#endif
   }
 
   // Set up the optional filters
@@ -963,13 +953,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
   for (const std::string& sink_yaml : stats_sinks_) {
-#ifdef ENVOY_ENABLE_YAML
     auto* sink = bootstrap->add_stats_sinks();
     MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
-#else
-    UNREFERENCED_PARAMETER(sink_yaml);
-    IS_ENVOY_BUG("stats sinks can not be added when YAML is compiled out.");
-#endif
   }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;

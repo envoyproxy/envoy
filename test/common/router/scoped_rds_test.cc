@@ -1678,7 +1678,7 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce([&temp_post_cb](Event::PostCb cb) { temp_post_cb = std::move(cb); });
+      .WillOnce(testing::SaveArg<0>(&temp_post_cb));
   std::shared_ptr<ScopeKey> scope_key =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});

@@ -53,6 +53,7 @@ public:
   MOCK_METHOD(const std::string&, socketPath, (), (const));
   MOCK_METHOD(mode_t, socketMode, (), (const));
   MOCK_METHOD((const Stats::TagVector&), statsTags, (), (const));
+  MOCK_METHOD(const std::string&, listenerManager, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;

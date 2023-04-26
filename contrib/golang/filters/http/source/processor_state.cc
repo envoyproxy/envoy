@@ -38,10 +38,10 @@ void BufferList::clearAll() {
 };
 
 bool BufferList::checkExisting(Buffer::Instance* data) {
-  for (auto& it : queue_) {
-    if (it.get() == data) {
+  for (auto it = queue_.begin(); it != queue_.end(); ++it) {
+    if ((*it).get() == data) {
       return true;
-    }
+    };
   }
   return false;
 };

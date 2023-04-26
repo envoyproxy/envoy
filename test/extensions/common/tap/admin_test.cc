@@ -43,8 +43,8 @@ public:
 class MockDispatcherQueued : public Event::MockDispatcher {
 public:
   MockDispatcherQueued(const std::string& name) : Event::MockDispatcher(name) {
-    ON_CALL(*this, post).WillByDefault([this](Event::PostCb callback) {
-      callbacks_.push(std::move(callback));
+    ON_CALL(*this, post).WillByDefault([this](std::function<void()> callback) {
+      callbacks_.push(callback);
     });
   }
 
@@ -63,7 +63,7 @@ public:
   }
 
 private:
-  std::queue<Event::PostCb> callbacks_;
+  std::queue<std::function<void()>> callbacks_;
 };
 
 class BaseAdminHandlerTest : public testing::Test {

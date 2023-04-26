@@ -16,6 +16,7 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::SaveArg;
 
 class MockTsiHandshakerCallbacks : public TsiHandshakerCallbacks {
 public:
@@ -149,9 +150,9 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   handshaker->setHandshakerCallbacks(client_callbacks_);
 
   Buffer::OwnedImpl empty;
-  Event::PostCb done;
+  std::function<void()> done;
 
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&done](Event::PostCb cb) { done = std::move(cb); });
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&done));
 
   handshaker->next(empty);
   handshaker->deferredDelete();

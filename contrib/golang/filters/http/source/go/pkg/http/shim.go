@@ -91,7 +91,7 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	}
 
 	configId := uint64(r.configId)
-	filterFactory := getOrCreateHttpFilterFactory(req.pluginName(), configId)
+	filterFactory := getOrCreateHttpFilterFactory(C.GoStringN(r.plugin_name.data, C.int(r.plugin_name.len)), configId)
 	f := filterFactory(req)
 	req.httpFilter = f
 
@@ -115,60 +115,31 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 			req = createRequest(r)
 		}
 	}
-	if req.pInfo.paniced {
+	if req.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
-		req.sendPanicReply(req.pInfo.details)
+		req.safeReplyPanic()
 		return uint64(api.LocalReply)
 	}
 	defer req.RecoverPanic()
 	f := req.httpFilter
 
+	header := &httpHeaderMap{
+		request:     req,
+		headerNum:   headerNum,
+		headerBytes: headerBytes,
+		isTrailer:   phase == api.DecodeTrailerPhase || phase == api.EncodeTrailerPhase,
+	}
+
 	var status api.StatusType
 	switch phase {
 	case api.DecodeHeaderPhase:
-		header := &requestHeaderMapImpl{
-			requestOrResponseHeaderMapImpl{
-				headerMapImpl{
-					request:     req,
-					headerNum:   headerNum,
-					headerBytes: headerBytes,
-				},
-			},
-		}
 		status = f.DecodeHeaders(header, endStream == 1)
 	case api.DecodeTrailerPhase:
-		header := &requestTrailerMapImpl{
-			requestOrResponseTrailerMapImpl{
-				headerMapImpl{
-					request:     req,
-					headerNum:   headerNum,
-					headerBytes: headerBytes,
-				},
-			},
-		}
 		status = f.DecodeTrailers(header)
 	case api.EncodeHeaderPhase:
-		header := &responseHeaderMapImpl{
-			requestOrResponseHeaderMapImpl{
-				headerMapImpl{
-					request:     req,
-					headerNum:   headerNum,
-					headerBytes: headerBytes,
-				},
-			},
-		}
 		status = f.EncodeHeaders(header, endStream == 1)
 	case api.EncodeTrailerPhase:
-		header := &responseTrailerMapImpl{
-			requestOrResponseTrailerMapImpl{
-				headerMapImpl{
-					request:     req,
-					headerNum:   headerNum,
-					headerBytes: headerBytes,
-				},
-			},
-		}
 		status = f.EncodeTrailers(header)
 	}
 	return uint64(status)
@@ -177,10 +148,10 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	req := getRequest(r)
-	if req.pInfo.paniced {
+	if req.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
-		req.sendPanicReply(req.pInfo.details)
+		req.safeReplyPanic()
 		return uint64(api.LocalReply)
 	}
 	defer req.RecoverPanic()

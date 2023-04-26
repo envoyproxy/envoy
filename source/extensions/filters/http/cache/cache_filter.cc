@@ -289,16 +289,25 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   lookup_->getHeaders([self, &request_headers,
                        &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post(
-        [self, &request_headers, status = result.cache_entry_status_,
-         headers = std::move(result.headers_), range_details = std::move(result.range_details_),
-         content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
-          if (CacheFilterSharedPtr cache_filter = self.lock()) {
-            cache_filter->onHeaders(LookupResult{status, std::move(headers), content_length,
-                                                 range_details, has_trailers},
-                                    request_headers);
-          }
-        });
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // LookupResult is non-copyable as LookupResult::headers_ is a unique_ptr, which is
+    // non-copyable. Hence, "result" is decomposed when captured, and re-instantiated inside the
+    // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
+    // unique_ptr when the result is re-instantiated.
+    dispatcher.post([self, &request_headers, status = result.cache_entry_status_,
+                     headers_raw_ptr = result.headers_.release(),
+                     range_details = std::move(result.range_details_),
+                     content_length = result.content_length_,
+                     has_trailers = result.has_trailers_]() mutable {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Http::ResponseHeaderMapPtr headers = absl::WrapUnique(headers_raw_ptr);
+      if (CacheFilterSharedPtr cache_filter = self.lock()) {
+        cache_filter->onHeaders(
+            LookupResult{status, std::move(headers), content_length, range_details, has_trailers},
+            request_headers);
+      }
+    });
   });
 }
 
@@ -317,7 +326,13 @@ void CacheFilter::getBody() {
   lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
                                              Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post([self, body = std::move(body)]() mutable {
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
+    // wrapped in a unique_ptr inside the lambda.
+    dispatcher.post([self, body_raw_ptr = body.release()] {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Buffer::InstancePtr body = absl::WrapUnique(body_raw_ptr);
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
         cache_filter->onBody(std::move(body));
       }
@@ -341,8 +356,13 @@ void CacheFilter::getTrailers() {
   lookup_->getTrailers([self, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda must be mutable as it captures trailers as a unique_ptr.
-    dispatcher.post([self, trailers = std::move(trailers)]() mutable {
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
+    // pointer then wrapped in a unique_ptr inside the lambda.
+    dispatcher.post([self, trailers_raw_ptr = trailers.release()] {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Http::ResponseTrailerMapPtr trailers = absl::WrapUnique(trailers_raw_ptr);
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
         cache_filter->onTrailers(std::move(trailers));
       }

@@ -983,6 +983,7 @@ private:
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
@@ -1011,24 +1012,22 @@ private:
     struct FilterCallState {
       static constexpr uint32_t DecodeHeaders   = 0x01;
       static constexpr uint32_t DecodeData      = 0x02;
-      static constexpr uint32_t DecodeMetadata  = 0x04;
-      static constexpr uint32_t DecodeTrailers  = 0x08;
-      static constexpr uint32_t EncodeHeaders   = 0x10;
-      static constexpr uint32_t EncodeData      = 0x20;
-      static constexpr uint32_t EncodeMetadata  = 0x40;
-      static constexpr uint32_t EncodeTrailers  = 0x80;
+      static constexpr uint32_t DecodeTrailers  = 0x04;
+      static constexpr uint32_t EncodeHeaders   = 0x08;
+      static constexpr uint32_t EncodeData      = 0x10;
+      static constexpr uint32_t EncodeTrailers  = 0x20;
       // Encode1xxHeaders is a bit of a special state as 1xx
       // headers may be sent during request processing. This state is only used
       // to verify we do not encode1xx headers more than once per
       // filter.
-      static constexpr uint32_t Encode1xxHeaders  = 0x100;
+      static constexpr uint32_t Encode1xxHeaders  = 0x40;
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x200;
+      static constexpr uint32_t LastDataFrame = 0x80;
 
       // Masks for filter call state.
-      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;
-      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeMetadata | EncodeTrailers;
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
     };
   // clang-format on
 

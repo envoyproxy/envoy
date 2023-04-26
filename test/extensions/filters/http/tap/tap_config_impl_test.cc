@@ -112,59 +112,6 @@ http_buffered_trace:
   EXPECT_TRUE(tapper_->onDestroyLog());
 }
 
-TEST_F(HttpPerRequestTapperImplTest, SanitizeUTF8) {
-  EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(false));
-  EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
-  EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
-
-  std::string invalid_utf8("prefix");
-  invalid_utf8.append(1, char(0xc3));
-  invalid_utf8.append(1, char(0xc7));
-  invalid_utf8.append("suffix");
-
-  const Http::TestRequestHeaderMapImpl request_headers{{"header", invalid_utf8}};
-  const Http::TestRequestTrailerMapImpl request_trailers{{"trailer", invalid_utf8}};
-  const Http::TestResponseHeaderMapImpl response_headers{{"header", invalid_utf8}};
-  const Http::TestResponseTrailerMapImpl response_trailers{{"trailer", invalid_utf8}};
-
-  EXPECT_CALL(matcher_, onHttpRequestHeaders(_, _));
-  tapper_->onRequestHeaders(request_headers);
-  EXPECT_CALL(matcher_, onRequestBody(_, _));
-  tapper_->onRequestBody(Buffer::OwnedImpl("hello"));
-  EXPECT_CALL(matcher_, onHttpRequestTrailers(_, _));
-  tapper_->onRequestTrailers(request_trailers);
-  EXPECT_CALL(matcher_, onHttpResponseHeaders(_, _));
-  tapper_->onResponseHeaders(response_headers);
-  EXPECT_CALL(matcher_, onResponseBody(_, _));
-  tapper_->onResponseBody(Buffer::OwnedImpl("world"));
-  EXPECT_CALL(matcher_, onHttpResponseTrailers(_, _));
-  tapper_->onResponseTrailers(response_trailers);
-  (*statuses_)[0].matches_ = true;
-  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
-                                  R"EOF(
-http_buffered_trace:
-  request:
-    headers:
-      - key: header
-        value: prefix!!suffix
-    body:
-      as_bytes: aGVsbG8=
-    trailers:
-      - key: trailer
-        value: prefix!!suffix
-  response:
-    headers:
-      - key: header
-        value: prefix!!suffix
-    body:
-      as_bytes: d29ybGQ=
-    trailers:
-      - key: trailer
-        value: prefix!!suffix
-)EOF")));
-  EXPECT_TRUE(tapper_->onDestroyLog());
-}
-
 // Streamed tap where we match on request trailers and have to flush request headers/body.
 TEST_F(HttpPerRequestTapperImplTest, StreamedMatchRequestTrailers) {
   EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(true));

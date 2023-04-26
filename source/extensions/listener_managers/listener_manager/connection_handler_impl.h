@@ -37,8 +37,6 @@ public:
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                        OverloadManager& overload_manager);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -114,7 +112,7 @@ private:
     void addActiveListener(Network::ListenerConfig& config,
                            const Network::Address::InstanceConstSharedPtr& address,
                            UnitFloat& listener_reject_fraction, bool disable_listeners,
-                           ActiveListener&& listener, OptRef<OverloadManager> overload_manager) {
+                           ActiveListener&& listener) {
       auto per_address_details = std::make_shared<PerAddressActiveListenerDetails>();
       per_address_details->typed_listener_ = *listener;
       per_address_details->listener_ = std::move(listener);
@@ -124,9 +122,6 @@ private:
       }
       if (auto* listener = per_address_details->listener_->listener(); listener != nullptr) {
         listener->setRejectFraction(listener_reject_fraction);
-        if (overload_manager) {
-          listener->configureLoadShedPoints(overload_manager.value());
-        }
       }
       per_address_details->listener_tag_ = config.listenerTag();
       per_address_details_list_.emplace_back(per_address_details);
@@ -145,7 +140,6 @@ private:
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
-  OptRef<OverloadManager> overload_manager_;
   const std::string per_handler_stat_prefix_;
   // Declare before its users ActiveListenerDetails.
   std::atomic<uint64_t> num_handler_connections_{};
@@ -161,11 +155,6 @@ private:
 
 class ConnectionHandlerFactoryImpl : public ConnectionHandlerFactory {
 public:
-  std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                          OverloadManager& overload_manager) override {
-    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager);
-  }
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher,
                           absl::optional<uint32_t> worker_index) override {

@@ -87,7 +87,6 @@ EXTENSIONS = {
     "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
-    "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
 
     #
     # Generic Inputs
@@ -127,7 +126,6 @@ EXTENSIONS = {
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
-    "envoy.filters.http.geoip":                     "//source/extensions/filters/http/geoip:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -214,7 +212,6 @@ EXTENSIONS = {
     "envoy.stat_sinks.graphite_statsd":                 "//source/extensions/stat_sinks/graphite_statsd:config",
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
-    "envoy.stat_sinks.open_telemetry":                  "//source/extensions/stat_sinks/open_telemetry:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
     "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
@@ -426,17 +423,9 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
 
-    #
     # HTTP Early Header Mutation
     #
     "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
-
-    #
-    # Config Subscription
-    #
-    "envoy.config_subscription.rest": "//source/extensions/config_subscription/rest:http_subscription_lib",
-    "envoy.config_subscription.filesystem": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
-    "envoy.config_subscription.filesystem_collection": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

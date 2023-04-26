@@ -22,7 +22,6 @@ MockCodecFactory::MockCodecFactory() {
       .WillByDefault(Return(ByMove(std::make_unique<NiceMock<MockResponseEncoder>>())));
   ON_CALL(*this, messageCreator())
       .WillByDefault(Return(ByMove(std::make_unique<NiceMock<MockMessageCreator>>())));
-  ON_CALL(*this, protocolOptions()).WillByDefault(Return(ProtocolOptions{false}));
 }
 
 MockProxyFactory::MockProxyFactory() = default;

@@ -41,10 +41,9 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
                                CustomConfigValidatorsPtr&& config_validators,
-                               JitteredExponentialBackOffStrategyPtr backoff_strategy,
                                XdsConfigTrackerOptRef xds_config_tracker)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   std::move(backoff_strategy), rate_limit_settings),
+                   rate_limit_settings),
       local_info_(local_info), config_validators_(std::move(config_validators)),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {

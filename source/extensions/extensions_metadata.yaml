@@ -238,13 +238,6 @@ envoy.filters.http.cdn_loop:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
-envoy.filters.http.geoip:
-  categories:
-  - envoy.filters.http
-  security_posture: unknown
-  status: wip
-  type_urls:
-  - envoy.extensions.filters.http.geoip.v3.Geoip
 envoy.filters.http.upstream_codec:
   categories:
   - envoy.filters.http.upstream
@@ -1026,13 +1019,6 @@ envoy.stat_sinks.metrics_service:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.MetricsServiceConfig
-envoy.stat_sinks.open_telemetry:
-  categories:
-  - envoy.stats_sinks
-  security_posture: data_plane_agnostic
-  status: alpha
-  type_urls:
-  - envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig
 envoy.stat_sinks.statsd:
   categories:
   - envoy.stats_sinks
@@ -1215,26 +1201,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  # "This may never change from unknown until the threat model at
-  # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions
-  # is updated to capture additional Wasm runtimes".
-  security_posture: unknown
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  # "This may never change from unknown until the threat model at
-  # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions
-  # is updated to capture additional Wasm runtimes".
-  security_posture: unknown
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  # "This may never change from unknown until the threat model at
-  # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions
-  # is updated to capture additional Wasm runtimes".
-  security_posture: unknown
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
@@ -1506,24 +1483,3 @@ envoy.http.custom_response.local_response_policy:
   status: wip
   type_urls:
   - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
-envoy.config_subscription.rest:
-  categories:
-  - envoy.config_subscription
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.core.v3.RestSubscription
-envoy.config_subscription.filesystem:
-  categories:
-  - envoy.config_subscription
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemSubscription
-envoy.config_subscription.filesystem_collection:
-  categories:
-  - envoy.config_subscription
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemCollectionSubscription

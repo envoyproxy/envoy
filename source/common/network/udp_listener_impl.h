@@ -32,7 +32,6 @@ public:
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
-  void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
 
   // Network::UdpListener
   Event::Dispatcher& dispatcher() override;

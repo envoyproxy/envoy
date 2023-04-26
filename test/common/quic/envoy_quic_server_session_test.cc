@@ -462,7 +462,7 @@ TEST_F(EnvoyQuicServerSessionTest, RemoteConnectionCloseWithActiveStream) {
   EXPECT_CALL(request_decoder, accessLogHandlers());
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteConnectionFailure, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
   quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version,
                                        quic::QUIC_HANDSHAKE_TIMEOUT, quic::NO_IETF_QUIC_ERROR,
                                        "dummy details",

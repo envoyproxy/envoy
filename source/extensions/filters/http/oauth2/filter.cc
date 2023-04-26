@@ -274,11 +274,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
-      if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
-        sendUnauthorizedResponse();
-        return Http::FilterHeadersStatus::StopIteration;
-      }
-
       std::string state;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
         state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(

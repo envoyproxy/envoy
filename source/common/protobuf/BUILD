@@ -4,7 +4,6 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
-load("//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 
 licenses(["notice"])  # Apache 2
 
@@ -63,8 +62,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "yaml_utility_lib",
-    srcs = envoy_select_enable_yaml(["yaml_utility.cc"]),
+    name = "utility_lib",
+    srcs = ["utility.cc"],
     external_deps = [
         "protobuf",
         "yaml_cpp",
@@ -84,29 +83,6 @@ envoy_cc_library(
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_library(
-    name = "utility_lib",
-    srcs = ["utility.cc"],
-    external_deps = [
-        "protobuf",
-    ],
-    deps = [
-        ":message_validator_lib",
-        ":protobuf",
-        ":utility_lib_header",
-        "//envoy/runtime:runtime_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:documentation_url_lib",
-        "//source/common/common:hash_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/protobuf:visitor_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
-        "@envoy_api//envoy/annotations:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ] + envoy_select_enable_yaml(["yaml_utility_lib"]),
 )
 
 envoy_cc_library(

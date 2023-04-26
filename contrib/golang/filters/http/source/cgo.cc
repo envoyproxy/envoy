@@ -18,8 +18,8 @@ std::string copyGoString(void* str) {
   if (str == nullptr) {
     return "";
   }
-  auto go_str = reinterpret_cast<GoString*>(str);
-  return {go_str->p, static_cast<size_t>(go_str->n)};
+  auto goStr = reinterpret_cast<GoString*>(str);
+  return std::string{goStr->p, size_t(goStr->n)};
 }
 
 // The returned absl::string_view only refer to the GoString, won't copy the string content into
@@ -28,19 +28,9 @@ absl::string_view referGoString(void* str) {
   if (str == nullptr) {
     return "";
   }
-  auto go_str = reinterpret_cast<GoString*>(str);
-  return {go_str->p, static_cast<size_t>(go_str->n)};
+  auto goStr = reinterpret_cast<GoString*>(str);
+  return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
-
-absl::string_view stringViewFromGoSlice(void* slice) {
-  if (slice == nullptr) {
-    return "";
-  }
-  auto go_slice = reinterpret_cast<GoSlice*>(slice);
-  return {static_cast<const char*>(go_slice->data), static_cast<size_t>(go_slice->len)};
-}
-
-const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,8 +39,8 @@ extern "C" {
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
   auto req = reinterpret_cast<httpRequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  auto weakFilter = req->weakFilter();
+  if (auto filter = weakFilter.lock()) {
     return f(filter);
   }
   return CAPIStatus::CAPIFilterIsGone;
@@ -70,12 +60,12 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
       [response_code, body_text, headers, grpc_status,
        details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
         UNREFERENCED_PARAMETER(headers);
-        auto status = static_cast<Grpc::Status::GrpcStatus>(grpc_status);
+        auto grpcStatus = static_cast<Grpc::Status::GrpcStatus>(grpc_status);
 
         // Deep clone the GoString into C++, since the GoString may be freed after the function
         // returns, while they may still be used in the callback.
         return filter->sendLocalReply(static_cast<Http::Code>(response_code),
-                                      copyGoString(body_text), nullptr, status,
+                                      copyGoString(body_text), nullptr, grpcStatus,
                                       copyGoString(details));
       });
 }
@@ -84,33 +74,33 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
 CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key, void* value) {
   return envoyGoFilterHandlerWrapper(r,
                                      [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-                                       auto key_str = referGoString(key);
-                                       auto go_value = reinterpret_cast<GoString*>(value);
-                                       return filter->getHeader(key_str, go_value);
+                                       auto keyStr = referGoString(key);
+                                       auto goValue = reinterpret_cast<GoString*>(value);
+                                       return filter->getHeader(keyStr, goValue);
                                      });
 }
 
 CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf) {
   return envoyGoFilterHandlerWrapper(r, [strs, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    auto go_strs = reinterpret_cast<GoString*>(strs);
-    auto go_buf = reinterpret_cast<char*>(buf);
-    return filter->copyHeaders(go_strs, go_buf);
+    auto goStrs = reinterpret_cast<GoString*>(strs);
+    auto goBuf = reinterpret_cast<char*>(buf);
+    return filter->copyHeaders(goStrs, goBuf);
   });
 }
 
 CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, headerAction act) {
   return envoyGoFilterHandlerWrapper(
       r, [key, value, act](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        auto key_str = referGoString(key);
-        auto value_str = referGoString(value);
-        return filter->setHeader(key_str, value_str, act);
+        auto keyStr = referGoString(key);
+        auto valueStr = referGoString(value);
+        return filter->setHeader(keyStr, valueStr, act);
       });
 }
 
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key) {
   return envoyGoFilterHandlerWrapper(r, [key](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    auto key_str = referGoString(key);
-    return filter->removeHeader(key_str);
+    auto keyStr = referGoString(key);
+    return filter->removeHeader(keyStr);
   });
 }
 
@@ -134,18 +124,18 @@ CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buff
 
 CAPIStatus envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf) {
   return envoyGoFilterHandlerWrapper(r, [strs, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    auto go_strs = reinterpret_cast<GoString*>(strs);
-    auto go_buf = reinterpret_cast<char*>(buf);
-    return filter->copyTrailers(go_strs, go_buf);
+    auto goStrs = reinterpret_cast<GoString*>(strs);
+    auto goBuf = reinterpret_cast<char*>(buf);
+    return filter->copyTrailers(goStrs, goBuf);
   });
 }
 
 CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value) {
   return envoyGoFilterHandlerWrapper(r,
                                      [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-                                       auto key_str = referGoString(key);
-                                       auto value_str = referGoString(value);
-                                       return filter->setTrailer(key_str, value_str);
+                                       auto keyStr = referGoString(key);
+                                       auto valueStr = referGoString(value);
+                                       return filter->setTrailer(keyStr, valueStr);
                                      });
 }
 
@@ -163,18 +153,11 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-void envoyGoFilterHttpLog(uint32_t level, void* message) {
-  auto mesg = referGoString(message);
-  getFilterLogger().log(level, mesg);
-}
-
-CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
   return envoyGoFilterHandlerWrapper(
-      r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        auto name_str = copyGoString(name);
-        auto key_str = copyGoString(key);
-        auto buf_str = stringViewFromGoSlice(buf);
-        return filter->setDynamicMetadata(name_str, key_str, buf_str);
+      r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto mesg = referGoString(message);
+        return filter->log(level, mesg);
       });
 }
 
@@ -184,13 +167,6 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // phase of the go object.
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
-}
-
-CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
-  return envoyGoFilterHandlerWrapper(r, [details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    // Since this is only used for logs we don't need to deep copy.
-    return filter->sendPanicReply(referGoString(details));
-  });
 }
 
 #ifdef __cplusplus

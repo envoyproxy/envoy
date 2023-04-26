@@ -65,7 +65,6 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings,
               CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");
@@ -227,7 +226,6 @@ public:
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                CustomConfigValidatorsPtr&& config_validators,
-               JitteredExponentialBackOffStrategyPtr backoff_strategy,
                XdsConfigTrackerOptRef xds_config_tracker);
 
   // GrpcStreamCallbacks
@@ -244,7 +242,6 @@ public:
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");

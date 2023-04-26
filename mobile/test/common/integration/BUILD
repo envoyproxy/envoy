@@ -3,7 +3,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_google_grpc",
 )
 
 licenses(["notice"])  # Apache 2
@@ -25,11 +24,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "rtds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
-        ["rtds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["rtds_integration_test.cc"],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -48,11 +43,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
-        ["cds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["cds_integration_test.cc"],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -153,8 +144,9 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
+        "@envoy//source/exe:process_wide_lib",
+        "@envoy//test/config:utility_lib",
         "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",

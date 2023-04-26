@@ -4,7 +4,6 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -17,13 +16,9 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
-using ::Envoy::Http::TestRequestHeaderMapImpl;
-using ::Envoy::Http::TestRequestTrailerMapImpl;
-using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http2HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
+class Http2HeaderValidatorTest : public HeaderValidatorTest {
 protected:
   Http2HeaderValidatorPtr createH2(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -32,24 +27,7 @@ protected:
 
     return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_);
   }
-
-  TestRequestHeaderMapImpl makeGoodRequestHeaders() {
-    return TestRequestHeaderMapImpl{
-        {":scheme", "https"}, {":method", "GET"}, {":authority", "envoy.com"}, {":path", "/"}};
-  }
-
-  TestResponseHeaderMapImpl makeGoodResponseHeaders() {
-    return TestResponseHeaderMapImpl{{":status", "200"}};
-  }
-
-  TestScopedRuntime scoped_runtime_;
 };
-
-TEST_F(Http2HeaderValidatorTest, GoodHeadersAccepted) {
-  auto uhv = createH2(empty_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(makeGoodRequestHeaders()));
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(makeGoodResponseHeaders()));
-}
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapAllowed) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
@@ -59,7 +37,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapAllowed) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingPath) {
@@ -67,7 +45,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingPath) {
       {":scheme", "https"}, {":method", "GET"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -76,7 +54,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingMethod) {
       {":scheme", "https"}, {":path", "/"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidMethod);
 }
 
@@ -85,7 +63,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingScheme) {
       {":method", "GET"}, {":path", "/"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -94,7 +72,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudoHeader) {
       {":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidPseudoHeader);
 }
 
@@ -103,7 +81,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNoAuthorityIsOk) {
       {":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnect) {
@@ -111,7 +89,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnect) {
       {":method", "CONNECT"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectExtraPseudoHeader) {
@@ -119,7 +97,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectExtraPseudoHeade
       {":method", "CONNECT"}, {":scheme", "https"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -127,7 +105,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectMissingAuthority
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidHost);
 }
 
@@ -136,7 +114,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithPath) {
       {":method", "CONNECT"}, {":authority", "envoy.com"}, {":path", "/bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -145,7 +123,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithScheme) {
       {":method", "CONNECT"}, {":authority", "envoy.com"}, {":scheme", "https"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -157,7 +135,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapOptionsAsterisk) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNotOptionsAsterisk) {
@@ -168,7 +146,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNotOptionsAsterisk) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -180,7 +158,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
@@ -192,25 +170,8 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
                                                   {"", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapUnderscoreHeadersAllowedByDefault) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/"},
-                                                  {":authority", "envoy.com"},
-                                                  {"x_foo", "bar"}};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers, ::Envoy::Http::TestRequestHeaderMapImpl({{":scheme", "https"},
-                                                              {":method", "GET"},
-                                                              {":path", "/"},
-                                                              {":authority", "envoy.com"},
-                                                              {"x_foo", "bar"}}));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) {
@@ -221,25 +182,11 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
                                                   {"x_foo", "bar"}};
   auto uhv = createH2(drop_headers_with_underscores_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  // Headers with underscores are dropped by the transform method
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
   EXPECT_EQ(
       headers,
       ::Envoy::Http::TestRequestHeaderMapImpl(
           {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectUnderscoreHeaders) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/"},
-                                                  {":authority", "envoy.com"},
-                                                  {"x_foo", "bar"}};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
@@ -247,7 +194,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
       {":scheme", "https"},  {":method", "CONNECT"},      {":protocol", "websocket"},
       {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
@@ -256,7 +203,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
                                                   {":path", "/foo/bar"},
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -266,7 +213,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoPath) {
                                                   {":protocol", "websocket"},
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -278,7 +225,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectInvalidPath) {
                                                   {":path", "/fo\x7fo/bar"},
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -290,8 +237,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectPathNormalization) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
   EXPECT_EQ(headers.path(), "/dir2");
 }
 
@@ -301,20 +247,20 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoAuthorityIsOk) {
                                                   {":path", "/foo/bar"},
                                                   {":protocol", "websocket"}};
   auto uhv = createH2(empty_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapMissingStatus) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
@@ -322,204 +268,187 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {":foo", "bar"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidPseudoHeader);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "1024"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"", "bar"}};
   auto uhv = createH2(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersAllowUnderscoreHeadersByDefault) {
-  TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
-  auto uhv = createH2(empty_config);
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x_foo", "bar"}};
+  auto uhv = createH2(drop_headers_with_underscores_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestTrailers(trailers));
-  EXPECT_ACCEPT(uhv->transformRequestTrailers(trailers));
-  EXPECT_EQ(trailers, TestRequestTrailerMapImpl({{"trailer1", "value1"}, {"x_foo", "bar"}}));
+  EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
+  EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateTE) {
+  HeaderString trailers{"trailers"};
+  HeaderString deflate{"deflate"};
+  auto uhv = createH2(empty_config);
+  EXPECT_ACCEPT(uhv->validateTEHeader(trailers));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateTEHeader(deflate), "uhv.http2.invalid_te");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameRejectConnectionHeaders) {
-  std::string connection_headers[] = {"transfer-encoding", "connection", "keep-alive", "upgrade",
-                                      "proxy-connection"};
+  HeaderString transfer_encodings[] = {HeaderString("transfer-encoding"),
+                                       HeaderString("connection"), HeaderString("keep-alive"),
+                                       HeaderString("upgrade"), HeaderString("proxy-connection")};
   auto uhv = createH2(empty_config);
 
-  for (auto& header : connection_headers) {
-    TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-    request_headers.addCopy(header, "some-value");
-    EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+  for (auto& encoding : transfer_encodings) {
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(encoding),
                                "uhv.http2.connection_header_rejected");
   }
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
+  HeaderString authority{":authority"};
+  HeaderString valid{"envoy.com"};
+  HeaderString invalid{"user:pass@envoy.com"};
   auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.setPath("/ bad path");
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(authority, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(authority, invalid),
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
+  HeaderString path{":path"};
+  HeaderString valid{"/"};
+  HeaderString invalid{"/ bad path"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(path, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(path, invalid),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTETrailersAllowed) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {
+  HeaderString name{"te"};
+  HeaderString valid{"trailers"};
+  HeaderString invalid{"chunked"};
   auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.addCopy("te", "trailers");
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
+                             "uhv.http2.invalid_te");
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderInvalidTERejected) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethod) {
+  HeaderString method{":method"};
+  HeaderString valid{"GET"};
+  HeaderString invalid{"CUSTOM-METHOD"};
   auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.addCopy("te", "chunked");
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers), "uhv.http2.invalid_te");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderCustomMethod) {
-  auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.setMethod("CUSTOM-METHOD");
-
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(method, valid));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(method, invalid));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
+  HeaderString content_length{"content-length"};
+  HeaderString valid{"100"};
+  HeaderString invalid{"10a2"};
   auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.setContentLength("100");
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
-  request_headers.setContentLength("10a2");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(content_length, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(content_length, invalid),
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderContentLength) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
+  HeaderString scheme{":scheme"};
+  HeaderString valid{"https"};
+  HeaderString invalid{"http_ssh"};
   auto uhv = createH2(empty_config);
-  TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
-  response_headers.setContentLength("100");
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
 
-  response_headers.setContentLength("10a2");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
-                             UhvResponseCodeDetail::get().InvalidContentLength);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderInvalidScheme) {
-  auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.setScheme("http_ssh");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(scheme, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderInvalidProtocol) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderProtocol) {
+  HeaderString scheme{":protocol"};
+  HeaderString valid{"websocket"};
+  HeaderString invalid{"something \x7F bad"};
   auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                   {":method", "CONNECT"},
-                                   {":protocol", "something \x7F bad"},
-                                   {":path", "/foo/bar"},
-                                   {":authority", "envoy.com"}};
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(scheme, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
                              UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
-TEST_F(Http2HeaderValidatorTest, InvalidRequestHeaderNameRejected) {
-  auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  // This header name is valid
-  request_headers.addCopy("x-foo", "bar");
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
+  HeaderString valid_name{"x-foo"};
+  HeaderString invalid_name{""};
+  HeaderString valid_value{"bar"};
 
-  // Reject invalid name
-  request_headers.addCopy("foo oo", "bar");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
-                             UhvResponseCodeDetail::get().InvalidNameCharacters);
-}
-
-TEST_F(Http2HeaderValidatorTest, InvalidRequestHeaderValueRejected) {
-  auto uhv = createH2(empty_config);
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  HeaderString invalid_value{};
+  HeaderString invalid_value;
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-  request_headers.addViaMove(HeaderString(absl::string_view("x-foo")), std::move(invalid_value));
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(valid_name, valid_value));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
+                             UhvResponseCodeDetail::get().EmptyHeaderName);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
                              UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
-TEST_F(Http2HeaderValidatorTest, InvalidResponseHeaderNameRejected) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
+  HeaderString name{"x_foo"};
+  HeaderString value{"bar"};
   auto uhv = createH2(empty_config);
-  TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
-  // This header name is valid
-  response_headers.addCopy("x-foo", "bar");
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
 
-  // Reject invalid name
-  response_headers.addCopy("foo oo", "bar");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
-                             UhvResponseCodeDetail::get().InvalidNameCharacters);
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, value));
 }
 
-TEST_F(Http2HeaderValidatorTest, InvalidResponseHeaderValueRejected) {
-
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
+  HeaderString status{":status"};
+  HeaderString valid{"200"};
+  HeaderString invalid{"1024"};
   auto uhv = createH2(empty_config);
-  TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
-  HeaderString invalid_value{};
-  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-  response_headers.addViaMove(HeaderString(absl::string_view("x-foo")), std::move(invalid_value));
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
-                             UhvResponseCodeDetail::get().InvalidValueCharacters);
-}
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderInvalidStatusRejected) {
-  auto uhv = createH2(empty_config);
-  TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
-  response_headers.setStatus("1024");
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
+  EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(status, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(status, invalid),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateUppercaseRequestHeaderRejected) {
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
+  HeaderString valid_name{"x-foo"};
+  HeaderString valid_name_underscore{"x_foo"};
+  HeaderString invalid_name{""};
+  HeaderString valid_value{"bar"};
+  HeaderString invalid_name_uppercase{"X-Foo"};
+
+  HeaderString invalid_value;
+  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
+
   auto uhv = createH2(empty_config);
 
-  HeaderString invalid_name_uppercase;
-  setHeaderStringUnvalidated(invalid_name_uppercase, "X-Foo");
-  TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-  request_headers.addViaMove(std::move(invalid_name_uppercase),
-                             HeaderString(absl::string_view("some value")));
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+  EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name, valid_value));
+  EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name_underscore, valid_value));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
+                             UhvResponseCodeDetail::get().EmptyHeaderName);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name_uppercase, valid_value),
                              UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateUppercaseResponseHeaderRejected) {
-  auto uhv = createH2(empty_config);
-
-  HeaderString invalid_name_uppercase;
-  setHeaderStringUnvalidated(invalid_name_uppercase, "X-Foo");
-  TestResponseHeaderMapImpl headers = makeGoodResponseHeaders();
-  headers.addViaMove(std::move(invalid_name_uppercase),
-                     HeaderString(absl::string_view("some value")));
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
-                             UhvResponseCodeDetail::get().InvalidNameCharacters);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderName) {
   auto uhv = createH2(empty_config);
   std::string name{"aaaaa"};
   for (int i = 0; i < 0xff; ++i) {
@@ -528,12 +457,9 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
     name[2] = c;
 
     setHeaderStringUnvalidated(header_string, name);
-    TestRequestHeaderMapImpl request_headers = makeGoodRequestHeaders();
-    request_headers.addViaMove(std::move(header_string),
-                               HeaderString(absl::string_view("some value")));
 
-    auto result = uhv->validateRequestHeaders(request_headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    auto result = uhv->validateGenericHeaderName(header_string);
+    if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -543,27 +469,21 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
   }
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseGenericHeaderName) {
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
+  HeaderString invalid_empty{""};
   auto uhv = createH2(empty_config);
-  std::string name{"aaaaa"};
-  for (int i = 0; i < 0xff; ++i) {
-    char c = static_cast<char>(i);
-    HeaderString header_string{"x"};
-    name[2] = c;
 
-    setHeaderStringUnvalidated(header_string, name);
-    TestResponseHeaderMapImpl headers = makeGoodResponseHeaders();
-    headers.addViaMove(std::move(header_string), HeaderString(absl::string_view("some value")));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
+                             UhvResponseCodeDetail::get().EmptyHeaderName);
+}
 
-    auto result = uhv->validateResponseHeaders(headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
-      EXPECT_ACCEPT(result);
-    } else if (c != '_') {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
-    } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidUnderscore);
-    }
-  }
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
+  HeaderString drop_underscore{"x_foo"};
+  auto uhv = createH2(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(drop_underscore);
+  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
@@ -573,8 +493,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
   EXPECT_EQ(headers.path(), "/dir2");
 }
 
@@ -582,9 +501,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
   auto uhv = createH2(empty_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  // Path normalization should fail due to /.. path
-  auto result = uhv->transformRequestHeaders(headers);
+  auto result = uhv->validateRequestHeaderMap(headers);
   EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
@@ -595,31 +512,17 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
                                                   {":path", "/dir1%2fdir2"},
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2(redirect_encoded_slash_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  // Path normalization should result in redirect
-  auto result = uhv->transformRequestHeaders(headers);
+  auto result = uhv->validateRequestHeaderMap(headers);
   EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeadersPathNormalizationDisabled) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/./dir1%2f../dir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH2(no_path_normalization);
-
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
-  EXPECT_EQ(headers.path(), "/./dir1%2f../dir2");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailerMap) {
   auto uhv = createH2(empty_config);
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
                                                                {"trailer2", "values"}};
-  EXPECT_TRUE(uhv->validateRequestTrailers(request_trailer_map));
+  EXPECT_TRUE(uhv->validateRequestTrailerMap(request_trailer_map));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidRequestTrailerMap) {
@@ -627,7 +530,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidRequestTrailerMap) {
   // H/2 trailers must not contain pseudo headers
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{":path", "value1"},
                                                                {"trailer2", "values"}};
-  auto result = uhv->validateRequestTrailers(request_trailer_map);
+  auto result = uhv->validateRequestTrailerMap(request_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
 }
@@ -640,42 +543,15 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueRequestTrailerMap) {
   // \n must not be present in header values
   invalid_value.setCopyUnvalidatedForTestOnly("invalid\nvalue");
   request_trailer_map.addViaMove(::Envoy::Http::HeaderString("trailer3"), std::move(invalid_value));
-  auto result = uhv->validateRequestTrailers(request_trailer_map);
+  auto result = uhv->validateRequestTrailerMap(request_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
-}
-
-TEST_F(Http2HeaderValidatorTest, UnderscoreHeadersAllowedInRequestTrailersByDefault) {
-  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_ACCEPT(uhv->validateRequestTrailers(trailers));
-  EXPECT_ACCEPT(uhv->transformRequestTrailers(trailers));
-  EXPECT_EQ(trailers,
-            ::Envoy::Http::TestRequestTrailerMapImpl({{"trailer1", "value1"}, {"x_foo", "bar"}}));
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersDropUnderscoreHeaders) {
-  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
-  auto uhv = createH2(drop_headers_with_underscores_config);
-
-  EXPECT_ACCEPT(uhv->validateRequestTrailers(trailers));
-  EXPECT_ACCEPT(uhv->transformRequestTrailers(trailers));
-  EXPECT_EQ(trailers, ::Envoy::Http::TestRequestTrailerMapImpl({{"trailer1", "value1"}}));
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersRejectUnderscoreHeaders) {
-  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestTrailers(trailers),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseTrailerMap) {
   auto uhv = createH2(empty_config);
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
-  EXPECT_TRUE(uhv->validateResponseTrailers(response_trailer_map).ok());
+  EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
@@ -683,7 +559,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
   // H/2 trailers must not contain pseudo headers
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{":status", "200"},
                                                                  {"trailer1", "value1"}};
-  auto result = uhv->validateResponseTrailers(response_trailer_map);
+  auto result = uhv->validateResponseTrailerMap(response_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
 }
@@ -693,35 +569,9 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
   // The DEL (0x7F) character is illegal in header values
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer0", "abcd\x7F\\ef"},
                                                                  {"trailer1", "value1"}};
-  auto result = uhv->validateResponseTrailers(response_trailer_map);
+  auto result = uhv->validateResponseTrailerMap(response_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
-}
-
-TEST_F(Http2HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5C"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
-}
-
-TEST_F(Http2HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5c"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
 }
 
 } // namespace

@@ -24,7 +24,7 @@ mkdir -p "$DOCKER_CACHE_PATH"
 mount -t tmpfs none "$DOCKER_CACHE_PATH"
 
 echo "Creating tarball: /var/lib/docker -> ${DOCKER_CACHE_TARBALL}"
-tar cf - -C /var/lib/docker . | zstd - -T0 -o "$DOCKER_CACHE_TARBALL"
+tar -I "zstd -T0 --fast " -acf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker .
 
 echo "Docker cache tarball created: ${DOCKER_CACHE_TARBALL}"
 ls -lh "$DOCKER_CACHE_TARBALL"

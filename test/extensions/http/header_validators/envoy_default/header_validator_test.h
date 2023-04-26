@@ -21,7 +21,7 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-class HeaderValidatorTest {
+class HeaderValidatorTest : public testing::Test {
 protected:
   void setHeaderStringUnvalidated(Envoy::Http::HeaderString& header_string,
                                   absl::string_view value) {
@@ -50,12 +50,6 @@ protected:
 
   static constexpr absl::string_view redirect_encoded_slash_config = R"EOF(
     uri_path_normalization_options:
-      path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
-    )EOF";
-
-  static constexpr absl::string_view no_path_normalization = R"EOF(
-    uri_path_normalization_options:
-      skip_path_normalization: true
       path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
     )EOF";
 };

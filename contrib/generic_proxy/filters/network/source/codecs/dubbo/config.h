@@ -121,12 +121,9 @@ public:
       }
 
       ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
-      ExtendedOptions extended_options{metadata_->requestId(), metadata_->context().isTwoWay(),
-                                       false, metadata_->context().heartbeat()};
-      callback_->onDecodingSuccess(std::make_unique<MessageType>(std::move(metadata_)),
-                                   extended_options);
+      callback_->onDecodingSuccess(std::make_unique<MessageType>(std::move(metadata_)));
       metadata_.reset();
-    } catch (const EnvoyException& error) {
+    } catch (EnvoyException& error) {
       ENVOY_LOG(warn, "Dubbo codec: decoding error: {}", error.what());
       metadata_.reset();
       callback_->onDecodingFailure();
@@ -151,7 +148,8 @@ public:
 
     Buffer::OwnedImpl buffer;
     codec_->encode(buffer, *typed_request->inner_metadata_);
-    callback.onEncodingSuccess(buffer);
+    callback.onEncodingSuccess(buffer, typed_request->inner_metadata_->messageType() !=
+                                           Common::Dubbo::MessageType::Oneway);
   }
 };
 
@@ -165,7 +163,7 @@ public:
 
     Buffer::OwnedImpl buffer;
     codec_->encode(buffer, *typed_response->inner_metadata_);
-    callback.onEncodingSuccess(buffer);
+    callback.onEncodingSuccess(buffer, false);
   }
 };
 
@@ -195,7 +193,6 @@ public:
   MessageCreatorPtr messageCreator() const override {
     return std::make_unique<DubboMessageCreator>();
   }
-  ProtocolOptions protocolOptions() const override { return {}; }
 };
 
 class DubboCodecFactoryConfig : public CodecFactoryConfig {

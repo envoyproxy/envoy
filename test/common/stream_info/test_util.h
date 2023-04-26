@@ -42,10 +42,6 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
-    return duration(end_time_);
-  }
-
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
   }

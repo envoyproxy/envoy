@@ -69,9 +69,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   switch (reason) {
   case Http::StreamResetReason::LocalRefusedStreamReset:
     return quic::QUIC_REFUSED_STREAM;
-  case Http::StreamResetReason::LocalConnectionFailure:
-  case Http::StreamResetReason::RemoteConnectionFailure:
-  case Http::StreamResetReason::ConnectionTimeout:
+  case Http::StreamResetReason::ConnectionFailure:
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
@@ -87,7 +85,7 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
-    return Http::StreamResetReason::LocalConnectionFailure;
+    return Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_BAD_APPLICATION_PAYLOAD:
     return Http::StreamResetReason::ProtocolError;
   default:
@@ -111,11 +109,11 @@ Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
-    return Http::StreamResetReason::LocalConnectionFailure;
+    return Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_PACKET_WRITE_ERROR:
   case quic::QUIC_NETWORK_IDLE_TIMEOUT:
     return connected ? Http::StreamResetReason::ConnectionTermination
-                     : Http::StreamResetReason::LocalConnectionFailure;
+                     : Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_HTTP_FRAME_ERROR:
     return Http::StreamResetReason::ProtocolError;
   default:
@@ -127,7 +125,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
-    return Http::StreamResetReason::RemoteConnectionFailure;
+    return Http::StreamResetReason::ConnectionFailure;
   default:
     return Http::StreamResetReason::ConnectionTermination;
   }

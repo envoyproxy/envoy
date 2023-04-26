@@ -101,7 +101,6 @@ paths:
   json_string_to_message:
     include:
     - source/common/protobuf/utility.cc
-    - source/common/protobuf/yaml_utility.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -316,5 +315,3 @@ visibility_excludes:
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD
-- source/extensions/config_subscription/rest/BUILD
-- source/extensions/config_subscription/filesystem/BUILD

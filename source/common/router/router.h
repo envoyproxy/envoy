@@ -206,7 +206,6 @@ public:
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
-               bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -217,7 +216,6 @@ public:
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
-        flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
@@ -231,27 +229,16 @@ public:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(),
-                     config.suppress_grpc_request_failure_code_stats(),
-                     config.has_upstream_log_options()
-                         ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                         : false,
-                     config.strict_check_headers(), context.api().timeSource(),
-                     context.httpContext(), context.routerContext()) {
+      : FilterConfig(
+            stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+            context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+            config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+            config.suppress_grpc_request_failure_code_stats(), config.strict_check_headers(),
+            context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
-
-    if (config.has_upstream_log_options() &&
-        config.upstream_log_options().has_upstream_log_flush_interval()) {
-      upstream_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-          config.upstream_log_options().upstream_log_flush_interval()));
-    }
-
     if (config.upstream_http_filters_size() > 0) {
       auto& server_factory_ctx = context.getServerFactoryContext();
       const Http::FilterChainUtility::FiltersList& upstream_http_filters =
@@ -310,8 +297,6 @@ public:
   const bool suppress_grpc_request_failure_code_stats_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
-  const bool flush_upstream_log_on_upstream_stream_;
-  absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatName zone_name_;

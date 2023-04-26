@@ -65,11 +65,9 @@ void ExtensionConfigBase::installNewTap(const envoy::config::tap::v3::TapConfig&
                                         Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(proto_config, admin_streamer);
-  tls_slot_.runOnAllThreads(
-      [new_config](OptRef<TlsFilterConfig> tls_filter_config) {
-        tls_filter_config->config_ = new_config;
-      },
-      []() -> void { ENVOY_LOG(debug, "New tap installed on all workers."); });
+  tls_slot_.runOnAllThreads([new_config](OptRef<TlsFilterConfig> tls_filter_config) {
+    tls_filter_config->config_ = new_config;
+  });
 }
 
 void ExtensionConfigBase::newTapConfig(const envoy::config::tap::v3::TapConfig& proto_config,

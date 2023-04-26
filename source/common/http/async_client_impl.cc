@@ -25,13 +25,13 @@ const Router::PathRewriterSharedPtr AsyncStreamImpl::RouteEntryImpl::path_rewrit
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
-const AsyncStreamImpl::NullCommonConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
+const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const AsyncStreamImpl::RouteEntryImpl::ConnectConfigOptRef
     AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
-const std::list<LowerCaseString> AsyncStreamImpl::NullCommonConfig::internal_only_headers_;
+const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
@@ -42,8 +42,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Http::Context& http_context, Router::Context& router_context)
     : cluster_(cluster),
       config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
-              runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
-              {}, dispatcher.timeSource(), http_context, router_context),
+              runtime, random, std::move(shadow_writer), true, false, false, false, false, {},
+              dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -107,7 +107,6 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
-  stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);

@@ -42,11 +42,10 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     Random::RandomGenerator& random, Stats::Scope& scope,
     const RateLimitSettings& rate_limit_settings, CustomConfigValidatorsPtr&& config_validators,
-    JitteredExponentialBackOffStrategyPtr backoff_strategy,
     XdsConfigTrackerOptRef xds_config_tracker, XdsResourcesDelegateOptRef xds_resources_delegate,
     const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   std::move(backoff_strategy), rate_limit_settings),
+                   rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(local_info),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -368,12 +367,10 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                            CustomConfigValidatorsPtr&& config_validators,
-                           JitteredExponentialBackOffStrategyPtr backoff_strategy,
                            XdsConfigTrackerOptRef xds_config_tracker)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, std::move(config_validators), std::move(backoff_strategy),
-                  xds_config_tracker) {}
+                  rate_limit_settings, std::move(config_validators), xds_config_tracker) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -392,14 +389,13 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         JitteredExponentialBackOffStrategyPtr backoff_strategy,
                          XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, std::move(config_validators), std::move(backoff_strategy),
-                  xds_config_tracker, xds_resources_delegate, target_xds_authority) {}
+                  rate_limit_settings, std::move(config_validators), xds_config_tracker,
+                  xds_resources_delegate, target_xds_authority) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,

@@ -312,8 +312,6 @@ void BalsaParser::OnChunkLength(size_t chunk_length) {
 
 void BalsaParser::OnChunkExtensionInput(absl::string_view /*input*/) {}
 
-void BalsaParser::OnInterimHeaders(BalsaHeaders /*headers*/) {}
-
 void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
     return;

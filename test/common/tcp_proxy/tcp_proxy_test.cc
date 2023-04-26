@@ -959,8 +959,11 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
 // Test that intermediate log entry by field %DURATION%.
 TEST_F(TcpProxyTest, IntermediateLogEntry) {
   auto config = accessLogConfig("%DURATION%");
-  config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_seconds(1);
+  config.mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, streamState())
+      .WillRepeatedly(Return(StreamInfo::StreamState::InProgress));
 
   auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
@@ -980,19 +983,26 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
 }
 
 TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
-  auto config = accessLogConfig("%UPSTREAM_HOST%");
-  config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
+  auto config = accessLogConfig("%STREAM_STATE%");
+  config.set_flush_access_log_on_connected(true);
 
   setup(1, config);
+
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, streamState())
+      .WillOnce(Return(StreamInfo::StreamState::Started))
+      .WillOnce(Return(StreamInfo::StreamState::Ended));
+
   raiseEventUpstreamConnected(0);
 
   // Default access log will only be flushed after the stream is closed.
   // Passing the following check makes sure that the access log was flushed
   // before the stream was closed.
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80");
+  EXPECT_EQ(access_log_data_.value(), StreamInfo::StreamStateStrings::get().StreamStarted);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(), StreamInfo::StreamStateStrings::get().StreamEnded);
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {

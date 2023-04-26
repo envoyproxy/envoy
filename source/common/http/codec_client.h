@@ -241,7 +241,8 @@ private:
         break;
       case Protocol::Http2:
       case Protocol::Http3:
-        wait_encode_complete_ = true;
+        wait_encode_complete_ =
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_response_half_close");
         break;
       }
     }

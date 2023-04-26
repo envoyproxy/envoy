@@ -4,7 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -218,12 +218,11 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
-  // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster,
+                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
     span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.

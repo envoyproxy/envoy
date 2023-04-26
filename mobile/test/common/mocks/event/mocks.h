@@ -29,12 +29,15 @@ public:
     }
   }
 
-  envoy_status_t post(Event::PostCb callback) override { return post_(std::move(callback)); }
+  envoy_status_t post(std::function<void()> callback) override {
+    callbacks_.push_back(callback);
+    return post_(callback);
+  }
 
   // Event::ProvisionalDispatcher
   MOCK_METHOD(void, drain, (Event::Dispatcher & event_dispatcher));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
-  MOCK_METHOD(envoy_status_t, post_, (Event::PostCb callback));
+  MOCK_METHOD(envoy_status_t, post_, (std::function<void()> callback));
   MOCK_METHOD(Event::SchedulableCallbackPtr, createSchedulableCallback, (std::function<void()> cb));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
   MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
@@ -44,6 +47,7 @@ public:
 
   Event::GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
+  std::list<std::function<void()>> callbacks_;
 };
 
 } // namespace Event

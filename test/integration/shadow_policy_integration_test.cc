@@ -459,8 +459,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowOnlyTimeout) {
   // Clean up.
   ASSERT_TRUE(fake_upstream_connection_main->close());
   ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_shadow->close());
-  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
   cleanupUpstreamAndDownstream();
 

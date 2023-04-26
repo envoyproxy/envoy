@@ -115,8 +115,6 @@ public:
   using ClientConnectionImpl::getStream;
   using ConnectionImpl::sendPendingFrames;
 
-  bool useOghttp2Library() const { return use_oghttp2_library_; }
-
 protected:
   // Overrides ClientConnectionImpl::onSettings().
   void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }

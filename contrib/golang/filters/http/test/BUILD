@@ -91,7 +91,6 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )

@@ -29,7 +29,7 @@ void MultiEnvoyTest::createL1Envoy() {
     }
   }
   ConfigHelper l1_helper(version_, *api_,
-                         MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+                         MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   l1_helper.setPorts(zero, true); // Zero out ports set by config_helper_'s finalize();
   const std::string bootstrap_path = finalizeConfigWithPorts(l1_helper, ports, use_lds_);
 

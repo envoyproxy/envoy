@@ -563,9 +563,7 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
 
   MockLoadDnsCacheEntryCallbacks callbacks;
   Event::PostCb post_cb;
-  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
-    post_cb = std::move(cb);
-  });
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   auto result = dns_cache_->loadDnsCacheEntry("localhost", 80, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);

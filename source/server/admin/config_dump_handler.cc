@@ -301,8 +301,8 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
-    if (!cluster_info->edsServiceName().empty()) {
-      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName());
+    if (cluster_info->edsServiceName().has_value()) {
+      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().value());
     } else {
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }

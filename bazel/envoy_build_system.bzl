@@ -25,7 +25,6 @@ load(
     _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
-    _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
     _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
     _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
@@ -237,7 +236,6 @@ envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
-envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests

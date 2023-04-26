@@ -16,9 +16,8 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  MOCK_METHOD(void, runOnAllThreads, (std::function<void()> cb));
-  MOCK_METHOD(void, runOnAllThreads,
-              (std::function<void()> cb, std::function<void()> main_callback));
+  MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb));
+  MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb, Event::PostCb main_callback));
 
   // Server::ThreadLocal
   MOCK_METHOD(SlotPtr, allocateSlot, ());
@@ -29,8 +28,8 @@ public:
   bool isShutdown() const override { return shutdown_; }
 
   SlotPtr allocateSlotMock() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
-  void runOnAllThreads1(std::function<void()> cb) { cb(); }
-  void runOnAllThreads2(std::function<void()> cb, std::function<void()> main_callback) {
+  void runOnAllThreads1(Event::PostCb cb) { cb(); }
+  void runOnAllThreads2(Event::PostCb cb, Event::PostCb main_callback) {
     cb();
     main_callback();
   }
@@ -70,10 +69,9 @@ public:
       EXPECT_TRUE(was_set_);
       parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
-    void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& main_callback) override {
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
       EXPECT_TRUE(was_set_);
-      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); },
-                              std::move(main_callback));
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
     bool isShutdown() const override { return parent_.shutdown_; }
 
