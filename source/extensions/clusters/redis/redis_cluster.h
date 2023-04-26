@@ -90,13 +90,11 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(Server::Configuration::ServerFactoryContext& server_context,
-               const envoy::config::cluster::v3::Cluster& cluster,
+  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
                Upstream::ClusterFactoryContext& context,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
-               Network::DnsResolverSharedPtr dns_resolver, bool added_via_api,
+               Network::DnsResolverSharedPtr dns_resolver,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
@@ -301,7 +299,6 @@ private:
 
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context) override;

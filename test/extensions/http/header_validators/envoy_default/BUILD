@@ -31,6 +31,22 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "http_common_validation_test",
+    srcs = [
+        "http_common_validation_test.cc",
+    ],
+    extension_names = ["envoy.http.header_validators.envoy_default"],
+    deps = [
+        ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "http1_header_validator_test",
     srcs = [
         "http1_header_validator_test.cc",

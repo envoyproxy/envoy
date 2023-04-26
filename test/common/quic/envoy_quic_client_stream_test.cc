@@ -471,8 +471,8 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
@@ -631,8 +631,8 @@ TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
 
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
 }
 
 TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
@@ -641,8 +641,8 @@ TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.message(), testing::HasSubstr("invalid header value for: x-foo"));
 
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
 }
 #endif
 

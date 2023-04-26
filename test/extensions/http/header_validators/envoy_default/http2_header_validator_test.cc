@@ -17,12 +17,13 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http2HeaderValidatorTest : public HeaderValidatorTest {
+class Http2HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   Http2HeaderValidatorPtr createH2(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -532,7 +533,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
                                HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateRequestHeaders(request_headers);
-    if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -555,7 +556,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseGenericHeaderName) {
     headers.addViaMove(std::move(header_string), HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateResponseHeaders(headers);
-    if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -701,7 +702,7 @@ TEST_F(Http2HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5c"},
+                                                  {":path", "/path\\with/back\\/slash%5C"},
                                                   {":authority", "envoy.com"},
                                                   {":method", "GET"}};
   auto uhv = createH2(empty_config);

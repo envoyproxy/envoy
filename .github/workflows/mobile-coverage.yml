@@ -36,7 +36,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
+        cd mobile && BAZEL_BUILD_OPTION_LIST="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
             COVERAGE_THRESHOLD=95 \
             ../test/run_envoy_bazel_coverage.sh //test/common/...

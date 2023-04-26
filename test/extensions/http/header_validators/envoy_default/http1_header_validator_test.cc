@@ -21,7 +21,7 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http1HeaderValidatorTest : public HeaderValidatorTest {
+class Http1HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   Http1HeaderValidatorPtr createH1(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -667,7 +667,7 @@ TEST_F(Http1HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5c"},
+                                                  {":path", "/path\\with/back\\/slash%5C"},
                                                   {":authority", "envoy.com"},
                                                   {":method", "GET"}};
   auto uhv = createH1(empty_config);
