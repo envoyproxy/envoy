@@ -20,7 +20,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"

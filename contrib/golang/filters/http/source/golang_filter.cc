@@ -911,6 +911,21 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
+  case EnvoyValue::UpstreamHostAddress:
+    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
+  case EnvoyValue::UpstreamClusterName:
+    if (state.streamInfo().upstreamClusterInfo().has_value() &&
+        state.streamInfo().upstreamClusterInfo().value()) {
+      req_->strValue = state.streamInfo().upstreamClusterInfo().value()->name();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }

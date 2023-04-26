@@ -18,12 +18,10 @@ namespace DynamicForwardProxy {
 class Cluster : public Upstream::BaseDynamicClusterImpl,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
-  Cluster(Server::Configuration::ServerFactoryContext& server_context,
-          const envoy::config::cluster::v3::Cluster& cluster,
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-          Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-          const LocalInfo::LocalInfo& local_info, bool added_via_api);
+          Upstream::ClusterFactoryContext& context,
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -166,7 +164,6 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context) override;
