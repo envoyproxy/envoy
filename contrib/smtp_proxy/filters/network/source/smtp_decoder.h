@@ -7,47 +7,11 @@
 #include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "contrib/common/sqlutils/source/sqlutils.h"
-#include "contrib/smtp_proxy/filters/network/source/smtp_message.h"
-#include "contrib/smtp_proxy/filters/network/source/smtp_session.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SmtpProxy {
-
-// General callbacks for dispatching decoded Smtp messages to a sink.
-class DecoderCallbacks {
-public:
-  virtual ~DecoderCallbacks() = default;
-
-  virtual void incMessagesBackend() PURE;
-  virtual void incMessagesFrontend() PURE;
-  virtual void incMessagesUnknown() PURE;
-
-  virtual void incSessionsEncrypted() PURE;
-  virtual void incSessionsUnencrypted() PURE;
-
-  enum class StatementType { Insert, Delete, Select, Update, Other, Noop };
-  virtual void incStatements(StatementType) PURE;
-
-  virtual void incTransactions() PURE;
-  virtual void incTransactionsCommit() PURE;
-  virtual void incTransactionsRollback() PURE;
-
-  enum class NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
-  virtual void incNotices(NoticeType) PURE;
-
-  enum class ErrorType { Error, Fatal, Panic, Unknown };
-  virtual void incErrors(ErrorType) PURE;
-
-  virtual void processQuery(const std::string&) PURE;
-
-  virtual bool onSSLRequest() PURE;
-  virtual bool shouldEncryptUpstream() const PURE;
-  virtual void sendUpstream(Buffer::Instance&) PURE;
-  virtual void encryptUpstream(bool, Buffer::Instance&) PURE;
-};
 
 // Smtp message decoder.
 class Decoder {
@@ -59,154 +23,50 @@ public:
   enum class Result {
     ReadyForNext, // Decoder processed previous message and is ready for the next message.
     NeedMoreData, // Decoder needs more data to reconstruct the message.
-    Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
-            // data. This happens when decoder wants filter to perform some action, for example to
-            // call starttls transport socket to enable TLS.
+    Bad
   };
-  virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
-  virtual SmtpSession& getSession() PURE;
 
-  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
-    return attributes_;
-  }
+  struct Command {
+    std::string verb;
+    std::string rest;
+    size_t wire_len;
+  };
 
+  struct Response {
+    int code;
+    std::string msg;
+    size_t wire_len;
+  };
+
+  virtual Result DecodeCommand(Buffer::Instance& data,
+			       Command& result) = 0;
+
+  virtual Result DecodeResponse(Buffer::Instance& data,
+				Response& result) = 0;
+ 
 protected:
-  // Decoder attributes extracted from Startup message.
-  // It can be username, database name, client app type, etc.
-  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
+
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) { initialize(); }
+  DecoderImpl() = default;
 
-  Result onData(Buffer::Instance& data, bool frontend) override;
-  SmtpSession& getSession() override { return session_; }
+  // if data starts with a valid smtp command, decodes into result and returns ReadyForNext
+  // else returns NeedMoreData
+  Result DecodeCommand(Buffer::Instance& data,
+		       Command& result) override;
 
-  std::string getMessage() { return message_; }
-
-  void initialize();
-
-  bool encrypted() const { return encrypted_; }
-
-  enum class State {
-    InitState,
-    InSyncState,
-    OutOfSyncState,
-    EncryptedState,
-    NegotiatingUpstreamSSL
-  };
-  State state() const { return state_; }
-  void state(State state) { state_ = state; }
-
+  Result DecodeResponse(Buffer::Instance& data,
+			Response& result) override;
+ 
 protected:
-  State state_{State::InitState};
-
-  Result onDataInit(Buffer::Instance& data, bool frontend);
-  Result onDataInSync(Buffer::Instance& data, bool frontend);
-  Result onDataIgnore(Buffer::Instance& data, bool frontend);
-  Result onDataInNegotiating(Buffer::Instance& data, bool frontend);
-
-  // MsgAction defines the Decoder's method which will be invoked
-  // when a specific message has been decoded.
-  using MsgAction = std::function<void(DecoderImpl*)>;
-
-  // MsgBodyReader is a function which returns a pointer to a Message
-  // class which is able to read the Smtp message body.
-  // The Smtp message body structure depends on the message type.
-  using MsgBodyReader = std::function<std::unique_ptr<Message>()>;
-
-  // MessageProcessor has the following fields:
-  // first - string with message description
-  // second - function which instantiates a Message object of specific type
-  // which is capable of parsing the message's body.
-  // third - vector of Decoder's methods which are invoked when the message
-  // is processed.
-  using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
-
-  // Frontend and Backend messages.
-  using MsgGroup = struct {
-    // String describing direction (Frontend or Backend).
-    absl::string_view direction_;
-    // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
-    absl::flat_hash_map<char, MessageProcessor> messages_;
-    // Handler used for processing messages not found in hash map.
-    MessageProcessor unknown_;
-  };
-
-  // Hash map binding keyword found in a message to an
-  // action to be executed when the keyword is found.
-  using KeywordProcessor = absl::flat_hash_map<std::string, MsgAction>;
-
-  // Structure is used for grouping keywords found in a specific message.
-  // Known keywords are dispatched via hash map and unknown keywords
-  // are handled by unknown_.
-  using MsgParserDict = struct {
-    // Handler for known keywords.
-    KeywordProcessor keywords_;
-    // Handler invoked when a keyword is not found in hash map.
-    MsgAction unknown_;
-  };
-
-  void processMessageBody(Buffer::Instance& data, absl::string_view direction, uint32_t length,
-                          MessageProcessor& msg, const std::unique_ptr<Message>& parser);
-  void decode(Buffer::Instance& data);
-  void decodeAuthentication();
-  void decodeBackendStatements();
-  void decodeBackendErrorResponse();
-  void decodeBackendNoticeResponse();
-  void decodeFrontendTerminate();
-  void decodeErrorNotice(MsgParserDict& types);
-  void onQuery();
-  void onParse();
-  void onStartup();
-
-  void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
-  void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
-  void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
-
-  // Helper method generating currently processed message in
-  // displayable format.
-  const std::string genDebugMessage(const std::unique_ptr<Message>& parser, Buffer::Instance& data,
-                                    uint32_t message_len);
-
-  DecoderCallbacks* callbacks_{};
-  SmtpSession session_{};
-
-  // The following fields store result of message parsing.
-  char command_{'-'};
-  std::string message_;
-  uint32_t message_len_{};
-
-  bool encrypted_{false}; // tells if exchange is encrypted
-
-  // Dispatchers for Backend (BE) and Frontend (FE) messages.
-  MsgGroup FE_messages_;
-  MsgGroup BE_messages_;
-
-  // Handler for startup smtp message.
-  // Startup message message which does not start with 1 byte TYPE.
-  // It starts with message length and must be therefore handled
-  // differently.
-  MessageProcessor first_;
-
-  // hash map for dispatching backend transaction messages
-  KeywordProcessor BE_statements_;
-
-  MsgParserDict BE_errors_;
-  MsgParserDict BE_notices_;
-
   // Buffer used to temporarily store a downstream smtp packet
   // while sending other packets. Currently used only when negotiating
   // upstream SSL.
   Buffer::OwnedImpl temp_storage_;
-
-  // MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
-  // as maximum size of initial packet.
-  // https://github.com/postgres/postgres/search?q=MAX_STARTUP_PACKET_LENGTH&type=code
-  static constexpr uint64_t MAX_STARTUP_PACKET_LENGTH = 10000;
 };
 
 } // namespace SmtpProxy

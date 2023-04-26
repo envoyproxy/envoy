@@ -11,7 +11,7 @@ envoy_contrib_package()
 
 #package(default_visibility = ["//visibility:public"])
 
-# SmtpSQL proxy L7 network filter.
+# Smtp proxy L7 network filter.
 # Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/smtp_proxy_filter
 
 envoy_cc_library(
@@ -29,13 +29,13 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//contrib/common/sqlutils/source:sqlutils_lib",
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
+	"//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha:pkg_cc_proto",
     ],

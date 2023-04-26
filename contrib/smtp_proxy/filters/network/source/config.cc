@@ -16,8 +16,10 @@ NetworkFilters::SmtpProxy::SmtpConfigFactory::createFilterFactoryFromProtoTyped(
 
   SmtpFilterConfig::SmtpFilterConfigOptions config_options;
   config_options.stats_prefix_ = fmt::format("smtp.{}", proto_config.stat_prefix());
-  config_options.enable_sql_parsing_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_sql_parsing, true);
+  if (proto_config.has_proxy_protocol_config()) {
+    config_options.proxy_protocol_config_ = proto_config.proxy_protocol_config();
+  }
+
   config_options.terminate_ssl_ = proto_config.terminate_ssl();
   config_options.upstream_ssl_ = proto_config.upstream_ssl();
 
