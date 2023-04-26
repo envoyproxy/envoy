@@ -1487,8 +1487,8 @@ public:
 private:
   using WildcardVirtualHosts =
       std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
-  using SubstringFunction = std::function<std::string(const std::string&, int)>;
-  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
+  using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
+  const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
