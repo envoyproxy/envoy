@@ -96,7 +96,6 @@ public:
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
   Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
-  Api::IoCallBoolResult createPath(absl::string_view path) override;
 };
 
 using FileImpl = FileImplWin32;
