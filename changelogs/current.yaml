@@ -19,9 +19,34 @@ minor_behavior_changes:
     to uppercase characters. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 - area: uhv
   change: |
-    Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
-    in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+    Using %DURATION% in access logs will either resolve the total duration of the stream, or mid-stream duration.
+    This is useful to track stream duration with periodic access logs.
+- area: matchers
+  change: |
+    Added dynamic metadata to the MatchingData object to enable writing matcher_tree input objects that can parse provided
+    dynamic metadata.
+- area: skywalking
+  change: |
+    If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when
+    sampling is enabled and disabled.
+- area: http3
+  change: |
+    Convert HTTP/3 extended connect to/from HTTP/1 upgrade. This behavior change can be reverted by setting
+    ``envoy.reloadable_features.use_http3_header_normalisation`` to ``false``.
+- area: http
+  change: |
+    prohibit route refresh after the response headers have been sent,  and clear the cached route table to more
+    aggressively free memory. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`` to false.
+- area: ext_authz
+  change: |
+    Ext_authz will add ``x-envoy-auth-failure-mode-allowed`` header when ``failure_mode_allow`` is enable.
+    This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
+- area: ext_proc
+  change: |
+    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check for header mutations beforce clearing the route cache.
+    Failures due to this check will be counted under the clear_route_cache_ignored stat.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -61,7 +86,119 @@ new_features:
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
 - area: ratelimit
   change: |
-    added new configuration field :ref:`domain
-    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
-    per-route basis.
+    added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
+- area: proxy_protocol
+  change: |
+    added the support :ref:`pass_through_tlvs for listener
+    <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>` and
+    :ref:`pass_through_tlvs for upsteam <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`. They can
+    control which Proxy Protocol V2 TLVs can be passed through by listener and upstream separately.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response trailers in :ref:`TunnelingConfig
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to
+    the downstream info filter state.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state
+    object under the key ``envoy.upstream.dynamic_host``.
+- area: access_log
+  change: |
+    added support for :ref:`%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+    <config_access_log_format_downstream_transport_failure_reason>` as a log command operator about why listener may have
+    failed due to a transport socket error, including TLS handshake failures. added the field
+    :ref:`downstream_transport_failure_reason
+    <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` for common usage as well.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for
+    the generic proxy.
+- area: jwt_authn
+  change: |
+    added :ref:`failed_status_in_metadata
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the
+    JWT authentication failure status code and message in dynamic metadata.
+- area: ext_proc
+  change: |
+    added the support :ref:`override_message_timeout
+    <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>` for the ext_proc server to send
+    back a message to Envoy to extend the ext_proc timer. added the field :ref:`max_message_timeout
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max
+    override_message_timeout could be sent back by the ext_proc server.
+- area: http filter
+  change: |
+    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request
+    and response headers in any position of HTTP filter chain.
+- area: matching
+  change: |
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for
+    matching based on filter state objects.
+- area: overload manager
+  change: |
+    added stat ``overload.refresh_interval_delay`` to track the delay between overload manager resource loop refresh in
+    milliseconds.
+- area: http
+  change: |
+    make adding ProxyProtocolFilterState in the HCM optional.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state
+    object under the key ``envoy.upstream.dynamic_port``.
+- area: route
+  change: |
+    support dynamic clusters for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: route
+  change: |
+    support route callback after route matches for :ref:`VirtualHost.matcher
+    <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object
+    for the key ``envoy.tcp_proxy.disable_tunneling``.
+- area: tcp_proxy
+  change: |
+    add :ref:`flush access log on connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` to allow recording
+    an access log entry on the connection open event. This option does not require periodic access logging enabled, and the
+    other way around.
+- area: http
+  change: |
+    add :ref:`periodic access logging
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+    to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION%
+    <config_access_log_format_duration>` will be empty for mid-request logs. Enabling this may affect access loggers and
+    filters that register as access loggers that expect to be called only once.
+- area: http
+  change: |
+    add :ref:`flush access log on new request
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
+    to allow recording an access log entry when a new HTTP request is received by the HTTP connection manager. Details
+    related to upstream cluster, such as upstream host, will not be available for this log. This option does not require
+    periodic access logging enabled, and the other way around.
+- area: redis_health_check
+  change: |
+    added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check
+    failure.
+- area: redis
+  change: |
+    added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for
+    :ref:`Redis Cluster<arch_overview_redis>`.
+- area: ext_authz
+  change: |
+    added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>`
+    to support sending TLS SNI data as part of CheckRequest for authorization check.
+- area: tls
+  change: |
+    added new field :ref:`signature_algorithms
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature
+    algorithms.
+- area: metrics_service
+  change: |
+    added new configuration field :ref:`histogram_emit_mode
+    <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode>` to configure which stats
+    should be emitted for histograms.
+- area: ext_proc
+  change: |
+    added new configuration field :ref:`disable_clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the clear_route_cache_disabled stat.
 deprecated:
