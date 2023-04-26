@@ -61,6 +61,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",

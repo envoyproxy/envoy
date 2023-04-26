@@ -6,6 +6,7 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -132,6 +133,16 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.transportSocketFactoryContext();
   server.shutdownAdmin();
   server.shutdown();
+
+  server.admin()->addStreamingHandler("", "", nullptr, false, false);
+  server.admin()->addListenerToHandler(nullptr);
+  server.admin()->closeSocket();
+  server.admin()->startHttpListener({}, "", nullptr, nullptr, nullptr);
+
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(), false, false);
+
+  server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
