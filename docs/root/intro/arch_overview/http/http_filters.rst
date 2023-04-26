@@ -10,8 +10,7 @@ Filters can be written that operate on HTTP level messages without knowledge of 
 protocol (HTTP/1.1, HTTP/2, etc.) or multiplexing capabilities.
 
 HTTP filters can be downstream filters, associated with a given listener and doing stream processing on each
-downstream request before routing, or upstream filters, associated with a given cluster and doing stream once
-per upstream stream, processing after the router filter.
+downstream request before routing, or upstream filters, associated with a given cluster and doing stream processing once per upstream request, after the router filter.
 
 There are three types of HTTP level filters:
 

@@ -461,7 +461,7 @@ stream allocated from the HTTP connection pool. It also is responsible for reque
 and affinity.
 
 The router filter is also responsible for the creation and running of the `Upstream HTTP filter <arch_overview_http_filters>`
-chain. By default, upstream filters will start running immediately after headers arrived at the router
+chain. By default, upstream filters will start running immediately after headers arrive at the router
 filter, however C++ filters can pause until the upstream connection is established if they need to
 inspect the upstream stream or connection. Upstream filter chains are by default configured via cluster
 configuration, so for example a shadowed request can have a separate upstream filter chain for the primary
