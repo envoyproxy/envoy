@@ -30,8 +30,10 @@ class EdsClusterImpl
     : public BaseDynamicClusterImpl,
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                 ClusterFactoryContext& cluster_context);
+  EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                 const envoy::config::cluster::v3::Cluster& cluster,
+                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                 bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -114,7 +116,8 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
 

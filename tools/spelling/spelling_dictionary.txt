@@ -479,7 +479,6 @@ acks
 acls
 addr
 agg
-AggregationTemporality
 alice
 alignas
 alignof
@@ -1163,7 +1162,6 @@ retransmitted
 retransmitting
 retriable
 retriggers
-retryable
 revalidated
 revalidation
 reverify

@@ -10,7 +10,7 @@
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
 

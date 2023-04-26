@@ -61,9 +61,6 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
-    ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
-      return api_->threadFactory();
-    }));
     ON_CALL(file_system_, fileReadToEnd(_))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
@@ -113,10 +110,12 @@ public:
     }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
-        server_.httpContext(),
+        server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.secretManager(), server_.quic_stat_names_, server_);
+        ssl_context_manager_, server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+        server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+        server_.routerContext(), server_.accessLogManager(), server_.singletonManager(),
+        server_.options(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();

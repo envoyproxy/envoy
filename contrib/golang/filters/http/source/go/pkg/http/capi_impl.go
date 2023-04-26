@@ -51,8 +51,6 @@ const (
 	ValueAttemptCount            = 6
 	ValueDownstreamLocalAddress  = 7
 	ValueDownstreamRemoteAddress = 8
-	ValueUpstreamHostAddress     = 9
-	ValueUpstreamClusterName     = 10
 )
 
 type httpCApiImpl struct{}
