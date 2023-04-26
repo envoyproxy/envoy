@@ -918,8 +918,9 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     }
     break;
   case EnvoyValue::UpstreamClusterName:
-    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->cluster().name();
+    if (state.streamInfo().upstreamClusterInfo().has_value() &&
+        state.streamInfo().upstreamClusterInfo().value()) {
+      req_->strValue = state.streamInfo().upstreamClusterInfo().value()->name();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
