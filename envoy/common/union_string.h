@@ -58,10 +58,7 @@ public:
   /**
    * Default constructor. Sets up for inline storage.
    */
-  UnionStringBase() : buffer_(InlinedStringVector()) {
-    ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
-    ASSERT(valid());
-  }
+  UnionStringBase();
 
   /**
    * Constructor for a string reference.

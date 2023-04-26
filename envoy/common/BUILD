@@ -109,6 +109,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "union_string",
+    srcs = ["union_string.cc"],
     hdrs = [
         "union_string.h",
     ],
