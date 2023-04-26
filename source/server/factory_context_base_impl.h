@@ -12,7 +12,7 @@ public:
                          OptRef<Server::Admin> admin, Runtime::Loader& runtime,
                          Singleton::Manager& singleton_manager,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Stats::Store& store, ThreadLocal::SlotAllocator& local)
+                         Stats::Store& store, ThreadLocal::Instance& local)
       : options_(options), main_thread_dispatcher_(main_thread_dispatcher), api_(api),
         local_info_(local_info), admin_(admin), runtime_(runtime),
         singleton_manager_(singleton_manager), validation_visitor_(validation_visitor),

@@ -126,9 +126,10 @@ public:
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
+        server_context_, server_context_.cluster_manager_, stats_, nullptr, ssl_context_manager_,
+        nullptr, false, validation_visitor_);
+    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, factory_context,
+                                                runtime_.loader(), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
@@ -147,12 +148,14 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
-  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
+  NiceMock<Random::MockRandomGenerator> random_;
+  TestScopedRuntime runtime_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {

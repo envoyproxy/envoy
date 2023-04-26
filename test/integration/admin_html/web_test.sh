@@ -35,7 +35,7 @@ $ENVOY_BIN -c test/integration/admin_html/web_test.yaml \
   --admin-address-path "$tmp/admin.port" >& "$tmp/envoy.log" &
 
 echo "*** Waiting for the Envoy server to write admin port to $tmp/admin.port ..."
-admin_port=$(wait_for_admin_returning_admin_address "$tmp/admin.port")
+admin_port=$(wait_for_admin "$tmp/admin.port")
 
 echo ""
 echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
@@ -45,7 +45,7 @@ echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
 echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
 test_url="$admin_port/test?file=web_test.html"
-active_stats_url="$admin_port/stats?format=active-html"
+active_stats_url="$admin_port/stats?format=active"
 echo $browser "$test_url" "$active_stats_url" ">&" "$tmp/browser.log"
 $browser "$test_url" "$active_stats_url" >& "$tmp/browser.log"
 
