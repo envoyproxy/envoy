@@ -9,9 +9,6 @@ minor_behavior_changes:
   change: |
     Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
     the stream is reset when a connection pool's connection fails.
-- area: custom response
-  change: |
-    The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
@@ -28,18 +25,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: http
-  change: |
-    removed runtime key ``envoy.reloadable_features.allow_upstream_filters`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
-- area: logging
-  change: |
-    removed runtime key ``envoy.reloadable_features.correct_remote_address`` and legacy code paths.
-- area: http
-  change: |
-    removed runtime key ``envoy.reloadable_features.http_response_half_close`` and legacy code paths.
 
 new_features:
 - area: http
@@ -47,14 +35,9 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
-- area: stat_sinks
-  change: |
-    Added ``envoy.stat_sinks.open_telemetry`` stats_sink, that supports flushing metrics by the OTLP protocol,
-    for supported Open Telemetry collectors.
 - area: redis_proxy
   change: |
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
-
 deprecated:
