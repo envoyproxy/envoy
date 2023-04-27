@@ -87,6 +87,7 @@ paths:
   exception:
     include:
     - source/common/config/utility.h
+    - source/common/protobuf/visitor_helper.h
     # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
     exclude:
     - source/common/http/http2/codec_impl.h
