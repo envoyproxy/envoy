@@ -104,7 +104,7 @@ public:
                   bool validate_clusters_default = false);
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const;
-  absl::string_view name() { return name_; }
+  absl::string_view name() const { return name_; }
 
 private:
   std::string name_;
@@ -120,7 +120,7 @@ public:
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
 
-  absl::string_view name() { return name_; }
+  absl::string_view name() const { return name_; }
 
 private:
   using WildcardVirtualHosts =
