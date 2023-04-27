@@ -30,6 +30,7 @@ Common messages
   ../extensions/early_data/v3/default_early_data_policy.proto
   ../config/core/v3/http_uri.proto
   ../extensions/matching/input_matchers/ip/v3/ip.proto
+  ../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto
   ../config/core/v3/address.proto
   ../config/core/v3/protocol.proto
   ../config/core/v3/proxy_protocol.proto

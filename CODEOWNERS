@@ -165,6 +165,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
+# runtime fraction input matcher
+/*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @UNOWNED
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
 # format string matching
