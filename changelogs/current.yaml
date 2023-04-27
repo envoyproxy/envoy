@@ -89,8 +89,8 @@ new_features:
     per-route basis.
 - area: ext_proc
   change: |
-    added new configuration field :ref:`disable_clear_route_cache
-    <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    added new configuration field
+    :ref:`disable_clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
     to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
     clear_route_cache_disabled stat.
 deprecated:
