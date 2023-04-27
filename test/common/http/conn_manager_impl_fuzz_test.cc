@@ -255,6 +255,7 @@ public:
   bool use_srds_{};
   Router::MockRouteConfigProvider route_config_provider_;
   Router::MockScopedRouteConfigProvider scoped_route_config_provider_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
