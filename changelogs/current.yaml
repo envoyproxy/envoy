@@ -24,8 +24,9 @@ minor_behavior_changes:
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 - area: ext_proc
   change: |
-    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check for header mutations beforce clearing the route cache.
-    Failures due to this check will be counted under the clear_route_cache_ignored stat.
+    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check
+    for header mutations beforce clearing the route cache. Failures due to this check will be counted under the
+    clear_route_cache_ignored stat.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -70,6 +71,8 @@ new_features:
     per-route basis.
 - area: ext_proc
   change: |
-    added new configuration field :ref:`disable_clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
-    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the clear_route_cache_disabled stat.
+    added new configuration field :ref:`disable_clear_route_cache
+    <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
+    clear_route_cache_disabled stat.
 deprecated:
