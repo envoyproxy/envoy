@@ -1922,8 +1922,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         virtual_host_config, optional_http_filters, global_route_config, factory_context,
         *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      const Http::LowerCaseString lower_case_donain_name(domain_name);
-      absl::string_view domain = lower_case_donain_name;
+      const Http::LowerCaseString lower_case_domain_name(domain_name);
+      absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
