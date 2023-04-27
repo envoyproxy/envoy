@@ -96,7 +96,8 @@ message RouteConfiguration {
   // The match tree to use when resolving route actions for incoming requests.
   // If no any virtual host is configured in the ``virtual_hosts`` field or no special wildcard
   // virtual host is configured, the ``routes`` field will be used as the default route table.
-  // If the wildcard virtual host is configured, the ``routes`` field will be ignored.
+  // If both the wildcard virtual host and ``routes`` are configured, the configuration will fail
+  // to load.
   xds.type.matcher.v3.Matcher routes = 2;
 
   // An array of virtual hosts that make up the route table.

@@ -566,7 +566,7 @@ TEST_F(RouteMatcherImplTest, RouteConfigurationWithUnknownInput) {
   EXPECT_EQ(nullptr, route_matcher_.get());
 }
 
-static const std::string RouteConfigurationYamlWithoutHost = R"EOF(
+static const std::string RouteConfigurationYamlWithoutDefaultHost = R"EOF(
 name: test_matcher_tree
 virtual_hosts:
 - hosts:
@@ -594,8 +594,8 @@ virtual_hosts:
                     key_0: value_0
 )EOF";
 
-TEST_F(RouteMatcherImplTest, NoHost) {
-  initialize(RouteConfigurationYamlWithoutHost);
+TEST_F(RouteMatcherImplTest, NoHostMatch) {
+  initialize(RouteConfigurationYamlWithoutDefaultHost);
 
   // Test the host not match.
   {
@@ -606,6 +606,168 @@ TEST_F(RouteMatcherImplTest, NoHost) {
 
     EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
   }
+}
+
+static const std::string RouteConfigurationYamlWithRepeatedHost = R"EOF(
+name: test_matcher_tree
+virtual_hosts:
+- hosts:
+  - "service_0"
+  - "service_0"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.host
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
+)EOF";
+
+TEST_F(RouteMatcherImplTest, RouteConfigurationYamlWithRepeatedHost) {
+  EXPECT_THROW_WITH_MESSAGE(initialize(RouteConfigurationYamlWithRepeatedHost), EnvoyException,
+                            "Only unique values for host are permitted. Duplicate "
+                            "entry of domain service_0 in route test_matcher_tree");
+  EXPECT_EQ(nullptr, route_matcher_.get());
+}
+
+static const std::string RouteConfigurationYamlWithMultipleWildcard = R"EOF(
+name: test_matcher_tree
+virtual_hosts:
+- hosts:
+  - "*"
+  - "*"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.host
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
+)EOF";
+
+TEST_F(RouteMatcherImplTest, RouteConfigurationYamlWithMultipleWildcard) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize(RouteConfigurationYamlWithMultipleWildcard), EnvoyException,
+      "Only a single wildcard domain is permitted in route test_matcher_tree");
+  EXPECT_EQ(nullptr, route_matcher_.get());
+}
+
+static const std::string RouteConfigurationYamlWithMultipleWildcard2 = R"EOF(
+name: test_matcher_tree
+virtual_hosts:
+- hosts:
+  - "*"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.host
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
+routes:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: envoy.matching.generic_proxy.input.host
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+          value_match:
+            exact: "service_0"
+      on_match:
+        action:
+          name: envoy.matching.action.generic_proxy.route
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+            cluster: "cluster_0"
+            metadata:
+              filter_metadata:
+                mock_filter:
+                  key_0: value_0
+)EOF";
+
+TEST_F(RouteMatcherImplTest, RouteConfigurationYamlWithMultipleWildcard2) {
+  EXPECT_THROW_WITH_MESSAGE(initialize(RouteConfigurationYamlWithMultipleWildcard2), EnvoyException,
+                            "'routes' cannot be specified at the same time as a "
+                            "catch-all ('*') virtual host in route test_matcher_tree");
+  EXPECT_EQ(nullptr, route_matcher_.get());
+}
+
+static const std::string RouteConfigurationYamlWithEmptyHost = R"EOF(
+name: test_matcher_tree
+virtual_hosts:
+- hosts:
+  - ""
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.host
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
+)EOF";
+
+TEST_F(RouteMatcherImplTest, RouteConfigurationYamlWithEmptyHost) {
+  EXPECT_THROW_WITH_MESSAGE(initialize(RouteConfigurationYamlWithEmptyHost), EnvoyException,
+                            "Invalid empty host name in route test_matcher_tree");
+  EXPECT_EQ(nullptr, route_matcher_.get());
 }
 
 } // namespace

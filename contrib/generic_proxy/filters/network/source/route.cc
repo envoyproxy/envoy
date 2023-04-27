@@ -91,23 +91,32 @@ RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,
                                    bool validate_clusters)
     : name_(route_config.name()) {
+  constexpr absl::string_view wildcard_flag{"*"};
+
+  // TODO(wbpcode): maybe share the same code with common/router/config_impl.cc by using template.
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host =
         std::make_shared<VirtualHostImpl>(virtual_host_config, context, validate_clusters);
     for (const std::string& host_name : virtual_host_config.hosts()) {
+      if (host_name.empty()) {
+        throw EnvoyException(
+            fmt::format("Invalid empty host name in route {}", route_config.name()));
+      }
+
       absl::string_view host_name_view{host_name};
       bool duplicate_found = false;
-      if ("*" == host_name_view) {
-        if (default_virtual_host_) {
+      if (wildcard_flag == host_name_view) {
+        // Catch all virtual host.
+        if (default_virtual_host_ != nullptr) {
           throw EnvoyException(fmt::format("Only a single wildcard domain is permitted in route {}",
                                            route_config.name()));
         }
         default_virtual_host_ = virtual_host;
-      } else if (!host_name_view.empty() && '*' == host_name_view[0]) {
+      } else if (absl::StartsWith(host_name_view, wildcard_flag)) {
         duplicate_found = !wildcard_virtual_host_suffixes_[host_name_view.size() - 1]
                                .emplace(host_name_view.substr(1), virtual_host)
                                .second;
-      } else if (!host_name_view.empty() && '*' == host_name_view[host_name_view.size() - 1]) {
+      } else if (absl::EndsWith(host_name_view, wildcard_flag)) {
         duplicate_found =
             !wildcard_virtual_host_prefixes_[host_name_view.size() - 1]
                  .emplace(host_name_view.substr(0, host_name_view.size() - 1), virtual_host)
@@ -123,11 +132,19 @@ RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
     }
   }
 
-  if (default_virtual_host_ == nullptr && route_config.has_routes()) {
-    ProtoVirtualHost proto_virtual_host;
-    proto_virtual_host.mutable_routes()->MergeFrom(route_config.routes());
-    default_virtual_host_ =
-        std::make_shared<VirtualHostImpl>(proto_virtual_host, context, validate_clusters);
+  // 'routes' is supported for backwards compatibility. It will be used as default virtual host
+  // if no catch-all virtual host is specified.
+  if (route_config.has_routes()) {
+    if (default_virtual_host_ == nullptr) {
+      ProtoVirtualHost proto_virtual_host;
+      proto_virtual_host.mutable_routes()->MergeFrom(route_config.routes());
+      default_virtual_host_ =
+          std::make_shared<VirtualHostImpl>(proto_virtual_host, context, validate_clusters);
+    } else {
+      throw EnvoyException(fmt::format("'routes' cannot be specified at the same time as a "
+                                       "catch-all ('*') virtual host in route {}",
+                                       route_config.name()));
+    }
   }
 }
 
