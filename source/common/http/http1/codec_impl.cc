@@ -127,7 +127,7 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+void ResponseEncoderImpl::encode1xxHeaders(ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
@@ -398,7 +398,7 @@ const Network::ConnectionInfoProvider& StreamEncoderImpl::connectionInfoProvider
 static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
 static constexpr absl::string_view HTTP_10_RESPONSE_PREFIX = "HTTP/1.0 ";
 
-void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
+void ResponseEncoderImpl::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present and valid.

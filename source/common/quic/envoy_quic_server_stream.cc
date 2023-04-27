@@ -43,12 +43,12 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   set_ack_listener(stats_gatherer_);
 }
 
-void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
+void EnvoyQuicServerStream::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
   ASSERT(Http::HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
-void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
+void EnvoyQuicServerStream::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   if (write_side_closed()) {
     IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
@@ -63,9 +63,14 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
-    modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
-    Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
-    header_map = modified_headers.get();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http2_no_copy_response_transformation")) {
+      Http::Utility::transformUpgradeResponseFromH1toH3(headers);
+    } else {
+      modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
+      Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
+      header_map = modified_headers.get();
+    }
   }
 
   // This is counting not serialized bytes in the send buffer.

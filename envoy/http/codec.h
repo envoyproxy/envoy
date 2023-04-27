@@ -148,7 +148,7 @@ public:
    * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
    * @param headers supplies the 1xx header map to encode.
    */
-  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -156,7 +156,7 @@ public:
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only response.
    */
-  virtual void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.

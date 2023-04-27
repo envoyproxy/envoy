@@ -109,10 +109,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                      /*server_name=*/config_.serverName(),
                                      /*proxy_status_config=*/config_.proxyStatusConfig())) {}
 
-const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
-  static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
+ResponseHeaderMapPtr ConnectionManagerImpl::continueHeader() {
+  return createHeaderMap<ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}});
-  return *headers;
 }
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -1104,8 +1103,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                              Headers::get().ExpectValues._100Continue)) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
-    chargeStats(continueHeader());
-    response_encoder_->encode1xxHeaders(continueHeader());
+    ResponseHeaderMapPtr continue_headers = continueHeader();
+    chargeStats(*continue_headers);
+    response_encoder_->encode1xxHeaders(*continue_headers);
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
   }

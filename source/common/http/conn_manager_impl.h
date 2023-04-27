@@ -77,7 +77,7 @@ public:
                                  ConnectionManagerTracingStats& tracing_stats);
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
-  static const ResponseHeaderMap& continueHeader();
+  static ResponseHeaderMapPtr continueHeader();
 
   // Currently the ConnectionManager creates a codec lazily when either:
   //   a) onConnection for H3.

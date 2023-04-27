@@ -26,6 +26,10 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: http2
+  change: |
+    Modify response header map inline for HTTP/1 upgrade to HTTP/2 extended CONNECT transformation. This behavior can be reverted by
+    setting runtime flag ``envoy.reloadable_features.http2_no_copy_response_transformation`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -243,7 +243,7 @@ ConnectionImpl::StreamImpl::buildHeaders(const HeaderMap& headers) {
   return out;
 }
 
-void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
@@ -285,21 +285,28 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   return okStatus();
 }
 
-void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
-                                                     bool end_stream) {
+void ConnectionImpl::ServerStreamImpl::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
 
-  // This must exist outside of the scope of isUpgrade as the underlying memory is
-  // needed until encodeHeadersBase has been called.
-  Http::ResponseHeaderMapPtr modified_headers;
-  if (Http::Utility::isUpgrade(headers)) {
-    modified_headers = createHeaderMap<ResponseHeaderMapImpl>(headers);
-    Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
-    encodeHeadersBase(*modified_headers, end_stream);
-  } else {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_no_copy_response_transformation")) {
+    if (Http::Utility::isUpgrade(headers)) {
+      Http::Utility::transformUpgradeResponseFromH1toH2(headers);
+    }
     encodeHeadersBase(headers, end_stream);
+  } else {
+    // This must exist outside of the scope of isUpgrade as the underlying memory is
+    // needed until encodeHeadersBase has been called.
+    Http::ResponseHeaderMapPtr modified_headers;
+    if (Http::Utility::isUpgrade(headers)) {
+      modified_headers = createHeaderMap<ResponseHeaderMapImpl>(headers);
+      Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
+      encodeHeadersBase(*modified_headers, end_stream);
+    } else {
+      encodeHeadersBase(headers, end_stream);
+    }
   }
 }
 

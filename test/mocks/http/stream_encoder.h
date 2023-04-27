@@ -45,8 +45,8 @@ public:
   ~MockResponseEncoder() override;
 
   // Http::ResponseEncoder
-  MOCK_METHOD(void, encode1xxHeaders, (const ResponseHeaderMap& headers));
-  MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream));
+  MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
   MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder));
   MOCK_METHOD(void, setDeferredLoggingHeadersAndTrailers,

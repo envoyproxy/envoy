@@ -28,8 +28,8 @@ public:
   QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
   // Http::StreamEncoder
-  void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
-  void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
+  void encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
+  void encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;

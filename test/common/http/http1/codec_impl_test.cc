@@ -209,7 +209,8 @@ public:
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
-    response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    TestResponseHeaderMapImpl response{{":status", "200"}};
+    response_encoder->encodeHeaders(response, true);
   }
 
   void createHeaderValidator() {
@@ -2005,7 +2006,8 @@ TEST_P(Http1ServerConnectionImplTest, DoubleRequest) {
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(request.size(), buffer.length());
 
-  response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  TestResponseHeaderMapImpl response{{":status", "200"}};
+  response_encoder->encodeHeaders(response, true);
 
   status = codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
