@@ -60,9 +60,6 @@ public:
   explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config)
       : config_(std::move(config)) {}
 
-  // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  // ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
-
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
 };
