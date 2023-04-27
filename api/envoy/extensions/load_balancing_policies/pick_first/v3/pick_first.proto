@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Pick First Load Balancing Policy]
-// [#extension: envoy.load_balancing_policies.pick_first]
+// [#not-implemented-hide:]
 
 // This configuration allows the built-in PICK_FIRST LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
