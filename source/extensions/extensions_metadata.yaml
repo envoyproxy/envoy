@@ -1471,6 +1471,11 @@ envoy.load_balancing_policies.maglev:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.maglev.v3.Maglev
+envoy.load_balancing_policies.subset:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

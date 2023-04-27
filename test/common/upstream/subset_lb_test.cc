@@ -10,8 +10,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
-#include "source/common/upstream/subset_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"

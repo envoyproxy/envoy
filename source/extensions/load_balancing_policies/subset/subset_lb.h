@@ -30,9 +30,10 @@ using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
   SubsetLoadBalancer(
-      LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-      ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-      Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+      LoadBalancerType lb_type, const PrioritySet& priority_set,
+      const PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const LoadBalancerSubsetInfo& subsets,
       OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
       OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
       OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
