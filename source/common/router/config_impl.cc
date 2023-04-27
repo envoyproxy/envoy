@@ -1884,7 +1884,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
-    const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
+    absl::string_view host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
     RouteMatcher::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
@@ -1897,7 +1897,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     if (wildcard_length >= host.size()) {
       continue;
     }
-    const auto& match = wildcard_map.find(substring_function(host, wildcard_length));
+    const auto match = wildcard_map.find(substring_function(host, wildcard_length));
     if (match != wildcard_map.end()) {
       return match->second.get();
     }
@@ -1922,7 +1922,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         virtual_host_config, optional_http_filters, global_route_config, factory_context,
         *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      const std::string domain = Http::LowerCaseString(domain_name).get();
+      const Http::LowerCaseString lower_case_domain_name(domain_name);
+      absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
@@ -1975,14 +1976,14 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
   const std::string host = absl::AsciiStrToLower(host_header_value);
-  const auto& iter = virtual_hosts_.find(host);
+  const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   }
   if (!wildcard_virtual_host_suffixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_suffixes_,
-        [](const std::string& h, int l) -> std::string { return h.substr(h.size() - l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
     if (vhost != nullptr) {
       return vhost;
     }
@@ -1990,7 +1991,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   if (!wildcard_virtual_host_prefixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_prefixes_,
-        [](const std::string& h, int l) -> std::string { return h.substr(0, l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
     if (vhost != nullptr) {
       return vhost;
     }
