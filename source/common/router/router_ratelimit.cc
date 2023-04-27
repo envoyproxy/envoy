@@ -64,7 +64,7 @@ public:
     if (absl::holds_alternative<absl::monostate>(result.data_)) {
       return false;
     }
-    auto str = absl::get<std::string>(result.data_);
+    const std::string& str = absl::get<std::string>(result.data_);
     if (!str.empty()) {
       descriptor_entry = {descriptor_key_, str};
     }

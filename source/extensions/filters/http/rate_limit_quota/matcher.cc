@@ -42,7 +42,7 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
       if (absl::holds_alternative<absl::monostate>(result.data_)) {
         return absl::InternalError("Failed to generate the id from custom value config.");
       }
-      auto str = absl::get<std::string>(result.data_);
+      const std::string& str = absl::get<std::string>(result.data_);
       if (!str.empty()) {
         // Build the bucket id from the matched result.
         bucket_id.mutable_bucket()->insert({bucket_id_key, str});

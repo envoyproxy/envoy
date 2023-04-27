@@ -33,7 +33,7 @@ bool Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
   if (ip_str.empty()) {
     return false;
   }
-  const auto ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
+  const std::string& ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
     ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
