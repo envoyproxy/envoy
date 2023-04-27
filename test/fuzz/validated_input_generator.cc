@@ -419,7 +419,7 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
       // No required member in one of set, so create one.
       for (int index = 0; index < oneof_desc->field_count(); ++index) {
         const std::string parents_class_name = parents.back()->GetDescriptor()->full_name();
-        // Treat matchers special, because in their oneof they reference themself, which may
+        // Treat matchers special, because in their oneof they reference themselves, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.
         if ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
