@@ -31,8 +31,9 @@ message FilterConfig {
     // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
     common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
 
-    // The timeout used for sub cluster initialization. Defaults to 5s if not set.
-    google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
+    // The configuration that the filter will use, when the related dynamic forward proxy cluster enabled
+    // sub clusters.
+    SubClusterConfig sub_cluster_config = 3;
   }
 
   // When this flag is set, the filter will add the resolved upstream address in the filter
@@ -74,4 +75,9 @@ message PerRouteConfig {
     //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 2;
   }
+}
+
+message SubClusterConfig {
+  // The timeout used for sub cluster initialization. Defaults to 5s if not set.
+  google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
 }

@@ -41,7 +41,8 @@ public:
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-  cluster_init_timeout: 5s
+  sub_cluster_config:
+    cluster_init_timeout: 5s
 )EOF";
     const std::string filter_use_dns_cache =
         fmt::format(R"EOF(

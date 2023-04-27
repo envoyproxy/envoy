@@ -58,7 +58,8 @@ ProxyFilterConfig::ProxyFilterConfig(
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
-      cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cluster_init_timeout, 5000)),
+      cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config.sub_cluster_config(),
+                                                       cluster_init_timeout, 5000)),
       save_upstream_address_(proto_config.save_upstream_address()) {
   tls_slot_.set(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalClusterInfo>(*this); });
