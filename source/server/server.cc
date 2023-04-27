@@ -127,7 +127,8 @@ InstanceImpl::InstanceImpl(
   }
   END_TRY
   catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+    ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+              options.configProto().DebugString(), options.configYaml(), options.configPath(),
               e.what());
     terminate();
     throw;
@@ -384,13 +385,24 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+#else
+    if (!config_path.empty()) {
+      throw EnvoyException("Cannot load from file with YAML disabled\n");
+    }
+    UNREFERENCED_PARAMETER(api);
+#endif
   }
   if (!config_yaml.empty()) {
+#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
+#else
+    throw EnvoyException("Cannot load from YAML with YAML disabled\n");
+#endif
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -701,11 +713,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), admin(), runtime(), stats_store_, thread_local_,
+      serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
+      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -824,7 +834,9 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
+#ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+#endif
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),

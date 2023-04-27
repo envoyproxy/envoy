@@ -43,10 +43,12 @@ private:
   };
 
   // Common::ImplBase
-  void emitLog(const Http::RequestHeaderMap& request_headers,
-               const Http::ResponseHeaderMap& response_headers,
-               const Http::ResponseTrailerMap& response_trailers,
-               const StreamInfo::StreamInfo& stream_info) override;
+  void
+  emitLog(const Http::RequestHeaderMap& request_headers,
+          const Http::ResponseHeaderMap& response_headers,
+          const Http::ResponseTrailerMap& response_trailers,
+          const StreamInfo::StreamInfo& stream_info,
+          AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) override;
 
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
