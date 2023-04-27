@@ -70,6 +70,19 @@ latency_thresholds:
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
+TEST(ZookeeperFilterConfigTest, TooSmallLatencyThreshold) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+latency_thresholds:
+  - opcode: Default
+    threshold:
+      nanos: 999999
+  )EOF";
+
+  ZooKeeperProxyProtoConfig proto_config;
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
+}
+
 TEST(ZookeeperFilterConfigTest, UnsetLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix

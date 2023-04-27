@@ -94,6 +94,6 @@ message LatencyThreshold {
   // The latency threshold of each opcode.
   google.protobuf.Duration threshold = 2 [(validate.rules).duration = {
     required: true
-    gt {}
+    gte {nanos: 1000000}
   }];
 }
