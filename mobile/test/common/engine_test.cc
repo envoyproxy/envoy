@@ -21,7 +21,7 @@ struct TestEngineHandle {
     run_engine(handle_, yaml.c_str(), level.c_str(), "");
   }
 
-  void terminate() { terminate_engine(handle_, /* release */ false); }
+  envoy_status_t terminate() { return terminate_engine(handle_, /* release */ false); }
 
   ~TestEngineHandle() { terminate_engine(handle_, /* release */ true); }
 };
@@ -55,7 +55,7 @@ TEST_F(EngineTest, EarlyExit) {
   envoy_engine_t handle = engine_->handle_;
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  engine_->terminate();
+  ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   start_stream(handle, 0, {}, false);
