@@ -22,12 +22,12 @@ namespace {
 
 class NullSpanContext : public opentracing::SpanContext {
 public:
-  virtual void ForeachBaggageItem(
+  void ForeachBaggageItem(
       std::function<bool(const std::string& key, const std::string& value)>) const override {
     // not implemented
   }
 
-  virtual std::unique_ptr<opentracing::SpanContext> Clone() const noexcept {
+  virtual std::unique_ptr<opentracing::SpanContext> clone() const noexcept {
     return std::make_unique<NullSpanContext>(*this);
   }
 };
@@ -36,40 +36,40 @@ class NullSpan : public opentracing::Span {
 public:
   explicit NullSpan(const opentracing::Tracer& tracer) : tracer_(tracer) {}
 
-  virtual void FinishWithOptions(const opentracing::FinishSpanOptions&) noexcept override {
+  void FinishWithOptions(const opentracing::FinishSpanOptions&) noexcept override {
     // not implemented
   }
 
-  virtual void SetOperationName(opentracing::string_view /*name*/) noexcept override {
+  void SetOperationName(opentracing::string_view /*name*/) noexcept override {
     // not implemented
   }
 
-  virtual void SetTag(opentracing::string_view /*key*/,
+  void SetTag(opentracing::string_view /*key*/,
                       const opentracing::Value& /*value*/) noexcept override {
     // not implemented
   }
 
-  virtual void SetBaggageItem(opentracing::string_view /*key*/,
+  void SetBaggageItem(opentracing::string_view /*key*/,
                               opentracing::string_view /*value*/) noexcept override {
     // not implemented
   }
 
-  virtual std::string BaggageItem(opentracing::string_view /*key*/) const noexcept override {
+  std::string BaggageItem(opentracing::string_view /*key*/) const noexcept override {
     return ""; // not implemented
   }
 
-  virtual void
+  void
   Log(std::initializer_list<
       std::pair<opentracing::string_view, opentracing::Value>> /*fields*/) noexcept override {
     // not implemented
   }
 
-  virtual const opentracing::SpanContext& context() const noexcept override {
+  const opentracing::SpanContext& context() const noexcept override {
     static NullSpanContext context;
     return context;
   }
 
-  virtual const opentracing::Tracer& tracer() const noexcept override { return tracer_; }
+  const opentracing::Tracer& tracer() const noexcept override { return tracer_; }
 
   const opentracing::Tracer& tracer_;
 };
@@ -80,7 +80,7 @@ public:
       std::vector<std::pair<std::string, std::string>>& extracted_headers_destination)
       : extracted_headers_(&extracted_headers_destination) {}
 
-  virtual std::unique_ptr<opentracing::Span>
+  std::unique_ptr<opentracing::Span>
   StartSpanWithOptions(opentracing::string_view /*operation_name*/,
                        const opentracing::StartSpanOptions&) const noexcept override {
     return std::make_unique<NullSpan>(*this);
