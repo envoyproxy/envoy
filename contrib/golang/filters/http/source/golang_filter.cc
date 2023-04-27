@@ -201,7 +201,8 @@ void Filter::onDestroy() {
 
 // access_log is executed before the log of the stream filter
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&) {
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+                 Envoy::AccessLog::AccessLogType) {
   // Todo log phase of stream filter
 }
 
