@@ -142,6 +142,7 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  access_log_type: NotSet
   upstream_local_address:
     socket_address:
       address: "127.1.2.3"
@@ -214,6 +215,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -263,6 +265,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -340,6 +343,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -420,6 +424,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -477,6 +482,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -542,6 +548,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -597,6 +604,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -652,6 +660,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -707,6 +716,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -767,6 +777,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -859,6 +870,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -945,6 +957,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -1012,6 +1025,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -1070,6 +1084,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -1125,6 +1140,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"

@@ -72,7 +72,8 @@ public:
   explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
 
   void log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-           const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info) override {
+           const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info,
+           AccessLog::AccessLogType) override {
     func_(info);
   }
 

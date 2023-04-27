@@ -213,7 +213,8 @@ Filter::~Filter() {
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpConnectionEnd);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -813,7 +814,8 @@ void Filter::onUpstreamConnection() {
 
   if (config_->flushAccessLogOnConnected()) {
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                      AccessLog::AccessLogType::TcpUpstreamConnected);
     }
   }
 }
@@ -838,7 +840,8 @@ void Filter::onMaxDownstreamConnectionDuration() {
 
 void Filter::onAccessLogFlushInterval() {
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpPeriodic);
   }
   resetAccessLogFlushTimer();
 }
