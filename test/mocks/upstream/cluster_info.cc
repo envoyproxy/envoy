@@ -198,6 +198,7 @@ MockClusterInfo::MockClusterInfo()
             manager.applyFilterFactoryCb({}, factory_cb);
             return true;
           }));
+  ON_CALL(*this, loadBalancingPolicy).WillByDefault(ReturnRef(load_balancing_policy_));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
