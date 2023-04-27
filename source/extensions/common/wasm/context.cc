@@ -1556,7 +1556,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_read_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close");
       });
     }
     return WasmResult::Ok;
@@ -1565,7 +1565,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_write_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close");
       });
     }
     return WasmResult::Ok;
