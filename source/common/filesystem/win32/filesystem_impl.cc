@@ -1,7 +1,6 @@
 #include <fcntl.h>
 
 #include <chrono>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -185,15 +184,6 @@ Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
     return resultFailure<FileInfo>({}, ::GetLastError());
   }
   return resultSuccess(fileInfoFromAttributeData(full_path, data));
-}
-
-Api::IoCallBoolResult InstanceImplWin32::createPath(absl::string_view path) {
-  std::error_code ec;
-  while (path.size() > 0 && path.back() == '/') {
-    path.remove_suffix(1);
-  }
-  bool result = std::filesystem::create_directories(std::string{path}, ec);
-  return ec ? resultFailure(false, ec.value()) : resultSuccess(result);
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {

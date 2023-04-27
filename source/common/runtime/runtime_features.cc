@@ -31,7 +31,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
-RUNTIME_GUARD(envoy_reloadable_features_closer_shadow_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
@@ -66,7 +65,6 @@ RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
-RUNTIME_GUARD(envoy_reloadable_features_udp_proxy_connect);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_preserve_url_encoded_case);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_translate_backslash_to_slash);

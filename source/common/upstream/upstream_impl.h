@@ -1148,10 +1148,8 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                  bool added_via_api, TimeSource& time_source);
+  ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,

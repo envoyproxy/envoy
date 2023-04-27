@@ -67,7 +67,6 @@ public:
   MOCK_METHOD(PathSplitResult, splitPathFromFilename, (absl::string_view));
   MOCK_METHOD(bool, illegalPath, (const std::string&));
   MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view));
-  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view));
 };
 
 class MockWatcher : public Watcher {

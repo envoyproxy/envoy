@@ -128,7 +128,6 @@ private:
   bool connected_{false};
 };
 
-#ifdef ENVOY_ENABLE_YAML
 Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
@@ -140,9 +139,15 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+#ifdef ENVOY_ENABLE_YAML
   initializeUpstreamTlsContextConfig(
       Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
       *tls_context);
+#else
+  UNREFERENCED_PARAMETER(tls_context);
+  UNREFERENCED_PARAMETER(san_to_match);
+  RELEASE_ASSERT(0, "unsupported");
+#endif // ENVOY_ENABLE_YAML
 
   envoy::config::core::v3::TransportSocket message;
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
@@ -200,9 +205,14 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
-      time_system)};
+  Upstream::HostDescriptionConstSharedPtr host_description =
+      std::make_shared<Upstream::HostDescriptionImpl>(
+          cluster, "",
+          Network::Utility::resolveUrl(
+              fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
+          nullptr, envoy::config::core::v3::Locality().default_instance(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+          time_system);
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,
@@ -259,7 +269,6 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
-#endif // ENVOY_ENABLE_YAML
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
                                          ReadCallback response_data_callback,
