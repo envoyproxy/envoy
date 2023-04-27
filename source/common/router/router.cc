@@ -724,9 +724,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-        options.setFilterConfig(config_);
-      }
+      options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -971,9 +969,7 @@ void Filter::maybeDoShadowing() {
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled())
                        .setIsShadow(true);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-      options.setFilterConfig(config_);
-    }
+    options.setFilterConfig(config_);
     config_.shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                   options);
   }
