@@ -60,17 +60,17 @@ ConfigProviderPtr create(
             envoy::config::route::v3::ScopedRouteConfiguration,
             ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
         factory_context,
-        ScopedRoutesConfigProviderManagerOptArg(
-            config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            optional_http_filters));
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                optional_http_filters));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
-        ScopedRoutesConfigProviderManagerOptArg(
-            config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            optional_http_filters));
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                optional_http_filters));
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
     PANIC("not implemented");
@@ -140,9 +140,8 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
     const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
-    const std::string& name,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    envoy::config::core::v3::ConfigSource rds_config_source,
+    const std::string& name, Server::Configuration::ServerFactoryContext& factory_context,
+    const std::string& stat_prefix, envoy::config::core::v3::ConfigSource rds_config_source,
     RouteConfigProviderManager& route_config_provider_manager,
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
@@ -152,8 +151,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
-      rds_config_source_(std::move(rds_config_source)),
-      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager),
+      rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
+      route_config_provider_manager_(route_config_provider_manager),
       optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();
   if (scoped_rds.srds_resources_locator().empty()) {
@@ -621,8 +620,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
                 scoped_rds_config_source, typed_optarg.optional_http_filters_, manager_identifier,
-                typed_optarg.scoped_routes_name_, factory_context,
-                stat_prefix, typed_optarg.rds_config_source_,
+                typed_optarg.scoped_routes_name_, factory_context, stat_prefix,
+                typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
                     .routeConfigProviderManager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
@@ -638,8 +637,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
-      typed_optarg.rds_config_source_,
-      typed_optarg.optional_http_filters_);
+      typed_optarg.rds_config_source_, typed_optarg.optional_http_filters_);
 }
 
 } // namespace Router

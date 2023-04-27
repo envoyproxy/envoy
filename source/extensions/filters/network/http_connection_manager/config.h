@@ -18,8 +18,8 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
-#include "envoy/tracing/tracer_manager.h"
 #include "envoy/router/scopes.h"
+#include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
@@ -186,9 +186,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
-  const Router::ScopeKeyBuilder* scopeKeyBuilder() override {
-    return scope_key_builder_.get();
-  }
+  const Router::ScopeKeyBuilder* scopeKeyBuilder() override { return scope_key_builder_.get(); }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {

@@ -169,10 +169,7 @@ MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
 MockScopeKeyBuilder::MockScopeKeyBuilder() {
   ON_CALL(*this, computeScopeKey(_))
-      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr {
-
-        return nullptr;
-  }));
+      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr { return nullptr; }));
 }
 MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
 

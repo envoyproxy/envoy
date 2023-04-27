@@ -10,9 +10,9 @@
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/scopes.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
-#include "envoy/router/scopes.h"
 
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/config/subscription_base.h"
@@ -37,7 +37,8 @@ Envoy::Config::ConfigProviderPtr create(
 
 // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
 // configuration.
-ScopeKeyBuilderPtr createScopeKeyBuilder(const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+ScopeKeyBuilderPtr createScopeKeyBuilder(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config);
 
 } // namespace ScopedRoutesConfigProviderUtil
@@ -117,9 +118,8 @@ public:
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
       const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
-      const std::string& name,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      envoy::config::core::v3::ConfigSource rds_config_source,
+      const std::string& name, Server::Configuration::ServerFactoryContext& factory_context,
+      const std::string& stat_prefix, envoy::config::core::v3::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
