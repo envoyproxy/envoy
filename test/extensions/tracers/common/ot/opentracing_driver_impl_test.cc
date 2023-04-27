@@ -45,12 +45,12 @@ public:
   }
 
   void SetTag(opentracing::string_view /*key*/,
-                      const opentracing::Value& /*value*/) noexcept override {
+              const opentracing::Value& /*value*/) noexcept override {
     // not implemented
   }
 
   void SetBaggageItem(opentracing::string_view /*key*/,
-                              opentracing::string_view /*value*/) noexcept override {
+                      opentracing::string_view /*value*/) noexcept override {
     // not implemented
   }
 
@@ -58,9 +58,8 @@ public:
     return ""; // not implemented
   }
 
-  void
-  Log(std::initializer_list<
-      std::pair<opentracing::string_view, opentracing::Value>> /*fields*/) noexcept override {
+  void Log(std::initializer_list<
+           std::pair<opentracing::string_view, opentracing::Value>> /*fields*/) noexcept override {
     // not implemented
   }
 
