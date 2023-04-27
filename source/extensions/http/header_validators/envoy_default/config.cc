@@ -13,7 +13,13 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 ::Envoy::Http::HeaderValidatorFactoryPtr HeaderValidatorFactoryConfig::createFromProto(
-    const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validation_visitor) {
+    const Protobuf::Message& message, Server::Configuration::ServerFactoryContext& server_context) {
+
+  ProtobufMessage::ValidationVisitor& validation_visitor =
+      server_context.initManager().state() == Init::Manager::State::Initialized
+          ? server_context.messageValidationContext().dynamicValidationVisitor()
+          : server_context.messageValidationContext().staticValidationVisitor();
+
   auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
   const auto& proto_config =

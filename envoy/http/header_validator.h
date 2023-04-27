@@ -3,10 +3,8 @@
 #include <string>
 #include <tuple>
 
-#include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/protobuf/message_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -125,18 +123,6 @@ public:
 };
 
 using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;
-
-/**
- * Extension configuration for header validators.
- */
-class HeaderValidatorFactoryConfig : public Config::TypedFactory {
-public:
-  virtual HeaderValidatorFactoryPtr
-  createFromProto(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
-
-  std::string category() const override { return "envoy.http.header_validators"; }
-};
 
 } // namespace Http
 } // namespace Envoy

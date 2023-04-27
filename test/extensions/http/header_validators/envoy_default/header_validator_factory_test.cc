@@ -6,7 +6,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/mocks/http/header_validator.h"
-#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -32,11 +32,11 @@ protected:
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    uhv_factory_ = factory->createFromProto(typed_config.typed_config(), validation_visitor_);
+    uhv_factory_ = factory->createFromProto(typed_config.typed_config(), server_context_);
     return uhv_factory_->create(protocol, stats_);
   }
 
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   ::Envoy::Http::HeaderValidatorFactoryPtr uhv_factory_;
   NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
 

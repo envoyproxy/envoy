@@ -47,6 +47,7 @@ envoy_extension_cc_test(
     deps = [
         ":config_cc_proto",
         ":config_test_base",
+        "//envoy/http:header_validator_factory_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/http_connection_manager:config",

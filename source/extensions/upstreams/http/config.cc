@@ -8,6 +8,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
@@ -96,7 +97,7 @@ getAlternateProtocolsCacheOptions(
 
 Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
     [[maybe_unused]] const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
 
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
@@ -124,7 +125,7 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   }
 
   header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), validation_visitor);
+      factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
     throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                      header_validator_config.name()));
@@ -137,6 +138,13 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   }
 #endif
   return header_validator_factory;
+}
+
+ProtobufMessage::ValidationVisitor&
+getValidationVisitor(Server::Configuration::ServerFactoryContext& server_context) {
+  return server_context.initManager().state() == Init::Manager::State::Initialized
+             ? server_context.messageValidationContext().dynamicValidationVisitor()
+             : server_context.messageValidationContext().staticValidationVisitor();
 }
 
 } // namespace
@@ -165,9 +173,9 @@ uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-    ProtobufMessage::ValidationVisitor& validation_visitor)
-    : http1_settings_(
-          Envoy::Http::Http1::parseHttp1Settings(getHttpOptions(options), validation_visitor)),
+    Server::Configuration::ServerFactoryContext& server_context)
+    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(getHttpOptions(options),
+                                                             getValidationVisitor(server_context))),
       http2_options_(Http2::Utility::initializeAndValidateOptions(getHttp2Options(options))),
       http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
@@ -178,7 +186,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
               : absl::nullopt),
       http_filters_(options.http_filters()),
       alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options)),
-      header_validator_factory_(createHeaderValidatorFactory(options, validation_visitor)),
+      header_validator_factory_(createHeaderValidatorFactory(options, server_context)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {}

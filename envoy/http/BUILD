@@ -239,10 +239,18 @@ envoy_cc_library(
     name = "header_validator_interface",
     hdrs = ["header_validator.h"],
     deps = [
-        "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
-        "//envoy/protobuf:message_validator_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_validator_factory_interface",
+    hdrs = ["header_validator_factory.h"],
+    deps = [
+        ":header_validator_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
     ],
 )
 
