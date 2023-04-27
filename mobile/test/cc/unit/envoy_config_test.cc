@@ -446,35 +446,6 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   release_envoy_data(data);
 }
 
-TEST(TestConfig, AddVirtualClusterLegacy) {
-  EngineBuilder engine_builder;
-
-  engine_builder.addVirtualCluster(
-      "{headers: [{name: ':method', string_match: {exact: POST}}], name: cluster1}");
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
-
-  engine_builder.addVirtualCluster(
-      "{headers: [{name: ':method', string_match: {exact: GET}}], name: cluster2}");
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
-}
-
-TEST(TestConfig, AddVirtualCluster) {
-  EngineBuilder engine_builder;
-
-  std::vector<MatcherData> matchers = {{":method", MatcherData::EXACT, "POST"},
-                                       {":method", MatcherData::SAFE_REGEX, ".*E.*"}};
-  engine_builder.addVirtualCluster("cluster1", matchers);
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
-
-  engine_builder.addVirtualCluster("cluster2", matchers);
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
-}
-
 #ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, SetNodeId) {
   EngineBuilder engine_builder;
