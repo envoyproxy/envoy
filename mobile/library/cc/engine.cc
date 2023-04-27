@@ -24,12 +24,13 @@ StreamClientSharedPtr Engine::streamClient() {
 
 PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient>(); }
 
-void Engine::terminate() {
+envoy_status_t Engine::terminate() {
   if (terminated_) {
     throw std::runtime_error("attempting to double terminate Engine");
   }
-  terminate_engine(engine_, /* release */ false);
+  envoy_status_t ret = terminate_engine(engine_, /* release */ false);
   terminated_ = true;
+  return ret;
 }
 
 } // namespace Platform

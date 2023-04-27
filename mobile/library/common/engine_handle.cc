@@ -25,13 +25,14 @@ envoy_status_t EngineHandle::runEngine(envoy_engine_t handle, const char* config
   return ENVOY_FAILURE;
 }
 
-void EngineHandle::terminateEngine(envoy_engine_t handle, bool release) {
+envoy_status_t EngineHandle::terminateEngine(envoy_engine_t handle, bool release) {
   auto engine = reinterpret_cast<Envoy::Engine*>(handle);
-  engine->terminate();
+  envoy_status_t ret = engine->terminate();
   if (release) {
     // TODO(jpsim): Always delete engine to avoid leaking it
     delete engine;
   }
+  return ret;
 }
 
 } // namespace Envoy
