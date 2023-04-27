@@ -647,8 +647,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
 
 // Verifies small metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
-  // Make sure we have metadata coverage of the new style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -678,8 +676,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
 
 // Verifies large metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
-  // Make sure we have metadata coverage of the old style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1022,7 +1018,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
   codec_client_->rawConnection().write(bogus_data, false);
 
   // Verifies error is received.
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {

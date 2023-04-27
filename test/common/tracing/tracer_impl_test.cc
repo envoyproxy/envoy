@@ -93,6 +93,9 @@ protected:
   FinalizerImplTest() {
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info.upstreamInfo()->setUpstreamHost(shared_host);
+    ON_CALL(stream_info, upstreamClusterInfo())
+        .WillByDefault(
+            Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(cluster_info_)));
   }
   struct CustomTagCase {
     std::string custom_tag;
@@ -116,6 +119,8 @@ protected:
   NiceMock<MockSpan> span;
   NiceMock<MockConfig> config;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
   Upstream::MockHostDescription* host_{new NiceMock<Upstream::MockHostDescription>()};
 };
 
@@ -129,8 +134,8 @@ TEST_F(FinalizerImplTest, TestAll) {
   trace_context.context_protocol_ = "test";
 
   // Set upstream cluster.
-  host_->cluster_.name_ = "my_upstream_cluster";
-  host_->cluster_.observability_name_ = "my_upstream_cluster_observable";
+  cluster_info_->name_ = "my_upstream_cluster_from_cluster_info";
+  cluster_info_->observability_name_ = "my_upstream_cluster_observable_from_cluster_info";
 
   // Enable verbose logs.
   EXPECT_CALL(config, verbose).Times(2).WillRepeatedly(Return(true));
@@ -163,9 +168,10 @@ TEST_F(FinalizerImplTest, TestAll) {
   {
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+                             Eq("my_upstream_cluster_from_cluster_info")));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
-                             Eq("my_upstream_cluster_observable")));
+                             Eq("my_upstream_cluster_observable_from_cluster_info")));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
                              Eq("10.0.0.1:443"))); // Upstream address as 'peer.address'
@@ -199,9 +205,10 @@ TEST_F(FinalizerImplTest, TestAll) {
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
                              remote_address->asString())); // Downstream address as 'peer.address'
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+                             Eq("my_upstream_cluster_from_cluster_info")));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
-                             Eq("my_upstream_cluster_observable")));
+                             Eq("my_upstream_cluster_observable_from_cluster_info")));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
 
     const auto log_timestamp =
@@ -269,7 +276,12 @@ public:
     tracer_ = std::make_shared<TracerImpl>(std::move(driver_ptr), local_info_);
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info_.upstreamInfo()->setUpstreamHost(shared_host);
+
+    ON_CALL(stream_info_, upstreamClusterInfo())
+        .WillByDefault(
+            Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(cluster_info_)));
   }
+
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
@@ -281,7 +293,9 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<MockConfig> config_;
   NiceMock<MockDriver>* driver_;
-  HttpTracerSharedPtr tracer_;
+  TracerSharedPtr tracer_;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
   Upstream::MockHostDescription* host_{new NiceMock<Upstream::MockHostDescription>()};
 };
 
@@ -341,8 +355,8 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   EXPECT_CALL(*host_, address()).WillOnce(Return(remote_address));
-  EXPECT_CALL(host_->cluster_, name()).WillOnce(ReturnRef(cluster_name));
-  EXPECT_CALL(host_->cluster_, observabilityName()).WillOnce(ReturnRef(ob_cluster_name));
+  EXPECT_CALL(*cluster_info_, name()).WillOnce(ReturnRef(cluster_name));
+  EXPECT_CALL(*cluster_info_, observabilityName()).WillOnce(ReturnRef(ob_cluster_name));
 
   EXPECT_CALL(*second_span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));

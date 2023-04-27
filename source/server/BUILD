@@ -405,7 +405,7 @@ envoy_cc_library(
         "//envoy/server:options_interface",
         "//envoy/server:process_context_interface",
         "//envoy/stats:stats_macros",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",

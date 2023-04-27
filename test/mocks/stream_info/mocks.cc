@@ -100,6 +100,7 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
+  ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
     end_time_ = absl::make_optional<std::chrono::nanoseconds>(
@@ -122,7 +123,6 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
-  ON_CALL(*this, streamState()).WillByDefault(ReturnPointee(&stream_state_));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));

@@ -531,7 +531,72 @@ public:
     }
     return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
   }
-};
 
+  /**
+   * Returns Jittered Exponential BackOff Strategy from BackoffStrategy config if present or
+   * provided default timer values
+   * @param api_config_source config
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
+   * found in the config or 2. default base interval and default maximum interval is specified or 3.
+   * max interval is set to 10*default base interval
+   */
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source,
+      Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms) {
+
+    auto& grpc_services = api_config_source.grpc_services();
+    if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
+      return prepareJitteredExponentialBackOffStrategy(
+          grpc_services[0].envoy_grpc(), random, default_base_interval_ms, default_max_interval_ms);
+    }
+    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+                                                   default_max_interval_ms);
+  }
+
+  /**
+   * Prepares Jittered Exponential BackOff Strategy from config containing the Retry Policy
+   * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. RetryPolicy containing backoff values is
+   * found in config or 2. default base interval and default maximum interval is specified or 3.
+   * default max interval is set to 10*default base interval
+   */
+  template <typename T>
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const T& config, Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms) {
+    // If RetryPolicy containing backoff values is found in config
+    if (config.has_retry_policy() && config.retry_policy().has_retry_back_off()) {
+      return buildJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(), random,
+                                                     default_base_interval_ms,
+                                                     default_max_interval_ms);
+    }
+    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+                                                   default_max_interval_ms);
+  }
+
+private:
+  /**
+   * Returns Jittered Exponential BackOff Strategy from BackoffStrategy config or default
+   * values
+   * @param config (optional) BackoffStrategy config
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
+   * specified or 2. default base interval and default maximum interval is specified or 3.
+   * max interval is set to 10*default base interval
+   */
+  static JitteredExponentialBackOffStrategyPtr buildJitteredExponentialBackOffStrategy(
+      absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+      Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms);
+};
 } // namespace Config
 } // namespace Envoy
