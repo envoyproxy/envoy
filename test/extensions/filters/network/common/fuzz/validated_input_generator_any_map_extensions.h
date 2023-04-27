@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-ValidatedInputGenerator::AnyMap compose_filters_any_map();
+ValidatedInputGenerator::AnyMap composeFiltersAnyMap();
 
 } // namespace ProtobufMessage
 } // namespace Envoy

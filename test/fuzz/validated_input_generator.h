@@ -10,8 +10,7 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-template <typename T, typename R>
-static bool handle_numeric_rules(T& number, const R& number_rules);
+template <typename T, typename R> static bool handleNumericRules(T& number, const R& number_rules);
 
 class ValidatedInputGenerator : public ProtobufMessage::ProtoVisitor, private pgv::BaseValidator {
 public:
@@ -25,7 +24,7 @@ public:
       std::map<std::string /* field */, ListOfTypeUrlAndFactory /* type_url_to_factories */>;
   using AnyMap = std::map<std::string /* class name */, FieldToTypeUrls>;
 
-  static AnyMap get_default_any_map();
+  static AnyMap getDefaultAnyMap();
 
   class Mutator : public protobuf_mutator::libfuzzer::Mutator {
   public:
@@ -33,26 +32,26 @@ public:
 
     using protobuf_mutator::libfuzzer::Mutator::MutateString;
   };
-  ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map = get_default_any_map());
+  ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map = getDefaultAnyMap());
 
-  void handle_any_rules(Protobuf::Message* msg, const validate::AnyRules& any_rules,
-                        const absl::Span<const Protobuf::Message* const>& parents);
+  void handleAnyRules(Protobuf::Message* msg, const validate::AnyRules& any_rules,
+                      const absl::Span<const Protobuf::Message* const>& parents);
 
-  void handle_message_typed_field(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-                                  const Protobuf::Reflection* reflection,
-                                  const validate::FieldRules& rules,
-                                  const absl::Span<const Protobuf::Message* const>& parents,
-                                  const bool force_create);
+  void handleMessageTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
+                               const Protobuf::Reflection* reflection,
+                               const validate::FieldRules& rules,
+                               const absl::Span<const Protobuf::Message* const>& parents,
+                               const bool force_create);
 
   // Handle all validation rules for intrinsic types like int, uint and string.
   // Messages are more complicated to handle and can not be handled here.
   template <typename T, auto FIELDGETTER, auto FIELDSETTER, auto REPGETTER, auto REPSETTER,
             auto FIELDADDER, auto RULEGETTER,
-            auto TYPEHANDLER = &handle_numeric_rules<
+            auto TYPEHANDLER = &handleNumericRules<
                 T, typename std::result_of<decltype(RULEGETTER)(validate::FieldRules)>::type>>
-  void handle_intrinsic_typed_field(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-                                    const Protobuf::Reflection* reflection,
-                                    const validate::FieldRules& rules, const bool force);
+  void handleIntrinsicTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
+                                 const Protobuf::Reflection* reflection,
+                                 const validate::FieldRules& rules, const bool force);
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                const absl::Span<const Protobuf::Message* const> parents) override;
@@ -71,7 +70,7 @@ private:
   Random::PsuedoRandomGenerator64 random_;
   std::deque<absl::string_view> message_path_;
 
-  const AnyMap any_map;
+  const AnyMap any_map_;
 };
 } // namespace ProtobufMessage
 } // namespace Envoy

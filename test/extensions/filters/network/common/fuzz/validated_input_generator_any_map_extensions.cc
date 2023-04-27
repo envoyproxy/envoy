@@ -17,14 +17,14 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-ValidatedInputGenerator::AnyMap compose_filters_any_map() {
+ValidatedInputGenerator::AnyMap composeFiltersAnyMap() {
   static const auto dummy_proto_msg = []() -> std::unique_ptr<Protobuf::Message> {
     return std::make_unique<ProtobufWkt::Struct>();
   };
 
   static ValidatedInputGenerator::AnyMap any_map;
   if (any_map.empty()) {
-    any_map = ValidatedInputGenerator::get_default_any_map();
+    any_map = ValidatedInputGenerator::getDefaultAnyMap();
     any_map.insert(
         {{"envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
           {{"typed_header_validation_config",

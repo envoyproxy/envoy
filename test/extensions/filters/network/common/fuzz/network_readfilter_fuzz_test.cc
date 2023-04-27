@@ -46,8 +46,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
           std::fstream out("last_post_processed", std::ios::out);
           out << input->DebugString();
         }
-        ProtobufMessage::ValidatedInputGenerator generator(
-            seed, ProtobufMessage::compose_filters_any_map());
+        ProtobufMessage::ValidatedInputGenerator generator(seed,
+                                                           ProtobufMessage::composeFiltersAnyMap());
         ProtobufMessage::traverseMessage(generator, *input, true);
       }};
 

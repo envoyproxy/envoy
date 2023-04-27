@@ -2,14 +2,14 @@
 
 #include "source/common/protobuf/visitor_helper.h"
 
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/cel.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/domain.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/http_inputs.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/ip.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/matcher.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/range.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/regex.pb.h"
-#include "external/com_github_cncf_udpa/xds/type/matcher/v3/string.pb.h"
+#include "xds/type/matcher/v3/cel.pb.h"
+#include "xds/type/matcher/v3/domain.pb.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
+#include "xds/type/matcher/v3/ip.pb.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
+#include "xds/type/matcher/v3/range.pb.h"
+#include "xds/type/matcher/v3/regex.pb.h"
+#include "xds/type/matcher/v3/string.pb.h"
 
 namespace Envoy {
 namespace ProtobufMessage {
@@ -19,13 +19,12 @@ namespace ProtobufMessage {
 const std::string ValidatedInputGenerator::kAny = "google.protobuf.Any";
 
 ValidatedInputGenerator::ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map)
-    : any_map(std::move(default_any_map)) {
+    : any_map_(std::move(default_any_map)) {
   random_.initializeSeed(seed);
   mutator_.Seed(seed);
 }
 
-template <typename T, typename R>
-static bool handle_numeric_rules(T& number, const R& number_rules) {
+template <typename T, typename R> static bool handleNumericRules(T& number, const R& number_rules) {
   if (number_rules.has_ignore_empty() && number_rules.ignore_empty()) {
     return false;
   }
@@ -50,7 +49,7 @@ static bool handle_numeric_rules(T& number, const R& number_rules) {
   return true;
 }
 
-static void handle_string_rules(std::string& str, const validate::StringRules& string_rules) {
+static void handleStringRules(std::string& str, const validate::StringRules& string_rules) {
   // Multiple rules could be present, therefore use an if and not a switch.
   // Go by ascending order of proto-field-index.
   if (string_rules.has_const_()) {
@@ -160,7 +159,7 @@ static void handle_string_rules(std::string& str, const validate::StringRules& s
   }
 }
 
-void ValidatedInputGenerator::handle_any_rules(
+void ValidatedInputGenerator::handleAnyRules(
     Protobuf::Message* msg, const validate::AnyRules& any_rules,
     const absl::Span<const Protobuf::Message* const>& parents) {
   if (any_rules.has_required() && any_rules.required()) {
@@ -168,8 +167,8 @@ void ValidatedInputGenerator::handle_any_rules(
     std::unique_ptr<Protobuf::Message> inner_message;
     if (descriptor->full_name() == kAny) {
       const std::string class_name = parents.back()->GetDescriptor()->full_name();
-      AnyMap::const_iterator any_map_cand = any_map.find(class_name);
-      if (any_map_cand != any_map.end()) {
+      AnyMap::const_iterator any_map_cand = any_map_.find(class_name);
+      if (any_map_cand != any_map_.end()) {
         const FieldToTypeUrls& field_to_typeurls = any_map_cand->second;
         const std::string field_name = std::string(message_path_.back());
         FieldToTypeUrls::const_iterator field_to_typeurls_cand = field_to_typeurls.find(field_name);
@@ -199,7 +198,7 @@ void ValidatedInputGenerator::handle_any_rules(
   }
 }
 
-void ValidatedInputGenerator::handle_message_typed_field(
+void ValidatedInputGenerator::handleMessageTypedField(
     Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
     const Protobuf::Reflection* reflection, const validate::FieldRules& rules,
     const absl::Span<const Protobuf::Message* const>& parents, const bool force_create) {
@@ -242,7 +241,7 @@ void ValidatedInputGenerator::handle_message_typed_field(
       }
       switch (rules.type_case()) {
       case validate::FieldRules::kAny: {
-        handle_any_rules(value, rules.any(), parents);
+        handleAnyRules(value, rules.any(), parents);
         break;
       }
       default:
@@ -256,11 +255,11 @@ void ValidatedInputGenerator::handle_message_typed_field(
 // Messages are more complicated to handle and can not be handled here.
 template <typename T, auto FIELDGETTER, auto FIELDSETTER, auto REPGETTER, auto REPSETTER,
           auto FIELDADDER, auto RULEGETTER, auto TYPEHANDLER>
-void ValidatedInputGenerator::handle_intrinsic_typed_field(Protobuf::Message& msg,
-                                                           const Protobuf::FieldDescriptor& field,
-                                                           const Protobuf::Reflection* reflection,
-                                                           const validate::FieldRules& rules,
-                                                           const bool force) {
+void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
+                                                        const Protobuf::FieldDescriptor& field,
+                                                        const Protobuf::Reflection* reflection,
+                                                        const validate::FieldRules& rules,
+                                                        const bool force) {
 
   if (field.is_repeated()) {
     const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -329,7 +328,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
 
   switch (field.cpp_type()) {
   case Protobuf::FieldDescriptor::CPPTYPE_INT32: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         std::int32_t, &Protobuf::Reflection::GetInt32, &Protobuf::Reflection::SetInt32,
         &Protobuf::Reflection::GetRepeatedInt32, &Protobuf::Reflection::SetRepeatedInt32,
         &Protobuf::Reflection::AddInt32, &validate::FieldRules::int32>(msg, field, reflection,
@@ -337,7 +336,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_INT64: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         std::int64_t, &Protobuf::Reflection::GetInt64, &Protobuf::Reflection::SetInt64,
         &Protobuf::Reflection::GetRepeatedInt64, &Protobuf::Reflection::SetRepeatedInt64,
         &Protobuf::Reflection::AddInt64, &validate::FieldRules::int64>(msg, field, reflection,
@@ -345,7 +344,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_UINT32: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         std::uint32_t, &Protobuf::Reflection::GetUInt32, &Protobuf::Reflection::SetUInt32,
         &Protobuf::Reflection::GetRepeatedUInt32, &Protobuf::Reflection::SetRepeatedUInt32,
         &Protobuf::Reflection::AddUInt32, &validate::FieldRules::uint32>(msg, field, reflection,
@@ -353,7 +352,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_UINT64: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         std::uint64_t, &Protobuf::Reflection::GetUInt64, &Protobuf::Reflection::SetUInt64,
         &Protobuf::Reflection::GetRepeatedUInt64, &Protobuf::Reflection::SetRepeatedUInt64,
         &Protobuf::Reflection::AddUInt64, &validate::FieldRules::uint64>(msg, field, reflection,
@@ -361,7 +360,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         double, &Protobuf::Reflection::GetDouble, &Protobuf::Reflection::SetDouble,
         &Protobuf::Reflection::GetRepeatedDouble, &Protobuf::Reflection::SetRepeatedDouble,
         &Protobuf::Reflection::AddDouble, &validate::FieldRules::double_>(msg, field, reflection,
@@ -369,7 +368,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_FLOAT: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         float, &Protobuf::Reflection::GetFloat, &Protobuf::Reflection::SetFloat,
         &Protobuf::Reflection::GetRepeatedFloat, &Protobuf::Reflection::SetRepeatedFloat,
         &Protobuf::Reflection::AddFloat, &validate::FieldRules::float_>(msg, field, reflection,
@@ -381,15 +380,15 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
   case Protobuf::FieldDescriptor::CPPTYPE_ENUM:
     break;
   case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
-    handle_intrinsic_typed_field<
+    handleIntrinsicTypedField<
         std::string, &Protobuf::Reflection::GetString, &Protobuf::Reflection::SetString,
         &Protobuf::Reflection::GetRepeatedString, &Protobuf::Reflection::SetRepeatedString,
-        &Protobuf::Reflection::AddString, &validate::FieldRules::string, &handle_string_rules>(
+        &Protobuf::Reflection::AddString, &validate::FieldRules::string, &handleStringRules>(
         msg, field, reflection, rules, force_create);
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
-    handle_message_typed_field(msg, field, reflection, rules, parents, force_create);
+    handleMessageTypedField(msg, field, reflection, rules, parents, force_create);
     break;
   }
   default:
@@ -449,7 +448,7 @@ void ValidatedInputGenerator::onLeaveMessage(Protobuf::Message&,
   message_path_.pop_back();
 }
 
-ValidatedInputGenerator::AnyMap ValidatedInputGenerator::get_default_any_map() {
+ValidatedInputGenerator::AnyMap ValidatedInputGenerator::getDefaultAnyMap() {
 
   static const auto dummy_proto_msg = []() -> std::unique_ptr<Protobuf::Message> {
     return std::make_unique<ProtobufWkt::Struct>();
