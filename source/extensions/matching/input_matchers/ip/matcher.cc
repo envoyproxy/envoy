@@ -29,11 +29,11 @@ bool Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
   if (absl::holds_alternative<absl::monostate>(input)) {
     return false;
   }
-  const std::string ip_str = absl::get<std::string>(input);
+  const std::string& ip_str = absl::get<std::string>(input);
   if (ip_str.empty()) {
     return false;
   }
-  const std::string& ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
+  const auto ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
     ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
