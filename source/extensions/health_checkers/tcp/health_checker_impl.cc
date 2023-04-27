@@ -108,6 +108,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
+    ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     expect_close_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
     handleSuccess(false);
