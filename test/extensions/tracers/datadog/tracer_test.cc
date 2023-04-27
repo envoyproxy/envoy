@@ -84,6 +84,9 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   // resulting span.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  // Configure the tracer to keep all spans. We then override that
+  // configuration in the `Tracing::Decision`, below.
+  config.trace_sampler.sample_rate = 1.0; // 100%
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_);

@@ -1,4 +1,6 @@
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
@@ -18,6 +20,121 @@ namespace Common {
 namespace Ot {
 namespace {
 
+class NullSpanContext : public opentracing::SpanContext {
+public:
+  void ForeachBaggageItem(
+      std::function<bool(const std::string& key, const std::string& value)>) const override {
+    // not implemented
+  }
+
+  virtual std::unique_ptr<opentracing::SpanContext> clone() const noexcept {
+    return std::make_unique<NullSpanContext>(*this);
+  }
+};
+
+class NullSpan : public opentracing::Span {
+public:
+  explicit NullSpan(const opentracing::Tracer& tracer) : tracer_(tracer) {}
+
+  void FinishWithOptions(const opentracing::FinishSpanOptions&) noexcept override {
+    // not implemented
+  }
+
+  void SetOperationName(opentracing::string_view /*name*/) noexcept override {
+    // not implemented
+  }
+
+  void SetTag(opentracing::string_view /*key*/,
+              const opentracing::Value& /*value*/) noexcept override {
+    // not implemented
+  }
+
+  void SetBaggageItem(opentracing::string_view /*key*/,
+                      opentracing::string_view /*value*/) noexcept override {
+    // not implemented
+  }
+
+  std::string BaggageItem(opentracing::string_view /*key*/) const noexcept override {
+    return ""; // not implemented
+  }
+
+  void Log(std::initializer_list<
+           std::pair<opentracing::string_view, opentracing::Value>> /*fields*/) noexcept override {
+    // not implemented
+  }
+
+  const opentracing::SpanContext& context() const noexcept override {
+    static NullSpanContext context;
+    return context;
+  }
+
+  const opentracing::Tracer& tracer() const noexcept override { return tracer_; }
+
+  const opentracing::Tracer& tracer_;
+};
+
+class ContextIteratingTracer : public opentracing::Tracer {
+public:
+  explicit ContextIteratingTracer(
+      std::vector<std::pair<std::string, std::string>>& extracted_headers_destination)
+      : extracted_headers_(&extracted_headers_destination) {}
+
+  std::unique_ptr<opentracing::Span>
+  StartSpanWithOptions(opentracing::string_view /*operation_name*/,
+                       const opentracing::StartSpanOptions&) const noexcept override {
+    return std::make_unique<NullSpan>(*this);
+  }
+
+  opentracing::expected<void> Inject(const opentracing::SpanContext&,
+                                     std::ostream& /*writer*/) const override {
+    return {}; // not implemented
+  }
+
+  opentracing::expected<void> Inject(const opentracing::SpanContext&,
+                                     const opentracing::TextMapWriter&) const override {
+    return {}; // not implemented
+  }
+
+  opentracing::expected<void> Inject(const opentracing::SpanContext&,
+                                     const opentracing::HTTPHeadersWriter&) const override {
+    return {}; // not implemented
+  }
+
+  opentracing::expected<void>
+  Inject(const opentracing::SpanContext& sc,
+         const opentracing::CustomCarrierWriter& writer) const override {
+    return opentracing::Tracer::Inject(sc, writer);
+  }
+
+  opentracing::expected<std::unique_ptr<opentracing::SpanContext>>
+  Extract(std::istream& /*reader*/) const override {
+    return std::unique_ptr<opentracing::SpanContext>(); // not implemented
+  }
+
+  opentracing::expected<std::unique_ptr<opentracing::SpanContext>>
+  Extract(const opentracing::TextMapReader&) const override {
+    return std::unique_ptr<opentracing::SpanContext>(); // not implemented
+  }
+
+  opentracing::expected<std::unique_ptr<opentracing::SpanContext>>
+  Extract(const opentracing::HTTPHeadersReader& reader) const override {
+    reader.ForeachKey([this](opentracing::string_view key,
+                             opentracing::string_view value) -> opentracing::expected<void> {
+      extracted_headers_->emplace_back(key, value);
+      return {};
+    });
+
+    return std::unique_ptr<opentracing::SpanContext>();
+  }
+
+  opentracing::expected<std::unique_ptr<opentracing::SpanContext>>
+  Extract(const opentracing::CustomCarrierReader& reader) const override {
+    return opentracing::Tracer::Extract(reader);
+  }
+
+  std::vector<std::pair<std::string, std::string>>* extracted_headers_;
+};
+
 class TestDriver : public OpenTracingDriver {
 public:
   TestDriver(OpenTracingDriver::PropagationMode propagation_mode,
@@ -32,6 +149,10 @@ public:
     tracer_ = std::make_shared<opentracing::mocktracer::MockTracer>(std::move(options));
   }
 
+  TestDriver(const std::shared_ptr<ContextIteratingTracer>& tracer, Stats::Scope& scope)
+      : OpenTracingDriver{scope},
+        propagation_mode_{PropagationMode::TracerNative}, recorder_{nullptr}, tracer_{tracer} {}
+
   const opentracing::mocktracer::InMemoryRecorder& recorder() const { return *recorder_; }
 
   // OpenTracingDriver
@@ -42,7 +163,7 @@ public:
 private:
   const OpenTracingDriver::PropagationMode propagation_mode_;
   const opentracing::mocktracer::InMemoryRecorder* recorder_;
-  std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
+  std::shared_ptr<opentracing::Tracer> tracer_;
 };
 
 class OpenTracingDriverTest : public testing::Test {
@@ -53,6 +174,11 @@ public:
                    const opentracing::mocktracer::PropagationOptions& propagation_options = {}) {
     driver_ =
         std::make_unique<TestDriver>(propagation_mode, propagation_options, *stats_.rootScope());
+  }
+
+  void setupValidDriver(std::vector<std::pair<std::string, std::string>>& headers_destination) {
+    auto tracer = std::make_shared<ContextIteratingTracer>(headers_destination);
+    driver_ = std::make_unique<TestDriver>(tracer, *stats_.rootScope());
   }
 
   const std::string operation_name_{"test"};
@@ -226,6 +352,20 @@ TEST_F(OpenTracingDriverTest, GetTraceId) {
 
   // This method is unimplemented and a noop.
   ASSERT_EQ(first_span->getTraceIdAsHex(), "");
+}
+
+TEST_F(OpenTracingDriverTest, ExtractUsingForeach) {
+  std::vector<std::pair<std::string, std::string>> extracted_headers;
+  setupValidDriver(extracted_headers);
+
+  // Starting a new span, given the `request_headers_`, will visit the headers
+  // using "for each." We can immediately discard the span.
+  driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                     {Tracing::Reason::Sampling, true});
+
+  for (const auto& [key, value] : extracted_headers) {
+    EXPECT_EQ(value, request_headers_.getByKey(key));
+  }
 }
 
 } // namespace

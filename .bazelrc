@@ -58,10 +58,6 @@ build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm
 
-# TODO(keith): remove once https://github.com/DataDog/dd-opentracing-cpp/pull/252 is integrated
-# this avoids warnings/errors on arm64 Linux builds
-build:linux --per_file_copt=external/com_github_datadog_dd_opentracing_cpp/.*.cpp@-Wno-type-limits
-
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
