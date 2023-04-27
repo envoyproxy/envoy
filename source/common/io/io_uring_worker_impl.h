@@ -242,18 +242,22 @@ private:
   // For write. io_uring socket will write sequentially in the order of write_buf_ and shutdown_
   // Unless the write_buf_ is empty, the shutdown operation will not be performed.
   Buffer::OwnedImpl write_buf_;
-  bool shutdown_{};
-  // If there is in progress write_req_ during closing, a write timeout timer may be setup to
-  // cancel the write_req_, either a write request or a shutdown request. So we can make sure all
-  // SQEs bounding to the io_uring socket is completed and the socket can be closed successfully.
-  Request* write_req_{nullptr};
+  // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
+  // value represents the socket wants to be shutdown but the shutdown has not been performed or
+  // completed, and a true value means the socket has been shutdown.
+  absl::optional<bool> shutdown_{};
+  // If there is in progress write_or_shutdown_req_ during closing, a write timeout timer may be
+  // setup to cancel the write_or_shutdown_req_, either a write request or a shutdown request. So
+  // we can make sure all SQEs bounding to the io_uring socket is completed and the socket can be
+  // closed successfully.
+  Request* write_or_shutdown_req_{nullptr};
   Event::TimerPtr write_timeout_timer_{nullptr};
 
   bool keep_fd_open_{false};
 
   void closeInternal();
   void submitReadRequest();
-  void submitWriteRequest();
+  void submitWriteOrShutdownRequest();
 };
 
 } // namespace Io

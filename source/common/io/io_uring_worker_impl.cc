@@ -440,8 +440,9 @@ void IoUringServerSocket::close(bool keep_fd_open) {
   keep_fd_open_ = keep_fd_open;
 
   // Delay close until read request and write (or shutdown) request are drained.
-  if (read_req_ == nullptr && write_req_ == nullptr) {
+  if (read_req_ == nullptr && write_or_shutdown_req_ == nullptr) {
     closeInternal();
+    return;
   }
 
   if (read_req_ != nullptr) {
@@ -449,13 +450,13 @@ void IoUringServerSocket::close(bool keep_fd_open) {
     parent_.submitCancelRequest(*this, read_req_);
   }
 
-  if (write_req_ != nullptr) {
+  if (write_or_shutdown_req_ != nullptr) {
     ENVOY_LOG(trace, "delay cancel the write request, fd = {}", fd_);
     if (write_timeout_ms_ > 0) {
       write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
-        if (write_req_ != nullptr) {
-          ENVOY_LOG(trace, "cancel the write request, fd = {}", fd_);
-          parent_.submitCancelRequest(*this, write_req_);
+        if (write_or_shutdown_req_ != nullptr) {
+          ENVOY_LOG(trace, "cancel the write or shutdown request, fd = {}", fd_);
+          parent_.submitCancelRequest(*this, write_or_shutdown_req_);
         }
       });
       write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
@@ -481,16 +482,16 @@ void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
 
 void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
-  ASSERT(!shutdown_);
+  ASSERT(!shutdown_.has_value());
 
   write_buf_.move(data);
 
-  submitWriteRequest();
+  submitWriteOrShutdownRequest();
 }
 
 uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_slice) {
   ENVOY_LOG(trace, "write, num_slices = {}, fd = {}", num_slice, fd_);
-  ASSERT(!shutdown_);
+  ASSERT(!shutdown_.has_value());
 
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
@@ -498,7 +499,7 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
     bytes_written += slices[i].len_;
   }
 
-  submitWriteRequest();
+  submitWriteOrShutdownRequest();
   return bytes_written;
 }
 
@@ -508,9 +509,9 @@ void IoUringServerSocket::shutdown(int how) {
     PANIC("only the SHUT_WR implemented");
   }
 
-  shutdown_ = true;
+  shutdown_ = false;
 
-  submitWriteRequest();
+  submitWriteOrShutdownRequest();
 }
 
 void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
@@ -530,7 +531,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   if (!injected) {
     read_req_ = nullptr;
     // If the socket is going to close, discard all results.
-    if (status_ == Closed && write_req_ == nullptr) {
+    if (status_ == Closed && write_or_shutdown_req_ == nullptr) {
       closeInternal();
       return;
     }
@@ -610,7 +611,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
             injected, status_);
   if (!injected) {
-    write_req_ = nullptr;
+    write_or_shutdown_req_ = nullptr;
   }
 
   // Notify the handler directly since it is an injected request.
@@ -619,7 +620,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
               "there is a inject event, and same time we have regular write request, fd = {}", fd_);
     // There is case where write injection may come after shutdown or close which should be ignored
     // since the I/O handle or connection may be released after closing.
-    if (!shutdown_ && status_ != Closed) {
+    if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
       io_uring_handler_.onWrite(param);
     }
@@ -632,13 +633,13 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   } else {
     // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
-    if (!shutdown_ && status_ != Closed) {
+    if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
       io_uring_handler_.onWrite(param);
     }
   }
 
-  submitWriteRequest();
+  submitWriteOrShutdownRequest();
 }
 
 void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected) {
@@ -646,10 +647,10 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
 
   ENVOY_LOG(trace, "onShutdown with result {}, fd = {}, injected = {}", result, fd_, injected);
   ASSERT(!injected);
-  write_req_ = nullptr;
-  shutdown_ = false;
+  write_or_shutdown_req_ = nullptr;
+  shutdown_ = true;
 
-  submitWriteRequest();
+  submitWriteOrShutdownRequest();
 }
 
 void IoUringServerSocket::closeInternal() {
@@ -666,16 +667,16 @@ void IoUringServerSocket::submitReadRequest() {
   }
 }
 
-void IoUringServerSocket::submitWriteRequest() {
-  if (!write_req_) {
+void IoUringServerSocket::submitWriteOrShutdownRequest() {
+  if (!write_or_shutdown_req_) {
     if (write_buf_.length() > 0) {
       Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
       ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
                 write_buf_.length(), slices.size(), fd_);
-      write_req_ = parent_.submitWriteRequest(*this, slices);
-    } else if (shutdown_) {
+      write_or_shutdown_req_ = parent_.submitWriteRequest(*this, slices);
+    } else if (shutdown_.has_value() && !shutdown_.value()) {
       // Only SHUT_WR is supported now.
-      write_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
+      write_or_shutdown_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
     } else if (status_ == Closed && read_req_ == nullptr) {
       closeInternal();
     }

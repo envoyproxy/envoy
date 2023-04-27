@@ -438,6 +438,37 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
   delete static_cast<Request*>(read_req2);
 }
 
+TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInShutdownWriteSocketInjection) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  MockIoUringHandler handler;
+  void* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  IoUringServerSocket socket(0, worker, handler, 0, false);
+
+  // Shutdown and then shutdown completes.
+  EXPECT_CALL(mock_io_uring, submit());
+  void* shutdown_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareShutdown(socket.fd(), _, _))
+      .WillOnce(DoAll(SaveArg<2>(&shutdown_req), Return<IoUringResult>(IoUringResult::Ok)));
+  socket.shutdown(SHUT_WR);
+  socket.onShutdown(static_cast<Request*>(shutdown_req), 0, false);
+
+  // onWrite happens after the shutdown completed will not trigger calling back.
+  socket.onWrite(nullptr, 0, true);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete static_cast<Request*>(read_req);
+  delete static_cast<Request*>(shutdown_req);
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
