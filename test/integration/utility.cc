@@ -328,9 +328,12 @@ IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view 
 
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
+  ON_CALL(server_context, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
+
   TestUtility::loadFromYaml(std::string(config), typed_config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   return factory->createFromProto(typed_config.typed_config(), server_context);
 #else
   return nullptr;

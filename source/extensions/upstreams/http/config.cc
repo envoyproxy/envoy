@@ -140,13 +140,6 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   return header_validator_factory;
 }
 
-ProtobufMessage::ValidationVisitor&
-getValidationVisitor(Server::Configuration::ServerFactoryContext& server_context) {
-  return server_context.initManager().state() == Init::Manager::State::Initialized
-             ? server_context.messageValidationContext().dynamicValidationVisitor()
-             : server_context.messageValidationContext().staticValidationVisitor();
-}
-
 } // namespace
 
 uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
@@ -174,8 +167,8 @@ uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context)
-    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(getHttpOptions(options),
-                                                             getValidationVisitor(server_context))),
+    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
+          getHttpOptions(options), server_context.messageValidationVisitor())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(getHttp2Options(options))),
       http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
