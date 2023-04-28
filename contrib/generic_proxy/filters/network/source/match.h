@@ -24,10 +24,8 @@ using PropertyDataInputProto =
 class ServiceMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.host());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.host())};
   }
 };
 
@@ -50,10 +48,8 @@ public:
 class MethodMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.method());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.method())};
   }
 };
 
@@ -78,15 +74,11 @@ public:
   PropertyMatchDataInput(const std::string& property_name) : name_(property_name) {}
 
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-
     const auto value = data.getByKey(name_);
-
-    if (value.has_value()) {
-      result.data_.emplace(value.value());
-    }
-    return result;
+    Matcher::MatchingDataType matching_data =
+        value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
+                          : absl::monostate();
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, matching_data};
   }
 
 private:

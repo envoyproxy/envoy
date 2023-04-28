@@ -182,7 +182,7 @@ on_no_match:
   {
     // Input is nullopt.
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateMatch("bar");
   }
 }
@@ -473,26 +473,26 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     validateUnableToMatch();
   }
 }

@@ -21,7 +21,7 @@ public:
     const auto maybe_headers = data.responseHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
 
@@ -30,7 +30,7 @@ public:
               absl::StrCat(*maybe_status)};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -42,7 +42,7 @@ public:
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.responseHeaders();
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
@@ -63,7 +63,7 @@ public:
         return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "5xx"};
       }
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 

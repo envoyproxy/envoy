@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/matcher/matcher.h"
 
 namespace Envoy {
@@ -27,11 +29,12 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    if (!input.data_) {
+    // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
+    if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(*input.data_);
+    const auto result = doMatch(absl::get<std::string>(input.data_));
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);

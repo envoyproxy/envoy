@@ -7,16 +7,17 @@
 namespace Envoy {
 namespace Matcher {
 
-template <class StringMatcherType> class StringInputMatcher : public InputMatcher {
+template <class StringMatcherType>
+class StringInputMatcher : public InputMatcher, Logger::Loggable<Logger::Id::matcher> {
 public:
   explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
 
-  bool match(absl::optional<absl::string_view> input) override {
-    if (!input) {
-      return false;
+  bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<std::string>(input)) {
+      return matcher_.match(absl::get<std::string>(input));
     }
-
-    return matcher_.match(*input);
+    // Return false when input is empty.(i.e., input is absl::monostate).
+    return false;
   }
 
 private:
