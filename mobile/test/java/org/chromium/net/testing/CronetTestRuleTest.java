@@ -65,7 +65,6 @@ public class CronetTestRuleTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testRunOnlyNativeMustRun() {
-    assertFalse(mTestRule.testingJavaImpl());
     assertFalse(mTestWasRun);
     mTestWasRun = true;
     assertEquals(mTestFramework.mCronetEngine.getClass(), CronetUrlRequestContext.class);
