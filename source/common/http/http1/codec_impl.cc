@@ -526,7 +526,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
   if (codec_settings_.use_balsa_parser_) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
+                                            codec_settings_.allow_custom_methods_);
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
   }

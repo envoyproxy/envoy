@@ -39,6 +39,8 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
   }
 
+  ret.allow_custom_methods_ = config.allow_custom_methods();
+
   return ret;
 }
 
