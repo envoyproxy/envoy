@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/common/io/io_uring.h"
 #include "envoy/event/file_event.h"
 
@@ -198,8 +200,9 @@ public:
 private:
   const uint32_t accept_size_;
   // These are used to track the current submitted accept requests.
-  size_t request_count_{};
   std::vector<Request*> requests_;
+  std::atomic<size_t> request_count_{};
+  std::atomic<bool> closed_{};
 
   void submitRequests();
 };

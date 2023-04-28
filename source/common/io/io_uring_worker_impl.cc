@@ -338,8 +338,10 @@ void IoUringAcceptSocket::close(bool keep_fd_open) {
   ASSERT(!keep_fd_open);
 
   // Delay close until all accept requests are drained.
-  if (!request_count_) {
-    parent_.submitCloseRequest(*this);
+  if (!request_count_.load()) {
+    if (!closed_.exchange(true)) {
+      parent_.submitCloseRequest(*this);
+    }
     return;
   }
 
@@ -382,9 +384,11 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
   // If there is no pending accept request and the socket is going to close, submit close request.
   AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
   requests_[accept_req->i_] = nullptr;
-  request_count_--;
-  if (status_ == Closed && !request_count_) {
-    parent_.submitCloseRequest(*this);
+  request_count_.fetch_sub(1);
+  if (status_ == Closed && !request_count_.load()) {
+    if (!closed_.exchange(true)) {
+      parent_.submitCloseRequest(*this);
+    }
   }
 
   // If the socket is not enabled, drop all following actions to all accepted fds.
@@ -404,7 +408,7 @@ void IoUringAcceptSocket::submitRequests() {
     if (requests_[i] == nullptr) {
       requests_[i] = parent_.submitAcceptRequest(*this);
       static_cast<AcceptRequest*>(requests_[i])->i_ = i;
-      request_count_++;
+      request_count_.fetch_add(1);
     }
   }
 }
