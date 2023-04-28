@@ -397,9 +397,6 @@ PrometheusStatsRender::generateHistogramOutput(const Stats::HistogramSharedPtr& 
                                                const std::string& prefixed_tag_extracted_name) {
   auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(metric.get());
   if (parent_histogram != nullptr) {
-    // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
-    // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
-    // source/server/admin/utils.h).
     const std::string tags = formattedTags(parent_histogram->tags());
     const std::string hist_tags = parent_histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
 
