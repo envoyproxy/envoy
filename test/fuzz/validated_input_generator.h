@@ -32,7 +32,8 @@ public:
 
     using protobuf_mutator::libfuzzer::Mutator::MutateString;
   };
-  ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map = getDefaultAnyMap());
+  ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map = getDefaultAnyMap(),
+                          unsigned int max_depth = 0);
 
   void handleAnyRules(Protobuf::Message* msg, const validate::AnyRules& any_rules,
                       const absl::Span<const Protobuf::Message* const>& parents);
@@ -69,7 +70,9 @@ private:
   Mutator mutator_;
   Random::PsuedoRandomGenerator64 random_;
   std::deque<absl::string_view> message_path_;
+  unsigned int current_depth_;
 
+  const unsigned int max_depth_;
   const AnyMap any_map_;
 };
 } // namespace ProtobufMessage

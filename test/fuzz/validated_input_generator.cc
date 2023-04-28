@@ -18,8 +18,9 @@ namespace ProtobufMessage {
 
 const std::string ValidatedInputGenerator::kAny = "google.protobuf.Any";
 
-ValidatedInputGenerator::ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map)
-    : any_map_(std::move(default_any_map)) {
+ValidatedInputGenerator::ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map,
+                                                 unsigned int max_depth)
+    : current_depth_(0), max_depth_(max_depth), any_map_(std::move(default_any_map)) {
   random_.initializeSeed(seed);
   mutator_.Seed(seed);
 }
@@ -163,6 +164,12 @@ void ValidatedInputGenerator::handleAnyRules(
     Protobuf::Message* msg, const validate::AnyRules& any_rules,
     const absl::Span<const Protobuf::Message* const>& parents) {
   if (any_rules.has_required() && any_rules.required()) {
+    // Stop creating any message when a certain depth is reached
+    if (max_depth_ > 0 && current_depth_ > max_depth_) {
+      auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
+      any_message->PackFrom(ProtobufWkt::Struct());
+      return;
+    }
     const Protobuf::Descriptor* descriptor = msg->GetDescriptor();
     std::unique_ptr<Protobuf::Message> inner_message;
     if (descriptor->full_name() == kAny) {
@@ -399,6 +406,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
 void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
                                              absl::Span<const Protobuf::Message* const> parents,
                                              bool, absl::string_view const& field_name) {
+  ++current_depth_;
   const Protobuf::Reflection* reflection = msg.GetReflection();
   const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
   message_path_.push_back(field_name);
@@ -421,10 +429,11 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
         // Treat matchers special, because in their oneof they reference themselves, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.
-        if ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
-             parents_class_name ==
-                 "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
-            (random_() % 200) > 0) {
+        if ((max_depth_ > 0 && current_depth_ > max_depth_) ||
+            ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
+              parents_class_name ==
+                  "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
+             (random_() % 200) > 0)) {
           onField(msg, *oneof_desc->field(0), parents, true);
         } else {
           // Do not use the first available alternative all the time, because of cyclic
@@ -446,6 +455,7 @@ void ValidatedInputGenerator::onLeaveMessage(Protobuf::Message&,
                                              absl::Span<const Protobuf::Message* const>, bool,
                                              absl::string_view const&) {
   message_path_.pop_back();
+  --current_depth_;
 }
 
 ValidatedInputGenerator::AnyMap ValidatedInputGenerator::getDefaultAnyMap() {
