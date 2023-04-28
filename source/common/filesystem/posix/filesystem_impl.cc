@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -182,6 +183,15 @@ Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
     return resultFailure<FileInfo>({}, errno);
   }
   return resultSuccess(infoFromStat(path, s));
+}
+
+Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
+  std::error_code ec;
+  while (path.size() > 0 && path.back() == '/') {
+    path.remove_suffix(1);
+  }
+  bool result = std::filesystem::create_directories(std::string{path}, ec);
+  return ec ? resultFailure(false, ec.value()) : resultSuccess(result);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
