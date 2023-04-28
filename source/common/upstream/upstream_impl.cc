@@ -1721,11 +1721,11 @@ ClusterInfoImpl::getHeaderValidatorStats(Http::Protocol protocol) const {
 }
 #endif
 
-Http::HeaderValidatorPtr
+Http::ClientHeaderValidatorPtr
 ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) const {
 #ifdef ENVOY_ENABLE_UHV
   return http_protocol_options_->header_validator_factory_
-             ? http_protocol_options_->header_validator_factory_->create(
+             ? http_protocol_options_->header_validator_factory_->createClientHeaderValidator(
                    protocol, getHeaderValidatorStats(protocol))
              : nullptr;
 #else

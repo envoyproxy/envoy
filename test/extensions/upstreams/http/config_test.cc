@@ -98,9 +98,10 @@ public:
   createFromProto(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) override {
     auto header_validator =
         std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(::Envoy::Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidator>>(); }));
+    EXPECT_CALL(*header_validator, createClientHeaderValidator(::Envoy::Http::Protocol::Http2, _))
+        .WillOnce(InvokeWithoutArgs([]() {
+          return std::make_unique<StrictMock<::Envoy::Http::MockClientHeaderValidator>>();
+        }));
     return header_validator;
   }
 };
@@ -134,9 +135,10 @@ public:
     config_ = proto_config;
     auto header_validator =
         std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(::Envoy::Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidator>>(); }));
+    EXPECT_CALL(*header_validator, createClientHeaderValidator(::Envoy::Http::Protocol::Http2, _))
+        .WillOnce(InvokeWithoutArgs([]() {
+          return std::make_unique<StrictMock<::Envoy::Http::MockClientHeaderValidator>>();
+        }));
     return header_validator;
   }
 
@@ -162,8 +164,8 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
 #ifdef ENVOY_ENABLE_UHV
   ProtocolOptionsConfigImpl config(options_, server_context_);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
 #else
   // If UHV is disabled, providing config should result in rejection
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
@@ -178,8 +180,8 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfig) {
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
@@ -202,8 +204,8 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
@@ -226,8 +228,8 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
@@ -250,8 +252,8 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
@@ -274,8 +276,8 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr,
-            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+                         ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr

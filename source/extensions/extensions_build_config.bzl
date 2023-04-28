@@ -72,6 +72,7 @@ EXTENSIONS = {
 
     "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
+    "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
 
     #
     # Network Matchers
@@ -425,6 +426,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
+    "envoy.load_balancing_policies.subset":       "//source/extensions/load_balancing_policies/subset:config",
 
     #
     # HTTP Early Header Mutation

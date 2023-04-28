@@ -206,7 +206,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   stream_info_.onRequestComplete();
-  upstreamLog();
+  upstreamLog(AccessLog::AccessLogType::UpstreamEnd);
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
@@ -219,10 +219,10 @@ void UpstreamRequest::cleanUp() {
   parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
 }
 
-void UpstreamRequest::upstreamLog() {
+void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_);
+                      upstream_trailers_.get(), stream_info_, access_log_type);
   }
 }
 
@@ -374,7 +374,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
       // If the request is complete, we've already done the stream-end upstream log, and shouldn't
       // do the periodic log.
       if (!streamInfo().requestComplete().has_value()) {
-        upstreamLog();
+        upstreamLog(AccessLog::AccessLogType::UpstreamPeriodic);
         resetUpstreamLogFlushTimer();
       }
     });
@@ -646,7 +646,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
   if (parent_.config().flush_upstream_log_on_upstream_stream_) {
-    upstreamLog();
+    upstreamLog(AccessLog::AccessLogType::UpstreamPoolReady);
   }
 
   for (auto* callback : upstream_callbacks_) {
