@@ -34,14 +34,14 @@ services:
 
   service-http:
     build:
-      dockerfile: Dockerfile-echo
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-http
     environment:
     - HTTPS_PORT=0
 
   service-https:
     build:
-      dockerfile: Dockerfile-echo
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https
     environment:
     - HTTP_PORT=0

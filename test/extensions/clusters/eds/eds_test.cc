@@ -125,14 +125,10 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.",
-        eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
-                                                factory_context, std::move(scope), false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
@@ -151,14 +147,12 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
-  Stats::TestUtil::TestStore stats_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  NiceMock<Random::MockRandomGenerator> random_;
-  TestScopedRuntime runtime_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {

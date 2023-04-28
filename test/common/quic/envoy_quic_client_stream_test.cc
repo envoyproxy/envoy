@@ -471,8 +471,8 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
@@ -621,6 +621,30 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   quic::QuicStreamFrame frame(stream_id_, true, 0, data);
   quic_stream_->OnStreamFrame(frame);
 }
+
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
+  request_headers_.addCopy("x-foo\r\n", "hello world");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
+  request_headers_.addCopy("x-foo", "hello\r\n\r\nGET /evil HTTP/1.1");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header value for: x-foo"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
+}
+#endif
 
 TEST_F(EnvoyQuicClientStreamTest, EncodeHeadersOnClosedStream) {
   // Reset stream should clear the connection level buffered bytes accounting.

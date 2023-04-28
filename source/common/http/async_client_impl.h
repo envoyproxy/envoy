@@ -28,7 +28,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -175,17 +175,7 @@ private:
         rate_limit_policy_entry_;
   };
 
-  struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                                      uint64_t) const override {
-      return nullptr;
-    }
-
-    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
-                                      const StreamInfo::StreamInfo&, uint64_t) const override {
-      return nullptr;
-    }
-
+  struct NullCommonConfig : public Router::CommonConfig {
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
       return internal_only_headers_;
     }
@@ -203,7 +193,7 @@ private:
     Stats::StatName statName() const override { return {}; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    const Router::Config& routeConfig() const override { return route_configuration_; }
+    const Router::CommonConfig& routeConfig() const override { return route_configuration_; }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     bool includeIsTimeoutRetryHeader() const override { return false; }
@@ -218,7 +208,7 @@ private:
         const std::string&,
         std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const NullConfig route_configuration_;
+    static const NullCommonConfig route_configuration_;
   };
 
   struct NullPathMatchCriterion : public Router::PathMatchCriterion {

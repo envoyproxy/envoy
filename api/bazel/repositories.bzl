@@ -164,6 +164,26 @@ go_proto_library(
 )
 
 api_cc_py_proto_library(
+    name = "metrics",
+    srcs = [
+        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+        "opentelemetry/proto/metrics/v1/metrics.proto",
+    ],
+    deps = [
+        "//:common",
+        "//:resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "metrics_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
+    proto = ":metrics",
+    visibility = ["//visibility:public"],
+)
+
+api_cc_py_proto_library(
     name = "trace",
     srcs = [
         "opentelemetry/proto/collector/trace/v1/trace_service.proto",

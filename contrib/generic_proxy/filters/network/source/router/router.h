@@ -11,6 +11,7 @@
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/upstream.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,43 +35,59 @@ enum class StreamResetReason : uint32_t {
 };
 
 class RouterFilter;
+class UpstreamRequest;
 
-class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
-                        public Tcp::ConnectionPool::UpstreamCallbacks,
+/**
+ * We needn't to inherit from UpstreamManager interfaces because
+ * the Router::UpstreamManagerImpl is only used by Router::UpstreamRequest and
+ * only one request is allowed to be processed at the same time.
+ * We still inherit from UpstreamConnection to avoid code duplication.
+ */
+class UpstreamManagerImpl : public UpstreamConnection {
+public:
+  UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool);
+
+  void setResponseCallback();
+
+  void onEventImpl(Network::ConnectionEvent event) override;
+  void onPoolSuccessImpl() override;
+  void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
+                         absl::string_view transport_failure_reason) override;
+
+  UpstreamRequest& parent_;
+};
+
+class UpstreamRequest : public UpstreamBindingCallback,
                         public LinkedObject<UpstreamRequest>,
                         public Envoy::Event::DeferredDeletable,
                         public RequestEncoderCallback,
-                        public ResponseDecoderCallback,
+                        public PendingResponseCallback,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data);
+  UpstreamRequest(RouterFilter& parent, absl::optional<Upstream::TcpPoolData> tcp_data);
 
   void startStream();
   void resetStream(StreamResetReason reason);
-  void completeUpstreamRequest();
+  void clearStream(bool close_connection);
 
   // Called when the stream has been reset or completed.
   void deferredDelete();
 
-  // Tcp::ConnectionPool::Callbacks
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+  // UpstreamBindingCallback
+  void onBindFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
-                   Upstream::HostDescriptionConstSharedPtr host) override;
+  void onBindSuccess(Network::ClientConnection& conn,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
 
-  // Tcp::ConnectionPool::UpstreamCallbacks
-  void onUpstreamData(Buffer::Instance& data, bool) override;
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-
-  // ResponseDecoderCallback
-  void onDecodingSuccess(ResponsePtr response) override;
+  // PendingResponseCallback
+  void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  void onConnectionClose(Network::ConnectionEvent event) override;
 
   // RequestEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) override;
+  void onEncodingSuccess(Buffer::Instance& buffer) override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void encodeBufferToUpstream(Buffer::Instance& buffer);
@@ -78,19 +95,20 @@ public:
   bool stream_reset_{};
 
   RouterFilter& parent_;
-  Upstream::TcpPoolData tcp_data_;
+  DecoderFilterCallback& decoder_callbacks_;
 
-  Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
-  Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
+  uint64_t stream_id_{};
+  bool wait_response_{};
+
+  absl::optional<Upstream::TcpPoolData> tcp_pool_data_;
+  std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
+
+  Network::ClientConnection* upstream_conn_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
-  bool request_complete_{};
-  bool response_started_{};
   bool response_complete_{};
-  ResponseDecoderPtr response_decoder_;
 
   Buffer::OwnedImpl upstream_request_buffer_;
-  bool expect_response_{};
 
   StreamInfo::StreamInfoImpl stream_info_;
 
@@ -110,10 +128,11 @@ public:
 
   void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) override {
     callbacks_ = &callbacks;
+    protocol_options_ = callbacks_->downstreamCodec().protocolOptions();
   }
   FilterStatus onStreamDecoded(Request& request) override;
 
-  void onUpstreamResponse(ResponsePtr response);
+  void onUpstreamResponse(ResponsePtr response, ExtendedOptions options);
   void completeDirectly();
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason);
@@ -125,6 +144,7 @@ public:
 
 private:
   friend class UpstreamRequest;
+  friend class UpstreamManagerImpl;
 
   void kickOffNewUpstreamRequest();
   void resetStream(StreamResetReason reason);
@@ -144,6 +164,7 @@ private:
   std::list<UpstreamRequestPtr> upstream_requests_;
 
   DecoderFilterCallback* callbacks_{};
+  ProtocolOptions protocol_options_;
 
   Server::Configuration::FactoryContext& context_;
 };

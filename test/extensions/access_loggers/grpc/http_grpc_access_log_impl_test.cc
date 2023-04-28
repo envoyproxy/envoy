@@ -142,6 +142,7 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  access_log_type: NotSet
   upstream_local_address:
     socket_address:
       address: "127.1.2.3"
@@ -214,6 +215,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -263,6 +265,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -340,6 +343,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -420,6 +424,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -477,6 +482,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -542,6 +548,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -597,6 +604,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -652,6 +660,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -707,6 +716,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -767,6 +777,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -859,6 +870,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -897,6 +909,89 @@ response:
   }
 }
 
+// Test sanitizing non-UTF-8 header values.
+TEST_F(HttpGrpcAccessLogTest, SanitizeUTF8) {
+  InSequence s;
+
+  config_.add_additional_request_headers_to_log("X-Request");
+  config_.add_additional_response_headers_to_log("X-Response");
+  config_.add_additional_response_trailers_to_log("X-Trailer");
+
+  init();
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    stream_info.start_time_ = SystemTime(1h);
+    std::string non_utf8("prefix");
+    non_utf8.append(1, char(0xc3));
+    non_utf8.append(1, char(0xc7));
+    non_utf8.append("suffix");
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", non_utf8},
+        {":method", "POST"},
+        {"x-envoy-max-retries", "3"}, // test inline header not
+                                      // otherwise logged
+        {"x-request", non_utf8},
+        {"x-request", non_utf8},
+    };
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+        {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
+        {"x-response", non_utf8},
+        {"x-response", non_utf8},
+    };
+
+    Http::TestResponseTrailerMapImpl response_trailers{
+        {"x-trailer", non_utf8},
+        {"x-trailer", non_utf8},
+    };
+
+    stream_info.onRequestComplete();
+    expectLog(fmt::format(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  access_log_type: NotSet
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  start_time:
+    seconds: 3600
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "{0}"
+  request_method: "POST"
+  request_headers_bytes: 140
+  request_headers:
+    "x-request": "{0},{0}"
+response:
+  response_headers_bytes: 97
+  response_headers:
+    "x-response": "{0},{0}"
+  response_trailers:
+    "x-trailer": "{0},{0}"
+)EOF",
+                          "prefix!!suffix"));
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+  }
+}
+
 TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
   InSequence s;
   expectLogRequestMethod("GET");
@@ -930,6 +1025,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -988,6 +1084,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -1043,6 +1140,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"

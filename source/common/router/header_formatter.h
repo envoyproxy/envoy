@@ -117,7 +117,8 @@ public:
                            const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
     buf = formatter_->format(request_headers, response_headers,
-                             *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "");
+                             *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "",
+                             AccessLog::AccessLogType::NotSet);
     return buf;
   };
 

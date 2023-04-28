@@ -281,3 +281,15 @@ message ExtensionConfigSource {
   // if they do not match any type URL in the set.
   repeated string type_urls = 4 [(validate.rules).repeated = {min_items: 1}];
 }
+
+// A placeholder proto for the registration for the REST subscription implementation.
+message RestSubscription {
+}
+
+// A placeholder proto for the registration for the filesystem subscription implementation.
+message FilesystemSubscription {
+}
+
+// A placeholder proto for the registration for the filesystem collection subscription implementation.
+message FilesystemCollectionSubscription {
+}

@@ -94,7 +94,7 @@ public:
     return callbacks_->last_connection_event_;
   }
   // Wait until connected or closed().
-  void waitForConnection();
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
   bool allBytesSent() const;
@@ -208,6 +208,8 @@ public:
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                            Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);
+
+  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(absl::string_view config);
 };
 
 // A set of connection callbacks which tracks connection state.

@@ -14,10 +14,8 @@ namespace Upstream {
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+  StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -38,11 +36,9 @@ public:
   StaticClusterFactory() : ClusterFactoryImplBase("envoy.cluster.static") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(StaticClusterFactory);
