@@ -90,9 +90,13 @@ private:
         return std::make_pair(absl::nullopt, use_old_style_encoding);
       }
     } else {
+      static bool generate_log = true;
+      if (generate_log) {
+        ENVOY_LOG_MISC(
+            warn, "Non-proto cookie format detected. This format will be rejected in the future.");
+        generate_log = false;
+      }
       // Treat this as "old" style cookie.
-      ENVOY_LOG_MISC(
-          warn, "Non-proto cookie format detected. This format will be rejected in the future.");
       address = decoded_value;
       use_old_style_encoding = true;
     }
@@ -103,7 +107,6 @@ private:
   }
 
   std::string makeSetCookie(const std::string& address) const {
-
     return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true);
   }
 
