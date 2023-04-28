@@ -37,11 +37,11 @@ TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
 
   FakeStreamCodecFactory::FakeRequest request;
 
-  EXPECT_EQ("", input->get(request).data_.value());
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", input->get(request).data_.value());
+  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
 }
 
 TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
@@ -53,11 +53,11 @@ TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
 
   FakeStreamCodecFactory::FakeRequest request;
 
-  EXPECT_EQ("", input->get(request).data_.value());
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
 
   request.path_ = "fake_path";
 
-  EXPECT_EQ("fake_path", input->get(request).data_.value());
+  EXPECT_EQ("fake_path", absl::get<std::string>(input->get(request).data_));
 }
 
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
