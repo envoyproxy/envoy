@@ -21,7 +21,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // The filter configuration is a collection of custom response
 // policies in a matcher tree. The configuration can be defined at the filter,
-// virtual host or route level. The most specific configuration will apply.
+// virtual host or route level. The response will be matched against the most
+// specific to the least specific config, till a match is found.
 message CustomResponse {
   // Matcher to match against the original response to select a
   // :ref:`Custom Response Policy <extension_category_envoy.http.custom_response>`

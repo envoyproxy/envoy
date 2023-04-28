@@ -60,16 +60,16 @@ curl -s http://localhost:19000/config_dump \
 
 run_log "Edit resource.go"
 sed -i'.bak' s/service1/service2/ resource.go
-sed -i'.bak' s/\"1\",/\"2\",/ resource.go
+sed -i'.bak2' s/\"1\",/\"2\",/ resource.go
 
 run_log "Bring back up the control plane"
 "${DOCKER_COMPOSE[@]}" up --build -d go-control-plane
 wait_for 30 sh -c "${DOCKER_COMPOSE[*]} ps go-control-plane | grep healthy | grep -v unhealthy"
 
 run_log "Check for response from service2 backend"
-responds_with \
-    "Request served by service2" \
-    http://localhost:10000
+wait_for 5 bash -c "responds_with \
+    'Request served by service2' \
+    http://localhost:10000"
 
 run_log "Check config for active clusters pointing to service2"
 curl -s http://localhost:19000/config_dump \
@@ -78,3 +78,5 @@ curl -s http://localhost:19000/config_dump \
 curl -s http://localhost:19000/config_dump \
     | jq -r '.configs[1].dynamic_active_clusters' \
     | grep '"address": "service2"'
+
+mv resource.go.bak resource.go

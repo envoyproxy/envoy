@@ -22,7 +22,7 @@ public:
   StreamClientSharedPtr streamClient();
   PulseClientSharedPtr pulseClient();
 
-  void terminate();
+  envoy_status_t terminate();
 
 private:
   Engine(envoy_engine_t engine);

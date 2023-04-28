@@ -96,7 +96,6 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
                              typedDirectResponses:
@@ -162,7 +161,6 @@
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
-  self.virtualClusters = virtualClusters;
   self.runtimeGuards = runtimeGuards;
   self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
@@ -249,9 +247,6 @@
   builder.setAppVersion([self.appVersion toCXXString]);
   builder.setAppId([self.appId toCXXString]);
   builder.setDeviceOs("iOS");
-  for (NSString *cluster in self.virtualClusters) {
-    builder.addVirtualCluster([cluster toCXXString]);
-  }
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 

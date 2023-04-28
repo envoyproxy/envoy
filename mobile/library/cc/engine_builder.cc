@@ -128,18 +128,6 @@ EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepaliv
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
-  virtual_clusters_.push_back(std::move(virtual_cluster));
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string name,
-                                                std::vector<MatcherData> matchers) {
-  std::pair<std::string, std::vector<MatcherData>> matcher(name, std::move(matchers));
-  virtual_cluster_data_.emplace_back(std::move(matcher));
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
   key_value_stores_[std::move(name)] = std::move(key_value_store);
@@ -391,25 +379,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
-  // Virtual clusters
-  for (auto& cluster : virtual_clusters_) {
-    MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
-                              ProtobufMessage::getStrictValidationVisitor());
-  }
-  for (auto& name_and_data : virtual_cluster_data_) {
-    auto* virtual_cluster = api_service->add_virtual_clusters();
-    virtual_cluster->set_name(name_and_data.first);
-    for (auto& matcher : name_and_data.second) {
-      auto* match = virtual_cluster->add_headers();
-      match->set_name(matcher.name);
-      if (matcher.type == MatcherData::EXACT) {
-        match->set_exact_match(matcher.value);
-      } else {
-        ASSERT(matcher.type == MatcherData::SAFE_REGEX);
-        match->mutable_safe_regex_match()->set_regex(matcher.value);
-      }
-    }
-  }
 
   for (auto& direct_response_in : direct_responses_) {
     auto* this_route = api_service->add_routes();
@@ -458,10 +427,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
+#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name((*filter).name_);
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
+#else
+    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
+#endif
   }
 
   // Set up the optional filters
@@ -953,8 +926,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
   for (const std::string& sink_yaml : stats_sinks_) {
+#ifdef ENVOY_ENABLE_YAML
     auto* sink = bootstrap->add_stats_sinks();
     MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+#else
+    UNREFERENCED_PARAMETER(sink_yaml);
+    IS_ENVOY_BUG("stats sinks can not be added when YAML is compiled out.");
+#endif
   }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
