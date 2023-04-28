@@ -205,16 +205,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying virtual clusters overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addVirtualCluster("[test]")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.legacyVirtualClusters.size).isEqualTo(1)
-  }
-
-  @Test
   fun `specifying native filters overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

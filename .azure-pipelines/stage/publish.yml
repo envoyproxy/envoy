@@ -6,10 +6,16 @@ parameters:
   default: ""
 
 ## Timeouts
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
 - name: timeoutDockerPublish
   displayName: "Timout Docker publish"
   type: number
-  default: 10
+  # in seconds
+  default: 15
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
 
 # Auth
 - name: authGCP
@@ -121,6 +127,7 @@ jobs:
       AZP_SHA1: $(Build.SourceVersion)
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+      DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
   - bash: |
       echo "disk space at end of build:"
       df -h
