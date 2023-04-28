@@ -1589,7 +1589,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
       break;
     }
-    }
   }
 }
 

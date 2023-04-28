@@ -2045,8 +2045,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   lr_lb_config.mutable_choice_count()->set_value(2);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,       runtime_,
+  lr_lb_config.mutable_choice_count()->set_value(3);
+  LeastRequestLoadBalancer lb_3{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
+  lr_lb_config.mutable_choice_count()->set_value(4);
+  LeastRequestLoadBalancer lb_4{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
   // Verify correct number of choices.
@@ -2059,20 +2062,21 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
 
-  // 5 choices configured results in P5C.
-  EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
 
-  // Verify correct host chosen in P5C scenario.
+  // Verify correct host chosen in P3C scenario.
   EXPECT_CALL(random_, random())
-      .Times(6)
+      .Times(3)
       .WillOnce(Return(0))
       .WillOnce(Return(3))
-      .WillOnce(Return(0))
-      .WillOnce(Return(3))
-      .WillOnce(Return(2))
       .WillOnce(Return(1));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
+
+
+  // When the number of hosts is smaller or equal to the number of choices we don't call
+  // random() since we do a full table scan.
+  EXPECT_CALL(random_, random()).Times(0);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_4.chooseHost(nullptr));
+
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
