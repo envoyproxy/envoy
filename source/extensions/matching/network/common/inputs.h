@@ -39,7 +39,7 @@ public:
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -63,13 +63,17 @@ DECLARE_FACTORY(DestinationIPInputFactory);
 DECLARE_FACTORY(UdpDestinationIPInputFactory);
 DECLARE_FACTORY(HttpDestinationIPInputFactory);
 
+// With the support of generic matching API, integer is allowed in inputs such as
+// `DestinationPortInput` and `SourcePortInput`. As a result, there is no longer a need for the
+// redundant conversion of int-to-string. We can change them here once IntInputMatcher (for integer
+// type input) is implemented.
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat(address.ip()->port())};
@@ -99,7 +103,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -128,7 +132,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat(address.ip()->port())};
@@ -157,7 +161,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address->ip()->addressAsString()};
@@ -189,7 +193,7 @@ public:
     if (is_local_connection) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -217,7 +221,7 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               std::string(server_name)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
