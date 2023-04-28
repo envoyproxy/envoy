@@ -179,6 +179,7 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
 
   cluster_ = nullptr;
   host_address_map_.clear();
+  cx_rate_limiter_map_.clear();
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsAdded(
@@ -201,6 +202,10 @@ void InstanceImpl::ThreadLocalPool::onHostsAdded(
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
     const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
   for (const auto& host : hosts_removed) {
+    auto token_bucket = cx_rate_limiter_map_.find(host);
+    if (token_bucket != cx_rate_limiter_map_.end()) {
+      cx_rate_limiter_map_.erase(token_bucket);
+    }
     auto it = client_map_.find(host);
     if (it != client_map_.end()) {
       if (it->second->redis_client_->active()) {
@@ -236,14 +241,24 @@ void InstanceImpl::ThreadLocalPool::drainClients() {
 
 InstanceImpl::ThreadLocalActiveClientPtr&
 InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
+  TokenBucketPtr& rate_limiter = cx_rate_limiter_map_[host];
+  if (config_->connectionRateLimitEnabled() && !rate_limiter) {
+    rate_limiter = std::make_unique<TokenBucketImpl>(config_->connectionRateLimitPerSec(),
+                                                     dispatcher_.timeSource(),
+                                                     config_->connectionRateLimitPerSec());
+  }
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = host;
-    client->redis_client_ =
-        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, false);
-    client->redis_client_->addConnectionCallbacks(*client);
+    if (config_->connectionRateLimitEnabled() && rate_limiter->consume(1, false) == 0) {
+      redis_cluster_stats_.connection_rate_limited_.inc();
+    } else {
+      client = std::make_unique<ThreadLocalActiveClient>(*this);
+      client->host_ = host;
+      client->redis_client_ =
+          client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                                 auth_username_, auth_password_, false);
+      client->redis_client_->addConnectionCallbacks(*client);
+    }
   }
   return client;
 }
@@ -283,9 +298,16 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   PendingRequest& pending_request = pending_requests_.back();
 
   if (!transaction.active_) {
-    pending_request.request_handler_ =
-        this->threadLocalActiveClient(host)->redis_client_->makeRequest(
-            getRequest(pending_request.incoming_request_), pending_request);
+    ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+    if (!client) {
+      ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+      pending_request.request_handler_ = nullptr;
+      onRequestCompleted();
+      client_map_.erase(host);
+      return nullptr;
+    }
+    pending_request.request_handler_ = client->redis_client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
   } else {
     pending_request.request_handler_ = transaction.client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
@@ -365,6 +387,11 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
   }
 
   ThreadLocalActiveClientPtr& client = threadLocalActiveClient(it->second);
+  if (!client) {
+    ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+    client_map_.erase(it->second);
+    return nullptr;
+  }
 
   return client->redis_client_->makeRequest(request, callbacks);
 }
