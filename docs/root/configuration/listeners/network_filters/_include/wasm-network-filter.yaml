@@ -29,8 +29,8 @@ static_resources:
           cluster: web_service
   clusters:
   - name: web_service
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
