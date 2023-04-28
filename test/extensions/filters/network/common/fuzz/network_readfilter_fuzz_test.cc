@@ -14,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
-  //  TestDeprecatedV2Api _deprecated_v2_api;
+  TestDeprecatedV2Api _deprecated_v2_api;
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
         // This post-processor mutation is applied only when libprotobuf-mutator
@@ -42,21 +42,10 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
 
-        {
-          std::fstream out("last_post_processed", std::ios::out);
-          out << input->DebugString();
-        }
         ProtobufMessage::ValidatedInputGenerator generator(seed,
                                                            ProtobufMessage::composeFiltersAnyMap());
         ProtobufMessage::traverseMessage(generator, *input, true);
       }};
-
-  Envoy::Logger::Registry::setLogLevel(ENVOY_SPDLOG_LEVEL(info));
-
-  {
-    std::fstream out("last_checked", std::ios::out);
-    out << input.DebugString();
-  }
 
   try {
     TestUtility::validate(input);
