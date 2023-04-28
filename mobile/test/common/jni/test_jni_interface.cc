@@ -44,6 +44,7 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownTestServer(J
   shutdown_server();
 }
 
+#ifdef ENVOY_ENABLE_YAML
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeCreateYaml(JNIEnv* env, jclass,
                                                                        jlong bootstrap_ptr) {
@@ -53,3 +54,4 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeCreateYaml(JNIEnv* e
   std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
   return env->NewStringUTF(yaml.c_str());
 }
+#endif

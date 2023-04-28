@@ -21,11 +21,11 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
 
   FakeStreamCodecFactory::FakeRequest request;
 
-  EXPECT_EQ("", input->get(request).data_.value());
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", input->get(request).data_.value());
+  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
 }
 
 TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
@@ -69,11 +69,11 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
 
   FakeStreamCodecFactory::FakeRequest request;
 
-  EXPECT_EQ("", input->get(request).data_.value());
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
 
   request.method_ = "fake_method";
 
-  EXPECT_EQ("fake_method", input->get(request).data_.value());
+  EXPECT_EQ("fake_method", absl::get<std::string>(input->get(request).data_));
 }
 
 TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
@@ -90,11 +90,11 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
 
   FakeStreamCodecFactory::FakeRequest request;
 
-  EXPECT_EQ(absl::nullopt, input->get(request).data_);
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(input->get(request).data_));
 
   request.data_["key_0"] = "value_0";
 
-  EXPECT_EQ("value_0", input->get(request).data_.value());
+  EXPECT_EQ("value_0", absl::get<std::string>(input->get(request).data_));
 }
 
 } // namespace

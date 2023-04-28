@@ -1,11 +1,14 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include <iostream>
+
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
-#include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/functional/bind_front.h"
 #include "absl/strings/match.h"
@@ -20,11 +23,10 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderUtility;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using HeaderValidatorFunction1 =
-    HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
+using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
 
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
@@ -95,7 +97,7 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method", ":authority"};
@@ -227,19 +229,7 @@ Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderM
   return ValidationResult::success();
 }
 
-HeaderValidator::HeadersTransformationResult
-Http2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
-  sanitizeHeadersWithUnderscores(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
-  }
-  return HeadersTransformationResult::success();
-}
-
-HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
@@ -389,7 +379,8 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
        iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
+      is_valid &=
+          testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
     } else {
       reject_due_to_underscore = reject_header_names_with_underscores;
     }
@@ -409,28 +400,104 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   return HeaderEntryValidationResult::success();
 }
 
-HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) {
-  HeaderValidator::ValidationResult result = validateTrailers(trailer_map);
+  ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
   return result;
 }
 
-HeaderValidator::TrailersTransformationResult
-Http2HeaderValidator::transformRequestTrailers(::Envoy::Http::RequestTrailerMap& trailer_map) {
+::Envoy::Http::HeaderValidator::TransformationResult
+ServerHttp2HeaderValidator::transformRequestTrailers(
+    ::Envoy::Http::RequestTrailerMap& trailer_map) {
   sanitizeHeadersWithUnderscores(trailer_map);
-  return HeadersTransformationResult::success();
+  return ::Envoy::Http::HeaderValidator::TransformationResult::success();
 }
 
-HeaderValidator::ValidationResult Http2HeaderValidator::validateResponseTrailers(
+ValidationResult Http2HeaderValidator::validateResponseTrailers(
     const ::Envoy::Http::ResponseTrailerMap& trailer_map) {
-  HeaderValidator::ValidationResult result = validateTrailers(trailer_map);
+  ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
   return result;
+}
+
+::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult
+ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
+  sanitizeHeadersWithUnderscores(header_map);
+  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result.ok()) {
+      return path_result;
+    }
+  }
+
+  // Transform H/2 extended CONNECT to H/1 UPGRADE, so that request processing always observes H/1
+  // UPGRADE requests
+  if (::Envoy::Http::Utility::isH2UpgradeRequest(header_map)) {
+    ::Envoy::Http::Utility::transformUpgradeRequestFromH2toH1(header_map);
+  }
+  return ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::success();
+}
+
+::Envoy::Http::HeaderValidator::ResponseHeadersTransformationResult
+ServerHttp2HeaderValidator::transformResponseHeaders(
+    const ::Envoy::Http::ResponseHeaderMap& header_map) {
+  // Check if the response is for the the H/1 UPGRADE and transform it to the H/2 extended CONNECT
+  // response.
+  // Note that at this point the header map may not be valid if a buggy encoder filter
+  // removed the :status header, so we check for this case as well.
+
+  if (header_map.Status() != nullptr && ::Envoy::Http::Utility::isUpgrade(header_map)) {
+    ::Envoy::Http::ResponseHeaderMapPtr modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::ResponseHeaderMapImpl>(header_map);
+    ::Envoy::Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
+    // Return new header map along with the success result
+    return {RejectResult::success(), std::move(modified_headers)};
+  }
+
+  return {RejectResult::success(), nullptr};
+}
+
+::Envoy::Http::ClientHeaderValidator::RequestHeadersTransformationResult
+ClientHttp2HeaderValidator::transformRequestHeaders(
+    const ::Envoy::Http::RequestHeaderMap& header_map) {
+  ::Envoy::Http::RequestHeaderMapPtr modified_headers;
+  if (::Envoy::Http::Utility::isUpgrade(header_map)) {
+    // Remember the fact that H/1 upgrade was transformed into H/2 extended CONNECT, so that
+    // response can be transformed from extended CONNECT to H/1 upgrade.
+    upgrade_type_ = std::string(header_map.getUpgradeValue());
+    modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::RequestHeaderMapImpl>(header_map);
+    ::Envoy::Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
+  } else if (::Envoy::Http::HeaderUtility::isConnect(header_map)) {
+    // Sanitize the standard CONNECT request, as filters (and HCM) may add prohibited headers
+    // like :scheme, or :path (i.e. by a path rewrite rule)
+    modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::RequestHeaderMapImpl>(header_map);
+    modified_headers->removeScheme();
+    modified_headers->removePath();
+    // Note that extended CONNECT is transformed to H/1 upgrade and handled above.
+    // The only case where the :protocol header would be present here is if an HTTP
+    // filter adds it. But this case is unsupported at this point.
+    modified_headers->removeProtocol();
+  }
+
+  return {RejectResult::success(), std::move(modified_headers)};
+}
+
+::Envoy::Http::ClientHeaderValidator::TransformationResult
+ClientHttp2HeaderValidator::transformResponseHeaders(::Envoy::Http::ResponseHeaderMap& header_map) {
+  // Check if the request was the extended CONNECT and transform response from extended CONNECT
+  // to the H/1 upgrade response.
+  if (!upgrade_type_.empty() && header_map.Status() != nullptr) {
+    ::Envoy::Http::Utility::transformUpgradeResponseFromH2toH1(header_map, upgrade_type_);
+  }
+
+  return TransformationResult::success();
 }
 
 } // namespace EnvoyDefault
