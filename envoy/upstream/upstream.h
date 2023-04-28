@@ -1191,7 +1191,7 @@ public:
    * @return create header validator based on cluster configuration. Returns nullptr if
    * ENVOY_ENABLE_UHV is undefined.
    */
-  virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
+  virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
 protected:
   /**

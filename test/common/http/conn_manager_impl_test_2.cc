@@ -3317,7 +3317,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       HeaderValidator::HeadersTransformationResult::success());
+                       HeaderValidator::RequestHeadersTransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3363,7 +3363,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
   setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       HeaderValidator::HeadersTransformationResult::success());
+                       HeaderValidator::RequestHeadersTransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3392,7 +3392,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       HeaderValidator::HeadersTransformationResult::success());
+                       HeaderValidator::RequestHeadersTransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3422,8 +3422,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
   setup(false, "");
   expectUhvHeaderCheck(
       HeaderValidator::ValidationResult::success(),
-      HeaderValidator::HeadersTransformationResult(
-          HeaderValidator::HeadersTransformationResult::Action::Redirect, "bad_header_map"));
+      HeaderValidator::RequestHeadersTransformationResult(
+          HeaderValidator::RequestHeadersTransformationResult::Action::Redirect, "bad_header_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3451,8 +3451,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   setup(false, "");
   expectUhvHeaderCheck(
       HeaderValidator::ValidationResult::success(),
-      HeaderValidator::HeadersTransformationResult(
-          HeaderValidator::HeadersTransformationResult::Action::Redirect, "bad_header_map"));
+      HeaderValidator::RequestHeadersTransformationResult(
+          HeaderValidator::RequestHeadersTransformationResult::Action::Redirect, "bad_header_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3483,7 +3483,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
   setup(false, "");
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TrailersTransformationResult::success());
+                        HeaderValidator::TransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3512,7 +3512,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
   setup(false, "");
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TrailersTransformationResult::success());
+                        HeaderValidator::TransformationResult::success(), false);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3535,9 +3535,9 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
   codec_->protocol_ = Protocol::Http11;
   setup(false, "");
-  expectUhvTrailerCheck(HeaderValidator::TrailersTransformationResult::success(),
-                        HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"));
+  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
+                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
+                        HeaderValidator::TransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3568,7 +3568,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
   setupFilterChain(1, 0, 1);
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TrailersTransformationResult::success());
+                        HeaderValidator::TransformationResult::success());
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
         return FilterHeadersStatus::StopIteration;
@@ -3606,7 +3606,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult::success(),
-                       HeaderValidator::HeadersTransformationResult::success());
+                       HeaderValidator::RequestHeadersTransformationResult::success());
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
