@@ -13,6 +13,38 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 
+envoy::config::listener::v3::Filter
+mutateConfig(unsigned int seed, envoy::config::listener::v3::Filter* config = nullptr) {
+  // TODO(jianwendong): After extending to cover all the filters, we can use
+  // `Registry::FactoryRegistry<
+  // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
+  // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`.
+  static const auto filter_names = UberFilterFuzzer::filterNames();
+  static const auto factories = Registry::FactoryRegistry<
+      Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
+
+  envoy::config::listener::v3::Filter result;
+  if (config == nullptr) {
+    config = &result;
+  }
+  // Choose a valid filter name.
+  if (std::find(filter_names.begin(), filter_names.end(), config->name()) ==
+      std::end(filter_names)) {
+    absl::string_view filter_name = filter_names[seed % filter_names.size()];
+    if (filter_name != config->name()) {
+      // Clear old config, or unpacking non-suitable value may crash.
+      config->clear_typed_config();
+      config->set_name(std::string(filter_name));
+    }
+  }
+  // Set the corresponding type_url for Any.
+  auto& factory = factories.at(config->name());
+  config->mutable_typed_config()->set_type_url(absl::StrCat(
+      "type.googleapis.com/", factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
+
+  return *config;
+}
+
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   TestDeprecatedV2Api _deprecated_v2_api;
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
@@ -21,29 +53,16 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         // calls mutate on an input, and *not* during fuzz target execution.
         // Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
-
-        // TODO(jianwendong): After extending to cover all the filters, we can use
-        // `Registry::FactoryRegistry<
-        // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
-        // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`.
-        static const auto filter_names = UberFilterFuzzer::filterNames();
-        static const auto factories = Registry::FactoryRegistry<
-            Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-        // Choose a valid filter name.
-        if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
-            std::end(filter_names)) {
-          absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          if (filter_name != input->config().name()) {
-            // Clear old config, or unpacking non-suitable value may crash.
-            input->mutable_config()->clear_typed_config();
-            input->mutable_config()->set_name(std::string(filter_name));
-          }
+        static unsigned config_mutation_cnt = 0;
+        // mutate the config part of the fuzzer only so often.
+        static const unsigned config_mutation_limit = 1000;
+        static envoy::config::listener::v3::Filter config = mutateConfig(seed);
+        if (config_mutation_cnt > config_mutation_limit) {
+          config = mutateConfig(seed, &config);
+          config_mutation_cnt = 0;
         }
-        // Set the corresponding type_url for Any.
-        auto& factory = factories.at(input->config().name());
-        input->mutable_config()->mutable_typed_config()->set_type_url(
-            absl::StrCat("type.googleapis.com/",
-                         factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
+        input->mutable_config()->operator=(config);
+        ++config_mutation_cnt;
 
         ProtobufMessage::ValidatedInputGenerator generator(
             seed, ProtobufMessage::composeFiltersAnyMap(), 20);
