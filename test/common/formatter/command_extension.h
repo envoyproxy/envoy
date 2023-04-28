@@ -13,14 +13,12 @@ namespace Formatter {
 class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string>
-  format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-         const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
-  ProtobufWkt::Value
-  formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-              const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view, AccessLog::AccessLogType) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view, AccessLog::AccessLogType) const override;
 };
 
 class TestCommandParser : public CommandParser {
@@ -40,14 +38,12 @@ public:
 class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string>
-  format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-         const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
-  ProtobufWkt::Value
-  formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-              const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view, AccessLog::AccessLogType) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view, AccessLog::AccessLogType) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {

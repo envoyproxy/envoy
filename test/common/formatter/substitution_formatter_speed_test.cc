@@ -91,9 +91,10 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
+    output_bytes += formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, AccessLog::AccessLogType::NotSet)
+                        .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -111,10 +112,10 @@ static void BM_StructAccessLogFormatter(benchmark::State& state) {
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        struct_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += struct_formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, AccessLog::AccessLogType::NotSet)
+                        .ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -133,10 +134,10 @@ static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        typed_struct_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += typed_struct_formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, AccessLog::AccessLogType::NotSet)
+                        .ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -154,10 +155,10 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        json_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
+    output_bytes += json_formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, AccessLog::AccessLogType::NotSet)
+                        .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -176,10 +177,10 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        typed_json_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
+    output_bytes += typed_json_formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, AccessLog::AccessLogType::NotSet)
+                        .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
