@@ -18,18 +18,12 @@ Example configuration
 
 Example filter configuration:
 
-.. code-block:: yaml
-
-  name: envoy.filters.network.wasm
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm
-    config:
-      name: "my_plugin"
-      vm_config:
-        code:
-          local:
-            filename: "/etc/envoy_filter_http_wasm_example.wasm"
-        allow_precompiled: true
-
+.. literalinclude:: _include/wasm-network-filter.yaml
+    :language: yaml
+    :lines: 13-29
+    :emphasize-lines: 3-12
+    :linenos:
+    :lineno-start: 13
+    :caption: :download:`wasm-network-filter.yaml <_include/wasm-network-filter.yaml>`
 
 The preceding snippet configures a filter from a Wasm binary on local disk.
