@@ -138,6 +138,7 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 # to add platform-specific options. Avoid using this config directly and
 # instead use a platform-specific config
 #############################################################################
+build:remote-ci-common --config=ci
 build:remote-ci-common --config=remote
 build:remote-ci-common --google_default_credentials=false
 build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com

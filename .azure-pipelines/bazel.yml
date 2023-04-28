@@ -172,7 +172,7 @@ steps:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
     ${{ if eq(parameters.rbe, false) }}:
-      BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
       ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
