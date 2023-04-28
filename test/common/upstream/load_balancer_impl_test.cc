@@ -2053,11 +2053,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 
   // 0 choices configured should default to P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_.chooseHost(nullptr));
 
   // 2 choices configured results in P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
 
   // 5 choices configured results in P5C.
   EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
