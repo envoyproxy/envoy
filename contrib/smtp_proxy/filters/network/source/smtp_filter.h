@@ -22,12 +22,15 @@ namespace SmtpProxy {
  * All Smtp proxy stats. @see stats_macros.h
  */
 #define ALL_SMTP_PROXY_STATS(COUNTER)                                                          \
-  COUNTER(sessions)                                                                                \
-  COUNTER(sessions_encrypted)                                                                      \
-  COUNTER(sessions_terminated_ssl)                                                                 \
-  COUNTER(sessions_unencrypted)                                                                    \
-  COUNTER(sessions_upstream_ssl_success)                                                           \
-  COUNTER(sessions_upstream_ssl_failed)                                                            
+  COUNTER(sessions)                                                                            \
+  COUNTER(sessions_bad_line)                                                                   \
+  COUNTER(sessions_bad_pipeline)                                                               \
+  COUNTER(sessions_bad_ehlo)                                                                   \
+  COUNTER(sessions_non_esmtp)                                                                  \
+  COUNTER(sessions_esmtp_unencrypted)                                                          \
+  COUNTER(sessions_terminated_ssl)                                                             \
+  COUNTER(sessions_no_ehlo_after_starttls)
+
 
 /**
  * Struct definition for all Smtp proxy stats. @see stats_macros.h
@@ -140,6 +143,9 @@ private:
     UPSTREAM_RESPONSE,
   };
 
+  // The filter callbacks may have previously buffered data in
+  // frontend/backend_buffer_ while we were talking to the opposite
+  // side that we're ready to process now.
   Network::FilterStatus readUpstream(State new_state);
   Network::FilterStatus readDownstream(State new_state);
 

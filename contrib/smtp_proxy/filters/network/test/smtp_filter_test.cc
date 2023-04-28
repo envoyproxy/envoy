@@ -115,6 +115,8 @@ TEST_F(SmtpFilterTest, BadPipeline) {
   EXPECT_CALL(connection_, close(_));
 
   ReadExpectConsumed("ehlo gargantua1\r\nstuff");
+  ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_bad_pipeline_.value(), 1);
 }
 
 // !(ehlo or helo)
@@ -126,6 +128,7 @@ TEST_F(SmtpFilterTest, NoHelo) {
   EXPECT_CALL(connection_, close(_));
 
   ReadExpectConsumed("starttls\r\n");
+  ASSERT_THAT(filter_->getStats().sessions_bad_ehlo_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, NoEsmtp) {
@@ -142,6 +145,7 @@ TEST_F(SmtpFilterTest, NoEsmtp) {
 
   ReadExpectContinue("mail from:<alice>\r\n");
   WriteExpectContinue("200 ok\r\n");
+  ASSERT_THAT(filter_->getStats().sessions_non_esmtp_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, NoStarttls) {
@@ -166,6 +170,8 @@ TEST_F(SmtpFilterTest, NoStarttls) {
     "200-upstream smtp ok\r\n"
     "200-PIPELINING\r\n"
     "200 8BITMIME\r\n");
+
+  ASSERT_THAT(filter_->getStats().sessions_esmtp_unencrypted_.value(), 1);
 }
 
 
@@ -208,6 +214,9 @@ TEST_F(SmtpFilterTest, Starttls) {
     "200 8BITMIME\r\n");
 
   ReadExpectContinue("mail from:<someone>\r\n");
+
+  ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_no_ehlo_after_starttls_.value(), 0);
 }
 
 // ehlo starttls mail
@@ -248,8 +257,10 @@ TEST_F(SmtpFilterTest, StarttlsNoEhlo2) {
     "200 8BITMIME\r\n");
 
   WriteExpectContinue("200 ok\r\n");  // response to mail
-}
 
+  ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_no_ehlo_after_starttls_.value(), 1);
+}
 
 
 

@@ -9,27 +9,37 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SmtpProxy {
 
+static const absl::string_view CRLF = "\r\n";
+
+// https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.4
+const size_t kMaxCommandLine = 512;
+
+// https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.5
+const size_t kMaxReplyLine = 512;
+
 Decoder::Result GetLine(Buffer::Instance& data,
-			size_t off,
+			size_t start,
 			std::unique_ptr<char[]>& raw_line,
-			absl::string_view& line) {
-  ssize_t crlf = data.search("\r\n", 2, off, data.length() - off);
+			absl::string_view& line,
+			size_t max_line) {
+  ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
-    if (data.length() >= 1024) {
+    if (data.length() >= 512) {
       return Decoder::Result::Bad;
     } else {
       return Decoder::Result::NeedMoreData;
     }
   }
   ASSERT(crlf >= 0);
-  if (static_cast<size_t>(crlf) == off) {
+  // empty line is invalid
+  if (static_cast<size_t>(crlf) == start) {
     return Decoder::Result::Bad;
   }
 
-  size_t len = crlf+2 - off;
-  ASSERT(len >= 2);
+  size_t len = crlf + CRLF.size() - start;
+  ASSERT(len > CRLF.size());
   raw_line.reset(new char[len]);
-  data.copyOut(off, len, raw_line.get());
+  data.copyOut(start, len, raw_line.get());
   line = absl::string_view(raw_line.get(), len);
 
   return Decoder::Result::ReadyForNext;
@@ -38,25 +48,35 @@ Decoder::Result GetLine(Buffer::Instance& data,
 Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& result) {
   std::unique_ptr<char[]> raw_line;
   absl::string_view line;
-  Result res = GetLine(data, 0, raw_line, line);
+  Result res = GetLine(data, 0, raw_line, line, kMaxCommandLine);
   if (res != Result::ReadyForNext) return res;
 
   result.wire_len = line.size();
 
-  ASSERT(absl::ConsumeSuffix(&line, "\r\n"));
+  ASSERT(absl::ConsumeSuffix(&line, CRLF));
 
   ssize_t space = line.find(' ');
   if (space == -1) {
     // no arguments e.g.
     // NOOP\r\n
-    result.verb = std::string(line);
+    result.raw_verb = std::string(line);
   } else {
     // EHLO mail.example.com\r\n
-    result.verb = std::string(line.substr(0, space));
+    result.raw_verb = std::string(line.substr(0, space));
     result.rest = std::string(line.substr(space + 1));
   }
 
-  absl::AsciiStrToLower(&result.verb);
+  static const struct { Command::Verb verb; absl::string_view raw_verb; } kCommands[] = {
+    {Decoder::Command::HELO, "HELO"},
+    {Decoder::Command::EHLO, "EHLO"},
+    {Decoder::Command::STARTTLS, "STARTTLS"},
+  };
+
+  for (const auto& c : kCommands) {
+    if (absl::AsciiStrToUpper(result.raw_verb) != c.raw_verb) continue;
+    result.verb = c.verb;
+    break;
+  }
   
   // could be a little more persnickety about at least verb must be only printing chars, etc.
 
@@ -71,7 +91,7 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
   std::string msg;
   for (;;) {
     absl::string_view line;
-    Result res = GetLine(data, line_off, raw_line, line);
+    Result res = GetLine(data, line_off, raw_line, line, kMaxReplyLine);
     if (res != Result::ReadyForNext) return res;
     line_off += line.size();
     // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.2
@@ -91,7 +111,7 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
 
     line = line.substr(3);
     char sp_or_dash = ' ';
-    if (!line.empty() && line != "\r\n") {
+    if (!line.empty() && line != CRLF) {
       sp_or_dash = line[0];
       if (sp_or_dash != ' ' && sp_or_dash != '-') return Result::Bad;
       line = line.substr(1);

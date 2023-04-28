@@ -31,20 +31,39 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   Decoder::Command command;
   EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->DecodeCommand(data_, command));
 
-  data_.add(std::string(2000, 'q'));
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
-  data_.drain(data_.length());
-
   data_.add("\r\n");
   EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
-  data_.drain(data_.length());
+  data_.drain(data_.length());;
 
-  data_.add("FOO bar\r\n");
+  data_.add(std::string(510, 'q'));
+  data_.add("\r\n");
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Command::UNKNOWN, command.verb);
+  EXPECT_EQ(std::string(510, 'q'), command.raw_verb);
+  EXPECT_TRUE(command.rest.empty());
+  EXPECT_EQ(512, command.wire_len);
+  data_.drain(data_.length());;
+
+  data_.add(std::string(511, 'q'));
+  data_.add("\r\n");
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
+  data_.drain(data_.length());;
+
+  data_.add("fOo bar\r\n");
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
   data_.drain(data_.length());
   EXPECT_EQ(9, command.wire_len);
-  EXPECT_EQ("foo", command.verb);
+  EXPECT_EQ(Decoder::Command::UNKNOWN, command.verb);
+  EXPECT_EQ("fOo", command.raw_verb);
   EXPECT_EQ("bar", command.rest);
+
+  data_.add("eHlO gargantua1\r\n");
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
+  data_.drain(data_.length());
+  EXPECT_EQ(17, command.wire_len);
+  EXPECT_EQ(Decoder::Command::EHLO, command.verb);
+  EXPECT_EQ("eHlO", command.raw_verb);
+  EXPECT_EQ("gargantua1", command.rest);
 }
 
 
@@ -62,6 +81,21 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   EXPECT_EQ(200, response.code);
   EXPECT_EQ("", response.msg);
   EXPECT_EQ(5, response.wire_len);
+
+  data_.add("200 ");
+  data_.add(std::string(506, 'q'));
+  data_.add("\r\n");
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  data_.drain(data_.length());
+  EXPECT_EQ(200, response.code);
+  EXPECT_EQ(std::string(506, 'q') + "\r\n", response.msg);
+  EXPECT_EQ(512, response.wire_len);
+
+  data_.add("200 ");
+  data_.add(std::string(507, 'q'));
+  data_.add("\r\n");
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+  data_.drain(data_.length());
 
   data_.add("200 ok\r\n");
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));

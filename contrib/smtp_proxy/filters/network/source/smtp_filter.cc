@@ -30,6 +30,8 @@ SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
 }
 
 Network::FilterStatus SmtpFilter::onNewConnection() {
+  config_->stats_.sessions_.inc();
+
   Buffer::OwnedImpl banner("220 envoy ESMTP\r\n");
   write_callbacks_->injectWriteDataToFilterChain(banner, /*end_stream=*/false);
   state_ = EHLO;
@@ -38,7 +40,6 @@ Network::FilterStatus SmtpFilter::onNewConnection() {
 
 Network::FilterStatus SmtpFilter::readUpstream(State new_state) {
   state_ = new_state;
-  // may need to wake up writer
   if (backend_buffer_.length() > 0) {
     Buffer::OwnedImpl empty;
     onWrite(empty, false);
@@ -48,7 +49,6 @@ Network::FilterStatus SmtpFilter::readUpstream(State new_state) {
 
 Network::FilterStatus SmtpFilter::readDownstream(State new_state) {
   state_ = new_state;
-  // may need to wake up writer
   if (frontend_buffer_.length() > 0) {
     Buffer::OwnedImpl empty;
     onData(empty, false);
@@ -88,9 +88,11 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     Decoder::Result res = decoder_->DecodeCommand(frontend_buffer_, command);
 
     if (res == Decoder::Result::Bad) {
+      config_->stats_.sessions_bad_line_.inc();
       Buffer::OwnedImpl err("500 bad\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      // TODO may not always want to hang up here
+      // TODO may not always want to hang up here though the decoder
+      // isn't very strict on this, only enforces max line length.
       read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return Network::FilterStatus::StopIteration; 
     }
@@ -99,6 +101,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     }
 
     if (command.wire_len != frontend_buffer_.length()) {
+      config_->stats_.sessions_bad_pipeline_.inc();
       ENVOY_CONN_LOG(trace, "smtp_proxy: bad pipeline {} {}", read_callbacks_->connection(),
 		     command.wire_len, frontend_buffer_.length());
 
@@ -114,13 +117,15 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
 
   switch (state_) {
     case EHLO: {
-      if (command.verb != "helo" && command.verb != "ehlo") {
+      if (command.verb != Decoder::Command::HELO && command.verb != Decoder::Command::EHLO) {
+	config_->stats_.sessions_bad_ehlo_.inc();
 	Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
 	write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
 	read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 	return Network::FilterStatus::StopIteration; 
       }
-      if (command.verb == "helo") {
+      if (command.verb == Decoder::Command::HELO) {
+	config_->stats_.sessions_non_esmtp_.inc();
 	return maybeSendProxyHeader(UPSTREAM_RESPONSE);
       }
       Buffer::OwnedImpl esmtp;
@@ -134,7 +139,8 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       return Network::FilterStatus::StopIteration; 
     }
     case STARTTLS: {
-      if (command.verb != "starttls") {
+      if (command.verb != Decoder::Command::STARTTLS) {
+	config_->stats_.sessions_esmtp_unencrypted_.inc();
 	return maybeSendProxyHeader(UPSTREAM_BANNER);
       }
       frontend_buffer_.drain(command.wire_len);
@@ -142,12 +148,13 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       return Network::FilterStatus::StopIteration; 
     }
     case EHLO2: {
-      // If the next command from the client after TLS isn't ehlo:
+      // If the next command from the client after the TLS negotiation isn't EHLO:
       // leave the command in frontend_buffer_
       // emit an ehlo to the upstream
       // consume the ehlo response
       // inject the buffered command from frontend_buffer_ to the upstream
-      if (command.verb != "ehlo") {
+      if (command.verb != Decoder::Command::EHLO) {
+	config_->stats_.sessions_no_ehlo_after_starttls_.inc();
 	Buffer::OwnedImpl ehlo2("ehlo envoy\r\n");
 	read_callbacks_->injectReadDataToFilterChain(ehlo2, false);
 	state_ = UPSTREAM_RESPONSE;
@@ -214,8 +221,8 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     // we may have buffered the next command while we were waiting for this, resume processing that
     return readDownstream(EHLO2);
   } else {  // UPSTREAM_RESPONSE
-    // after filter-emitted 2nd ehlo: consumed ehlo response, send buffered command (mail, etc)
-    // after client helo: consumed banner, send buffered helo
+    // after filter-emitted 2nd EHLO: consumed EHLO response, send buffered command (MAIL, etc)
+    // after client HELO: consumed banner, send buffered HELO
     read_callbacks_->injectReadDataToFilterChain(frontend_buffer_, false);
     frontend_buffer_.drain(frontend_buffer_.length());
     state_ = PASSTHROUGH;

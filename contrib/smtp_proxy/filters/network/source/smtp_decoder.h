@@ -27,7 +27,14 @@ public:
   };
 
   struct Command {
-    std::string verb;
+    enum Verb {
+      UNKNOWN,
+      HELO,
+      EHLO,
+      STARTTLS
+    };
+    Verb verb = UNKNOWN;
+    std::string raw_verb;
     std::string rest;
     size_t wire_len;
   };
