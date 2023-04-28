@@ -45,7 +45,11 @@ public:
           called_random_value = random_value;
           return result;
         });
-    EXPECT_EQ(matcher_->match(value), result);
+
+    EXPECT_EQ(matcher_->match(value.has_value()
+                                  ? ::Envoy::Matcher::MatchingDataType(std::string(value.value()))
+                                  : absl::monostate()),
+              result);
     return called_random_value;
   }
 
@@ -54,7 +58,7 @@ public:
         runtime_.snapshot_,
         featureEnabled(key_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
         .Times(0);
-    EXPECT_FALSE(matcher_->match(absl::nullopt));
+    EXPECT_FALSE(matcher_->match(absl::monostate()));
   }
 
 private:
