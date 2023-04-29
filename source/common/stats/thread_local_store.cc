@@ -958,18 +958,18 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
-std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedTotalBuckets(
-    uint32_t max_buckets) const {
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedTotalBuckets(uint32_t max_buckets) const {
   return detailedlBucketsHelper(max_buckets, *cumulative_histogram_);
 }
 
-std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedIntervalBuckets(
-    uint32_t max_buckets) const {
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedIntervalBuckets(uint32_t max_buckets) const {
   return detailedlBucketsHelper(max_buckets, *interval_histogram_);
 }
 
-std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedlBucketsHelper(
-    uint32_t max_buckets, const histogram_t& histogram) {
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram) {
   const uint32_t num_src_buckets = hist_num_buckets(&histogram);
   if (max_buckets == 0) {
     max_buckets = num_src_buckets;

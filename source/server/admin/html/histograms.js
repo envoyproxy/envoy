@@ -142,7 +142,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
 
   // Lay out the buckets evenly, independent of the bucket values. It's up
-  // to the circlhist library to space out the buckets in a shape tuned to
+  // to the `circlhist` library to space out the buckets in a shape tuned to
   // the data.
   //
   // We will not draw percentile lines outside of the bucket values. E.g. we
@@ -150,7 +150,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   //
   // We lay out horizontally based on CSS percentage so users can see the
   // graphics better if they make the window wider. We do this by inventing
-  // arbitrary "virtual pixels" (variables with Vpx suffix) during the
+  // arbitrary "virtual pixels" (variables with `Vpx` suffix) during the
   // computation in JS and converting them to percentages for writing element
   // style.
   const bucketWidthVpx = 20;
@@ -175,7 +175,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       for (annotation of bucket.annotations) {
         // Find the ideal place to draw the percentile bar, by linearly
         // interpolating between the current bucket and the previous bucket.
-        // We know that the next bucket does not come into play becasue
+        // We know that the next bucket does not come into play because
         // the percentiles held underneath a bucket are based on a value that
         // is at most as large as the current bucket.
         let percentileVpx = leftVpx;

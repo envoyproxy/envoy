@@ -13,7 +13,7 @@
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
 //   * json variant to send hierarchical names to save serialization/deserialization costs
-//   * pause auto-refresh for at least 5 seconds when editng fields.
+//   * pause auto-refresh for at least 5 seconds when editing fields.
 //   * don't auto-refresh when there is error -- provide a button to re-retry.
 //   * consider removing histogram mode during active display, and overlay summary graphics
 //   * rename bucket mode "none" to "summary"

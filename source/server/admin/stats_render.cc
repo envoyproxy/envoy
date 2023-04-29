@@ -40,7 +40,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     addDisjointBuckets(name, histogram, response);
     break;
   case Utility::HistogramBucketsMode::Detailed:
-    //addDetailedBuckets(name, histogram, response);
+    // addDetailedBuckets(name, histogram, response);
     break;
   }
 }

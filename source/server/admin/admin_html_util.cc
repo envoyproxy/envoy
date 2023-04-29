@@ -204,9 +204,9 @@ void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
   const char* method = handler.mutates_server_state_ ? "post" : "get";
   if (submit_on_change || active) {
     response.addFragments({"\n<tr><td><form ",
-        active ? "onsubmit='return onSubmit()'" :
-        absl::StrCat("action='", path, "' method='", method, "'"),
-        " id='", path, "' class='home-form'></form></td><td></td></tr>\n"});
+                           active ? "onsubmit='return onSubmit()'"
+                                  : absl::StrCat("action='", path, "' method='", method, "'"),
+                           " id='", path, "' class='home-form'></form></td><td></td></tr>\n"});
   } else {
     response.addFragments({"\n<tr class='vert-space'><td></td><td></td></tr>\n<tr", row_class,
                            ">\n  <td class='home-data'>"});

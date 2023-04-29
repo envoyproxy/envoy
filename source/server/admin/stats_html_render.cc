@@ -27,8 +27,8 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
     StatsParams json_params(params);
     json_params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
     json_response_headers_ = Http::ResponseHeaderMapImpl::create();
-    histogram_json_render_ = std::make_unique<StatsJsonRender>(
-        *json_response_headers_, json_data_, json_params);
+    histogram_json_render_ =
+        std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);
   }
 }
 
@@ -57,9 +57,8 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
   std::string buf;
   if (active_) {
     std::string buf2;
-    response.addFragments(
-        {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf),
-         AdminHtmlUtil::getResource("active_stats.js", buf2), "</script>\n"});
+    response.addFragments({"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf),
+                           AdminHtmlUtil::getResource("active_stats.js", buf2), "</script>\n"});
   } else {
     response.addFragments(
         {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf), "</script>\n<pre>\n"});

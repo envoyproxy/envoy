@@ -51,7 +51,7 @@ TEST_F(HistogramSettingsImplTest, Sorted) {
   EXPECT_EQ(settings_->buckets("a"), ConstSupportedBuckets({0.1, 1, 2}));
 }
 
-// Tests with histogram data generating a huge number of bucikets.
+// Tests with histogram data generating a huge number of buckets.
 TEST_F(HistogramSettingsImplTest, Basic) {
   envoy::config::metrics::v3::HistogramBucketSettings setting;
   setting.mutable_match()->set_prefix("a");

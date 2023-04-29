@@ -123,8 +123,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
-  static std::vector<Stats::ParentHistogram::Bucket> detailedlBucketsHelper(
-      uint32_t max_buckets, const histogram_t& histogram);
+  static std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram);
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& thread_local_store_;

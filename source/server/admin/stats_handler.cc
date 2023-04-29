@@ -171,23 +171,22 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
 }
 
 Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool active_mode) {
-  Admin::ParamDescriptor usedonly{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-    "Only include stats that have been written by system since restart"};
+  Admin::ParamDescriptor usedonly{
+      Admin::ParamDescriptor::Type::Boolean, "usedonly",
+      "Only include stats that have been written by system since restart"};
   Admin::ParamDescriptor filter{Admin::ParamDescriptor::Type::String, "filter",
-    "Regular expression (Google re2) for filtering stats"};
-  Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
-    "format",
-    "Format to use",
-    {"html", "text", "json"}};
+                                "Regular expression (Google re2) for filtering stats"};
+  Admin::ParamDescriptor format{
+      Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}};
   Admin::ParamDescriptor type{Admin::ParamDescriptor::Type::Enum,
-    "type",
-    "Stat types to include.",
-    {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-     StatLabels::TextReadouts}};
+                              "type",
+                              "Stat types to include.",
+                              {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
+                               StatLabels::Gauges, StatLabels::TextReadouts}};
   Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
-        "histogram_buckets",
-        "Histogram bucket display mode",
-        {"cumulative", "disjoint", "none", "detailed"}};
+                                           "histogram_buckets",
+                                           "Histogram bucket display mode",
+                                           {"cumulative", "disjoint", "none", "detailed"}};
 
   Admin::ParamDescriptorVec params;
   if (active_mode) {
@@ -201,15 +200,14 @@ Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool act
     params.push_back(histogram_buckets);
   }
 
-  return {
-      prefix,
-      "print server stats",
-      [this, active_mode](AdminStream& admin_stream) -> Admin::RequestPtr {
-        return makeRequest(admin_stream, active_mode);
-      },
-      false,
-      false,
-      params};
+  return {prefix,
+          "print server stats",
+          [this, active_mode](AdminStream& admin_stream) -> Admin::RequestPtr {
+            return makeRequest(admin_stream, active_mode);
+          },
+          false,
+          false,
+          params};
 }
 
 } // namespace Server
