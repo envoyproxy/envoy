@@ -29,6 +29,8 @@ else
   verbose=0
 fi
 
+. ci/build_setup.sh
+
 # Runs the formatting functions on the specified args, echoing commands
 # if -vergbose was supplied to the script.
 function format_one() {
