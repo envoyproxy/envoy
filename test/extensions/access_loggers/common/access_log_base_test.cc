@@ -25,7 +25,7 @@ public:
 private:
   void emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) override {
+               AccessLog::AccessLogType) override {
     count_++;
   }
 
@@ -36,7 +36,7 @@ TEST(AccessLogBaseTest, NoFilter) {
   StreamInfo::MockStreamInfo stream_info;
   TestImpl logger(nullptr);
   EXPECT_EQ(logger.count(), 0);
-  logger.log(nullptr, nullptr, nullptr, stream_info);
+  logger.log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   EXPECT_EQ(logger.count(), 1);
 }
 
@@ -47,7 +47,7 @@ TEST(AccessLogBaseTest, FilterReject) {
   EXPECT_CALL(*filter, evaluate(_, _, _, _)).WillOnce(Return(false));
   TestImpl logger(std::move(filter));
   EXPECT_EQ(logger.count(), 0);
-  logger.log(nullptr, nullptr, nullptr, stream_info);
+  logger.log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   EXPECT_EQ(logger.count(), 0);
 }
 
