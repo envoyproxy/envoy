@@ -29,7 +29,7 @@ else
   verbose=0
 fi
 
-if [[ "$BUILD_REASON" == "local-ci" ]]'; then
+if [[ "$BUILD_REASON" == "local-ci" ]]; then
     . ci/build_setup.sh
 fi
 
