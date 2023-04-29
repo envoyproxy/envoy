@@ -31,7 +31,7 @@ protected:
 };
 
 TEST_F(AdminHtmlUtilTest, RenderTableBegin) {
-  AdminHtmlUtil::renderTableBegin(response_);
+  AdminHtmlUtil::renderTableBegin(response_, "Parameter");
   EXPECT_THAT(response_.toString(), HasSubstr("<table class='home-table'>"));
 }
 

@@ -206,7 +206,8 @@ public:
   MOCK_METHOD(void, recordValue, (uint64_t value));
   MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
   MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const));
-  MOCK_METHOD(std::vector<Bucket>, detailedBuckets, (uint32_t max_buckets), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedTotalBuckets, (uint32_t max_buckets), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedIntervalBuckets, (uint32_t max_buckets), (const));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -245,8 +246,7 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
-
-  SystemTime snapshotTime() const override { return snapshot_time_; }
+  MOCK_METHOD(SystemTime, snapshotTime, (), (const));
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;

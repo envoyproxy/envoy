@@ -240,12 +240,12 @@ async function loadStats() {
 
   // Compute the fetch URL prefix based on the current URL, so that the admin
   // site can be hosted underneath a site-specific URL structure.
-  const stats_pos = href.indexOf('/stats/html-active');
-  if (stats_pos == -1) {
+  const statsPos = href.indexOf('/stats/html-active');
+  if (statsPos == -1) {
     statusDiv.textContent = 'Cannot find /stats/html-active in ' + href;
     return;
   }
-  const prefix = href.substring(0, stats_pos);
+  const prefix = href.substring(0, statsPos);
   const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
         params.map(makeQueryParam).join('&');
 

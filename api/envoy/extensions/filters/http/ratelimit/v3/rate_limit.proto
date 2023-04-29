@@ -385,4 +385,7 @@ message RateLimitPerRoute {
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields instead.
   // [#not-implemented-hide:]
   repeated RateLimitConfig rate_limits = 3;
+
+  // Overrides the domain. If not set, uses the filter-level domain instead.
+  string domain = 4;
 }

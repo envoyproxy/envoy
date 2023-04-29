@@ -40,8 +40,8 @@ TEST(StatsParamsTest, ParseParamsFormat) {
 #ifdef ENVOY_ADMIN_HTML
   ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
   EXPECT_EQ(StatsFormat::Html, params.format_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=active-html", response));
-  EXPECT_EQ(StatsFormat::ActiveHtml, params.format_);
+  EXPECT_EQ(Http::Code::OK, params.parse("?format=active-html", response));
+  EXPECT_TRUE(params.active_html_);
 #else
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=html", response));
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=active-html", response));

@@ -1026,6 +1026,13 @@ envoy.stat_sinks.metrics_service:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.MetricsServiceConfig
+envoy.stat_sinks.open_telemetry:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig
 envoy.stat_sinks.statsd:
   categories:
   - envoy.stats_sinks
@@ -1464,6 +1471,11 @@ envoy.load_balancing_policies.maglev:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.maglev.v3.Maglev
+envoy.load_balancing_policies.subset:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
