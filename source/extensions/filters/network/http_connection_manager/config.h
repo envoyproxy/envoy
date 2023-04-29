@@ -245,9 +245,9 @@ public:
   }
   Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV
-    return header_validator_factory_
-               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
-               : nullptr;
+    return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                           protocol, getHeaderValidatorStats(protocol))
+                                     : nullptr;
 #else
     return nullptr;
 #endif
