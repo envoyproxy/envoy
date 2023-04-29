@@ -852,9 +852,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
-
   EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+            "name cluster passthrough_enabled=false framed binary call framed binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -1359,8 +1358,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
-                              "binary reply success 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -1405,7 +1403,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false header binary call - - - - 0 0 0 -\n");
+            "name cluster passthrough_enabled=false header binary call header binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, BadFunctionCallExceptionHandling) {
@@ -1469,7 +1467,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+            "name cluster passthrough_enabled=false framed binary call framed binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -1957,7 +1955,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+            "name cluster passthrough_enabled=false framed binary call framed binary call success 0 0 0 -\n");
 }
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
@@ -2011,7 +2009,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+            "name cluster passthrough_enabled=false framed binary call framed binary call error 0 0 0 -\n");
 }
 
 // sendLocalReply does nothing, when the remote closed the connection.
