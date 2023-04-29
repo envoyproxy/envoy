@@ -29,7 +29,9 @@ else
   verbose=0
 fi
 
-. ci/build_setup.sh
+if [[ "$BUILD_REASON" == "local-ci" ]]'; then
+    . ci/build_setup.sh
+fi
 
 # Runs the formatting functions on the specified args, echoing commands
 # if -vergbose was supplied to the script.
