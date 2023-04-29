@@ -1657,10 +1657,10 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
-  EXPECT_THAT(parent_histogram->detailedBuckets(), UnorderedElementsAre(Bucket{10.0, 1}));
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10.0, 1}));
 
   // Verifies that if we ask for more buckets than there are, we just get our one bucket.
-  EXPECT_THAT(parent_histogram->detailedBuckets(10), UnorderedElementsAre(Bucket{10.0, 1}));
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(10), UnorderedElementsAre(Bucket{10.0, 1}));
 }
 
 TEST_F(HistogramTest, ParentHistogramBucketManyBucketDetail) {
@@ -1677,9 +1677,9 @@ TEST_F(HistogramTest, ParentHistogramBucketManyBucketDetail) {
   }
   store_->mergeHistograms([]() -> void {});
   std::vector<Bucket> expected_buckets{Bucket{10.0, 1}};
-  EXPECT_LT(100, parent_histogram->detailedBuckets().size());
+  EXPECT_LT(100, parent_histogram->detailedTotalBuckets().size());
   for (uint32_t i = 1; i < 100; ++i) {
-    EXPECT_EQ(i, parent_histogram->detailedBuckets(i).size());
+    EXPECT_EQ(i, parent_histogram->detailedTotalBuckets(i).size());
   }
 }
 
