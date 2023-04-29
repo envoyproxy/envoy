@@ -105,7 +105,7 @@ public:
   bool bodyReplaced() const { return body_replaced_; }
   bool partialBodyProcessed() const { return partial_body_processed_; }
 
-  void clearRouteCache(envoy::service::ext_proc::v3::CommonResponse common_response);
+  void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse& common_response);
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;

@@ -2028,7 +2028,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
 // Verify that the "disable_route_cache_clearing" setting prevents the "clear_route_cache" flag
 // from performing route clearing callbacks when enabled.
-TEST_F(HttpFilterTest, ClearRouteCacheDiasallowedHeaderMutation) {
+TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
