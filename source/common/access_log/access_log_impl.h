@@ -62,7 +62,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -77,7 +77,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -106,7 +106,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -120,7 +120,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -133,7 +133,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -144,7 +144,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 };
 
 /**
@@ -158,7 +158,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 
 private:
   Runtime::Loader& runtime_;
@@ -178,7 +178,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 
 private:
   const Http::HeaderUtility::HeaderDataPtr header_data_;
@@ -194,7 +194,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 
 private:
   uint64_t configured_flags_{};
@@ -215,7 +215,7 @@ public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 
 private:
   GrpcStatusHashSet statuses_;
@@ -238,7 +238,7 @@ public:
 
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
 
 private:
   Matchers::ValueMatcherConstSharedPtr present_matcher_;
