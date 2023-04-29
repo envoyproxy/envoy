@@ -23,7 +23,8 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) override {
+           const StreamInfo::StreamInfo& stream_info,
+           AccessLog::AccessLogType access_log_type) override {
     if (filter_ && request_headers && response_headers && response_trailers) {
       if (!filter_->evaluate(stream_info, *request_headers, *response_headers,
                              *response_trailers)) {
@@ -40,7 +41,7 @@ public:
     }
     if (handle->wasmHandle()) {
       handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
-                                        response_trailers, stream_info);
+                                        response_trailers, stream_info, access_log_type);
     }
   }
 
