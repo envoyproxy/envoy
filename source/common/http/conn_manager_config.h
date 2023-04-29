@@ -10,7 +10,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/date_provider.h"
@@ -425,9 +425,9 @@ public:
   virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
-   *  @return HttpTracerSharedPtr HttpTracer to use.
+   *  @return TracerSharedPtr Tracer to use.
    */
-  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
+  virtual Tracing::TracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.

@@ -8,8 +8,8 @@
 #include "source/common/memory/stats.h"
 #include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/ring_hash_lb.h"
-#include "source/common/upstream/subset_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"

@@ -259,7 +259,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -358,6 +358,19 @@ message Http1ProtocolOptions {
   // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding so that field can be removed.
+  // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
+  // or `envoy.reloadable_features.http1_use_balsa_parser` is true and
+  // `use_balsa_parser` is unset), then every non-empty method with only valid
+  // characters is accepted. Otherwise, methods not on the hard-coded list are
+  // rejected.
+  // Once UHV is enabled, this field should be removed, and BalsaParser should
+  // allow any method. UHV validates the method, rejecting empty string or
+  // invalid characters, and provides :ref:`restrict_http_methods
+  // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
+  // to reject custom methods.
+  bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 message KeepaliveSettings {

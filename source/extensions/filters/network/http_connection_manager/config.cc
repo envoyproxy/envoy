@@ -14,7 +14,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -325,7 +325,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
+          config, max_request_headers_kb,
+          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersSizeOverrideKey,
+                                                  Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
@@ -537,7 +539,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_tracing()) {
-    http_tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
+    tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
     tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
                                                                              config.tracing());
   }
