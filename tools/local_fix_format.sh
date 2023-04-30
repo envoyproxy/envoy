@@ -31,9 +31,9 @@ fi
 
 # The following condition is added to be able to run this script using Docker,
 # due to a problem to locate clang using WSL on Windows. Use with the following command:
-# BUILD_REASON=local-ci ./ci/run_envoy_docker.sh ./tools/local_fix_format.sh
+# 'BUILD_REASON=local-ci ./ci/run_envoy_docker.sh ./tools/local_fix_format.sh'
 if [[ "$BUILD_REASON" == "local-ci" ]]; then
-    . ci/build_setup.sh
+  . ci/build_setup.sh
 fi
 
 # Runs the formatting functions on the specified args, echoing commands
