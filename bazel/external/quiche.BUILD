@@ -3484,13 +3484,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_core_io_socket_lib",
-    srcs = select({
-        "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
-    }),
+    srcs = ["quiche/quic/core/io/socket.cc"],
     hdrs = [
         "quiche/quic/core/connecting_client_socket.h",
         "quiche/quic/core/io/socket.h",
+        "quiche/quic/core/io/socket_posix.inc",
+        "quiche/quic/core/io/socket_win.inc",
+        "quiche/quic/core/io/socket_internal.h",
         "quiche/quic/core/socket_factory.h",
     ],
     copts = quiche_copts,
