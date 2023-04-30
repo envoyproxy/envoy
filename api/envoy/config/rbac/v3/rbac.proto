@@ -320,6 +320,11 @@ message Principal {
 
     // A CIDR block that describes the downstream IP.
     // This address will honor proxy protocol, but will not honor XFF.
+    //
+    // This field is deprecated; either use :ref:`direct_remote_ip
+    // <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>` for the same
+    // behavior, or use
+    // :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`.
     core.v3.CidrRange source_ip = 5
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
