@@ -5,6 +5,7 @@
 #include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
@@ -22,6 +23,7 @@ namespace {
 class XRayDriverTest : public ::testing::Test {
 public:
   const std::string operation_name_ = "test_operation_name";
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -38,8 +40,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
   auto* xray_span = static_cast<XRay::Span*>(span.get());
@@ -54,8 +56,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
 }
@@ -68,8 +70,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is no valid sampling decision in the X-Ray header
@@ -94,8 +96,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling will not be done since:
   // a) there is no sampling decision in the X-Ray header
@@ -111,8 +113,8 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is no X-Ray header to determine the sampling decision
@@ -128,8 +130,8 @@ TEST_F(XRayDriverTest, XForwardedForHeaderSet) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
 
   ASSERT_NE(span, nullptr);
@@ -144,8 +146,8 @@ TEST_F(XRayDriverTest, XForwardedForHeaderNotSet) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
 
   ASSERT_NE(span, nullptr);
