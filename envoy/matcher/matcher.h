@@ -10,6 +10,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
@@ -161,10 +162,17 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
+   * @param  Matcher::MatchingDataType the value to match on. Will beabsl::monostate() if the
    * lookup failed.
    */
   virtual bool match(const Matcher::MatchingDataType& input) PURE;
+
+  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
+    // absl::flat_hash_set<std::string> supported_types = {typeid(std::string).name()};
+    return absl::flat_hash_set<std::string>{typeid(std::string).name()};
+    // return absl::flat_hash_set<std::string> {{typeid(std::string).name()},
+    // {typeid(bool).name()}};
+  }
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
@@ -237,6 +245,12 @@ public:
   virtual ~DataInput() = default;
 
   virtual DataInputGetResult get(const DataType& data) const PURE;
+
+  virtual std::string dataInputType() const { return typeid(std::string).name(); }
+
+  // DataInput() = default;
+  // DataInput(DataInput&& other) = default;
+  // DataInput& operator=(DataInput&& other) = default;
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;

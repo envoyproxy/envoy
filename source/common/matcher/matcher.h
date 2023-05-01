@@ -241,6 +241,14 @@ private:
           match_input_factory_.createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
+      // auto data_input_ptr = data_input();
+      // auto input_matcher_ptr = input_matcher();
+
+      // if (input_matcher_ptr-> != matcher_type) {
+      //   throw EnvoyException(absl::StrCat("mismatch input and matcher type, input type: ",
+      //   input_type, " matcher type: ", matcher_type));
+      // }
+
       return [data_input, input_matcher]() {
         return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
       };
@@ -297,6 +305,14 @@ private:
   MatchTreeFactoryCb<DataType>
   createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
                    absl::optional<OnMatchFactoryCb<DataType>>& on_no_match) {
+
+    // auto data_input_ptr = data_input();
+    // auto input_type = data_input_ptr->dataInputType();
+    // if (input_type != typeid(std::string).name()) {
+    //   throw EnvoyException(absl::StrCat("Unsupported input type: ", input_type,
+    //                                     ", only string data input is supported in tree
+    //                                     matcher"));
+    // }
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
 
@@ -304,6 +320,15 @@ private:
       match_children.push_back(
           std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
     }
+
+    // return [match_children, data_input_ptr, on_no_match]() {
+    //   auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
+    //       data_input_ptr, on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+    //   for (const auto& children : match_children) {
+    //     multimap_matcher->addChild(children.first, children.second());
+    //   }
+    //   return multimap_matcher;
+    // };
 
     return [match_children, data_input, on_no_match]() {
       auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
