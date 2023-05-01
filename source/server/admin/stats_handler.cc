@@ -95,7 +95,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, StatsPara
                      });
 #else
   return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(false); });
+                     [this]() -> Admin::UrlHandler { return statsHandler("/stats", false); });
 #endif
 }
 
