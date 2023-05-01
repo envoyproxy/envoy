@@ -24,6 +24,10 @@ private:
       const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace AwsRequestSigningFilter
