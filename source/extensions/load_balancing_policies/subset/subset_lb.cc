@@ -12,8 +12,8 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/ring_hash_lb.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 
 #include "absl/container/node_hash_set.h"
 

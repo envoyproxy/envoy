@@ -6,9 +6,9 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/memory/stats.h"
-#include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/ring_hash_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/benchmark/main.h"

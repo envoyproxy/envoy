@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
 
-#include "source/common/upstream/maglev_lb.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,10 +18,12 @@ Upstream::ThreadAwareLoadBalancerPtr Factory::create(const Upstream::ClusterInfo
       dynamic_cast<const envoy::extensions::load_balancing_policies::maglev::v3::Maglev*>(
           cluster_info.loadBalancingPolicy().get());
 
-  // The load balancing policy configuration will be loaded and validated in the main thread when we
-  // load the cluster configuration. So we can assume the configuration is valid here.
-  ASSERT(typed_config != nullptr,
-         "Invalid load balancing policy configuration for maglev load balancer");
+  // Assume legacy config.
+  if (!typed_config) {
+    return std::make_unique<Upstream::MaglevLoadBalancer>(
+        priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
+        cluster_info.lbMaglevConfig(), cluster_info.lbConfig());
+  }
 
   return std::make_unique<Upstream::MaglevLoadBalancer>(
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,

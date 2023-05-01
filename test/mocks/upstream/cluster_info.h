@@ -253,6 +253,7 @@ public:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  ProtobufTypes::MessagePtr load_balancing_policy_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
