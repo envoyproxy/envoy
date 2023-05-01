@@ -16,6 +16,7 @@ envoy_cc_library(
         "//envoy/matcher:matcher_interface",
         "//envoy/upstream:retry_interface",
         "//source/common/common:hash_lib",
+        "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

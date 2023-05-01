@@ -199,9 +199,27 @@ MockClusterInfo::MockClusterInfo()
             return true;
           }));
   ON_CALL(*this, loadBalancingPolicy).WillByDefault(ReturnRef(load_balancing_policy_));
+  ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
+    return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
+                                           protocol, codecStats(protocol))
+                                     : nullptr;
+  }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
+
+::Envoy::Http::HeaderValidatorStats& MockClusterInfo::codecStats(Http::Protocol protocol) const {
+  switch (protocol) {
+  case ::Envoy::Http::Protocol::Http10:
+  case ::Envoy::Http::Protocol::Http11:
+    return http1CodecStats();
+  case ::Envoy::Http::Protocol::Http2:
+    return http2CodecStats();
+  case ::Envoy::Http::Protocol::Http3:
+    return http3CodecStats();
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
   return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);

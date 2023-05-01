@@ -13,6 +13,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -29,6 +30,7 @@
 
 using testing::_;
 using testing::AtMost;
+using testing::ByMove;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -62,6 +64,17 @@ public:
     client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
                                                    nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+#ifdef ENVOY_ENABLE_UHV
+    ON_CALL(*header_validator_, transformRequestHeaders(_))
+        .WillByDefault(
+            Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult::success())));
+    ON_CALL(*header_validator_, validateResponseHeaders(_))
+        .WillByDefault(Return(HeaderValidator::ValidationResult::success()));
+    ON_CALL(*header_validator_, transformResponseHeaders(_))
+        .WillByDefault(Return(HeaderValidator::TransformationResult::success()));
+    ON_CALL(*cluster_, makeHeaderValidator(_))
+        .WillByDefault(Return(ByMove(std::unique_ptr<ClientHeaderValidator>(header_validator_))));
+#endif
   }
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
@@ -78,6 +91,9 @@ public:
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+#ifdef ENVOY_ENABLE_UHV
+  NiceMock<MockClientHeaderValidator>* header_validator_{new NiceMock<MockClientHeaderValidator>};
+#endif
 };
 
 TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
@@ -292,6 +308,152 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
+
+#ifdef ENVOY_ENABLE_UHV
+TEST_F(CodecClientTest, RequestHeaderTransformationFails) {
+  initialize();
+  EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
+      .WillOnce(Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult{
+          {HeaderValidator::RejectResult::Action::Reject, "some error"}, nullptr})));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  auto status = request_encoder.encodeHeaders(request_headers, true);
+  EXPECT_THAT(status, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                               testing::HasSubstr("some error")));
+  // Router will reset upstream request when encodeHeaders returns failure status
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
+}
+
+TEST_F(CodecClientTest, RequestHeaderTransformationUpdatesHeaders) {
+  initialize();
+  TestRequestHeaderMapImpl expected_new_headers{
+      {":authority", "new_hosthost"}, {":path", "/new_path"}, {":method", "PUT"}};
+  auto new_headers = std::make_unique<TestRequestHeaderMapImpl>(expected_new_headers);
+  EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
+      .WillOnce(Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult{
+          HeaderValidator::RejectResult::success(), std::move(new_headers)})));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  // Codec's encodeHeaders should observe header map modified by the transformRequestHeaders()
+  // method
+  EXPECT_CALL(inner_encoder, encodeHeaders(HeaderMapEqualRef(&expected_new_headers), _));
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
+  initialize();
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
+      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
+          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+  // Invalid response should cause stream reset
+  EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderTransformationFails) {
+  initialize();
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, transformResponseHeaders(_))
+      .WillOnce(Return(ClientHeaderValidator::TransformationResult{
+          ClientHeaderValidator::TransformationResult::Action::Reject, "some error"}));
+  // Invalid transformation should cause stream reset
+  EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
+  initialize();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
+      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
+          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+  // By default H/2 and H/3 connections are disconnected on protocol errors
+  EXPECT_CALL(*connection_, close(_));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  // Connection closure will cause stream to be reset
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
+}
+#endif // ENVOY_ENABLE_UHV
 
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
