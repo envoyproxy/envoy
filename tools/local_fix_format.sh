@@ -21,7 +21,6 @@
 
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
-
 # The following optional argument is added to be able to run this script using Docker,
 # due to a problem to locate clang using WSL on Windows. Call with -docker as the first arument.
 if [[ $# -gt 0 && "$1" == "-docker" ]]; then
