@@ -27,6 +27,7 @@ pyreadline
 pyyaml
 setuptools
 slackclient
+sphinx>=7
 thrift
 verboselogs
 yapf
