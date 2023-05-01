@@ -70,7 +70,7 @@ TEST_F(HashSlotRoutesTest, RouteToExpectedClusters) {
 
   HashSlotRoutes router(hash_slot_routes, std::move(upstreams), runtime_);
 
-  // Slot: xxHash64("testkey_a") % 8192 = 7129, going to cluster_c
+  // Slot: xxHash64() % 8192 = 7129, going to cluster_c
   std::string testkey_1("testkey_a");
   // Slot: 393, going to cluster_a
   std::string testkey_2("testkey_ab");
@@ -110,7 +110,7 @@ TEST_F(HashSlotRoutesTest, SetMultipleSlotRanges) {
 
   HashSlotRoutes router(hash_slot_routes, std::move(upstreams), runtime_);
 
-  // Slot: xxHash64("testkey_a") % 8192 = 7129, going to cluster_a
+  // Slot: xxHash64() % 8192 = 7129, going to cluster_a
   std::string testkey_1("testkey_a");
   // Slot: 393, going to cluster_a
   std::string testkey_2("testkey_ab");
@@ -137,7 +137,7 @@ TEST_F(HashSlotRoutesTest, RouteToCatchAll) {
 
   HashSlotRoutes router(hash_slot_routes, std::move(upstreams), runtime_);
 
-  // Slot: xxHash64("testkey_a") % 8192 = 7129, going to cluster_b
+  // Slot: xxHash64() % 8192 = 7129, going to cluster_b
   std::string testkey_1("testkey_a");
   // Slot: 393, going to cluster_a
   std::string testkey_2("testkey_ab");

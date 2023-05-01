@@ -1039,7 +1039,7 @@ TEST_P(RedisProxyWithPrefixRoutesIntegrationTest, SimpleRequestAndResponseRouted
 TEST_P(RedisProxyWithHashSlotRoutesIntegrationTest, SimpleRequestAndResponseRoutedByHashSlot) {
   initialize();
 
-  // Slot: xxHash64("testkey_a") % 8192 = 7129, going to cluster_c (catch_all_route)
+  // Slot: xxHash64() % 8192 = 7129, going to cluster_c (catch_all_route)
   simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "testkey_a"}),
                             "$3\r\nbar\r\n");
 
