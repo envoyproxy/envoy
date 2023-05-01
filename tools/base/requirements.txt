@@ -473,9 +473,9 @@ envoy-github-release==0.0.15 \
     --hash=sha256:955671aa0c664ade3d8dbcd60bc9c72284139b81aeaa3fe72157c4e8383fd35b \
     --hash=sha256:d571422a79e535ec36130dae5a3c56b429040fb20ca60cd3b8cf8588c52b546c
     # via envoy-distribution-release
-envoy-gpg-identity==0.1.0 \
-    --hash=sha256:1df6989e1a6a3a9f5809ac056829b840f57326d41ae1181db415a722216bff48 \
-    --hash=sha256:9e11625e25ad6a031f1c85c57067673f50c0427b0e71ef0a7e926ce77ebb75a9
+envoy-gpg-identity==0.1.1 \
+    --hash=sha256:03f615278b2ca0de652be9d9e3a45faffae74f85f483347c1e0d690edd4019f3 \
+    --hash=sha256:c41505491f906bd5ab22504b0ae2f9e76430ae492c9f59278a306225ed19c785
     # via
     #   -r requirements.in
     #   envoy-gpg-sign
