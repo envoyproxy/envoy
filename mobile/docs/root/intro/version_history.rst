@@ -17,7 +17,7 @@ Breaking changes:
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
 - java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
-- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: remove ``addVirtualClusters`` APIs.
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 - api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
@@ -27,7 +27,7 @@ Breaking changes:
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
 - listeners: switched the default listener from Envoy's TCP listener to a lightweight API listener by default. (:issue: `#25899 <25899>`).
 - headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
-- building/iOS: the minimum supported iOS version is now 13.0 (:issue: `#24994 <24994>`).
+- build: the minimum supported iOS version is now 13.0 and minimum MacOS version is 10.15 (:issue: `#24994 <24994>`).
 
 Bugfixes:
 

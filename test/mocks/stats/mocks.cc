@@ -10,6 +10,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -63,6 +64,7 @@ MockMetricSnapshot::MockMetricSnapshot() {
   ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
   ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
   ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
+  ON_CALL(*this, snapshotTime()).WillByDefault(Return(snapshot_time_));
 }
 
 MockMetricSnapshot::~MockMetricSnapshot() = default;

@@ -109,15 +109,20 @@ public:
       // This part approximates calling header validation and handling errors, in which case HCM
       // calls sendLocalReply and closes network connection (based on the
       // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
-      auto result = header_validator_->validateRequestHeaderMap(*headers);
+      auto result = header_validator_->validateRequestHeaders(*headers);
+      std::string failure_details(result.details());
       if (result.ok()) {
-        MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
-      } else {
-        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, absl::nullopt, result.details());
-        response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
-        connection_.state_ = Network::Connection::State::Closing;
+        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
+        if (transformation_result.ok()) {
+          MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
+          return;
+        }
+        failure_details = transformation_result.details();
       }
+      sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                     nullptr, absl::nullopt, failure_details);
+      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      connection_.state_ = Network::Connection::State::Closing;
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
     }
@@ -215,9 +220,9 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ =
-        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, http1CodecStats());
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
+        header_validator_config_, Protocol::Http11, http1CodecStats());
   }
 
 protected:
@@ -1221,36 +1226,48 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   EXPECT_TRUE(isCodecProtocolError(status));
 }
 
-TEST_P(Http1ServerConnectionImplTest, CustomMethod) {
-  bool reject_custom_methods = true;
-#ifdef ENVOY_ENABLE_UHV
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // When both BalsaParser and UHV are enabled, custom methods are allowed by
-    // default.
-    reject_custom_methods = false;
-  }
-#endif
-
+TEST_P(Http1ServerConnectionImplTest, RejectCustomMethod) {
   initialize();
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  if (reject_custom_methods) {
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  }
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
-  if (reject_custom_methods) {
-    // http-parser rejects unknown methods.
-    // This behavior was observed during CVE-2019-18801 and helped to limit the
-    // scope of affected Envoy configurations.
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+}
+
+TEST_P(Http1ServerConnectionImplTest, RejectInvalidCharacterInMethod) {
+  codec_settings_.allow_custom_methods_ = true;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+
+  Buffer::OwnedImpl buffer("B{}D / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+}
+
+TEST_P(Http1ServerConnectionImplTest, AllowCustomMethod) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
     return;
   }
 
+  codec_settings_.allow_custom_methods_ = true;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(buffer);
   ASSERT_TRUE(status.ok());
 
   TestRequestHeaderMapImpl expected_headers{
