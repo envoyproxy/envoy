@@ -151,6 +151,11 @@ The following core load shed points are supported:
     - Envoy will reject (close) new TCP connections. This occurs before the
       :ref:`Listener Filter Chain <life_of_a_request>` is created.
 
+  * - envoy.load_shed_points.http_connection_manager_decode_headers
+    - Envoy will reject new HTTP streams by sending a local reply. This occurs
+      right after the http codec has finished parsing headers but before the
+      :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
