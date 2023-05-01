@@ -32,6 +32,7 @@ if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
   . ci/build_setup.sh
   shift
 fi
+
 if [[ $# -gt 0 && "$1" == "-verbose" ]]; then
   verbose=1
   shift
