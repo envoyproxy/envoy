@@ -161,9 +161,14 @@ fi
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 
+if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+    ENVOY_BUILD_DIR="${BUILD_DIR}/envoy/x64"
+else
+    ENVOY_BUILD_DIR="${BUILD_DIR}/envoy/arm64"
+fi
 
 # Also setup some space for building Envoy standalone.
-export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
+export ENVOY_BUILD_DIR
 mkdir -p "${ENVOY_BUILD_DIR}"
 
 # This is where we copy build deliverables to.
