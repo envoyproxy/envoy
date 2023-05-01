@@ -404,7 +404,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -417,7 +417,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -437,7 +437,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -452,7 +452,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),

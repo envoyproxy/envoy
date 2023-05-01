@@ -57,8 +57,7 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, local_info_, true, std::move(config_validators_),
-          std::move(backoff_strategy),
+          scope_, {}, local_info_, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
@@ -66,7 +65,7 @@ public:
           server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
+          scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""));

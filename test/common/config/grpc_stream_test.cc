@@ -36,8 +36,8 @@ protected:
             &callbacks_, std::move(async_client_owner_),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            random_, dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_),
-            rate_limit_settings_)) {}
+            dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_)) {
+  }
 
   void setUpCustomBackoffRetryTimer(uint32_t retry_initial_delay_ms,
                                     absl::optional<uint32_t> retry_max_delay_ms,
@@ -54,8 +54,7 @@ protected:
         &callbacks_, std::move(async_client_owner_),
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-        random_, dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_),
-        rate_limit_settings_);
+        dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
