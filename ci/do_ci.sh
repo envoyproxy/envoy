@@ -305,7 +305,7 @@ case $CI_TARGET in
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild  --remote_download_minimal -- "${TEST_TARGETS[@]}"
 
         echo "bazel release build with gcc..."
-        # bazel_envoy_binary_build fastbuild
+        bazel_envoy_binary_build fastbuild
         ;;
     debug)
         setup_clang_toolchain
