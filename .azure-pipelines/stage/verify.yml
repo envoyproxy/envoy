@@ -38,7 +38,7 @@ jobs:
     inputs:
       buildType: current
       artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/packages.x64.tar.gz"
+      itemPattern: "bazel.distribution/x64/packages.x64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
   - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
@@ -60,8 +60,8 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution.arm64"
-      itemPattern: "bazel.distribution.arm64/packages.arm64.tar.gz"
+      artifactName: "bazel.distribution"
+      itemPattern: "bazel.distribution/arm64/packages.arm64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
   - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
