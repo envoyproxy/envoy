@@ -26,9 +26,9 @@ using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
 
 class MirrorPolicyImpl : public MirrorPolicy {
 public:
-  MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-                       RequestMirrorPolicy&,
-                   const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
+  MirrorPolicyImpl(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy&,
+      const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
 
@@ -46,4 +46,3 @@ private:
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-

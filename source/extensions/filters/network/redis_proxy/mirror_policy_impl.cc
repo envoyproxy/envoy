@@ -8,10 +8,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::
-                                       RedisProxy::RequestMirrorPolicy& config,
-                                   const ConnPool::InstanceSharedPtr upstream,
-                                   Runtime::Loader& runtime)
+MirrorPolicyImpl::MirrorPolicyImpl(
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy&
+        config,
+    const ConnPool::InstanceSharedPtr upstream, Runtime::Loader& runtime)
     : runtime_key_(config.runtime_fraction().runtime_key()),
       default_value_(config.has_runtime_fraction()
                          ? absl::optional<envoy::type::v3::FractionalPercent>(
@@ -42,4 +42,3 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-

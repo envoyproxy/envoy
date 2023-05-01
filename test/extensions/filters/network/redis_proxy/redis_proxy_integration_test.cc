@@ -497,12 +497,14 @@ public:
 
 class RedisProxyWithPrefixRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
-  RedisProxyWithPrefixRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_PREFIX_ROUTES, 6) {}
+  RedisProxyWithPrefixRoutesIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_PREFIX_ROUTES, 6) {}
 };
 
 class RedisProxyWithHashSlotRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
-  RedisProxyWithHashSlotRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_HASH_SLOT_ROUTES, 6) {}
+  RedisProxyWithHashSlotRoutesIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_HASH_SLOT_ROUTES, 6) {}
 };
 
 class RedisProxyWithDownstreamAuthIntegrationTest : public RedisProxyIntegrationTest {

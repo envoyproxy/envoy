@@ -9,8 +9,8 @@
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/filters/network/redis_proxy/hash_slot_router_impl.h"
-#include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/redis_proxy/prefix_router_impl.h"
+#include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -110,7 +110,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   if (proto_config.has_prefix_routes()) {
     router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
   } else {
-    router = std::make_unique<HashSlotRoutes>(hash_slot_routes, std::move(upstreams), context.runtime());
+    router =
+        std::make_unique<HashSlotRoutes>(hash_slot_routes, std::move(upstreams), context.runtime());
   }
 
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(

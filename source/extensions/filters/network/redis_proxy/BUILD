@@ -126,9 +126,9 @@ envoy_cc_extension(
     deps = [
         ":command_splitter_lib",
         ":conn_pool_lib",
-        ":proxy_filter_lib",
-        ":prefix_router_lib",
         ":hash_slot_router_lib",
+        ":prefix_router_lib",
+        ":proxy_filter_lib",
         "//envoy/upstream:upstream_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
@@ -148,8 +148,8 @@ envoy_cc_library(
     hdrs = ["prefix_router_impl.h"],
     deps = [
         ":conn_pool_lib",
-        ":router_interface",
         ":mirror_policy_lib",
+        ":router_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
@@ -166,8 +166,8 @@ envoy_cc_library(
     hdrs = ["hash_slot_router_impl.h"],
     deps = [
         ":conn_pool_lib",
-        ":router_interface",
         ":mirror_policy_lib",
+        ":router_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
@@ -184,8 +184,8 @@ envoy_cc_library(
     hdrs = ["mirror_policy_impl.h"],
     deps = [
         ":conn_pool_lib",
-        ":router_interface",
         ":mirror_policy_interface",
+        ":router_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",

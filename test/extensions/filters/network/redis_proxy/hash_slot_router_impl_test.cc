@@ -185,12 +185,10 @@ TEST_F(HashSlotRoutesTest, DuplicatedSlotConfig) {
   }
 
   EXPECT_THROW_WITH_MESSAGE(HashSlotRoutes router(hash_slot_routes, std::move(upstreams), runtime_),
-                            EnvoyException,
-                            "slot `1000` is already assigned.");
+                            EnvoyException, "slot `1000` is already assigned.");
 }
 
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-

@@ -29,9 +29,10 @@ using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
 
 class HashSlot : public Route {
 public:
-  HashSlot(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes::Route
-             route,
-         Upstreams& upstreams, Runtime::Loader& runtime);
+  HashSlot(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes::Route
+          route,
+      Upstreams& upstreams, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
@@ -45,9 +46,10 @@ using HashSlotSharedPtr = std::shared_ptr<HashSlot>;
 
 class HashSlotRoutes : public Router {
 public:
-  HashSlotRoutes(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes&
-                   hash_slot_routes,
-               Upstreams&& upstreams, Runtime::Loader& runtime);
+  HashSlotRoutes(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes&
+          hash_slot_routes,
+      Upstreams&& upstreams, Runtime::Loader& runtime);
 
   RouteSharedPtr upstreamPool(std::string& key) override;
 
@@ -68,4 +70,3 @@ private:
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-

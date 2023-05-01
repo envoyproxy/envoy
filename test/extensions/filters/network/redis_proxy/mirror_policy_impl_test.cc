@@ -21,8 +21,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      RequestMirrorPolicy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy config;
   auto upstream = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Runtime::MockLoader> runtime;
 
@@ -35,8 +34,7 @@ TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {
 }
 
 TEST(MirrorPolicyImplTest, MissingUpstream) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      RequestMirrorPolicy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy config;
   NiceMock<Runtime::MockLoader> runtime;
 
   MirrorPolicyImpl policy(config, nullptr, runtime);
@@ -48,8 +46,7 @@ TEST(MirrorPolicyImplTest, MissingUpstream) {
 }
 
 TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      RequestMirrorPolicy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy config;
   config.set_exclude_read_commands(true);
   auto upstream = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Runtime::MockLoader> runtime;
@@ -63,8 +60,7 @@ TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
 }
 
 TEST(MirrorPolicyImplTest, DefaultValueZero) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      RequestMirrorPolicy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy config;
   auto* runtime_fraction = config.mutable_runtime_fraction();
   auto* percentage = runtime_fraction->mutable_default_value();
   percentage->set_numerator(0);
@@ -79,8 +75,7 @@ TEST(MirrorPolicyImplTest, DefaultValueZero) {
 }
 
 TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      RequestMirrorPolicy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RequestMirrorPolicy config;
   auto* runtime_fraction = config.mutable_runtime_fraction();
   runtime_fraction->set_runtime_key("runtime_key");
   auto* percentage = runtime_fraction->mutable_default_value();
@@ -118,4 +113,3 @@ TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-

@@ -42,4 +42,3 @@ using MirrorPolicies = std::vector<MirrorPolicyConstSharedPtr>;
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-
