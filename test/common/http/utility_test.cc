@@ -501,6 +501,15 @@ TEST(HttpUtility, updateAuthority) {
     EXPECT_EQ("newhost.com", headers.get_(":authority"));
     EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
   }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "false"}});
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name,dns.name", headers.get_("x-forwarded-host"));
+  }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {
