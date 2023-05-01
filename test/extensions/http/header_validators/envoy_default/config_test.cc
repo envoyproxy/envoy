@@ -3,7 +3,7 @@
 
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 
-#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -29,8 +29,8 @@ TEST(EnvoyDefaultUhvFactoryTest, Basic) {
 )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
 
-  ::testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  EXPECT_NE(factory->createFromProto(typed_config.typed_config(), validation_visitor), nullptr);
+  ::testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  EXPECT_NE(factory->createFromProto(typed_config.typed_config(), server_context), nullptr);
 }
 
 } // namespace EnvoyDefault

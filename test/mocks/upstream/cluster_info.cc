@@ -198,6 +198,7 @@ MockClusterInfo::MockClusterInfo()
             manager.applyFilterFactoryCb({}, factory_cb);
             return true;
           }));
+  ON_CALL(*this, loadBalancingPolicy).WillByDefault(ReturnRef(load_balancing_policy_));
   ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
     return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
                                            protocol, codecStats(protocol))
