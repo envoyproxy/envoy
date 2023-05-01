@@ -533,7 +533,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2023-03-31",
         cpe = "N/A",
         license = "Apache-2.0",
-        license_url = "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE",
+        license_url = "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md",
     ),
     com_github_google_benchmark = dict(
         project_name = "Benchmark",
