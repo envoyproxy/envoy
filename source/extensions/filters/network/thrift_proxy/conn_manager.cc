@@ -107,10 +107,11 @@ void ConnectionManager::dispatch() {
   resetAllRpcs(true);
 }
 
-void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
-                                       bool end_stream) {
+absl::optional<DirectResponse::ResponseType>
+ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
+                                  bool end_stream) {
   if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
-    return;
+    return absl::nullopt;
   }
 
   DirectResponse::ResponseType result = DirectResponse::ResponseType::Exception;
@@ -140,6 +141,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
     stats_.response_exception_.inc();
     break;
   }
+  return result;
 }
 
 void ConnectionManager::continueDecoding() {
@@ -357,20 +359,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     }
   }
 
-  ProtobufWkt::Struct stats_obj;
-  auto& fields_map = *stats_obj.mutable_fields();
-  auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
-
-  response_fields_map["transport_type"] =
-      ValueUtil::stringValue(TransportNames::get().fromType(decoder_->transportType()));
-  response_fields_map["protocol_type"] =
-      ValueUtil::stringValue(ProtocolNames::get().fromType(decoder_->protocolType()));
-  response_fields_map["message_type"] = ValueUtil::stringValue(
-      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
-  response_fields_map["reply_type"] = ValueUtil::stringValue(
-      metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
-
-  parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  parent_.recordResponseAccessLog(metadata);
 
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
@@ -817,6 +806,43 @@ bool ConnectionManager::ActiveRpc::passthroughSupported() const {
   return true;
 }
 
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(
+    DirectResponse::ResponseType direct_response_type, const MessageMetadataSharedPtr& metadata) {
+  if (direct_response_type == DirectResponse::ResponseType::Exception) {
+    recordResponseAccessLog(MessageTypeNames::get().fromType(MessageType::Exception), "-");
+    return;
+  }
+  const std::string& message_type_name =
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-";
+  const std::string& reply_type_name = ReplyTypeNames::get().fromType(
+      direct_response_type == DirectResponse::ResponseType::SuccessReply ? ReplyType::Success
+                                                                         : ReplyType::Error);
+  recordResponseAccessLog(message_type_name, reply_type_name);
+}
+
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(
+    const MessageMetadataSharedPtr& metadata) {
+  recordResponseAccessLog(
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
+      metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
+}
+
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(const std::string& message_type,
+                                                           const std::string& reply_type) {
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
+
+  response_fields_map["transport_type"] =
+      ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
+  response_fields_map["protocol_type"] =
+      ValueUtil::stringValue(ProtocolNames::get().fromType(downstreamProtocolType()));
+  response_fields_map["message_type"] = ValueUtil::stringValue(message_type);
+  response_fields_map["reply_type"] = ValueUtil::stringValue(reply_type);
+
+  streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+}
+
 FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
   passthrough_ = true;
   return applyDecoderFilters(DecoderEvent::PassthroughData, &data);
@@ -876,7 +902,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   request_fields_map["transport_type"] =
       ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
   request_fields_map["protocol_type"] =
-      ValueUtil::stringValue(ProtocolNames::get().fromType(parent_.decoder_->protocolType()));
+      ValueUtil::stringValue(ProtocolNames::get().fromType(downstreamProtocolType()));
   request_fields_map["message_type"] = ValueUtil::stringValue(
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
@@ -1026,7 +1052,11 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
     cm.stats_.downstream_response_drain_close_.inc();
   }
 
-  parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
+  auto result = parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
+  // Only report while the local reply is successfully written.
+  if (result.has_value()) {
+    recordResponseAccessLog(*result, localReplyMetadata_);
+  }
 
   if (end_stream) {
     return;
