@@ -220,6 +220,6 @@ steps:
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
-    artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
+    artifactName: ${{ parameters.ciTarget }}
   timeoutInMinutes: 10
   condition: eq('${{ parameters.publishEnvoy }}', 'true')

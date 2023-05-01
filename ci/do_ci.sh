@@ -253,9 +253,9 @@ case $CI_TARGET in
         # Extract the Envoy binary from the tarball
         mkdir -p distribution/custom
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            ENVOY_RELEASE_TARBALL="/build/bazel.release/bin/release.tar.zst"
+            ENVOY_RELEASE_TARBALL="/build/bazel.release/x64/bin/release.tar.zst"
         else
-            ENVOY_RELEASE_TARBALL="/build/bazel.release.arm64/bin/release.tar.zst"
+            ENVOY_RELEASE_TARBALL="/build/bazel.release/arm64/bin/release.tar.zst"
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
 
@@ -564,9 +564,9 @@ case $CI_TARGET in
         ;;
     verify_distro)
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            PACKAGE_BUILD=/build/bazel.distribution/packages.x64.tar.gz
+            PACKAGE_BUILD=/build/bazel.distribution/x64/packages.x64.tar.gz
         else
-            PACKAGE_BUILD=/build/bazel.distribution.arm64/packages.arm64.tar.gz
+            PACKAGE_BUILD=/build/bazel.distribution/arm64/packages.arm64.tar.gz
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
         ;;
