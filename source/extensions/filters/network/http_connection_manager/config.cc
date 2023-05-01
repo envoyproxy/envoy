@@ -12,6 +12,7 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/tracer.h"
@@ -128,7 +129,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
 Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
     [[maybe_unused]] const envoy::extensions::filters::network::http_connection_manager::v3::
         HttpConnectionManager& config,
-    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
@@ -170,7 +171,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   }
 
   header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), validation_visitor);
+      factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
     throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                      header_validator_config.name()));
@@ -379,7 +380,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                      config.proxy_status_config())
                                : nullptr),
       header_validator_factory_(
-          createHeaderValidatorFactory(config, context.messageValidationVisitor())),
+          createHeaderValidatorFactory(config, context.getServerFactoryContext())),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {

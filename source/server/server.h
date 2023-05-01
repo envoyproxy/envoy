@@ -200,6 +200,7 @@ public:
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
+  ServerFactoryContext& getServerFactoryContext() override { return *this; };
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }

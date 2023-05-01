@@ -198,6 +198,39 @@ public:
   testing::NiceMock<MockOptions> options_;
 };
 
+// Stateless mock ServerFactoryContext for cases where it needs to be used concurrently in different
+// threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
+class StatelessMockServerFactoryContext : public virtual ServerFactoryContext {
+public:
+  StatelessMockServerFactoryContext() = default;
+  ~StatelessMockServerFactoryContext() override = default;
+
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
+  MOCK_METHOD(const Server::Options&, options, ());
+  MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
+  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
+  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
+  MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
+  MOCK_METHOD(Singleton::Manager&, singletonManager, ());
+  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
+  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
+  MOCK_METHOD(TimeSource&, timeSource, ());
+  MOCK_METHOD(Event::TestTimeSystem&, timeSystem, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(Grpc::Context&, grpcContext, ());
+  MOCK_METHOD(Router::Context&, routerContext, ());
+  MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, ());
+  MOCK_METHOD(Server::DrainManager&, drainManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
+  MOCK_METHOD(StatsConfig&, statsConfig, (), ());
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
+};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

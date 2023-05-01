@@ -27,6 +27,7 @@ public:
   void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }
 
   // TransportSocketFactoryContext
+  ServerFactoryContext& getServerFactoryContext() override { return server_context_; };
   OptRef<Server::Admin> admin() override { return server_context_.admin(); }
   Ssl::ContextManager& sslContextManager() override { return context_manager_; }
   Stats::Scope& scope() override { return stats_scope_; }
