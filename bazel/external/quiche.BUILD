@@ -3488,9 +3488,9 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/core/connecting_client_socket.h",
         "quiche/quic/core/io/socket.h",
+        "quiche/quic/core/io/socket_internal.h",
         "quiche/quic/core/io/socket_posix.inc",
         "quiche/quic/core/io/socket_win.inc",
-        "quiche/quic/core/io/socket_internal.h",
         "quiche/quic/core/socket_factory.h",
     ],
     copts = quiche_copts,
