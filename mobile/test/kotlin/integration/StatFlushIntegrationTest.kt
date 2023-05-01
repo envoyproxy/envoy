@@ -40,6 +40,8 @@ class StatFlushIntegrationTest {
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
   }
 
+  // TODO(abeyad): Fix the test and re-enable.
+  // See https://github.com/envoyproxy/envoy/issues/24657.
   @Ignore
   @Test
   fun `flush flushes to stats sink`() {
