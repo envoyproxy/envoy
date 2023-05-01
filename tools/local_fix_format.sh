@@ -29,6 +29,7 @@ if [[ $# -gt 0 && "$1" == "-docker" ]]; then
   shift
   exec ./ci/run_envoy_docker.sh "$0" -run-build-setup "$@"
 fi
+
 if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
   shift
   . ci/build_setup.sh
