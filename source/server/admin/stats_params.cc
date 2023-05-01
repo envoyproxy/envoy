@@ -50,6 +50,14 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
+#ifdef ENVOY_ADMIN_HTML
+  if (active_html_) {
+    active_html_ = true;
+    format_ = StatsFormat::Html;
+    return Http::Code::OK;
+  }
+#endif
+
   const absl::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
@@ -67,8 +75,8 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
 #endif
     } else if (format_value.value() == "active-html") {
 #ifdef ENVOY_ADMIN_HTML
-      active_html_ = true;
       format_ = StatsFormat::Html;
+      active_html_ = true;
 #else
       response.add("Active HTML output was disabled by building with --define=admin_html=disabled");
       return Http::Code::BadRequest;

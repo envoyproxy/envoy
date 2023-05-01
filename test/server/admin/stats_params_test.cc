@@ -42,6 +42,7 @@ TEST(StatsParamsTest, ParseParamsFormat) {
   EXPECT_EQ(StatsFormat::Html, params.format_);
   EXPECT_EQ(Http::Code::OK, params.parse("?format=active-html", response));
   EXPECT_TRUE(params.active_html_);
+  params.active_html_ = false;
 #else
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=html", response));
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=active-html", response));

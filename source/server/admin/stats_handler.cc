@@ -89,9 +89,10 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, StatsPara
         [this]() -> Admin::UrlHandler { return prometheusStatsHandler(); });
   }
 #ifdef ENVOY_ADMIN_HTML
-  return makeRequest(server_.stats(), params, [this, active_html = params.active_html_]() -> Admin::UrlHandler {
-    return statsHandler("/stats", active_html);
-  });
+  return makeRequest(server_.stats(), params,
+                     [this, active_html = params.active_html_]() -> Admin::UrlHandler {
+                       return statsHandler("/stats", active_html);
+                     });
 #else
   return makeRequest(server_.stats(), params,
                      [this]() -> Admin::UrlHandler { return statsHandler(false); });

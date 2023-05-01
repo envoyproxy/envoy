@@ -161,7 +161,6 @@ template class StatsRequest<
 } // namespace Server
 } // namespace Envoy
 
-
 #if 0
 void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   switch (phase_) {
