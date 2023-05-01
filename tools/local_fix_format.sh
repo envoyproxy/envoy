@@ -25,11 +25,11 @@ unset DISPLAY
 # The following optional argument is added to be able to run this script using Docker,
 # due to a problem to locate clang using WSL on Windows. Call with -docker as the first arument.
 if [[ $# -gt 0 && "$1" == "-docker" ]]; then
+  shift
   exec ./ci/run_envoy_docker.sh "$0" -run-build-setup "$@"
 fi
 if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
   . ci/build_setup.sh
-  shift
   shift
 fi
 
