@@ -17,7 +17,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/http:async_client_interface",
         "//envoy/http:header_map_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],

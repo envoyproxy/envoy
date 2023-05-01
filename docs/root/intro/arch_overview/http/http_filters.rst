@@ -9,6 +9,9 @@ HTTP level filter stack within the connection manager.
 Filters can be written that operate on HTTP level messages without knowledge of the underlying physical
 protocol (HTTP/1.1, HTTP/2, etc.) or multiplexing capabilities.
 
+HTTP filters can be downstream filters, associated with a given listener and doing stream processing on each
+downstream request before routing, or upstream filters, associated with a given cluster and doing stream processing once per upstream request, after the router filter.
+
 There are three types of HTTP level filters:
 
 **Decoder**
@@ -76,11 +79,11 @@ configure a match tree that can resolve filter configuration to use for a given 
 Filter route mutation
 ---------------------
 
-During HTTP filter chain processing, when ``decodeHeaders()`` is invoked by a filter, the
+During downstream HTTP filter chain processing, when ``decodeHeaders()`` is invoked by a filter, the
 connection manager performs route resolution and sets a *cached route* pointing to an upstream
 cluster.
 
-Filters have the capability to directly mutate this *cached route* after route resolution, via the
+Downstream filters have the capability to directly mutate this *cached route* after route resolution, via the
 ``setRoute`` callback and :repo:`DelegatingRoute <source/common/router/delegating_route_impl.h>`
 mechanism.
 

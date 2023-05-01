@@ -51,7 +51,6 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -546,27 +545,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add virtual cluster configuration.
-  ///
-  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualCluster(_ virtualCluster: String) -> Self {
-    self.virtualClusters.append(virtualCluster)
-    return self
-  }
-
-  /// Add virtual cluster configurations.
-  ///
-  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
-    self.virtualClusters.append(contentsOf: virtualClusters)
-    return self
-  }
 #if ENVOY_GOOGLE_GRPC
 
   /// Sets the node.id field in the Bootstrap configuration.
@@ -768,7 +746,6 @@ open class EngineBuilder: NSObject {
       perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
       appVersion: self.appVersion,
       appId: self.appId,
-      virtualClusters: self.virtualClusters,
       runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
       typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
@@ -805,7 +782,6 @@ open class EngineBuilder: NSObject {
   }
 }
 
-// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
@@ -850,9 +826,6 @@ private extension EngineBuilder {
     cxxBuilder.setAppVersion(self.appVersion.toCXX())
     cxxBuilder.setAppId(self.appId.toCXX())
     cxxBuilder.setDeviceOs("iOS".toCXX())
-    for cluster in self.virtualClusters {
-      cxxBuilder.addVirtualCluster(cluster.toCXX())
-    }
 
     for (runtimeGuard, value) in self.runtimeGuards {
       cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
