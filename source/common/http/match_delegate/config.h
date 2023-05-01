@@ -35,6 +35,8 @@ public:
     }
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
+    bool hasMatchTree() { return has_match_tree_; }
+
   private:
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
     const bool has_match_tree_{};
@@ -82,6 +84,8 @@ public:
   void encodeComplete() override;
   void setEncoderFilterCallbacks(Envoy::Http::StreamEncoderFilterCallbacks& callbacks) override;
 
+  FilterMatchState& getMatchState();
+
 private:
   FilterMatchState match_state_;
 
@@ -93,7 +97,8 @@ private:
 };
 
 class MatchDelegateConfig : public Extensions::HttpFilters::Common::FactoryBase<
-                                envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
+                                envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+                                envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
   MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
@@ -102,6 +107,36 @@ private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::common::matching::v3::
+          ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation) override;
+};
+
+
+class ExtensionWithMatcherFilterConfigPerRoute
+    : public Router::RouteSpecificFilterConfig {
+ public:
+  ExtensionWithMatcherFilterConfigPerRoute(
+      const envoy::extensions::common::matching::v3::
+          ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context)
+      : match_state_(createFilterMatchState(proto_config, server_context)) {}
+
+  const DelegatingStreamFilter::FilterMatchState& matchState() const {
+    return match_state_;
+  }
+
+ private:
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+  createFilterMatchState(
+      const envoy::extensions::common::matching::v3::
+          ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context);
+  DelegatingStreamFilter::FilterMatchState match_state_;
 };
 
 DECLARE_FACTORY(MatchDelegateConfig);

@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
 
@@ -135,10 +136,10 @@ DelegatingStreamFilter::DelegatingStreamFilter(
 
 Envoy::Http::FilterHeadersStatus
 DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool end_stream) {
-  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+  getMatchState().evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onRequestHeaders(headers);
   });
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
   return decoder_filter_->decodeHeaders(headers, end_stream);
@@ -146,17 +147,17 @@ DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
 
 Envoy::Http::FilterDataStatus DelegatingStreamFilter::decodeData(Buffer::Instance& data,
                                                                  bool end_stream) {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterDataStatus::Continue;
   }
   return decoder_filter_->decodeData(data, end_stream);
 }
 Envoy::Http::FilterTrailersStatus
 DelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers) {
-  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+  getMatchState().evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onRequestTrailers(trailers);
   });
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterTrailersStatus::Continue;
   }
   return decoder_filter_->decodeTrailers(trailers);
@@ -164,14 +165,14 @@ DelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers)
 
 Envoy::Http::FilterMetadataStatus
 DelegatingStreamFilter::decodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterMetadataStatus::Continue;
   }
   return decoder_filter_->decodeMetadata(metadata_map);
 }
 
 void DelegatingStreamFilter::decodeComplete() {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return;
   }
   decoder_filter_->decodeComplete();
@@ -179,14 +180,14 @@ void DelegatingStreamFilter::decodeComplete() {
 
 void DelegatingStreamFilter::setDecoderFilterCallbacks(
     Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
-  match_state_.onStreamInfo(callbacks.streamInfo());
+  getMatchState().onStreamInfo(callbacks.streamInfo());
   decoder_callbacks_ = &callbacks;
   decoder_filter_->setDecoderFilterCallbacks(callbacks);
 }
 
 Envoy::Http::Filter1xxHeadersStatus
 DelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::Filter1xxHeadersStatus::Continue;
   }
   return encoder_filter_->encode1xxHeaders(headers);
@@ -195,10 +196,10 @@ DelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers
 Envoy::Http::FilterHeadersStatus
 DelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
 
-  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+  getMatchState().evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onResponseHeaders(headers);
   });
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
   return encoder_filter_->encodeHeaders(headers, end_stream);
@@ -206,7 +207,7 @@ DelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, b
 
 Envoy::Http::FilterDataStatus DelegatingStreamFilter::encodeData(Buffer::Instance& data,
                                                                  bool end_stream) {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterDataStatus::Continue;
   }
   return encoder_filter_->encodeData(data, end_stream);
@@ -214,10 +215,10 @@ Envoy::Http::FilterDataStatus DelegatingStreamFilter::encodeData(Buffer::Instanc
 
 Envoy::Http::FilterTrailersStatus
 DelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers) {
-  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+  getMatchState().evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onResponseTrailers(trailers);
   });
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterTrailersStatus::Continue;
   }
   return encoder_filter_->encodeTrailers(trailers);
@@ -225,14 +226,14 @@ DelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers
 
 Envoy::Http::FilterMetadataStatus
 DelegatingStreamFilter::encodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return Envoy::Http::FilterMetadataStatus::Continue;
   }
   return decoder_filter_->decodeMetadata(metadata_map);
 }
 
 void DelegatingStreamFilter::encodeComplete() {
-  if (match_state_.skipFilter()) {
+  if (getMatchState().skipFilter()) {
     return;
   }
   encoder_filter_->encodeComplete();
@@ -240,9 +241,33 @@ void DelegatingStreamFilter::encodeComplete() {
 
 void DelegatingStreamFilter::setEncoderFilterCallbacks(
     Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
-  match_state_.onStreamInfo(callbacks.streamInfo());
+  getMatchState().onStreamInfo(callbacks.streamInfo());
   encoder_callbacks_ = &callbacks;
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
+}
+
+DelegatingStreamFilter::FilterMatchState& DelegatingStreamFilter::getMatchState() {
+  const Envoy::Http::StreamFilterCallbacks* callbacks = nullptr;
+  if (encoder_callbacks_ != nullptr) {
+    callbacks = encoder_callbacks_;
+  } else if (decoder_callbacks_ != nullptr) {
+    callbacks = decoder_callbacks_;
+  } else {
+    return match_state_;
+  }
+
+  const auto* per_route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<
+          ExtensionWithMatcherFilterConfigPerRoute>(callbacks);
+
+  if (per_route_config != nullptr) {
+    auto per_route_match_state = per_route_config->matchState();
+    if (per_route_match_state.hasMatchTree()) {
+      per_route_match_state.setBaseFilter(base_filter_);
+      return match_state_;
+    }
+  }
+  return match_state_;
 }
 
 Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTyped(
@@ -284,6 +309,41 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
     Factory::DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
     return filter_factory(delegating_callbacks);
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+MatchDelegateConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<ExtensionWithMatcherFilterConfigPerRoute>(
+      proto_config, server_context);
+}
+
+Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+ExtensionWithMatcherFilterConfigPerRoute::createFilterMatchState(
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  auto requirements =
+      std::make_unique<envoy::extensions::filters::common::dependency::v3::
+                           MatchingRequirements>();
+  Server::Configuration::FactoryContext* context =
+        reinterpret_cast<Server::Configuration::FactoryContext*>(
+            &server_context);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      server_context.scope().symbolTable().toString(
+          server_context.scope().prefix()),
+      *context};
+
+  Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                            Envoy::Http::Matching::HttpFilterActionContext>
+      matcher_factory(action_context, server_context, validation_visitor);
+  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb =
+      matcher_factory.create(proto_config.xds_matcher());
+  return factory_cb();
 }
 
 /**
