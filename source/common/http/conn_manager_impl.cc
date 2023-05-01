@@ -949,7 +949,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       failure = !transformation_result.ok();
       redirect = transformation_result.action() ==
                  Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
-      failure_details = transformation_result.details();
+      failure_details = std::string(transformation_result.details());
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
@@ -998,7 +998,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
     if (transformation_result.ok()) {
       return true;
     }
-    failure_details = transformation_result.details();
+    failure_details = std::string(transformation_result.details());
   }
 
   Code response_code = Code::BadRequest;
