@@ -55,7 +55,8 @@ void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_heade
                                      const Http::ResponseHeaderMap* response_headers,
                                      const StreamInfo::StreamInfo& stream_info) {
   for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(request_headers, response_headers, nullptr, stream_info);
+    access_log->log(request_headers, response_headers, nullptr, stream_info,
+                    AccessLog::AccessLogType::NotSet);
   }
 }
 

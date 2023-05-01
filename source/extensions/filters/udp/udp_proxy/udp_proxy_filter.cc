@@ -30,7 +30,8 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value());
+      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
+                      AccessLog::AccessLogType::NotSet);
     }
   }
 }
@@ -297,7 +298,8 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value());
+      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value(),
+                      AccessLog::AccessLogType::NotSet);
     }
   }
 }

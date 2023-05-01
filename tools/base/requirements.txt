@@ -480,9 +480,9 @@ envoy-gpg-identity==0.1.1 \
     # via
     #   -r requirements.in
     #   envoy-gpg-sign
-envoy-gpg-sign==0.1.1 \
-    --hash=sha256:5149360c2394a450ee9293d0d2a3a5d62ba8a06c5b92820c201241f61406c790 \
-    --hash=sha256:533154f983b3ccbbbf085aba9d79aa7f5452563f7854a6cdc4080ce60d1f3d04
+envoy-gpg-sign==0.2.0 \
+    --hash=sha256:53ef217a05555d725d467ceb70fbf7bc623eeb973a41996e8bbe1f295d8c9aab \
+    --hash=sha256:8bca326766a2b82864ec6274c51d99c9924f2ec773316c2f13034925ddf50772
     # via -r requirements.in
 flake8==6.0.0 \
     --hash=sha256:3833794e27ff64ea4e9cf5d410082a8b97ff1a06c16aa3d2027339cd0f1195c7 \
@@ -1129,7 +1129,6 @@ verboselogs==1.7 \
     #   envoy-distribution-repo
     #   envoy-github-abstract
     #   envoy-github-release
-    #   envoy-gpg-sign
 wrapt==1.14.1 \
     --hash=sha256:00b6d4ea20a906c0ca56d84f93065b398ab74b927a7a3dbd470f6fc503f95dc3 \
     --hash=sha256:01c205616a89d09827986bc4e859bcabd64f5a0662a7fe95e0d359424e0e071b \
