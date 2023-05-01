@@ -115,6 +115,7 @@ jobs:
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //:android_dist \
         && ./bazelw test \
+            --config=ci \
             --fat_apk_cpu=x86_64 \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \

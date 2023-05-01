@@ -131,8 +131,6 @@ BAZEL_BUILD_OPTIONS=(
   "--verbose_failures"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
-  "--noshow_progress"
-  "--noshow_loading_progress"
   "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
