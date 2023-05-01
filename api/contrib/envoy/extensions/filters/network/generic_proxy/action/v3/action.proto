@@ -22,7 +22,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Generic Proxy Route Action Configuration]
 
 // Configuration for the route match action.
+// [#next-free-field: 6]
 message RouteAction {
+  // The name of the route action. This should be unique across all route actions.
+  string name = 5;
+
   oneof cluster_specifier {
     option (validate.required) = true;
 

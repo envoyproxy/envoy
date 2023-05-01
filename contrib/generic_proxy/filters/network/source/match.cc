@@ -7,6 +7,10 @@ namespace GenericProxy {
 
 REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<Request>);
 
+REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+
+REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+
 REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<Request>);
 
 REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<Request>);

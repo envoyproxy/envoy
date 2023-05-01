@@ -28,6 +28,38 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
 }
 
+TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  HostMatchDataInputFactory factory;
+  auto proto_config = factory.createEmptyConfigProto();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+
+  FakeStreamCodecFactory::FakeRequest request;
+
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+
+  request.host_ = "fake_host_as_service";
+
+  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
+}
+
+TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  PathMatchDataInputFactory factory;
+  auto proto_config = factory.createEmptyConfigProto();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+
+  FakeStreamCodecFactory::FakeRequest request;
+
+  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+
+  request.path_ = "fake_path";
+
+  EXPECT_EQ("fake_path", absl::get<std::string>(input->get(request).data_));
+}
+
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   MethodMatchDataInputFactory factory;

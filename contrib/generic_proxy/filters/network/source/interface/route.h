@@ -28,6 +28,14 @@ class RouteEntry {
 public:
   virtual ~RouteEntry() = default;
 
+  /**
+   * @return absl::string_view the name of the route.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
+   * @return const std::string& the name of the target cluster.
+   */
   virtual const std::string& clusterName() const PURE;
 
   /**
