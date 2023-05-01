@@ -654,7 +654,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log() {
+  void log(AccessLog::AccessLogType access_log_type) {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
       request_headers = filter_manager_callbacks_.requestHeaders().ptr();
@@ -669,7 +669,8 @@ public:
     }
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, streamInfo());
+      log_handler->log(request_headers, response_headers, response_trailers, streamInfo(),
+                       access_log_type);
     }
   }
 

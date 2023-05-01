@@ -51,8 +51,15 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.http_response_half_close`` and legacy code paths.
+- area: udp
+  change: |
+    removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
 
 new_features:
+- area: access_log
+  change: |
+    added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
+    recorded. Please refer to the access log configuration documentation for more information.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
@@ -73,3 +80,7 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
 deprecated:
+- area: access_log
+  change: |
+    deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
+    in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
