@@ -173,7 +173,7 @@ static_resources:
 )EOF",
                                                         Platform::null_device_path);
 
-const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
+const std::string CONFIG_WITH_PREFIX_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
             catch_all_route:
               cluster: cluster_0
@@ -182,6 +182,21 @@ const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
               cluster: cluster_1
             - prefix: "baz:"
               cluster: cluster_2
+)EOF";
+
+const std::string CONFIG_WITH_HASH_SLOT_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
+          hash_slot_routes:
+            catch_all_route:
+              cluster: cluster_0
+            routes:
+              - slot_ranges:
+                - start: 0
+                  end: 2000
+                cluster: cluster_1
+              - slot_ranges:
+                - start: 2001
+                  end: 4000
+                cluster: cluster_2
 )EOF";
 
 const std::string CONFIG_WITH_MIRROR = CONFIG_WITH_ROUTES_BASE + R"EOF(
@@ -480,9 +495,14 @@ public:
   RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
 };
 
-class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
+class RedisProxyWithPrefixRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
-  RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
+  RedisProxyWithPrefixRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_PREFIX_ROUTES, 6) {}
+};
+
+class RedisProxyWithHashSlotRoutesIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithHashSlotRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_HASH_SLOT_ROUTES, 6) {}
 };
 
 class RedisProxyWithDownstreamAuthIntegrationTest : public RedisProxyIntegrationTest {
@@ -536,7 +556,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithPrefixRoutesIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithHashSlotRoutesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -991,7 +1015,7 @@ TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
 
 // This test verifies that it's possible to route keys to 3 different upstream pools.
 
-TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPrefix) {
+TEST_P(RedisProxyWithPrefixRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPrefix) {
   initialize();
 
   // roundtrip to cluster_0 (catch_all route)
@@ -1004,6 +1028,25 @@ TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPref
 
   // roundtrip to cluster_2 (prefix "baz:" route)
   simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
+                            "$3\r\nbar\r\n");
+}
+
+// This test verifies that it's possible to route keys to 3 different upstream pools based
+// on hash slot routes config
+
+TEST_P(RedisProxyWithHashSlotRoutesIntegrationTest, SimpleRequestAndResponseRoutedByHashSlot) {
+  initialize();
+
+  // Slot: xxHash64("testkey_a") % 8192 = 7129, going to cluster_c (catch_all_route)
+  simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "testkey_a"}),
+                            "$3\r\nbar\r\n");
+
+  // Slot: 393, going to cluster_1
+  simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "testkey_ab"}),
+                            "$3\r\nbar\r\n");
+
+  // Slot: 3249, going to cluster_2
+  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "testkey_abcd"}),
                             "$3\r\nbar\r\n");
 }
 

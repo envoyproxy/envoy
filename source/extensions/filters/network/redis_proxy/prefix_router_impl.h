@@ -15,6 +15,7 @@
 
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/filters/network/redis_proxy/mirror_policy_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
@@ -23,24 +24,6 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
-
-class MirrorPolicyImpl : public MirrorPolicy {
-public:
-  MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-                       PrefixRoutes::Route::RequestMirrorPolicy&,
-                   const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
-
-  ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
-
-  bool shouldMirror(const std::string& command) const override;
-
-private:
-  const std::string runtime_key_;
-  const absl::optional<envoy::type::v3::FractionalPercent> default_value_;
-  const bool exclude_read_commands_;
-  ConnPool::InstanceSharedPtr upstream_;
-  Runtime::Loader& runtime_;
-};
 
 class Prefix : public Route {
 public:

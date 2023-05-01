@@ -308,17 +308,13 @@ message RedisProxy {
       repeated RequestMirrorPolicy request_mirror_policy = 3;
     }
 
-    reserved 2;
-
-    reserved "catch_all_cluster";
-
     // List of hash slot routes.
     repeated Route routes = 1;
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified or there are slots not covered
     // with the slot range.
-    Route catch_all_route = 3;
+    Route catch_all_route = 2;
   }
 
   // RedisFault defines faults used for fault injection.

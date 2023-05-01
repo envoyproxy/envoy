@@ -48,7 +48,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    deps = [":conn_pool_interface"],
+    deps = [":mirror_policy_interface"],
 )
 
 envoy_cc_library(
@@ -127,7 +127,8 @@ envoy_cc_extension(
         ":command_splitter_lib",
         ":conn_pool_lib",
         ":proxy_filter_lib",
-        ":router_lib",
+        ":prefix_router_lib",
+        ":hash_slot_router_lib",
         "//envoy/upstream:upstream_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
@@ -142,12 +143,13 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
-    name = "router_lib",
-    srcs = ["router_impl.cc"],
-    hdrs = ["router_impl.h"],
+    name = "prefix_router_lib",
+    srcs = ["prefix_router_impl.cc"],
+    hdrs = ["prefix_router_impl.h"],
     deps = [
         ":conn_pool_lib",
         ":router_interface",
+        ":mirror_policy_lib",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
@@ -156,4 +158,46 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "hash_slot_router_lib",
+    srcs = ["hash_slot_router_impl.cc"],
+    hdrs = ["hash_slot_router_impl.h"],
+    deps = [
+        ":conn_pool_lib",
+        ":router_interface",
+        ":mirror_policy_lib",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "mirror_policy_lib",
+    srcs = ["mirror_policy_impl.cc"],
+    hdrs = ["mirror_policy_impl.h"],
+    deps = [
+        ":conn_pool_lib",
+        ":router_interface",
+        ":mirror_policy_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "mirror_policy_interface",
+    hdrs = ["mirror_policy.h"],
+    deps = [":conn_pool_interface"],
 )

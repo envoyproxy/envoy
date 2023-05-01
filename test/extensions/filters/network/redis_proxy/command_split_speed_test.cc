@@ -10,7 +10,7 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "source/extensions/filters/network/redis_proxy/router_impl.h"
+#include "source/extensions/filters/network/redis_proxy/prefix_router_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 

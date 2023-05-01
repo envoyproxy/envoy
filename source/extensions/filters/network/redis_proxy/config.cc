@@ -8,8 +8,10 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/filters/network/redis_proxy/hash_slot_router_impl.h"
 #include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
-#include "source/extensions/filters/network/redis_proxy/router_impl.h"
+#include "source/extensions/filters/network/redis_proxy/prefix_router_impl.h"
+#include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -19,9 +21,19 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 namespace {
-inline void addUniqueClusters(
+inline void addUniqueClustersPrefixRoutes(
     absl::flat_hash_set<std::string>& clusters,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
+        route) {
+  clusters.emplace(route.cluster());
+  for (auto& mirror : route.request_mirror_policy()) {
+    clusters.emplace(mirror.cluster());
+  }
+}
+
+inline void addUniqueClustersHashSlotRoutes(
+    absl::flat_hash_set<std::string>& clusters,
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes::Route&
         route) {
   clusters.emplace(route.cluster());
   for (auto& mirror : route.request_mirror_policy()) {
@@ -48,24 +60,42 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_shared<ProxyFilterConfig>(proto_config, context.scope(), context.drainDecision(),
                                           context.runtime(), context.api(), cache_manager_factory);
 
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
-      proto_config.prefix_routes());
-
-  // Set the catch-all route from the settings parameters.
-  if (prefix_routes.routes_size() == 0 && !prefix_routes.has_catch_all_route()) {
-    throw EnvoyException("cannot configure a redis-proxy without any upstream");
-  }
-
   absl::flat_hash_set<std::string> unique_clusters;
-  for (auto& route : prefix_routes.routes()) {
-    addUniqueClusters(unique_clusters, route);
-  }
-  addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HashSlotRoutes hash_slot_routes;
+
+  // Add upstream clusters
+  if (proto_config.has_prefix_routes()) {
+    prefix_routes = proto_config.prefix_routes();
+    // Set the catch-all route from the settings parameters.
+    if (prefix_routes.routes_size() == 0 && !prefix_routes.has_catch_all_route()) {
+      throw EnvoyException("cannot configure a redis-proxy without any upstream");
+    }
+
+    for (auto& route : prefix_routes.routes()) {
+      addUniqueClustersPrefixRoutes(unique_clusters, route);
+    }
+    addUniqueClustersPrefixRoutes(unique_clusters, prefix_routes.catch_all_route());
+  } else if (proto_config.has_hash_slot_routes()) {
+    hash_slot_routes = proto_config.hash_slot_routes();
+    // Set the catch-all route from the settings parameters.
+    if (hash_slot_routes.routes_size() == 0 && !hash_slot_routes.has_catch_all_route()) {
+      throw EnvoyException("cannot configure a redis-proxy without any upstream");
+    }
+
+    for (auto& route : hash_slot_routes.routes()) {
+      addUniqueClustersHashSlotRoutes(unique_clusters, route);
+    }
+    addUniqueClustersHashSlotRoutes(unique_clusters, hash_slot_routes.catch_all_route());
+  } else {
+    throw EnvoyException("please define a router for upstream clusters");
+  }
+
+  RouterPtr router;
+  Upstreams upstreams;
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
-
-  Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
@@ -77,8 +107,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     upstreams.emplace(cluster, conn_pool_ptr);
   }
 
-  auto router =
-      std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
+  if (proto_config.has_prefix_routes()) {
+    router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
+  } else {
+    router = std::make_unique<HashSlotRoutes>(hash_slot_routes, std::move(upstreams), context.runtime());
+  }
 
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       context.api().randomGenerator(), context.runtime(), proto_config.faults());
