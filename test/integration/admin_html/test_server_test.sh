@@ -63,7 +63,7 @@ run_testsuite() {
   # we don't want to diff as these files are computed, and we don't need
   # to do detailed content anslysis here.
   verify_admin_contains "/" "font-family: sans-serif"
-  verify_admin_contains "/stats/active-html" "let statusDiv = null;"
+  verify_admin_contains "/stats/html-active" "let statusDiv = null;"
 
   curl -X POST "$admin_address/quitquitquit"
   wait
