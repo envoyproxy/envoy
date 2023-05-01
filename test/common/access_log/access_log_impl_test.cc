@@ -691,24 +691,28 @@ duration_filter:
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
+                              AccessLog::AccessLogType::NotSet));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
+                               AccessLog::AccessLogType::NotSet));
 
   stream_info.end_time_ =
       stream_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
+                              AccessLog::AccessLogType::NotSet));
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
+                               AccessLog::AccessLogType::NotSet));
 
   StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_CALL(mock_stream_info, currentDuration()).WillOnce(testing::Return(std::nullopt));
-  EXPECT_FALSE(
-      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_FALSE(filter.evaluate(mock_stream_info, request_headers, response_headers,
+                               response_trailers, AccessLog::AccessLogType::NotSet));
 }
 
 TEST(AccessLogFilterTest, MidStreamDuration) {
@@ -734,11 +738,11 @@ duration_filter:
       .WillOnce(testing::Return(std::chrono::microseconds(1000)))     // 1ms
       .WillOnce(testing::Return(std::chrono::microseconds(1000000))); // 1000ms
 
-  EXPECT_FALSE(
-      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_FALSE(filter.evaluate(mock_stream_info, request_headers, response_headers,
+                               response_trailers, AccessLog::AccessLogType::NotSet));
 
-  EXPECT_TRUE(
-      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
+  EXPECT_TRUE(filter.evaluate(mock_stream_info, request_headers, response_headers,
+                              response_trailers, AccessLog::AccessLogType::NotSet));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
@@ -765,10 +769,12 @@ status_code_filter:
 
   info.response_code_ = 400;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
-  EXPECT_TRUE(filter.evaluate(info, request_headers, response_headers, response_trailers));
+  EXPECT_TRUE(filter.evaluate(info, request_headers, response_headers, response_trailers,
+                              AccessLog::AccessLogType::NotSet));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
-  EXPECT_FALSE(filter.evaluate(info, request_headers, response_headers, response_trailers));
+  EXPECT_FALSE(filter.evaluate(info, request_headers, response_headers, response_trailers,
+                               AccessLog::AccessLogType::NotSet));
 }
 
 TEST_F(AccessLogImplTest, StatusCodeLessThan) {
@@ -1545,7 +1551,8 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
-                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const override {
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                AccessLogType) const override {
     if (current_++ == 0) {
       return true;
     }
