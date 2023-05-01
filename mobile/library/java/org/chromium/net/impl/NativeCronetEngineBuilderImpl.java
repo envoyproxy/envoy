@@ -11,7 +11,6 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig;
-import io.envoyproxy.envoymobile.engine.VirtualClusterConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
@@ -63,8 +62,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAppVersion = "unspecified";
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
-  private List<String> mVirtualClusters = Collections.emptyList();
-  private List<VirtualClusterConfig> mVirtualClusterConfig = Collections.emptyList();
   private boolean mEnablePlatformCertificatesValidation = true;
   private String mRtdsLayerName = "";
   private int mRtdsTimeoutSeconds = 0;
@@ -145,10 +142,10 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
-        mTrustChainVerification, mVirtualClusters, mVirtualClusterConfig, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, statSinks, runtimeGuards,
-        mEnablePlatformCertificatesValidation, mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress,
-        mAdsPort, mAdsToken, mAdsTokenLifetime, mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone,
-        mNodeSubZone, mCdsResourcesLocator, mCdsTimeoutSeconds, mEnableCds);
+        mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
+        keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
+        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
+        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
+        mCdsTimeoutSeconds, mEnableCds);
   }
 }

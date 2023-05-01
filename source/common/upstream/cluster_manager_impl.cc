@@ -47,7 +47,6 @@
 #include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 #include "source/common/upstream/ring_hash_lb.h"
-#include "source/common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -1549,12 +1548,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_ = std::make_unique<SubsetLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->lbStats(),
-        cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
-        parent_.thread_local_dispatcher_.timeSource());
+    auto& factory = Config::Utility::getAndCheckFactoryByName<NonThreadAwareLoadBalancerFactory>(
+        "envoy.load_balancing_policies.subset");
+    lb_ = factory.create(*cluster, priority_set_, parent_.local_priority_set_,
+                         parent.parent_.runtime_, parent.parent_.random_,
+                         parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {

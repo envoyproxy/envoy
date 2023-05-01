@@ -306,10 +306,9 @@ public class JniLibrary {
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] virtualClustersLegacy, byte[][] virtualClusters,
-      byte[][] filterChain, byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      byte[][] runtimeGuards, String rtdsLayerName, long rtdsTimeoutSeconds, String adsAddress,
-      long adsPort, String adsToken, long adsTokenLifetime, String adsRootCerts, String nodeId,
-      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
-      long cdsTimeoutSeconds, boolean enableCds);
+      boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
+      boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsLayerName,
+      long rtdsTimeoutSeconds, String adsAddress, long adsPort, String adsToken,
+      long adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
 }

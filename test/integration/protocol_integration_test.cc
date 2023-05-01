@@ -406,6 +406,64 @@ name: add-trailers-filter
   }
 }
 
+TEST_P(ProtocolIntegrationTest, AccessLogTest) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
+      });
+
+  useAccessLog("%RESPONSE_CODE% %ACCESS_LOG_TYPE%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamStart)),
+            waitForAccessLog(access_log_name_, 0, true));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  if (downstream_protocol_ != Http::CodecType::HTTP3) {
+    EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
+              waitForAccessLog(access_log_name_, 1, true));
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_access_log_options()->mutable_access_log_flush_interval()->set_nanos(
+            100000000); // 0.1 seconds
+      });
+
+  useAccessLog("%ACCESS_LOG_TYPE%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
+            waitForAccessLog(access_log_name_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
@@ -2332,33 +2390,19 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 // :method request headers, since the case of other large headers is
 // covered in the various testLargeRequest-based integration tests here.
 //
-// Tests are run with two HTTP/1 parsers: http-parser and BalsaParser.
-// http-parser rejects large method strings, because it only accepts known
-// methods from a hardcoded list. BalsaParser mimics http-parser behavior when
-// UHV is disabled, but defers method validation to UHV when it is enabled.
+// Both HTTP/1 parsers (http-parser and BalsaParser) reject large method strings
+// by default, because they only accepts known methods from a hardcoded list.
+// HTTP/2 and HTTP/3 codecs accept large methods. The table below describes the
+// expected behaviors (in addition we should never see an ASSERT or ASAN failure
+// trigger).
 //
-// In addition to BalsaParser with UHV enabled, H2 and H3 codecs also accept
-// large methods. The table below describes the expected behaviors (in addition
-// we should never see an ASSERT or ASAN failure trigger).
-//
-// Downstream proto  Upstream proto  Behavior expected
-// --------------------------------------------------------
-// accepts           accepts         Success
-// accepts           rejects         Envoy will forward; backend will reject
-// rejects           accepts         Envoy will reject
-// rejects           rejects         Envoy will reject
+// Downstream proto  Upstream proto    Behavior expected
+// ----------------------------------------------------------
+// HTTP/2 or HTTP/3  HTTP/2 or HTTP/3  Success
+// HTTP/2 or HTTP/3  HTTP/1            Envoy will forward; backend will reject
+// HTTP/1            HTTP/2 or HTTP/3  Envoy will reject
+// HTTP/1            HTTP/1            Envoy will reject
 TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
-  bool http1_codec_rejects_large_method = true;
-#ifdef ENVOY_ENABLE_UHV
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    http1_codec_rejects_large_method = false;
-  }
-#endif
-  const bool downstream_proto_rejects_large_method =
-      downstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
-  const bool upstream_proto_rejects_large_method =
-      upstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
-
   // There will be no upstream connections for HTTP/1 downstream, we need to
   // test the full mesh regardless.
   testing_upstream_intentionally_ = true;
@@ -2370,15 +2414,14 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  if (downstream_proto_rejects_large_method) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
-  } else if (upstream_proto_rejects_large_method) {
+  } else if (upstreamProtocol() == Http::CodecType::HTTP1) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(response->waitForEndStream());

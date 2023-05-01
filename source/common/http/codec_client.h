@@ -262,6 +262,9 @@ private:
     // RequestEncoderWrapper
     void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
 
+    // RequestEncoder
+    Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+
     void setEncoder(RequestEncoder& encoder) {
       inner_encoder_ = &encoder;
       inner_encoder_->getStream().addCallbacks(*this);
@@ -270,7 +273,7 @@ private:
     void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
 
     CodecClient& parent_;
-    Http::HeaderValidatorPtr header_validator_;
+    Http::ClientHeaderValidatorPtr header_validator_;
     bool wait_encode_complete_{true};
     bool encode_complete_{false};
     bool decode_complete_{false};
