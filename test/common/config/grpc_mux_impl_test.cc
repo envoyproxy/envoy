@@ -64,7 +64,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
+        *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
         std::make_unique<JitteredExponentialBackOffStrategy>(
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
@@ -77,8 +77,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, *stats_.rootScope(), custom_rate_limit_settings, true,
-        std::move(config_validators_),
+        *stats_.rootScope(), custom_rate_limit_settings, true, std::move(config_validators_),
         std::make_unique<JitteredExponentialBackOffStrategy>(
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
@@ -956,7 +955,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, *stats_.rootScope(), rate_limit_settings_, true,
+          *stats_.rootScope(), rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
           std::make_unique<JitteredExponentialBackOffStrategy>(
               SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
@@ -976,7 +975,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, *stats_.rootScope(), rate_limit_settings_, true,
+          *stats_.rootScope(), rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
           std::make_unique<JitteredExponentialBackOffStrategy>(
               SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,

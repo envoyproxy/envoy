@@ -4,8 +4,8 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: build
   change: |
-    Moved the subset LB code into extensions. If you use the subset LB and override extensions_build_config.bzl you will
-    need to include it explicitly.
+    Moved the subset and maglev LB code into extensions. If you use these load balancers and override
+    extensions_build_config.bzl you will need to include them explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -48,6 +48,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.allow_upstream_filters`` and legacy code paths.
+- area: quic
+  change: |
+    removed runtime key ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
@@ -71,6 +74,10 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
+    by sending a local reply.
 - area: matchers
   change: |
     Added :ref:`RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>` input

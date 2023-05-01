@@ -144,7 +144,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":header_validator_factory",
-        "//envoy/http:header_validator_interface",
+        "//envoy/http:header_validator_factory_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",

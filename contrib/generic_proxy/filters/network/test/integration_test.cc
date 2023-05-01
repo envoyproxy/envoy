@@ -134,33 +134,37 @@ public:
               value: {}
           route_config:
             name: test-routes
-            routes:
-              matcher_tree:
-                input:
-                  name: request-service
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
-                exact_match_map:
-                  map:
-                    service_name_0:
-                      matcher:
-                        matcher_list:
-                          matchers:
-                          - predicate:
-                              single_predicate:
-                                input:
-                                  name: request-properties
+            virtual_hosts:
+            - name: test
+              hosts:
+              - "*"
+              routes:
+                matcher_tree:
+                  input:
+                    name: request-service
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
+                  exact_match_map:
+                    map:
+                      service_name_0:
+                        matcher:
+                          matcher_list:
+                            matchers:
+                            - predicate:
+                                single_predicate:
+                                  input:
+                                    name: request-properties
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                                      property_name: version
+                                  value_match:
+                                    exact: v1
+                              on_match:
+                                action:
+                                  name: route
                                   typed_config:
-                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
-                                    property_name: version
-                                value_match:
-                                  exact: v1
-                            on_match:
-                              action:
-                                name: route
-                                typed_config:
-                                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
-                                  cluster: cluster_0
+                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+                                    cluster: cluster_0
 )EOF");
   }
 
