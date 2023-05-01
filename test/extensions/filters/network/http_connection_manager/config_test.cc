@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -2961,8 +2962,8 @@ public:
     return std::make_unique<test::http_connection_manager::CustomHeaderValidator>();
   }
 
-  Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
-                                                  ProtobufMessage::ValidationVisitor&) override {
+  Http::HeaderValidatorFactoryPtr
+  createFromProto(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
@@ -2988,13 +2989,14 @@ public:
 
   Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& message,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+                  Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
+        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(
-            *mptr, validation_visitor);
+            *mptr, server_context.messageValidationVisitor());
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();

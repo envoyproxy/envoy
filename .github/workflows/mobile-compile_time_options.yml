@@ -119,6 +119,7 @@ jobs:
             //:android_dist \
         && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=ci \
             --fat_apk_cpu=x86_64 \
             --define=signal_trace=disabled \
             --define=admin_html=enabled \

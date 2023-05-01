@@ -83,7 +83,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
@@ -155,7 +155,8 @@ request:
 response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -247,7 +248,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -285,7 +286,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -404,7 +405,8 @@ response:
   response_body_bytes: 20
   response_code_details: "via_upstream"
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
+    access_log_->log(&request_headers, &response_headers, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -445,7 +447,8 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -517,7 +520,8 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1.2
@@ -573,7 +577,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1.1
@@ -629,7 +633,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1
@@ -685,7 +689,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // Unknown TLS version (TLSv1.4)
@@ -741,7 +745,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // Intermediate log entry.
@@ -809,7 +813,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 }
 
@@ -905,7 +909,8 @@ response:
     "x-logged-trailer": "value,response_trailer_value"
     "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 }
 
@@ -988,7 +993,8 @@ response:
     "x-trailer": "{0},{0}"
 )EOF",
                           "prefix!!suffix"));
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 }
 
@@ -1050,7 +1056,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
@@ -1109,7 +1115,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadataDefaultValue) {
@@ -1165,7 +1171,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace
