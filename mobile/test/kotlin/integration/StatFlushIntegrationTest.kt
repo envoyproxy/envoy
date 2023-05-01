@@ -12,9 +12,6 @@ import org.junit.After
 import org.junit.Ignore
 import org.junit.Test
 
-// TODO(abeyad): Fix the test and re-enable.
-// See https://github.com/envoyproxy/envoy/issues/24657.
-@Ignore
 class StatFlushIntegrationTest {
   private var engine: Engine? = null
 
@@ -43,6 +40,7 @@ class StatFlushIntegrationTest {
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
   }
 
+  @Ignore
   @Test
   fun `flush flushes to stats sink`() {
     val countDownLatch = CountDownLatch(1)
