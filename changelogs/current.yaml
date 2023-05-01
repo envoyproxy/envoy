@@ -4,8 +4,8 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: build
   change: |
-    Moved the subset LB code into extensions. If you use the subset LB and override extensions_build_config.bzl you will
-    need to include it explicitly.
+    Moved the subset and maglev LB code into extensions. If you use these load balancers and override
+    extensions_build_config.bzl you will need to include them explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
