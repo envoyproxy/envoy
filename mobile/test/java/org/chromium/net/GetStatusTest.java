@@ -15,7 +15,6 @@ import org.chromium.net.UrlRequest.Status;
 import org.chromium.net.UrlRequest.StatusListener;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.NativeTestServer;
 import org.chromium.net.testing.TestUploadDataProvider;
@@ -149,7 +148,6 @@ public class GetStatusTest {
   @SmallTest
   @Feature({"Cronet"})
   // Regression test for crbug.com/606872.
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1519")
   public void testGetStatusForUpload() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();

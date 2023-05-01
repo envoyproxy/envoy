@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,7 +32,6 @@ public class CronetEngineBuilderTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testVersionComparison() {
     assertVersionIsHigher("22.44", "22.43.12");
     assertVersionIsLower("22.43.12", "022.124");

@@ -106,24 +106,9 @@ public abstract class CronetProvider {
         + "enabled=" + isEnabled() + "]";
   }
 
-  /** Name of the Java {@link CronetProvider} class. */
-  private static final String JAVA_CRONET_PROVIDER_CLASS =
-      "org.chromium.net.impl.JavaCronetProvider";
-
   /** Name of the native {@link CronetProvider} class. */
   private static final String NATIVE_CRONET_PROVIDER_CLASS =
       "org.chromium.net.impl.NativeCronetProvider";
-
-  /** {@link CronetProvider} class that is packaged with Google Play Services. */
-  private static final String PLAY_SERVICES_CRONET_PROVIDER_CLASS =
-      "com.google.android.gms.net.PlayServicesCronetProvider";
-
-  /**
-   * {@link CronetProvider} a deprecated class that may be packaged with some old versions of Google
-   * Play Services.
-   */
-  private static final String GMS_CORE_CRONET_PROVIDER_CLASS =
-      "com.google.android.gms.net.GmsCoreCronetProvider";
 
   /**
    * Returns an unmodifiable list of all available {@link CronetProvider}s. The providers are
@@ -135,12 +120,7 @@ public abstract class CronetProvider {
   public static List<CronetProvider> getAllProviders(Context context) {
     // Use LinkedHashSet to preserve the order and eliminate duplicate providers.
     Set<CronetProvider> providers = new LinkedHashSet<>();
-    addCronetProviderFromResourceFile(context, providers);
-    addCronetProviderImplByClassName(context, PLAY_SERVICES_CRONET_PROVIDER_CLASS, providers,
-                                     false);
-    addCronetProviderImplByClassName(context, GMS_CORE_CRONET_PROVIDER_CLASS, providers, false);
     addCronetProviderImplByClassName(context, NATIVE_CRONET_PROVIDER_CLASS, providers, false);
-    addCronetProviderImplByClassName(context, JAVA_CRONET_PROVIDER_CLASS, providers, false);
     return Collections.unmodifiableList(new ArrayList<>(providers));
   }
 
@@ -190,41 +170,5 @@ public abstract class CronetProvider {
                        + " included in the app classpath");
       }
     }
-  }
-
-  /**
-   * Attempts to add a provider specified in the app resource file to a set.
-   *
-   * @param providers the set of providers to add the new provider to.
-   * @return {@code true} if the provider was added to the set; {@code false} if the app resources
-   *     do not include the string with {@link #RES_KEY_CRONET_IMPL_CLASS} key.
-   * @throws RuntimeException if the provider cannot be found or instantiated.
-   */
-  private static boolean addCronetProviderFromResourceFile(Context context,
-                                                           Set<CronetProvider> providers) {
-    int resId = context.getResources().getIdentifier(RES_KEY_CRONET_IMPL_CLASS, "string",
-                                                     context.getPackageName());
-    // Resource not found
-    if (resId == 0) {
-      // The resource wasn't included in the app; therefore, there is nothing to add.
-      return false;
-    }
-    String className = context.getResources().getString(resId);
-
-    // If the resource specifies a well known provider, don't load it because
-    // there will be an attempt to load it anyways.
-    if (className == null || className.equals(PLAY_SERVICES_CRONET_PROVIDER_CLASS) ||
-        className.equals(GMS_CORE_CRONET_PROVIDER_CLASS) ||
-        className.equals(JAVA_CRONET_PROVIDER_CLASS) ||
-        className.equals(NATIVE_CRONET_PROVIDER_CLASS)) {
-      return false;
-    }
-
-    if (!addCronetProviderImplByClassName(context, className, providers, true)) {
-      Log.e(TAG, "Unable to instantiate Cronet implementation class " + className +
-                     " that is listed as in the app string resource file under " +
-                     RES_KEY_CRONET_IMPL_CLASS + " key");
-    }
-    return true;
   }
 }

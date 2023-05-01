@@ -9,7 +9,6 @@ import static org.junit.Assert.assertTrue;
 
 import androidx.test.filters.SmallTest;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestUtil;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.Http2TestServer;
@@ -49,7 +48,6 @@ public class BrotliTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBrotliAdvertised() throws Exception {
     ExperimentalCronetEngine.Builder builder = new ExperimentalCronetEngine.Builder(getContext());
     builder.enableBrotli(true);
@@ -65,7 +63,6 @@ public class BrotliTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBrotliNotAdvertised() throws Exception {
     ExperimentalCronetEngine.Builder builder = new ExperimentalCronetEngine.Builder(getContext());
     CronetTestUtil.setMockCertVerifierForTesting(builder);
@@ -79,7 +76,6 @@ public class BrotliTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBrotliDecoded() throws Exception {
     ExperimentalCronetEngine.Builder builder = new ExperimentalCronetEngine.Builder(getContext());
     builder.enableBrotli(true);
