@@ -337,6 +337,10 @@ build:docker-tsan --config=rbe-toolchain-tsan
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+build:remote-ci --config=ci
+# Note this config is used by mobile CI also.
+build:ci --noshow_progress
+build:ci --noshow_loading_progress
 
 # Build Event Service
 build:google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
