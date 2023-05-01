@@ -42,7 +42,6 @@ import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.impl.UrlResponseInfoImpl;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.FailurePhase;
 import org.chromium.net.testing.Feature;
@@ -85,8 +84,8 @@ public class CronetUrlRequestTest {
 
   @Before
   public void setUp() {
-    mMockUrlRequestJobFactory = new MockUrlRequestJobFactory(
-        mTestRule.buildCronetTestFramework().mBuilder, mTestRule.testingJavaImpl());
+    mMockUrlRequestJobFactory =
+        new MockUrlRequestJobFactory(mTestRule.buildCronetTestFramework().mBuilder);
     assertTrue(NativeTestServer.startNativeTestServer(getContext()));
   }
 
@@ -199,7 +198,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1522")
   public void testLoadFlagsWithConnectionMigration() throws Exception {}
 
@@ -400,7 +398,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No canonical exception to assert on
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
   public void testContentLengthMismatchFailsOnce() throws Exception {
     String url = NativeTestServer.getFileURL("/content_length_mismatch.html");
@@ -568,7 +565,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1551")
   public void testCustomReferer_changeToCanonical() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -585,7 +581,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1551")
   public void testCustomReferer_discardInvalid() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -724,7 +719,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockStartAsyncError() throws Exception {
     final int arbitraryNetError = -3;
@@ -743,7 +737,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockReadDataSyncError() throws Exception {
     final int arbitraryNetError = -4;
@@ -766,7 +759,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockClientCertificateRequested() throws Exception {
     TestUrlRequestCallback callback =
@@ -786,7 +778,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockSSLCertificateError() throws Exception {
     TestUrlRequestCallback callback =
@@ -808,7 +799,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testSSLCertificateError() throws Exception {}
 
@@ -1775,13 +1765,8 @@ public class CronetUrlRequestTest {
     dataProvider.assertClosed();
 
     assertNull(callback.mResponseInfo);
-    if (mTestRule.testingJavaImpl()) {
-      Throwable cause = callback.mError.getCause();
-      assertTrue("Exception was: " + cause, cause instanceof ConnectException);
-    } else {
-      assertContains("Exception in CronetUrlRequest: net::ERR_CONNECTION_REFUSED",
-                     callback.mError.getMessage());
-    }
+    assertContains("Exception in CronetUrlRequest: net::ERR_CONNECTION_REFUSED",
+                   callback.mError.getMessage());
   }
 
   private void throwOrCancel(FailureType failureType, ResponseStep failureStep,
@@ -1930,7 +1915,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No destroyed callback for tests
   @Ignore("Not yet implemented")
   public void testExecutorShutdown() {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -2030,7 +2014,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No adapter to destroy in pure java
   @Ignore("Not yet implemented")
   public void testDestroyUploadDataStreamAdapterOnSucceededCallback() throws Exception {
     TestUrlRequestCallback callback = new QuitOnSuccessCallback();
@@ -2064,7 +2047,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   public void testErrorCodes() throws Exception {
     checkSpecificErrorCode(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
                            NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED",
@@ -2089,7 +2071,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
   public void testInternetDisconnectedError() throws Exception {
     AndroidNetworkMonitor androidNetworkMonitor = AndroidNetworkMonitor.getInstance();
     Intent intent = new Intent(ConnectivityManager.CONNECTIVITY_ACTION);
@@ -2138,7 +2119,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testQuicErrorCode() throws Exception {
     long envoyMobileError = 0x2000;
     TestUrlRequestCallback callback = startAndWaitForComplete(
@@ -2161,7 +2141,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testLegacyOnFailedCallback() throws Exception {
     final long envoyMobileError = 0x2000;
     final int netError = NetError.ERR_OTHER.getErrorCode();
@@ -2258,7 +2237,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
   public void testCleartextTrafficBlocked() throws Exception {
     // This feature only works starting from N.
