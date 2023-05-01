@@ -22,6 +22,9 @@ namespace {
 
 class XRayDriverTest : public ::testing::Test {
 public:
+  // To ensure the start_time_ is set to zero for each test to avoid flakiness.
+  XRayDriverTest() { stream_info_.start_time_ = Envoy::SystemTime{}; }
+
   const std::string operation_name_ = "test_operation_name";
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
