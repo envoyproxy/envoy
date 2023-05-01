@@ -63,14 +63,11 @@ def envoy_pkg_distros(
                SIGNING_ARGS+=("--maintainer-email" "$${PACKAGES_MAINTAINER_EMAIL}"); \
            fi \
         && $(location //tools/distribution:sign) \
-            --extract \
-            --tar $@ \
+            --out $@ \
             "$${SIGNING_ARGS[@]}" \
             $(location :distro_packages)
         """,
         outs = ["%s.tar.gz" % name],
         srcs = [":distro_packages"],
-        tools = [
-            "//tools/distribution:sign",
-        ],
+        tools = ["//tools/distribution:sign"],
     )

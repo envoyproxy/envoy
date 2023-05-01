@@ -33,6 +33,7 @@
 #include "test/integration/ssl_utility.h"
 #endif
 #include "test/mocks/common.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -315,6 +316,24 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     return true;
   });
   client_->connect();
+}
+
+Http::HeaderValidatorFactoryPtr
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
+#ifdef ENVOY_ENABLE_UHV
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
+      "envoy.http.header_validators.envoy_default");
+  ASSERT(factory != nullptr);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+  TestUtility::loadFromYaml(std::string(config), typed_config);
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  return factory->createFromProto(typed_config.typed_config(), validation_visitor);
+#else
+  return nullptr;
+#endif
 }
 
 RawConnectionDriver::~RawConnectionDriver() = default;

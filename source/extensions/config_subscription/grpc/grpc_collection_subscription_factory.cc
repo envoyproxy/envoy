@@ -28,8 +28,8 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
           Config::Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(),
                                                          api_config_source, data.scope_, true)
               ->createUncachedRawAsyncClient(),
-          data.dispatcher_, deltaGrpcMethod(data.type_url_), data.api_.randomGenerator(),
-          data.scope_, Utility::parseRateLimitSettings(api_config_source), data.local_info_,
+          data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
+          Utility::parseRateLimitSettings(api_config_source), data.local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           data.xds_config_tracker_),
       data.callbacks_, data.resource_decoder_, data.stats_, data.dispatcher_,

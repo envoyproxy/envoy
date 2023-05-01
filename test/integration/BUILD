@@ -894,6 +894,7 @@ envoy_cc_test_library(
         "fake_upstream.h",
     ],
     deps = [
+        ":utility_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//envoy/api:api_interface",
@@ -926,6 +927,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+        "//test/mocks/http:header_validator_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
@@ -1046,6 +1048,7 @@ envoy_cc_test_library(
         "//source/server:server_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

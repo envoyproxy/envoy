@@ -29,7 +29,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
         Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
                                                data.scope_, true)
             ->createUncachedRawAsyncClient(),
-        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.api_.randomGenerator(), data.scope_,
+        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
         std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
@@ -40,7 +40,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
         Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
                                                data.scope_, true)
             ->createUncachedRawAsyncClient(),
-        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.api_.randomGenerator(), data.scope_,
+        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source),
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
         std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
@@ -70,7 +70,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
         Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
                                                data.scope_, true)
             ->createUncachedRawAsyncClient(),
-        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.api_.randomGenerator(), data.scope_,
+        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
         std::move(backoff_strategy), data.xds_config_tracker_);
@@ -79,7 +79,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
         Config::Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(),
                                                        api_config_source, data.scope_, true)
             ->createUncachedRawAsyncClient(),
-        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.api_.randomGenerator(), data.scope_,
+        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
         std::move(custom_config_validators), std::move(backoff_strategy), data.xds_config_tracker_);
   }
