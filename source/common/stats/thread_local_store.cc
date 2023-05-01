@@ -993,7 +993,7 @@ ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets, const histogra
       --remainder;
     }
     for (uint32_t i = 0; i < merges; ++i, ++src) {
-      ASSERT(src < src < num_src_buckets);
+      ASSERT(src < num_src_buckets);
       double value;
       uint64_t count;
       /*int ret = */ hist_bucket_idx(&histogram, src, &value, &count);
