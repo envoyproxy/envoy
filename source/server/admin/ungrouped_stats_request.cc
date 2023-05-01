@@ -103,17 +103,6 @@ void UngroupedStatsRequest::processHistogram(const std::string& name, Buffer::In
 }
 
 void UngroupedStatsRequest::setRenderPtr(Http::ResponseHeaderMap& response_headers) {
-  /*
-#ifdef ENVOY_ADMIN_HTML
-  if (params_.active_html_) {
-    auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
-    setRenderPtr(std::move(html_render));
-    return;
-  }
-#endif
-*/
-
   switch (params_.format_) {
   case StatsFormat::Json:
     render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
