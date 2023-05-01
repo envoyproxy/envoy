@@ -89,7 +89,8 @@ TEST_F(TapFilterTest, NoConfig) {
   Http::MetadataMap metadata;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
 
-  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_);
+  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_,
+               AccessLog::AccessLogType::NotSet);
 }
 
 // Verify filter functionality when there is a tap config.
@@ -119,7 +120,8 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
   EXPECT_CALL(*http_per_request_tapper_, onDestroyLog()).WillOnce(Return(true));
-  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_);
+  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_,
+               AccessLog::AccessLogType::NotSet);
   EXPECT_EQ(1UL, filter_config_->stats_.rq_tapped_.value());
 
   // Workaround InSequence/shared_ptr mock leak.

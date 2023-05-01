@@ -52,7 +52,8 @@ protected:
         EXPECT_EQ(got, expected);
       }
     }));
-    logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+                AccessLog::AccessLogType::NotSet);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/bar/foo"}};
