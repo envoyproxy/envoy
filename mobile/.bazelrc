@@ -56,6 +56,7 @@ build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
+build:ios --test_timeout=390,750,1500,5700
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
