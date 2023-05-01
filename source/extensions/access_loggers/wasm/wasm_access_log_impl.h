@@ -41,7 +41,7 @@ public:
     }
     if (handle->wasmHandle()) {
       handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
-                                        response_trailers, stream_info);
+                                        response_trailers, stream_info, access_log_type);
     }
   }
 
