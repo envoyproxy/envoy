@@ -10,6 +10,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -30,6 +31,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // *downstream* interaction between Envoy and a connected client.
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
+
+enum AccessLogType {
+  NotSet = 0;
+  TcpUpstreamConnected = 1;
+  TcpPeriodic = 2;
+  TcpConnectionEnd = 3;
+  DownstreamStart = 4;
+  DownstreamPeriodic = 5;
+  DownstreamEnd = 6;
+  UpstreamPoolReady = 7;
+  UpstreamPeriodic = 8;
+  UpstreamEnd = 9;
+}
 
 message TCPAccessLogEntry {
   option (udpa.annotations.versioning).previous_message_type =
@@ -80,7 +94,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -214,7 +228,13 @@ message AccessLogCommon {
   // And if it is necessary, unique ID or identifier can be added to the log entry
   // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
   // correlate all these intermediate log entries and final log entry.
-  bool intermediate_log_entry = 27;
+  //
+  // .. attention::
+  //
+  //   This field is deprecated in favor of ``access_log_type`` for better indication of the
+  //   type of the access log record.
+  bool intermediate_log_entry = 27
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured downstream
@@ -236,6 +256,14 @@ message AccessLogCommon {
   // For HTTP: Total number of bytes received from the upstream by the http stream.
   // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
   uint64 upstream_wire_bytes_received = 32;
+
+  // The type of the access log, which indicates when the log was recorded.
+  // See :ref:`ACCESS_LOG_TYPE <config_access_log_format_access_log_type>` for the available values.
+  // In case the access log was recorded by a flow which does not correspond to one of the supported
+  // values, then the default value will be ``NotSet``.
+  // For more information about how access log behaves and when it is being recorded,
+  // please refer to :ref:`access logging <arch_overview_access_logs>`.
+  AccessLogType access_log_type = 33;
 }
 
 // Flags indicating occurrences during request/response processing.

@@ -1,4 +1,4 @@
-#include "source/common/upstream/subset_lb.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include <memory>
 
@@ -23,9 +23,10 @@ namespace Upstream {
 using HostPredicate = std::function<bool(const Host&)>;
 
 SubsetLoadBalancer::SubsetLoadBalancer(
-    LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+    LoadBalancerType lb_type, const PrioritySet& priority_set,
+    const PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
+    const LoadBalancerSubsetInfo& subsets,
     OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
     OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
@@ -593,7 +594,6 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
     const ProtobufWkt::Value& value = it.second;
     buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrError(value);
   }
-
   return buf.str();
 }
 

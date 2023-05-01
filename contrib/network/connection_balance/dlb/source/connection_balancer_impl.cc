@@ -249,22 +249,33 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
   events[0].adv_send.udata64 = reinterpret_cast<std::uintptr_t>(s);
   int ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
   if (ret != 1) {
-    uint i = 0;
-    while (i < DlbConnectionBalanceFactorySingleton::get().max_retries) {
-      ENVOY_LOG(debug, "{} dlb_send fail, start retry, errono: {}", name_, errno);
-      ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
-      if (ret == 1) {
-        ENVOY_LOG(warn, "{} dlb_send retry {} times and succeed", name_, i + 1);
-        break;
+    if (DlbConnectionBalanceFactorySingleton::get().max_retries > 0) {
+      uint i = 0;
+      while (i < DlbConnectionBalanceFactorySingleton::get().max_retries) {
+        ENVOY_LOG(debug, "{} dlb_send fail, start retry, errono: {}", name_, errno);
+        ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
+        if (ret == 1) {
+          ENVOY_LOG(warn, "{} dlb_send retry {} times and succeed", name_, i + 1);
+          break;
+        }
+        i++;
       }
-      i++;
-    }
 
-    if (ret != 1) {
-      ENVOY_LOG(error, "{} dlb_send fail with {} times retry, errono: {}, message: {}", name_,
-                DlbConnectionBalanceFactorySingleton::get().max_retries, errno,
+      if (ret != 1) {
+        ENVOY_LOG(error,
+                  "{} dlb_send fail with {} times retry, errono: {}, message: {}, increase "
+                  "max_retries may help",
+                  name_, DlbConnectionBalanceFactorySingleton::get().max_retries, errno,
+                  errorDetails(errno));
+      }
+    } else {
+      ENVOY_LOG(error,
+                "{} dlb_send fail without retry, errono: {}, message: {}, set "
+                "max_retries may help",
+                name_, DlbConnectionBalanceFactorySingleton::get().max_retries, errno,
                 errorDetails(errno));
     }
+
   } else {
     ENVOY_LOG(debug, "{} dlb send fd {}", name_, s->ioHandle().fdDoNotUse());
   }

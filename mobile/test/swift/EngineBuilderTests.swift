@@ -363,28 +363,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ], config.virtualClusters)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ])
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingNativeFiltersToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in

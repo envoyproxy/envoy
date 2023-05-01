@@ -14,57 +14,20 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::RequestHeaderMap;
-using ::Envoy::Http::RequestTrailerMap;
-using ::Envoy::Http::ResponseHeaderMap;
-using ::Envoy::Http::ResponseTrailerMap;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class BaseHttpHeaderValidator : public HeaderValidator {
-public:
-  BaseHttpHeaderValidator(
-      const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
-          config,
-      Protocol protocol, HeaderValidatorStats& stats)
-      : HeaderValidator(config, protocol, stats) {}
-
-  ValidationResult validateRequestHeaders(const RequestHeaderMap&) override {
-    return ValidationResult::success();
-  }
-
-  HeadersTransformationResult transformRequestHeaders(RequestHeaderMap&) override {
-    return HeadersTransformationResult::success();
-  }
-
-  ValidationResult validateResponseHeaders(const ResponseHeaderMap&) override {
-    return ValidationResult::success();
-  }
-
-  ValidationResult validateRequestTrailers(const RequestTrailerMap&) override {
-    return ValidationResult::success();
-  }
-
-  TrailersTransformationResult transformRequestTrailers(RequestTrailerMap&) override {
-    return TrailersTransformationResult::success();
-  }
-
-  ValidationResult validateResponseTrailers(const ResponseTrailerMap&) override {
-    return ValidationResult::success();
-  }
-};
-
-using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
+using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
-  BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
+  HeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 
@@ -153,7 +116,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testChar(kGenericHeaderNameCharTable, c)) {
+    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -190,7 +153,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testChar(kGenericHeaderValueCharTable, c)) {
+    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);

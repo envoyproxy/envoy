@@ -48,6 +48,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   spdy::Http2HeaderBlock spdy_headers;
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
     // In Envoy, both upgrade requests and extended CONNECT requests are
@@ -75,6 +77,12 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   if (spdy_headers.empty()) {
     spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   }
+#else
+  spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
+  if (headers.Method()->value() == "HEAD") {
+    sent_head_request_ = true;
+  }
+#endif
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -236,6 +244,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     set_headers_decompressed(false);
   }
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // In Envoy, both upgrade requests and extended CONNECT requests are
   // represented as their HTTP/1 forms, regardless of the HTTP version used.
   // Therefore, these need to be transformed into their HTTP/1 form.
@@ -243,6 +253,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       !upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
+#endif
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
