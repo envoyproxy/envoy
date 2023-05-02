@@ -59,14 +59,14 @@ class StatFlushIntegrationTest {
     val statsdServer2 = TestStatsdServer()
     statsdServer2.runAsync(5000)
 
-    val latch1 = statsdServer1.statMatchingLatch { s -> s == "envoy.pulse.foo.bar:1|c" }
-    val latch2 = statsdServer2.statMatchingLatch { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer1.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer2.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
 
     engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
     engine!!.flushStats()
 
-    latch1.await()
-    latch2.await()
+    statsdServer1.await()
+    statsdServer2.await()
   }
 
   private fun statsdSinkConfig(port: Int): String {

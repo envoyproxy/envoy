@@ -13,6 +13,7 @@ class TestStatsdServer {
   private val matchCriteria: AtomicReference<(String) -> Boolean> = AtomicReference()
 
   private var thread: Thread? = null
+  private var latch: CountDownLatch? = null
 
   @Throws(IOException::class)
   fun runAsync(port: Int) {
@@ -48,14 +49,17 @@ class TestStatsdServer {
     thread!!.start()
   }
 
-  // Creates and returns a CountDownLatch for the given predicate's condition being met.
-  // Callers of this method must call await() on the returned CountDownLatch to await the
-  // predicate condition being met.
-  fun statMatchingLatch(predicate: (String) -> Boolean): CountDownLatch {
-    val latch = CountDownLatch(1)
+  // Creates the notification condition based on the input predicate.
+  // Callers of this method must call await() to wait for the condition to be met on the server.
+  fun setStatMatching(predicate: (String) -> Boolean) {
+    latch = CountDownLatch(1)
     awaitNextStat.set(latch)
     matchCriteria.set(predicate)
-    return latch
+  }
+
+  // setStatMatching() must be called before calling this method.
+  fun await() {
+    latch?.await()
   }
 
   @Throws(InterruptedException::class)
