@@ -282,9 +282,9 @@ TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
-  EXPECT_CALL(*log_handler, log(_, _, _, _))
+  EXPECT_CALL(*log_handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
         EXPECT_EQ("overload_error:Envoy_Overloaded", stream_info.responseCodeDetails().value());
       }));
