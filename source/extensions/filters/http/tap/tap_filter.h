@@ -111,7 +111,7 @@ public:
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) override;
+           AccessLog::AccessLogType access_log_type) override;
 
 private:
   FilterConfigSharedPtr config_;
