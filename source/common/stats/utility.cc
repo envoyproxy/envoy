@@ -125,6 +125,42 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
 }
 
+std::vector<ParentHistogram::Bucket> interpolateHistogramBuckets(
+    uint32_t max_buckets, uint32_t num_src_buckets,
+    std::function<ParentHistogram::Bucket(uint32_t)> get_bucket) {
+  if (max_buckets == 0) {
+    max_buckets = num_src_buckets;
+  }
+  const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
+  uint32_t num_src_buckets_per_bucket = 1;
+  uint32_t remainder = 0;
+  if (num_src_buckets > num_buckets) {
+    num_src_buckets_per_bucket = num_src_buckets / num_buckets;
+    remainder = num_src_buckets - num_buckets * num_src_buckets_per_bucket;
+    ASSERT(remainder < num_buckets);
+  }
+
+  std::vector<ParentHistogram::Bucket> buckets(num_buckets);
+  uint32_t src = 0;
+  for (uint32_t dest = 0; dest < num_buckets; ++dest) {
+    ParentHistogram::Bucket& bucket = buckets[dest];
+    uint32_t merges = num_src_buckets_per_bucket;
+    if (remainder > 0) {
+      ++merges;
+      --remainder;
+    }
+    for (uint32_t i = 0; i < merges; ++i, ++src) {
+      ASSERT(src < num_src_buckets);
+      ParentHistogram::Bucket src_bucket = get_bucket(src);
+      bucket.count_ += src_bucket.count_;
+      bucket.value_ += src_bucket.value_;
+    }
+    bucket.value_ /= merges;
+  }
+  ASSERT(src == num_src_buckets);
+  return buckets;
+}
+
 } // namespace Utility
 } // namespace Stats
 } // namespace Envoy

@@ -231,6 +231,11 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+std::vector<ParentHistogram::Bucket> interpolateHistogramBuckets(
+    uint32_t max_buckets, uint32_t num_src_buckets,
+    std::function<ParentHistogram::Bucket(uint32_t)> get_bucket);
+
 } // namespace Utility
 
 /**
