@@ -642,16 +642,15 @@ public:
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
                 : 2),
-        
+
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
                 : absl::nullopt),
-                full_scan_hosts_(
-          least_request_config.has_value()
-            ? least_request_config->full_scan_hosts().value()
-            : false) {
+        full_scan_hosts_(least_request_config.has_value()
+                             ? least_request_config->full_scan_hosts().value()
+                             : false) {
     initialize();
   }
 
@@ -672,9 +671,9 @@ public:
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt),
-                         full_scan_hosts_(
-          least_request_config.has_full_scan_hosts() ? least_request_config.full_scan_hosts().value()
-            : false) {
+        full_scan_hosts_(least_request_config.has_full_scan_hosts()
+                             ? least_request_config.full_scan_hosts().value()
+                             : false) {
     initialize();
   }
 
