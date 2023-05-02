@@ -17,8 +17,20 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: "--flaky_test_attempts=2"
+# Unfortunately, AZP is an unmittigated and undocumented disaster.
+# The definition of primitive types is close to pointless, as depending
+# on where things are set, azp just turns them into strings anyway.
+- name: repoFetchDepth
+  type: string
+  default: 1
+- name: repoFetchTags
+  type: string
+  default: false
 
 steps:
+- checkout: self
+  fetchDepth: ${{ parameters.repoFetchDepth }}
+  fetchTags: ${{ parameters.repoFetchTags }}
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
 #
 # NB: Do not add any directory that grow larger than spare memory capacity!
