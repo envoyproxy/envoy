@@ -29,6 +29,7 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
   settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy config;
+  config.mutable_prefix_routes();
   config.set_stat_prefix("foo");
   config.mutable_settings()->CopyFrom(settings);
 
@@ -37,6 +38,21 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
   EXPECT_THROW_WITH_MESSAGE(
       RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
       "cannot configure a redis-proxy without any upstream");
+}
+
+TEST(RedisProxyFilterConfigFactoryTest, NoRouterDefined) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings settings;
+  settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy config;
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->CopyFrom(settings);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
+      "please define a router for upstream clusters");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
