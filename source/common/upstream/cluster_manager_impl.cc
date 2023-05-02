@@ -1589,406 +1589,412 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
       break;
     }
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
-    const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
-  // Drain or close any HTTP connection pool for the host.
-  {
-    const auto container = getHttpConnPoolsContainer(host);
-    if (container != nullptr) {
-      container->do_not_delete_ = true;
-      if (drain_behavior.has_value()) {
-        container->pools_->drainConnections(drain_behavior.value());
-      } else {
-        // TODO(wbpcode): 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' and 'closeConnections'
-        // is only supported for TCP connection pools for now. Use 'DrainExistingConnections'
-        // drain here as alternative.
-        container->pools_->drainConnections(
-            ConnectionPool::DrainBehavior::DrainExistingConnections);
-      }
-      container->do_not_delete_ = false;
-
-      if (container->pools_->empty()) {
-        host_http_conn_pool_map_.erase(host);
-      }
     }
   }
-  // Drain or close any TCP connection pool for the host.
-  {
-    const auto container = host_tcp_conn_pool_map_.find(host);
-    if (container != host_tcp_conn_pool_map_.end()) {
-      // Draining pools or closing connections can cause pool deletion if it becomes
-      // idle. Copy `pools_` so that we aren't iterating through a container that
-      // gets mutated by callbacks deleting from it.
-      std::vector<Tcp::ConnectionPool::Instance*> pools;
-      for (const auto& pair : container->second.pools_) {
-        pools.push_back(pair.second.get());
-      }
 
-      for (auto* pool : pools) {
+  void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
+      const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
+    // Drain or close any HTTP connection pool for the host.
+    {
+      const auto container = getHttpConnPoolsContainer(host);
+      if (container != nullptr) {
+        container->do_not_delete_ = true;
         if (drain_behavior.has_value()) {
-          pool->drainConnections(drain_behavior.value());
+          container->pools_->drainConnections(drain_behavior.value());
         } else {
-          pool->closeConnections();
+          // TODO(wbpcode): 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' and 'closeConnections'
+          // is only supported for TCP connection pools for now. Use 'DrainExistingConnections'
+          // drain here as alternative.
+          container->pools_->drainConnections(
+              ConnectionPool::DrainBehavior::DrainExistingConnections);
+        }
+        container->do_not_delete_ = false;
+
+        if (container->pools_->empty()) {
+          host_http_conn_pool_map_.erase(host);
+        }
+      }
+    }
+    // Drain or close any TCP connection pool for the host.
+    {
+      const auto container = host_tcp_conn_pool_map_.find(host);
+      if (container != host_tcp_conn_pool_map_.end()) {
+        // Draining pools or closing connections can cause pool deletion if it becomes
+        // idle. Copy `pools_` so that we aren't iterating through a container that
+        // gets mutated by callbacks deleting from it.
+        std::vector<Tcp::ConnectionPool::Instance*> pools;
+        for (const auto& pair : container->second.pools_) {
+          pools.push_back(pair.second.get());
+        }
+
+        for (auto* pool : pools) {
+          if (drain_behavior.has_value()) {
+            pool->drainConnections(drain_behavior.value());
+          } else {
+            pool->closeConnections();
+          }
         }
       }
     }
   }
-}
 
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
-  // We need to drain all connection pools for the cluster being removed. Then we can remove the
-  // cluster.
-  //
-  // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
-  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
-  // going with a more targeted approach for now.
-  drainConnPools();
-}
+  ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
+    // We need to drain all connection pools for the cluster being removed. Then we can remove the
+    // cluster.
+    //
+    // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
+    // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we
+    // are going with a more targeted approach for now.
+    drainConnPools();
+  }
 
-Http::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
-    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-    LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
-  if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+  Http::ConnectionPool::Instance*
+  ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
+      ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+      LoadBalancerContext * context, bool peek) {
+    HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
+    if (!host) {
+      if (!peek) {
+        ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+        cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+      }
+      return nullptr;
     }
-    return nullptr;
-  }
 
-  // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
-  // We could do better here, and always use the ALPN pool and simply make sure
-  // we end up on a connection of the correct protocol, but for simplicity we're
-  // starting with something simpler.
-  auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
-  std::vector<uint8_t> hash_key;
-  hash_key.reserve(upstream_protocols.size());
-  for (auto protocol : upstream_protocols) {
-    hash_key.push_back(uint8_t(protocol));
-  }
-
-  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-      alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
-  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
-  if (context) {
-    // Inherit socket options from downstream connection, if set.
-    if (context->downstreamConnection()) {
-      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+    // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
+    // We could do better here, and always use the ALPN pool and simply make sure
+    // we end up on a connection of the correct protocol, but for simplicity we're
+    // starting with something simpler.
+    auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
+    std::vector<uint8_t> hash_key;
+    hash_key.reserve(upstream_protocols.size());
+    for (auto protocol : upstream_protocols) {
+      hash_key.push_back(uint8_t(protocol));
     }
-    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
-  }
 
-  // Use the socket options for computing connection pool hash key, if any.
-  // This allows socket options to control connection pooling so that connections with
-  // different options are not pooled together.
-  for (const auto& option : *upstream_options) {
-    option->hashKey(hash_key);
-  }
+    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+        alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
+    Network::Socket::OptionsSharedPtr upstream_options(
+        std::make_shared<Network::Socket::Options>());
+    if (context) {
+      // Inherit socket options from downstream connection, if set.
+      if (context->downstreamConnection()) {
+        addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+      }
+      addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+    }
 
-  bool have_transport_socket_options = false;
-  if (context && context->upstreamTransportSocketOptions()) {
-    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
-    have_transport_socket_options = true;
-  }
+    // Use the socket options for computing connection pool hash key, if any.
+    // This allows socket options to control connection pooling so that connections with
+    // different options are not pooled together.
+    for (const auto& option : *upstream_options) {
+      option->hashKey(hash_key);
+    }
 
-  // If configured, use the downstream connection id in pool hash key
-  if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
-      context->downstreamConnection()) {
-    context->downstreamConnection()->hashKey(hash_key);
-  }
+    bool have_transport_socket_options = false;
+    if (context && context->upstreamTransportSocketOptions()) {
+      host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
+      have_transport_socket_options = true;
+    }
 
-  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
+    // If configured, use the downstream connection id in pool hash key
+    if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
+        context->downstreamConnection()) {
+      context->downstreamConnection()->hashKey(hash_key);
+    }
 
-  // Note: to simplify this, we assume that the factory is only called in the scope of this
-  // function. Otherwise, we'd need to capture a few of these variables by value.
-  ConnPoolsContainer::ConnPools::PoolOptRef pool =
-      container.pools_->getPool(priority, hash_key, [&]() {
-        auto pool = parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
-            alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.parent_.time_source_, parent_.cluster_manager_state_, quic_info_);
+    ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
-        pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
-          parent.httpConnPoolIsIdle(host, priority, hash_key);
+    // Note: to simplify this, we assume that the factory is only called in the scope of this
+    // function. Otherwise, we'd need to capture a few of these variables by value.
+    ConnPoolsContainer::ConnPools::PoolOptRef pool =
+        container.pools_->getPool(priority, hash_key, [&]() {
+          auto pool = parent_.parent_.factory_.allocateConnPool(
+              parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
+              alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
+              have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+              parent_.parent_.time_source_, parent_.cluster_manager_state_, quic_info_);
+
+          pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
+            parent.httpConnPoolIsIdle(host, priority, hash_key);
+          });
+
+          return pool;
         });
 
-        return pool;
-      });
-
-  if (pool.has_value()) {
-    return &(pool.value().get());
-  } else {
-    return nullptr;
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
-    HostConstSharedPtr host, ResourcePriority priority, const std::vector<uint8_t>& hash_key) {
-  if (destroying_) {
-    // If the Cluster is being destroyed, this pool will be cleaned up by that
-    // process.
-    return;
-  }
-
-  ConnPoolsContainer* container = getHttpConnPoolsContainer(host);
-  if (container == nullptr) {
-    // This could happen if we have cleaned out the host before iterating through every
-    // connection pool. Handle it by just continuing.
-    return;
-  }
-
-  ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
-  container->pools_->erasePool(priority, hash_key);
-
-  // Guard deletion of the container with `do_not_delete_` to avoid deletion while
-  // iterating through the container in `container->pools_->startDrain()`. See
-  // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-  if (!container->do_not_delete_ && container->pools_->empty()) {
-    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
-    host_http_conn_pool_map_.erase(
-        host); // NOTE: `container` is erased after this point in the lambda.
-  }
-}
-
-HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
-    LoadBalancerContext* context) {
-  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return host;
-  }
-  return lb_->chooseHost(context);
-}
-
-HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
-    LoadBalancerContext* context) {
-  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return host;
-  }
-  return lb_->peekAnotherHost(context);
-}
-
-Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
-    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-
-  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
-  if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+    if (pool.has_value()) {
+      return &(pool.value().get());
+    } else {
+      return nullptr;
     }
-    return nullptr;
   }
 
-  // Inherit socket options from downstream connection, if set.
-  std::vector<uint8_t> hash_key = {uint8_t(priority)};
-
-  // Use downstream connection socket options for computing connection pool hash key, if any.
-  // This allows socket options to control connection pooling so that connections with
-  // different options are not pooled together.
-  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
-  if (context) {
-    if (context->downstreamConnection()) {
-      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
-    }
-    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
-  }
-
-  for (const auto& option : *upstream_options) {
-    option->hashKey(hash_key);
-  }
-
-  bool have_transport_socket_options = false;
-  if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
-    have_transport_socket_options = true;
-    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
-  }
-
-  auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
-  if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
-    container_iter = parent_.host_tcp_conn_pool_map_.try_emplace(host, host->acquireHandle()).first;
-  }
-  TcpConnPoolsContainer& container = container_iter->second;
-  auto pool_iter = container.pools_.find(hash_key);
-  if (pool_iter == container.pools_.end()) {
-    bool inserted;
-    std::tie(pool_iter, inserted) = container.pools_.emplace(
-        hash_key,
-        parent_.parent_.factory_.allocateTcpConnPool(
-            parent_.thread_local_dispatcher_, host, priority,
-            !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.cluster_manager_state_, cluster_info_->tcpPoolIdleTimeout()));
-    ASSERT(inserted);
-    pool_iter->second->addIdleCallback(
-        [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
-  }
-
-  return pool_iter->second.get();
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
-    HostConstSharedPtr host, const std::vector<uint8_t>& hash_key) {
-  if (destroying_) {
-    // If the Cluster is being destroyed, this pool will be cleaned up by that process.
-    return;
-  }
-
-  auto it = host_tcp_conn_pool_map_.find(host);
-  if (it != host_tcp_conn_pool_map_.end()) {
-    TcpConnPoolsContainer& container = it->second;
-
-    auto erase_iter = container.pools_.find(hash_key);
-    if (erase_iter != container.pools_.end()) {
-      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
-      thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
-      container.pools_.erase(erase_iter);
+  void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
+      HostConstSharedPtr host, ResourcePriority priority, const std::vector<uint8_t>& hash_key) {
+    if (destroying_) {
+      // If the Cluster is being destroyed, this pool will be cleaned up by that
+      // process.
+      return;
     }
 
-    if (container.pools_.empty()) {
-      host_tcp_conn_pool_map_.erase(
+    ConnPoolsContainer* container = getHttpConnPoolsContainer(host);
+    if (container == nullptr) {
+      // This could happen if we have cleaned out the host before iterating through every
+      // connection pool. Handle it by just continuing.
+      return;
+    }
+
+    ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
+    container->pools_->erasePool(priority, hash_key);
+
+    // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+    // iterating through the container in `container->pools_->startDrain()`. See
+    // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+    if (!container->do_not_delete_ && container->pools_->empty()) {
+      ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
+      host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
     }
   }
-}
 
-ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
-      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
-      http_context_, grpc_context_, router_context_, server_)};
-}
-
-Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
-    Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    std::vector<Http::Protocol>& protocols,
-    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-        alternate_protocol_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
-
-  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
-  if (alternate_protocol_options.has_value()) {
-    // If there is configuration for an alternate protocols cache, always create one.
-    alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
-        alternate_protocol_options.value(), dispatcher);
-  } else if (!alternate_protocol_options.has_value() &&
-             (protocols.size() == 2 ||
-              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))) {
-    // If there is no configuration for an alternate protocols cache, still
-    // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
-    // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
-    // connections.
-    envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
-    default_options.set_name(host->cluster().name());
-    alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
-  }
-
-  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
-      getOrigin(transport_socket_options, host);
-  if (protocols.size() == 3 &&
-      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
-    ASSERT(contains(protocols,
-                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-    ASSERT(alternate_protocol_options.has_value());
-    ASSERT(alternate_protocols_cache);
-#ifdef ENVOY_ENABLE_QUIC
-    Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
-    if (quic_info == nullptr) {
-      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+  HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+      LoadBalancerContext * context) {
+    auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+    HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                              override_host_statuses_, context);
+    if (host != nullptr) {
+      return host;
     }
-    return std::make_unique<Http::ConnectivityGrid>(
-        dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info);
-#else
-    (void)quic_info;
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
-#endif
+    return lb_->chooseHost(context);
   }
-  if (protocols.size() >= 2) {
-    if (origin.has_value()) {
+
+  HostConstSharedPtr
+  ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
+      LoadBalancerContext * context) {
+    auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+    HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                              override_host_statuses_, context);
+    if (host != nullptr) {
+      return host;
+    }
+    return lb_->peekAnotherHost(context);
+  }
+
+  Tcp::ConnectionPool::Instance*
+  ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
+      ResourcePriority priority, LoadBalancerContext * context, bool peek) {
+
+    HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
+    if (!host) {
+      if (!peek) {
+        ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+        cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+      }
+      return nullptr;
+    }
+
+    // Inherit socket options from downstream connection, if set.
+    std::vector<uint8_t> hash_key = {uint8_t(priority)};
+
+    // Use downstream connection socket options for computing connection pool hash key, if any.
+    // This allows socket options to control connection pooling so that connections with
+    // different options are not pooled together.
+    Network::Socket::OptionsSharedPtr upstream_options(
+        std::make_shared<Network::Socket::Options>());
+    if (context) {
+      if (context->downstreamConnection()) {
+        addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+      }
+      addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+    }
+
+    for (const auto& option : *upstream_options) {
+      option->hashKey(hash_key);
+    }
+
+    bool have_transport_socket_options = false;
+    if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
+      have_transport_socket_options = true;
+      host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
+    }
+
+    auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
+    if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
+      container_iter =
+          parent_.host_tcp_conn_pool_map_.try_emplace(host, host->acquireHandle()).first;
+    }
+    TcpConnPoolsContainer& container = container_iter->second;
+    auto pool_iter = container.pools_.find(hash_key);
+    if (pool_iter == container.pools_.end()) {
+      bool inserted;
+      std::tie(pool_iter, inserted) = container.pools_.emplace(
+          hash_key,
+          parent_.parent_.factory_.allocateTcpConnPool(
+              parent_.thread_local_dispatcher_, host, priority,
+              !upstream_options->empty() ? upstream_options : nullptr,
+              have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+              parent_.cluster_manager_state_, cluster_info_->tcpPoolIdleTimeout()));
+      ASSERT(inserted);
+      pool_iter->second->addIdleCallback(
+          [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
+    }
+
+    return pool_iter->second.get();
+  }
+
+  void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
+      HostConstSharedPtr host, const std::vector<uint8_t>& hash_key) {
+    if (destroying_) {
+      // If the Cluster is being destroyed, this pool will be cleaned up by that process.
+      return;
+    }
+
+    auto it = host_tcp_conn_pool_map_.find(host);
+    if (it != host_tcp_conn_pool_map_.end()) {
+      TcpConnPoolsContainer& container = it->second;
+
+      auto erase_iter = container.pools_.find(hash_key);
+      if (erase_iter != container.pools_.end()) {
+        ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
+        thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+        container.pools_.erase(erase_iter);
+      }
+
+      if (container.pools_.empty()) {
+        host_tcp_conn_pool_map_.erase(
+            host); // NOTE: `container` is erased after this point in the lambda.
+      }
+    }
+  }
+
+  ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    return ClusterManagerPtr{new ClusterManagerImpl(
+        bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
+        context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
+        http_context_, grpc_context_, router_context_, server_)};
+  }
+
+  Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
+      Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      std::vector<Http::Protocol> & protocols,
+      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+          alternate_protocol_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
+
+    Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
+    if (alternate_protocol_options.has_value()) {
+      // If there is configuration for an alternate protocols cache, always create one.
+      alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
+          alternate_protocol_options.value(), dispatcher);
+    } else if (!alternate_protocol_options.has_value() &&
+               (protocols.size() == 2 ||
+                (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))) {
+      // If there is no configuration for an alternate protocols cache, still
+      // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
+      // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
+      // connections.
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());
       alternate_protocols_cache =
           alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
     }
 
-    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
-    return std::make_unique<Http::HttpConnPoolImplMixed>(
-        dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, origin, alternate_protocols_cache);
-  }
-  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
-      context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, origin,
-                                         alternate_protocols_cache);
-  }
-  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
-      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+    absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+        getOrigin(transport_socket_options, host);
+    if (protocols.size() == 3 &&
+        context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+      ASSERT(contains(protocols,
+                      {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+      ASSERT(alternate_protocol_options.has_value());
+      ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
-    if (quic_info == nullptr) {
-      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
-    }
-    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state,
-                                         quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info);
+      Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+      if (quic_info == nullptr) {
+        quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+      }
+      return std::make_unique<Http::ConnectivityGrid>(
+          dispatcher, context_.api().randomGenerator(), host, priority, options,
+          transport_socket_options, state, source, alternate_protocols_cache, coptions,
+          quic_stat_names_, *stats_.rootScope(), *quic_info);
 #else
-    UNREFERENCED_PARAMETER(source);
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
+      (void)quic_info;
+      // Should be blocked by configuration checking at an earlier point.
+      PANIC("unexpected");
 #endif
+    }
+    if (protocols.size() >= 2) {
+      if (origin.has_value()) {
+        envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+        default_options.set_name(host->cluster().name());
+        alternate_protocols_cache =
+            alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+      }
+
+      ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
+      return std::make_unique<Http::HttpConnPoolImplMixed>(
+          dispatcher, context_.api().randomGenerator(), host, priority, options,
+          transport_socket_options, state, origin, alternate_protocols_cache);
+    }
+    if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
+        context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+      return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                           priority, options, transport_socket_options, state,
+                                           origin, alternate_protocols_cache);
+    }
+    if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
+        context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+#ifdef ENVOY_ENABLE_QUIC
+      if (quic_info == nullptr) {
+        quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+      }
+      return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                           priority, options, transport_socket_options, state,
+                                           quic_stat_names_, {}, *stats_.rootScope(), {},
+                                           *quic_info);
+#else
+      UNREFERENCED_PARAMETER(source);
+      // Should be blocked by configuration checking at an earlier point.
+      PANIC("unexpected");
+#endif
+    }
+    ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+    return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state);
   }
-  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-  return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
-                                       options, transport_socket_options, state);
-}
 
-Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
-    Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    ClusterConnectivityState& state,
-    absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
-  ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  return std::make_unique<Tcp::ConnPoolImpl>(
-      dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
-}
+  Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
+      Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      ClusterConnectivityState& state,
+      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
+    ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options, state,
+                                               tcp_pool_idle_timeout);
+  }
 
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
-                                        ssl_context_manager_, outlier_event_logger, added_via_api,
-                                        added_via_api
-                                            ? validation_context_.dynamicValidationVisitor()
-                                            : validation_context_.staticValidationVisitor());
-}
+  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  ProdClusterManagerFactory::clusterFromProto(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+      Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
+                                          ssl_context_manager_, outlier_event_logger, added_via_api,
+                                          added_via_api
+                                              ? validation_context_.dynamicValidationVisitor()
+                                              : validation_context_.staticValidationVisitor());
+  }
 
-CdsApiPtr
-ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                                     const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                     ClusterManager& cm) {
-  // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
-                            validation_context_.dynamicValidationVisitor());
-}
+  CdsApiPtr ProdClusterManagerFactory::createCds(
+      const envoy::config::core::v3::ConfigSource& cds_config,
+      const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) {
+    // TODO(htuch): Differentiate static vs. dynamic validation visitors.
+    return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
+                              validation_context_.dynamicValidationVisitor());
+  }
 
 } // namespace Upstream
 } // namespace Envoy
