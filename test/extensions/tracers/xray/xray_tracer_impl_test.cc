@@ -22,10 +22,17 @@ namespace {
 
 class XRayDriverTest : public ::testing::Test {
 public:
-  // To ensure the start_time_ is set to zero for each test to avoid flakiness.
-  XRayDriverTest() { stream_info_.start_time_ = Envoy::SystemTime{}; }
+  XRayDriverTest() {
+    // To ensure the start_time_ is set to zero for each test to avoid flakiness.
+    stream_info_.start_time_ = Envoy::SystemTime{};
+    // To ensure the monotonicTime is set to value larger than 1s for each test
+    // to avoid flakiness.
+    stream_info_.ts_.setMonotonicTime(std::chrono::seconds(2048));
+  }
 
   const std::string operation_name_ = "test_operation_name";
+  // The MockStreamInfo will register the singleton time system to SymulatedTimeSystem and ignore
+  // the TestRealTimeSystem in the MockTracerFactoryContext.
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
