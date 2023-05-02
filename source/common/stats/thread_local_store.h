@@ -105,6 +105,8 @@ public:
   }
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
+  std::vector<Bucket> detailedTotalBuckets(uint32_t max_buckets) const override;
+  std::vector<Bucket> detailedIntervalBuckets(uint32_t max_buckets) const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -121,6 +123,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  static std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram);
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& thread_local_store_;
