@@ -93,14 +93,14 @@ struct HTTPStringTestCase {
 // validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderShimWithUhv(Http::HeaderValidator* header_validator,
+  MockRequestDecoderShimWithUhv(Http::ServerHeaderValidator* header_validator,
                                 Network::MockConnection& connection)
       : header_validator_(header_validator), connection_(connection) {}
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::HeaderValidator* header_validator) {
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
     header_validator_ = header_validator;
   }
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
@@ -129,7 +129,7 @@ public:
   }
 
 private:
-  Http::HeaderValidator* header_validator_;
+  Http::ServerHeaderValidator* header_validator_;
   Network::MockConnection& connection_;
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
@@ -232,7 +232,7 @@ protected:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
