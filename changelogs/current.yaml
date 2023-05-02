@@ -90,7 +90,7 @@ new_features:
 - area: redis_proxy
   change: |
     added new routing mechanism :ref:`hash_slot_routes
-    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.HashSlotRoutes>`
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.hash_slot_routes>`
     to route redis traffic based on the key hash.
 
 deprecated:
