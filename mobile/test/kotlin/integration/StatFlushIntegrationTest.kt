@@ -65,8 +65,8 @@ class StatFlushIntegrationTest {
     engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
     engine!!.flushStats()
 
-    statsdServer1.await()
-    statsdServer2.await()
+    statsdServer1.awaitStatMatching()
+    statsdServer2.awaitStatMatching()
   }
 
   private fun statsdSinkConfig(port: Int): String {

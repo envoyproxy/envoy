@@ -50,7 +50,8 @@ class TestStatsdServer {
   }
 
   // Creates the notification condition based on the input predicate.
-  // Callers of this method must call await() to wait for the condition to be met on the server.
+  // Callers of this method must call awaitStatMatching() to wait for the condition to be met on
+  // the server.
   fun setStatMatching(predicate: (String) -> Boolean) {
     latch = CountDownLatch(1)
     awaitNextStat.set(latch)
@@ -58,7 +59,7 @@ class TestStatsdServer {
   }
 
   // setStatMatching() must be called before calling this method.
-  fun await() {
+  fun awaitStatMatching() {
     latch?.await()
   }
 
