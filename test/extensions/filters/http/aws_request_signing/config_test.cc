@@ -15,12 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
-using AwsRequestSigningProtoConfig =
-    envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning;
-
-using AwsRequestSigningProtoPerRouteConfig =
-    envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute;
-
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 service_name: s3
