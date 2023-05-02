@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.chromium.net.impl.CronetMetrics;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.MetricsTestUtil;
@@ -108,7 +107,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListener() throws Exception {
@@ -137,7 +135,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerDirectExecutor() throws Exception {
@@ -170,7 +167,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerDifferentThreads() throws Exception {
@@ -212,7 +208,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @Ignore("Needs debugging")
   @SuppressWarnings("deprecation")
@@ -260,7 +255,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerRemoved() throws Exception {
@@ -283,7 +277,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testRequestFinishedListenerCanceledRequest() throws Exception {
     TestRequestFinishedListener requestFinishedListener = new TestRequestFinishedListener();
@@ -326,7 +319,6 @@ public class RequestFinishedInfoTest {
   // collection is enabled and the URLRequest hasn't been created. See http://crbug.com/675629.
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testExceptionInRequestStart() throws Exception {
     // The listener in this test shouldn't get any tasks.
@@ -390,7 +382,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testOrderSuccessfulRequest() throws Exception {
@@ -420,7 +411,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @RequiresMinApi(11)
   public void testUpdateAnnotationOnSucceeded() throws Exception {
@@ -458,7 +448,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   // Tests a failed request where the error originates from Java.
   public void testOrderFailedRequestJava() throws Exception {
@@ -491,7 +480,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @Ignore("Needs debugging")
   // Tests a failed request where the error originates from native code.
@@ -521,7 +509,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testOrderCanceledRequest() throws Exception {
     final TestUrlRequestCallback callback = new TestUrlRequestCallback() {
