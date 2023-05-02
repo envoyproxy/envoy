@@ -15,7 +15,8 @@ namespace AwsRequestSigningFilter {
  */
 class AwsRequestSigningFilterFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning> {
+          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning,
+          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute> {
 public:
   AwsRequestSigningFilterFactory() : FactoryBase("envoy.filters.http.aws_request_signing") {}
 
@@ -26,7 +27,7 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
+    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute& perRouteConfig,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) override;
 };
 
