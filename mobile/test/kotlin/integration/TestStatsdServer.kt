@@ -48,11 +48,14 @@ class TestStatsdServer {
     thread!!.start()
   }
 
-  fun awaitStatMatching(predicate: (String) -> Boolean) {
+  // Creates and returns a CountDownLatch for the given predicate's condition being met.
+  // Callers of this method must call await() on the returned CountDownLatch to await the
+  // predicate condition being met.
+  fun statMatchingLatch(predicate: (String) -> Boolean): CountDownLatch {
     val latch = CountDownLatch(1)
     awaitNextStat.set(latch)
     matchCriteria.set(predicate)
-    latch.await()
+    return latch
   }
 
   @Throws(InterruptedException::class)
