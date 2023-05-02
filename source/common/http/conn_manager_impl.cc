@@ -100,6 +100,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_state_(overload_manager.getThreadLocalOverloadState()),
+      accept_new_http_stream_(overload_manager.getLoadShedPoint(
+          "envoy.load_shed_points.http_connection_manager_decode_headers")),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
@@ -320,7 +322,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
-    stream.filter_manager_.log();
+    stream.filter_manager_.log(AccessLog::AccessLogType::DownstreamEnd);
   }
 
   stream.filter_manager_.destroyFilters();
@@ -815,7 +817,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           // If the request is complete, we've already done the stream-end access-log, and shouldn't
           // do the periodic log.
           if (!streamInfo().requestComplete().has_value()) {
-            filter_manager_.log();
+            filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
             refreshAccessLogFlushTimer();
           }
         });
@@ -946,8 +948,8 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
       failure = !transformation_result.ok();
       redirect = transformation_result.action() ==
-                 Http::HeaderValidator::HeadersTransformationResult::Action::Redirect;
-      failure_details = transformation_result.details();
+                 Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
+      failure_details = std::string(transformation_result.details());
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
@@ -996,7 +998,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
     if (transformation_result.ok()) {
       return true;
     }
-    failure_details = transformation_result.details();
+    failure_details = std::string(transformation_result.details());
   }
 
   Code response_code = Code::BadRequest;
@@ -1086,8 +1088,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
-  if (connection_manager_.random_generator_.bernoulli(
-          connection_manager_.overload_stop_accepting_requests_ref_.value())) {
+  const bool drop_request_due_to_overload =
+      (connection_manager_.accept_new_http_stream_ != nullptr &&
+       connection_manager_.accept_new_http_stream_->shouldShedLoad()) ||
+      connection_manager_.random_generator_.bernoulli(
+          connection_manager_.overload_stop_accepting_requests_ref_.value());
+
+  if (drop_request_due_to_overload) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
@@ -1244,7 +1251,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
   if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
-    filter_manager_.log();
+    filter_manager_.log(AccessLog::AccessLogType::DownstreamStart);
   }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
@@ -1692,9 +1699,22 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
-  // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
       connection_manager_.time_source_);
+
+  if (header_validator_) {
+    auto result = header_validator_->transformResponseHeaders(headers);
+    if (!result.status.ok()) {
+      // It is possible that the header map is invalid if an encoder filter makes invalid
+      // modifications
+      // TODO(yanavlasov): add handling for this case.
+    } else if (result.new_headers) {
+      response_encoder_->encodeHeaders(*result.new_headers, end_stream);
+      return;
+    }
+  }
+
+  // Now actually encode via the codec.
   response_encoder_->encodeHeaders(headers, end_stream);
 }
 

@@ -189,7 +189,7 @@ Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
 
 Api::IoCallBoolResult InstanceImplWin32::createPath(absl::string_view path) {
   std::error_code ec;
-  while (path.size() > 0 && path.back() == '/') {
+  while (!path.empty() && path.back() == '/') {
     path.remove_suffix(1);
   }
   bool result = std::filesystem::create_directories(std::string{path}, ec);

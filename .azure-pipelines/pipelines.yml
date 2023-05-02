@@ -84,6 +84,8 @@ stages:
 - ${{ if eq(variables.pipelinePostsubmit, true) }}:
   - template: stages.yml
     parameters:
+      # Build/publish can take longer in postsubmit, esp during release
+      timeoutDockerBuild: 720
       timeoutDockerPublish: 30
       buildStageDeps:
       - env

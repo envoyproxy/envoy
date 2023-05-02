@@ -2376,6 +2376,33 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   }
 }
 
+TEST_P(MultiplexedIntegrationTest, ConnectionPoolPerDownstream) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  // Preserve the upstream connection while making sure
+  // sendRequestAndWaitForResponse will wait for a new connection.
+  FakeHttpConnectionPtr upstream_connection_ptr = std::move(fake_upstream_connection_);
+  std::unique_ptr<IntegrationCodecClient> client = std::move(codec_client_);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  AssertionResult result = upstream_connection_ptr->close();
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_connection_ptr->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  upstream_connection_ptr.reset();
+  client->close();
+}
+
 // Ordering of inheritance is important here, SocketInterfaceSwap must be
 // destroyed after HttpProtocolIntegrationTest.
 class SocketSwappableMultiplexedIntegrationTest : public SocketInterfaceSwap,

@@ -72,28 +72,24 @@ public:
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
-        ssl_context_manager_, nullptr, false, validation_visitor_);
-    cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config,
-                                                    factory_context, runtime_, false);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, factory_context);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
-  NiceMock<MockClusterManager> cm_;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Ssl::MockContextManager ssl_context_manager_;
+
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* cleanup_timer_;
-  NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Server::MockOptions options_;
   Common::CallbackHandlePtr priority_update_cb_;
 };
 
