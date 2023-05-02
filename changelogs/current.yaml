@@ -91,6 +91,10 @@ new_features:
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http1_server_abort_dispatch`` that rejects HTTP1 server processing of requests.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.http2_server_go_away_on_dispatch`` that sends ``GOAWAY`` for HTTP2 server processing of requests.
+    When a ``GOAWAY`` frame is submitted by this the counter ``http2.goaway_sent`` will be incremented.
 - area: matchers
   change: |
     Added :ref:`RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>` input
