@@ -23,8 +23,8 @@ namespace {
 static const uint32_t MAX_HEADERS = 32;
 static const size_t MAX_HD_TABLE_BUF_SIZE = 4096;
 
-void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fragment,
-                     std::string& payload) {
+void deflateHeaders(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fragment,
+                    std::string& payload) {
 #define MAX_HDRS 32
   nghttp2_nv h2hdrs[MAX_HEADERS];
   uint8_t buf[MAX_HD_TABLE_BUF_SIZE];
@@ -56,8 +56,8 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
   }
 }
 
-Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
-                          const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
+Http2Frame pbToH2Frame(nghttp2_hd_deflater* deflater,
+                       const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
   if (pb_frame.has_junk()) {
     // Junk frame
     const auto& junk = pb_frame.junk();
@@ -91,7 +91,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
         payload.append(reinterpret_cast<char*>(&weight), sizeof(weight));
       }
 
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
       if (use_padding) {
         payload.append(f.padding().data(), padding_len);
       }
@@ -124,7 +124,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
       uint32_t stream_id = htonl(f.stream_id());
       payload.append(reinterpret_cast<char*>(&stream_id), sizeof(stream_id));
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
       if (use_padding) {
         payload.append(f.padding().data(), padding_len);
       }
@@ -149,15 +149,15 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     } else if (h2frame.has_continuation()) {
       type = Http2Frame::Type::Continuation;
       const auto& f = h2frame.continuation();
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
     } else {
       // Empty frame
-      return Http2Frame();
+      return {};
     }
     return Http2Frame::makeRawFrame(type, flags, streamid, payload);
   } else {
     // Empty frame
-    return Http2Frame();
+    return {};
   }
 }
 
@@ -179,7 +179,7 @@ public:
             [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
   }
 
-  void fuzz_request(std::vector<Http2Frame>& frames, bool use_oghttp2) {
+  void fuzzRequest(std::vector<Http2Frame>& frames, bool use_oghttp2) {
     TestScopedRuntime scoped_runtime;
     if (use_oghttp2) {
       scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
@@ -217,7 +217,7 @@ private:
 };
 
 static std::unique_ptr<Http2Harness> harness;
-static void reset_harness() { harness = nullptr; }
+static void resetHarness() { harness = nullptr; }
 
 // HTTP/2 fuzzer
 //
@@ -226,7 +226,7 @@ static void reset_harness() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& input) {
   if (harness == nullptr) {
     harness = std::make_unique<Http2Harness>();
-    atexit(reset_harness);
+    atexit(resetHarness);
   }
 
   // Convert input to Http2Frame wire format
@@ -240,13 +240,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& in
     return;
   }
   for (auto& pbframe : input.frames()) {
-    Http2Frame frame = pb_to_h2_frame(deflater, pbframe);
+    Http2Frame frame = pbToH2Frame(deflater, pbframe);
     frames.push_back(frame);
   }
   nghttp2_hd_deflate_del(deflater);
 
-  harness->fuzz_request(frames, true /* use oghttp2 rather than nghttp2 */);
-  harness->fuzz_request(frames, false);
+  harness->fuzzRequest(frames, true /* use oghttp2 rather than nghttp2 */);
+  harness->fuzzRequest(frames, false);
 }
 
 } // namespace
