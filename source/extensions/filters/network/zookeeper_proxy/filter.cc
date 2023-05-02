@@ -20,18 +20,18 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
-                                             const uint32_t max_packet_bytes,
-                                             const LatencyThresholdList& latency_thresholds,
-                                             Stats::Scope& scope)
+ZooKeeperFilterConfig::ZooKeeperFilterConfig(
+    const std::string& stat_prefix, const uint32_t max_packet_bytes,
+    const std::chrono::milliseconds default_latency_threshold,
+    const LatencyThresholdOverrideList& latency_threshold_overrides, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
       stat_prefix_(stat_name_set_->add(stat_prefix)), auth_(stat_name_set_->add("auth")),
       connect_latency_(stat_name_set_->add("connect_response_latency")),
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")),
-      latency_threshold_map_(parseLatencyThresholds(latency_thresholds)),
-      default_latency_threshold_(getDefaultLatencyThreshold()) {
+      default_latency_threshold_(default_latency_threshold),
+      latency_threshold_override_map_(parseLatencyThresholdOverrides(latency_threshold_overrides)) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
@@ -95,15 +95,11 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
 ErrorBudgetResponseType
 ZooKeeperFilterConfig::errorBudgetDecision(const OpCodes opcode,
                                            const std::chrono::milliseconds latency) const {
-  if (latency_threshold_map_.empty()) {
-    return ErrorBudgetResponseType::NONE;
-  }
-
   // Set latency threshold for the current opcode.
   std::chrono::milliseconds latency_threshold = default_latency_threshold_;
   int32_t opcode_val = enumToSignedInt(opcode);
-  auto it = latency_threshold_map_.find(opcode_val);
-  if (it != latency_threshold_map_.end()) {
+  auto it = latency_threshold_override_map_.find(opcode_val);
+  if (it != latency_threshold_override_map_.end()) {
     latency_threshold = it->second;
   }
 
@@ -126,62 +122,48 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_coun
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
-int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThreshold_Opcode opcode) {
-  static absl::flat_hash_map<LatencyThreshold_Opcode, int32_t> opcode_map = {
-      // Use a special key (-999) to store the default latency threshold.
-      {LatencyThreshold::Default, -999},
-      {LatencyThreshold::Connect, 0},
-      {LatencyThreshold::Create, 1},
-      {LatencyThreshold::Delete, 2},
-      {LatencyThreshold::Exists, 3},
-      {LatencyThreshold::GetData, 4},
-      {LatencyThreshold::SetData, 5},
-      {LatencyThreshold::GetAcl, 6},
-      {LatencyThreshold::SetAcl, 7},
-      {LatencyThreshold::GetChildren, 8},
-      {LatencyThreshold::Sync, 9},
-      {LatencyThreshold::Ping, 11},
-      {LatencyThreshold::GetChildren2, 12},
-      {LatencyThreshold::Check, 13},
-      {LatencyThreshold::Multi, 14},
-      {LatencyThreshold::Create2, 15},
-      {LatencyThreshold::Reconfig, 16},
-      {LatencyThreshold::CheckWatches, 17},
-      {LatencyThreshold::RemoveWatches, 18},
-      {LatencyThreshold::CreateContainer, 19},
-      {LatencyThreshold::CreateTtl, 21},
-      {LatencyThreshold::Close, -11},
-      {LatencyThreshold::SetAuth, 100},
-      {LatencyThreshold::SetWatches, 101},
-      {LatencyThreshold::GetEphemerals, 103},
-      {LatencyThreshold::GetAllChildrenNumber, 104},
-      {LatencyThreshold::SetWatches2, 105}};
+int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode opcode) {
+  static absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t> opcode_map = {
+      {LatencyThresholdOverride::Connect, 0},
+      {LatencyThresholdOverride::Create, 1},
+      {LatencyThresholdOverride::Delete, 2},
+      {LatencyThresholdOverride::Exists, 3},
+      {LatencyThresholdOverride::GetData, 4},
+      {LatencyThresholdOverride::SetData, 5},
+      {LatencyThresholdOverride::GetAcl, 6},
+      {LatencyThresholdOverride::SetAcl, 7},
+      {LatencyThresholdOverride::GetChildren, 8},
+      {LatencyThresholdOverride::Sync, 9},
+      {LatencyThresholdOverride::Ping, 11},
+      {LatencyThresholdOverride::GetChildren2, 12},
+      {LatencyThresholdOverride::Check, 13},
+      {LatencyThresholdOverride::Multi, 14},
+      {LatencyThresholdOverride::Create2, 15},
+      {LatencyThresholdOverride::Reconfig, 16},
+      {LatencyThresholdOverride::CheckWatches, 17},
+      {LatencyThresholdOverride::RemoveWatches, 18},
+      {LatencyThresholdOverride::CreateContainer, 19},
+      {LatencyThresholdOverride::CreateTtl, 21},
+      {LatencyThresholdOverride::Close, -11},
+      {LatencyThresholdOverride::SetAuth, 100},
+      {LatencyThresholdOverride::SetWatches, 101},
+      {LatencyThresholdOverride::GetEphemerals, 103},
+      {LatencyThresholdOverride::GetAllChildrenNumber, 104},
+      {LatencyThresholdOverride::SetWatches2, 105}};
 
   ASSERT(opcode_map.find(opcode) != opcode_map.end());
   return opcode_map[opcode];
 }
 
 absl::flat_hash_map<int32_t, std::chrono::milliseconds>
-ZooKeeperFilterConfig::parseLatencyThresholds(const LatencyThresholdList& latency_thresholds) {
-  absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map;
-  for (const auto& threshold : latency_thresholds) {
-    latency_threshold_map[getOpCodeIndex(threshold.opcode())] =
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(threshold, threshold));
+ZooKeeperFilterConfig::parseLatencyThresholdOverrides(
+    const LatencyThresholdOverrideList& latency_threshold_overrides) {
+  absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_override_map;
+  for (const auto& threshold_override : latency_threshold_overrides) {
+    latency_threshold_override_map[getOpCodeIndex(threshold_override.opcode())] =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(threshold_override, threshold));
   }
-  return latency_threshold_map;
-}
-
-std::chrono::milliseconds ZooKeeperFilterConfig::getDefaultLatencyThreshold() {
-  if (latency_threshold_map_.empty()) {
-    return std::chrono::milliseconds(0);
-  }
-
-  std::chrono::milliseconds default_latency_threshold(100);
-  auto it = latency_threshold_map_.find(-999);
-  if (it != latency_threshold_map_.end()) {
-    default_latency_threshold = it->second;
-  }
-  return default_latency_threshold;
+  return latency_threshold_override_map;
 }
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
@@ -416,7 +398,6 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
   case ErrorBudgetResponseType::SLOW:
     config_->stats_.connect_resp_slow_.inc();
     break;
-  case ErrorBudgetResponseType::NONE:
   default:
     break;
   }
@@ -450,7 +431,6 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
     case ErrorBudgetResponseType::SLOW:
       opcode_info.resp_slow_counter_->inc();
       break;
-    case ErrorBudgetResponseType::NONE:
     default:
       break;
     }

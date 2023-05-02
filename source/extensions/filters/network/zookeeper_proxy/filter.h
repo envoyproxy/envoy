@@ -146,11 +146,11 @@ struct ZooKeeperProxyStats {
   ALL_ZOOKEEPER_PROXY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-enum class ErrorBudgetResponseType { FAST, SLOW, NONE };
+enum class ErrorBudgetResponseType { FAST, SLOW };
 
-using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold;
-using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold_Opcode;
-using LatencyThresholdList = Protobuf::RepeatedPtrField<LatencyThreshold>;
+using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride;
+using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride_Opcode;
+using LatencyThresholdOverrideList = Protobuf::RepeatedPtrField<LatencyThresholdOverride>;
 
 /**
  * Configuration for the ZooKeeper proxy filter.
@@ -158,7 +158,9 @@ using LatencyThresholdList = Protobuf::RepeatedPtrField<LatencyThreshold>;
 class ZooKeeperFilterConfig {
 public:
   ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
-                        const LatencyThresholdList& latency_thresholds, Stats::Scope& scope);
+                        const std::chrono::milliseconds default_latency_threshold,
+                        const LatencyThresholdOverrideList& latency_threshold_overrides,
+                        Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -197,14 +199,13 @@ private:
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  int32_t getOpCodeIndex(LatencyThreshold_Opcode opcode);
+  int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
   absl::flat_hash_map<int32_t, std::chrono::milliseconds>
-  parseLatencyThresholds(const LatencyThresholdList& latency_thresholds);
-  std::chrono::milliseconds getDefaultLatencyThreshold();
+  parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 
-  // Key: opcode enum value defined in decoder.h, value: latency threshold in millisecond.
-  const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map_;
   const std::chrono::milliseconds default_latency_threshold_;
+  // Key: opcode enum value defined in decoder.h, value: latency threshold override in millisecond.
+  const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_override_map_;
 };
 
 using ZooKeeperFilterConfigSharedPtr = std::shared_ptr<ZooKeeperFilterConfig>;

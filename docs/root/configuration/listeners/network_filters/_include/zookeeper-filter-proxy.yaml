@@ -11,9 +11,8 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
           stat_prefix: zookeeper
-          latency_thresholds:
-            - opcode: Default
-              threshold: "0.1s"
+          default_latency_threshold: "0.1s"
+          latency_threshold_overrides:
             - opcode: Create
               threshold: "0.15s"
             - opcode: Multi

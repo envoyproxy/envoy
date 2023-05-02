@@ -31,22 +31,21 @@ public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
   void initialize() {
-    // Specify the default latency threshold as 100 milliseconds
-    LatencyThresholdList latency_thresholds;
-    auto* threshold = latency_thresholds.Add();
-    threshold->set_opcode(LatencyThreshold::Default);
-    threshold->mutable_threshold()->set_nanos(100000000); // 100 milliseconds
+    std::chrono::milliseconds default_latency_threshold(100);
+    LatencyThresholdOverrideList latency_threshold_overrides;
 
-    initializeHelper(latency_thresholds);
+    initializeHelper(default_latency_threshold, latency_threshold_overrides);
   }
 
-  void initialize(LatencyThresholdList& latency_thresholds) {
-    initializeHelper(latency_thresholds);
+  void initialize(std::chrono::milliseconds default_latency_threshold,
+                  LatencyThresholdOverrideList& latency_threshold_overrides) {
+    initializeHelper(default_latency_threshold, latency_threshold_overrides);
   }
 
-  void initializeHelper(LatencyThresholdList& latency_thresholds) {
-    config_ =
-        std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, latency_thresholds, scope_);
+  void initializeHelper(std::chrono::milliseconds default_latency_threshold,
+                        LatencyThresholdOverrideList& latency_threshold_overrides) {
+    config_ = std::make_shared<ZooKeeperFilterConfig>(
+        stat_prefix_, 1048576, default_latency_threshold, latency_threshold_overrides, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -674,34 +673,13 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
-TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithoutLatencyThresholdConfigs) {
-  LatencyThresholdList latency_thresholds;
-  initialize(latency_thresholds);
-  // Since no latency thresholds are specified, all error budget response types will be NONE.
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
-            ErrorBudgetResponseType::NONE);
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
-            ErrorBudgetResponseType::NONE);
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(101)),
-            ErrorBudgetResponseType::NONE);
-
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(101)),
-            ErrorBudgetResponseType::NONE);
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(102)),
-            ErrorBudgetResponseType::NONE);
-  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::NONE);
-}
-
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig) {
-  LatencyThresholdList latency_thresholds;
   // Set default latency threshold as 200 milliseconds. The latency thresholds of all other opcode
   // fallback to the default threshold.
-  auto* threshold = latency_thresholds.Add();
-  threshold->set_opcode(LatencyThreshold::Default);
-  threshold->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
+  std::chrono::milliseconds default_latency_threshold(200);
+  LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(latency_thresholds);
+  initialize(default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::FAST);
@@ -719,15 +697,16 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) {
-  LatencyThresholdList latency_thresholds;
-  // Set latency threshold for Multi opcode as 200 milliseconds. The latency thresholds of all other
-  // opcode fallback to the default threshold. Since no default threshold threshold is specified, it
-  // fallbacks to 100 milliseconds.
-  auto* threshold = latency_thresholds.Add();
-  threshold->set_opcode(LatencyThreshold::Multi);
-  threshold->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
+  // Set default latency threshold as 200 milliseconds. Set latency threshold override for Multi
+  // opcode as 200 milliseconds. The latency thresholds of all other opcode fallback to the default
+  // threshold.
+  std::chrono::milliseconds default_latency_threshold(100);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+  auto* threshold_override = latency_threshold_overrides.Add();
+  threshold_override->set_opcode(LatencyThresholdOverride::Multi);
+  threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(latency_thresholds);
+  initialize(default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::FAST);
@@ -745,21 +724,19 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) 
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresholdConfigs) {
-  LatencyThresholdList latency_thresholds;
   // Set default latency threshold as 150 milliseconds. Set latency threshold for Ping opcode as 50
   // milliseconds. Set latency threshold for Create opcode as 200 milliseconds. The latency
   // thresholds of all other opcode fallback to the default threshold.
-  auto* threshold = latency_thresholds.Add();
-  threshold->set_opcode(LatencyThreshold::Default);
-  threshold->mutable_threshold()->set_nanos(150000000); // 150 milliseconds
-  threshold = latency_thresholds.Add();
-  threshold->set_opcode(LatencyThreshold::Ping);
-  threshold->mutable_threshold()->set_nanos(50000000); // 50 milliseconds
-  threshold = latency_thresholds.Add();
-  threshold->set_opcode(LatencyThreshold::Create);
-  threshold->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
+  std::chrono::milliseconds default_latency_threshold(150);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+  auto* threshold_override = latency_threshold_overrides.Add();
+  threshold_override->set_opcode(LatencyThresholdOverride::Ping);
+  threshold_override->mutable_threshold()->set_nanos(50000000); // 50 milliseconds
+  threshold_override = latency_threshold_overrides.Add();
+  threshold_override->set_opcode(LatencyThresholdOverride::Create);
+  threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(latency_thresholds);
+  initialize(default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(150)),
             ErrorBudgetResponseType::FAST);

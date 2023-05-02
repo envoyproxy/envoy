@@ -41,48 +41,50 @@ message ZooKeeperProxy {
   // if that is set. If it isn't, ZooKeeper's default is also 1Mb.
   google.protobuf.UInt32Value max_packet_bytes = 3;
 
-  // List of latency thresholds for opcodes to decide the fast/slow responses and emit metrics (used for error budget calculation).
+  // The default latency threshold to decide the fast/slow responses and emit metrics (used for error budget calculation).
   //
   // https://sre.google/workbook/implementing-slos/
   //
-  // If no latency threshold is set, the fast/slow response counters will always be 0.
-  // If the default threshold is not set, it will be set as 100 millisecond.
-  // If the threshold of one opcode is not set, it will fallback to use the default
+  // If it is not set, the default value is 100 milliseconds.
+  google.protobuf.Duration default_latency_threshold = 4 [(validate.rules).duration = {
+    gte {nanos: 1000000}
+  }];
+
+  // List of latency threshold overrides for opcodes.
+  // If the threshold override of one opcode is not set, it will fallback to the default latency
   // threshold.
-  //
-  // Specifying latency thresholds multiple times for one opcode is not allowed.
-  repeated LatencyThreshold latency_thresholds = 4 [(validate.rules).repeated = {max_items: 27}];
+  // Specifying latency threshold overrides multiple times for one opcode is not allowed.
+  repeated LatencyThresholdOverride latency_threshold_overrides = 5 [(validate.rules).repeated = {max_items: 27}];
 }
 
-message LatencyThreshold {
+message LatencyThresholdOverride {
   enum Opcode {
-    Default = 0;
-    Connect = 1;
-    Create = 2;
-    Delete = 3;
-    Exists = 4;
-    GetData = 5;
-    SetData = 6;
-    GetAcl = 7;
-    SetAcl = 8;
-    GetChildren = 9;
-    Sync = 10;
-    Ping = 11;
-    GetChildren2 = 12;
-    Check = 13;
-    Multi = 14;
-    Create2 = 15;
-    Reconfig = 16;
-    CheckWatches = 17;
-    RemoveWatches = 18;
-    CreateContainer = 19;
-    CreateTtl = 20;
-    Close = 21;
-    SetAuth = 22;
-    SetWatches = 23;
-    GetEphemerals = 24;
-    GetAllChildrenNumber = 25;
-    SetWatches2 = 26;
+    Connect = 0;
+    Create = 1;
+    Delete = 2;
+    Exists = 3;
+    GetData = 4;
+    SetData = 5;
+    GetAcl = 6;
+    SetAcl = 7;
+    GetChildren = 8;
+    Sync = 9;
+    Ping = 10;
+    GetChildren2 = 11;
+    Check = 12;
+    Multi = 13;
+    Create2 = 14;
+    Reconfig = 15;
+    CheckWatches = 16;
+    RemoveWatches = 17;
+    CreateContainer = 18;
+    CreateTtl = 19;
+    Close = 20;
+    SetAuth = 21;
+    SetWatches = 22;
+    GetEphemerals = 23;
+    GetAllChildrenNumber = 24;
+    SetWatches2 = 25;
   }
 
   // The ZooKeeper opcode defined in decoder.h. You can find them from the ZooKeeper source code:
@@ -91,7 +93,7 @@ message LatencyThreshold {
   //
   Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // The latency threshold of each opcode.
+  // The latency threshold override of certain opcode.
   google.protobuf.Duration threshold = 2 [(validate.rules).duration = {
     required: true
     gte {nanos: 1000000}

@@ -46,7 +46,7 @@ max_packet_bytes: -1
 TEST(ZookeeperFilterConfigTest, UndefinedOpcode) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
+latency_threshold_overrides:
   - opcode: Undefined
     threshold:
       nanos: 150000000
@@ -60,8 +60,8 @@ latency_thresholds:
 TEST(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
-  - opcode: Default
+latency_threshold_overrides:
+  - opcode: Connect
     threshold:
       nanos: -150000000
   )EOF";
@@ -73,8 +73,8 @@ latency_thresholds:
 TEST(ZookeeperFilterConfigTest, TooSmallLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
-  - opcode: Default
+latency_threshold_overrides:
+  - opcode: Multi
     threshold:
       nanos: 999999
   )EOF";
@@ -86,8 +86,8 @@ latency_thresholds:
 TEST(ZookeeperFilterConfigTest, UnsetLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
-  - opcode: Default
+latency_threshold_overrides:
+  - opcode: Create
     threshold:
   )EOF";
 
@@ -99,11 +99,11 @@ TEST(ZookeeperFilterConfigTest, DuplicatedOpcodes) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
 max_packet_bytes: 1048576
-latency_thresholds:
-  - opcode: Default
+latency_threshold_overrides:
+  - opcode: Sync
     threshold:
       nanos: 150000000
-  - opcode: Default
+  - opcode: Sync
     threshold:
       nanos: 151000000
   - opcode: Create
@@ -148,9 +148,7 @@ stat_prefix: test_prefix
 TEST(ZookeeperFilterConfigTest, ConfigWithDefaultLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
-  - opcode: Default
-    threshold: "0.15s"
+default_latency_threshold: "0.15s"
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
@@ -168,7 +166,7 @@ latency_thresholds:
 TEST(ZookeeperFilterConfigTest, ConfigWithConnectLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
-latency_thresholds:
+latency_threshold_overrides:
   - opcode: Connect
     threshold: "0.151s"
   )EOF";
@@ -189,9 +187,8 @@ TEST(ZookeeperFilterConfigTest, FullConfig) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
 max_packet_bytes: 1048576
-latency_thresholds:
-  - opcode: Default
-    threshold: "0.15s"
+default_latency_threshold: "0.1s"
+latency_threshold_overrides:
   - opcode: Connect
     threshold: "0.151s"
   - opcode: Create
