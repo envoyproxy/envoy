@@ -24,9 +24,9 @@ import org.chromium.net.ApiVersion;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.UrlResponseInfo;
-import org.chromium.net.impl.CronetEngineBuilderImpl;
-import org.chromium.net.impl.NativeCronetProvider;
-import org.chromium.net.impl.UserAgent;
+import org.chromium.net.impl.CronvoyEngineBuilderImpl;
+import org.chromium.net.impl.NativeCronvoyProvider;
+import org.chromium.net.impl.CronvoyUserAgent;
 import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -272,7 +272,7 @@ public final class CronetTestRule implements TestRule {
    * @return the {@code CronetEngine.Builder} that builds Chromium-based {@code Cronet engine}.
    */
   public static ExperimentalCronetEngine.Builder createNativeEngineBuilder(Context context) {
-    return (ExperimentalCronetEngine.Builder) new NativeCronetProvider(context).createBuilder();
+    return (ExperimentalCronetEngine.Builder) new NativeCronvoyProvider(context).createBuilder();
   }
 
   public void assertResponseEquals(UrlResponseInfo expected, UrlResponseInfo actual) {
