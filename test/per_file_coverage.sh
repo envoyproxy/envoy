@@ -82,6 +82,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers/grpc:92.0"
 "source/extensions/load_balancing_policies:94.7"
 "source/extensions/load_balancing_policies/subset:94.3"
+"source/extensions/config_subscription:94.8"
+"source/extensions/config_subscription/grpc:94.0"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

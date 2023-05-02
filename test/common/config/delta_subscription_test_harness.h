@@ -8,10 +8,10 @@
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/common.h"

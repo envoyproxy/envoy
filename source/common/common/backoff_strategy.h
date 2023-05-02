@@ -40,7 +40,7 @@ public:
    * @param interval time interval to be checked.
    * @return returns true if interval is greater than the maximum time interval
    */
-  bool isOverTimeLimit(uint64_t interval_ms) const { return interval_ms > max_interval_; }
+  bool isOverTimeLimit(uint64_t interval_ms) const override { return interval_ms > max_interval_; }
 
 private:
   uint64_t base_interval_;
