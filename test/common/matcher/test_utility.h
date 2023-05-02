@@ -67,7 +67,7 @@ struct TestBoolInput : public DataInput<TestData> {
 struct TestFloatInput : public DataInput<TestData> {
   explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
   DataInputGetResult get(const TestData&) const override { return result_; }
-  virtual std::string dataInputType() const override { return typeid(float).name(); }
+  std::string dataInputType() const override { return typeid(float).name(); }
   DataInputGetResult result_;
 };
 

@@ -174,11 +174,13 @@ matcher_tree:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
-  // auto match_tree = factory_.create(matcher)();
 
-  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException,
-                            "Unsupported data input type: f, currently only string type is "
-                            "supported in map matcher");
+  auto match_tree = factory_.create(matcher);
+  std::string error_message =
+      absl::StrCat("Unsupported data input type: ", typeid(float).name(),
+                   ", currently only string type is supported in map matcher");
+
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 
 TEST_F(MatcherTest, TestInvalidFloatExactMapMatcher) {
@@ -221,14 +223,13 @@ matcher_tree:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
-  // auto match_tree = factory_.create(matcher)();
-
-  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException,
-                            "Unsupported data input type: f, currently only string type is "
-                            "supported in map matcher");
+  auto match_tree = factory_.create(matcher);
+  std::string error_message =
+      absl::StrCat("Unsupported data input type: ", typeid(float).name(),
+                   ", currently only string type is supported in map matcher");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 
-// TODO(tyxia) Add and matcher/ or matcher test
 TEST_F(MatcherTest, InvalidDataInput) {
   const std::string yaml = R"EOF(
 matcher_list:
@@ -258,10 +259,9 @@ matcher_list:
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
-  // auto match_tree = factory_.create(matcher)();
-
-  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException,
-                            "Unsupported data input type: f");
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat("Unsupported data input type: ", typeid(float).name());
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 
 TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
@@ -304,8 +304,8 @@ TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"))
       .Times(2);
 
-  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException,
-                            "Unsupported data input type: f");
+  std::string error_message = absl::StrCat("Unsupported data input type: ", typeid(float).name());
+  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException, error_message);
 }
 
 TEST_F(MatcherTest, TestAnyMatcher) {
