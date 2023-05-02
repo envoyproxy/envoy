@@ -21,7 +21,7 @@ namespace EnvoyDefault {
       MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                            envoy_default::v3::HeaderValidatorConfig&>(
           *mptr, server_context.messageValidationVisitor());
-  return std::make_unique<HeaderValidatorFactory>(proto_config);
+  return std::make_unique<HeaderValidatorFactory>(proto_config, server_context);
 }
 
 ProtobufTypes::MessagePtr HeaderValidatorFactoryConfig::createEmptyConfigProto() {

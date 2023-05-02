@@ -8,12 +8,17 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+struct Http2HeaderValidatorConfig {
+  const bool allow_extended_ascii_in_path_{false};
+};
+
 class Http2HeaderValidator : public HeaderValidator {
 public:
   Http2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const Http2HeaderValidatorConfig& http2_config);
 
   ::Envoy::Http::HeaderValidatorBase::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
@@ -26,6 +31,9 @@ public:
 
   ::Envoy::Http::HeaderValidatorBase::ValidationResult
   validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
+
+protected:
+  const Http2HeaderValidatorConfig http2_config_;
 
 private:
   /*
@@ -54,7 +62,7 @@ private:
 
   // Relax validation of character set in URL path, query and fragment by allowing extended ASCII
   // characters. This method is called iff
-  // `envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2` == true
+  // `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true
   HeaderValidator::HeaderValueValidationResult
   validatePathHeaderCharactersExtendedAsciiAllowed(const ::Envoy::Http::HeaderString& value);
 
@@ -71,8 +79,9 @@ public:
   ServerHttp2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http2HeaderValidator(config, protocol, stats) {}
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const Http2HeaderValidatorConfig& http2_config)
+      : Http2HeaderValidator(config, protocol, stats, http2_config) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {
@@ -105,7 +114,7 @@ public:
 
 private:
   // URL-encode extended ASCII characters in URL path. This method is called iff
-  // `envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2` == true
+  // `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true
   void encodeExtendedAsciiInPath(::Envoy::Http::RequestHeaderMap& header_map);
 };
 
@@ -116,7 +125,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http2HeaderValidator(config, protocol, stats) {}
+      : Http2HeaderValidator(config, protocol, stats, Http2HeaderValidatorConfig{false}) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {

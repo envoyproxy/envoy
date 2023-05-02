@@ -319,22 +319,48 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->connect();
 }
 
+// This wrapper is needed to preserve the ServerFactoryContext for the lifetime of the
+// `real_factory_` as it stores the reference to the ServerFactoryContext.
+// TODO(yanavlasov): clean-up integration tests that needs this and remove UHV from
+// fake upstreams.
+class FakeHeaderValidatorFactory : public Http::HeaderValidatorFactory {
+public:
+  FakeHeaderValidatorFactory(absl::string_view config) {
+    auto* factory =
+        Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
+            "envoy.http.header_validators.envoy_default");
+    ASSERT(factory != nullptr);
+
+    envoy::config::core::v3::TypedExtensionConfig typed_config;
+    Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+    ON_CALL(server_context_, messageValidationVisitor())
+        .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
+    ON_CALL(server_context_, runtime()).WillByDefault(testing::ReturnRef(runtime_loader_));
+
+    TestUtility::loadFromYaml(std::string(config), typed_config);
+
+    real_factory_ = factory->createFromProto(typed_config.typed_config(), server_context_);
+  }
+
+  Http::HeaderValidatorPtr createServerHeaderValidator(Http::Protocol protocol,
+                                                       Http::HeaderValidatorStats& stats) override {
+    return real_factory_->createServerHeaderValidator(protocol, stats);
+  }
+  Http::ClientHeaderValidatorPtr
+  createClientHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
+    return real_factory_->createClientHeaderValidator(protocol, stats);
+  }
+
+private:
+  testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
+  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context_;
+  Http::HeaderValidatorFactoryPtr real_factory_;
+};
+
 Http::HeaderValidatorFactoryPtr
 IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
 #ifdef ENVOY_ENABLE_UHV
-  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
-      "envoy.http.header_validators.envoy_default");
-  ASSERT(factory != nullptr);
-
-  envoy::config::core::v3::TypedExtensionConfig typed_config;
-  Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
-  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
-  ON_CALL(server_context, messageValidationVisitor())
-      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
-
-  TestUtility::loadFromYaml(std::string(config), typed_config);
-
-  return factory->createFromProto(typed_config.typed_config(), server_context);
+  return std::make_unique<FakeHeaderValidatorFactory>(config);
 #else
   return nullptr;
 #endif

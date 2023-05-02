@@ -134,6 +134,7 @@ envoy_cc_library(
         ":http1_header_validator",
         ":http2_header_validator",
         "//envoy/http:header_validator_interface",
+        "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )

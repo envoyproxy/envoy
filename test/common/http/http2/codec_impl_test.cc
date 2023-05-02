@@ -405,9 +405,11 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
+    Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidatorConfig http2_config{
+        false};
     header_validator_ = std::make_unique<
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
-        header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats(), http2_config);
     request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }

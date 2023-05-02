@@ -124,8 +124,8 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
 }
-// By default the `uhv_allow_extended_ascii_in_path_for_http2` == true and UHV behaves just like
-// legacy path normalization for H/2.
+// By default the `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true and UHV behaves just
+// like legacy path normalization for H/2.
 TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathAllowedInHttp2) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -286,8 +286,7 @@ TEST_P(DownstreamUhvIntegrationTest, DelInUriQueryRejected) {
 // Without the `uhv_allow_extended_ascii_in_path_for_http2` override UHV rejects extended ASCII
 // for all codecs.
 TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathRejectedWithOverride) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.allow_extended_ascii_in_path_for_http2", "false");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });

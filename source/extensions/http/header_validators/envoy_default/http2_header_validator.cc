@@ -46,8 +46,9 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const Http2HeaderValidatorConfig& http2_config)
+    : HeaderValidator(config, protocol, stats), http2_config_(http2_config),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
@@ -60,8 +61,7 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
       } {}
 
 HeaderValidator::HeaderValidatorFunction Http2HeaderValidator::getPathValidationMethod() {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2")) {
+  if (http2_config_.allow_extended_ascii_in_path_) {
     return absl::bind_front(&Http2HeaderValidator::validatePathHeaderCharactersExtendedAsciiAllowed,
                             this);
   }
@@ -106,7 +106,8 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-void ServerHttp2HeaderValidator::encodeExtendedAsciiInPath(::Envoy::Http::RequestHeaderMap& header_map) {
+void ServerHttp2HeaderValidator::encodeExtendedAsciiInPath(
+    ::Envoy::Http::RequestHeaderMap& header_map) {
   absl::string_view path = header_map.path();
   // Check if URI the path contains any characters >= 0x80
   auto extended_ascii_position = path.begin();
@@ -539,10 +540,8 @@ ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
     if (!path_result.ok()) {
       return path_result;
     }
-    if (protocol_ == Protocol::Http2 &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2")) {
-        encodeExtendedAsciiInPath(header_map);
+    if (protocol_ == Protocol::Http2 && http2_config_.allow_extended_ascii_in_path_) {
+      encodeExtendedAsciiInPath(header_map);
     }
   }
 

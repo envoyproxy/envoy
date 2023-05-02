@@ -30,7 +30,10 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_);
+    Http2HeaderValidatorConfig http2_config{scoped_runtime_.loader().snapshot().getBoolean(
+        "envoy.uhv.allow_extended_ascii_in_path_for_http2", true)};
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_,
+                                                        http2_config);
   }
 
   ::Envoy::Http::ClientHeaderValidatorPtr createH2ClientUhv(absl::string_view config_yaml) {
@@ -46,7 +49,10 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_);
+    Http2HeaderValidatorConfig http2_config{scoped_runtime_.loader().snapshot().getBoolean(
+        "envoy.uhv.allow_extended_ascii_in_path_for_http2", true)};
+    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_,
+                                                  http2_config);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -837,8 +843,7 @@ TEST_F(Http2HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathEncoded) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -855,8 +860,7 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathEncoded) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryAndFragmentAllowed) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -874,8 +878,7 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryAndFragmentAllowed) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathQueryAllowed) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -895,8 +898,7 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathQueryAllowed) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathRejectedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "false"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -910,8 +912,7 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathRejectedWithOverride) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryRejectedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "false"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -925,8 +926,7 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryRejectedWithOverride) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ControlAsciiInPathRejected) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -949,8 +949,7 @@ TEST_F(Http2HeaderValidatorTest, ControlAsciiInPathRejected) {
 }
 
 TEST_F(Http2HeaderValidatorTest, ControlAsciiInQueryRejected) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
   auto uhv = createH2ServerUhv(empty_config);
@@ -973,8 +972,7 @@ TEST_F(Http2HeaderValidatorTest, ControlAsciiInQueryRejected) {
 }
 
 TEST_F(Http2HeaderValidatorTest, DelInPathRejected) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":authority", "envoy.com"},
                                                   {":path", "/path/with/DE\x7FL"},
@@ -984,8 +982,7 @@ TEST_F(Http2HeaderValidatorTest, DelInPathRejected) {
 }
 
 TEST_F(Http2HeaderValidatorTest, DelInQueryRejected) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":authority", "envoy.com"},
                                                   {":path", "/query?with=DE\x7FL"},

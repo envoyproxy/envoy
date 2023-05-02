@@ -29,7 +29,9 @@ protected:
     if (GetParam() == Protocol::Http11) {
       return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
     }
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_);
+    Http2HeaderValidatorConfig http2_config{false};
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_,
+                                                        http2_config);
   }
 
   TestScopedRuntime scoped_runtime_;
