@@ -52,18 +52,6 @@ struct TestInput : public DataInput<TestData> {
   DataInputGetResult result_;
 };
 
-struct TestBoolInput : public DataInput<TestData> {
-  explicit TestBoolInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) const override { return result_; }
-  // TODO(tyxia) The test is using BoolValue as string
-  // auto nested = TestDataInputBoolFactory("baz");
-  // virtual std::string dataInputType() const override { return typeid(std::string).name(); }
-  // virtual std::string dataInputType() const override {
-  //   return typeid(bool).name();
-  // }
-  DataInputGetResult result_;
-};
-
 struct TestFloatInput : public DataInput<TestData> {
   explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
   DataInputGetResult get(const TestData&) const override { return result_; }
@@ -102,7 +90,8 @@ public:
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
-    return [&]() { return std::make_unique<TestBoolInput>(result_); };
+    // Note, here is using `TestInput` same as `TestDataInputStringFactory`.
+    return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -118,9 +107,9 @@ private:
 class TestDataInputFloatFactory : public DataInputFactory<TestData> {
 public:
   TestDataInputFloatFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
-  TestDataInputFloatFactory(float data)
+  TestDataInputFloatFactory(float)
       : TestDataInputFloatFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::to_string(data)}) {}
+            {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestFloatInput>(result_); };
@@ -137,14 +126,12 @@ private:
 };
 
 // A matcher that evaluates to the configured value.
-// Both `BoolMatcher` and `TestBoolInput` only support string type data.
+// Note, `BoolMatcher` supports string type data input only as `TestDataInputBoolFactory` is using
+// `TestInput` same as `TestDataInputStringFactory`.
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
   bool match(const MatchingDataType&) override { return value_; }
-  // virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
-  //   return absl::flat_hash_set<std::string>{typeid(bool).name()};
-  // }
   const bool value_;
 };
 

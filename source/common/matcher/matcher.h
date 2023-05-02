@@ -200,11 +200,7 @@ private:
           *createOnMatch(matcher.on_match())));
     }
 
-    // auto on_no_match = createOnMatch(config.on_no_match());
-    absl::optional<OnMatchFactoryCb<DataType>> on_no_match;
-    if (config.has_on_no_match()) {
-      on_no_match = createOnMatch(config.on_no_match());
-    }
+    auto on_no_match = createOnMatch(config.on_no_match());
     return [matcher_factories, on_no_match]() {
       auto list_matcher = std::make_unique<ListMatcher<DataType>>(
           on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
@@ -321,7 +317,6 @@ private:
   template <class OnMatchType>
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
-      // TODO(tyxia) Here is recursive call
       return [matcher_factory = std::move(create(on_match.matcher()))]() {
         return OnMatch<DataType>{{}, matcher_factory()};
       };

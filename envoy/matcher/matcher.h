@@ -167,10 +167,14 @@ public:
    */
   virtual bool match(const Matcher::MatchingDataType& input) PURE;
 
+  /**
+   * The supported data input types by InputMatcher. String is default supported data input type
+   * because nearly all the derived objects support string only currently. Override this function to
+   * provide matcher specific supported input types.
+   */
   virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
+
     return absl::flat_hash_set<std::string>{typeid(std::string).name()};
-    // return absl::flat_hash_set<std::string> {{typeid(std::string).name()},
-    // {typeid(bool).name()}};
   }
 };
 
@@ -245,11 +249,12 @@ public:
 
   virtual DataInputGetResult get(const DataType& data) const PURE;
 
+  /**
+   * The data input types. String is default data input type since nearly all the DataInput's
+   * derived objects use string as input type. Override this function to provide matcher specific
+   * input type.
+   */
   virtual std::string dataInputType() const { return typeid(std::string).name(); }
-
-  // DataInput() = default;
-  // DataInput(DataInput&& other) = default;
-  // DataInput& operator=(DataInput&& other) = default;
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
