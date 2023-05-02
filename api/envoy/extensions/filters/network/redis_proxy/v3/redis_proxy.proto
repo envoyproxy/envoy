@@ -248,7 +248,7 @@ message RedisProxy {
   // will be forward to cluster_a. When the hash result of the key is between 4096-8191, the requests
   // will be forward to cluster_b.
   //
-  // You can configure multiple slot ranges for one upstream cluster:
+  // You can configure multiple slot ranges for one upstream cluster.
   //
   // Example:
   //
@@ -267,9 +267,7 @@ message RedisProxy {
   //            end: 6999
   //          cluster: "cluster_b"
   //
-  // When there are un-assigned slots, A :ref:`catch-all
-  //   route<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.HashSlotRoutes.catch_all_route>`
-  //   would be used instead.
+  // When there are un-assigned slots, A catch_all_route would be used instead.
   //
   // Example:
   //
@@ -284,7 +282,7 @@ message RedisProxy {
   //      catch_all_route:
   //        cluster: "cluster_b"
   //
-  // With above, all the keys falls in 1-8191 will be routed to "cluster_b".
+  // With above, all the keys falls in 1-8191 will be routed to cluster_b.
   // When we want to route all keys to one cluster, we can just configure it as catch_all_route.
   //
   // When there are overlaps of slot ranges configured redis proxy will throw exception.
