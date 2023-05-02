@@ -6,6 +6,10 @@ behavior_changes:
   change: |
     Moved the subset and maglev LB code into extensions. If you use these load balancers and override
     extensions_build_config.bzl you will need to include them explicitly.
+- area: build
+  change: |
+    Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
+    need to include the new config_subscriptions explicitly.
 - area: http
   change: |
     When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
