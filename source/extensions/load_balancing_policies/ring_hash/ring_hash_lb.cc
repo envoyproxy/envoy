@@ -1,4 +1,4 @@
-#include "source/common/upstream/ring_hash_lb.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 #include <cstdint>
 #include <iostream>
