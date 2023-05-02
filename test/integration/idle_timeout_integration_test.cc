@@ -118,7 +118,7 @@ public:
 
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
-  static constexpr uint64_t IdleTimeoutMs = 400;
+  static constexpr uint64_t IdleTimeoutMs = 300 * TSAN_TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
