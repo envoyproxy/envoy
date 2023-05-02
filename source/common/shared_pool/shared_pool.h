@@ -41,6 +41,7 @@ public:
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
 
   std::shared_ptr<T> getObject(const T& obj) {
+    std::cout << "getObject" << std::endl;
     ASSERT(std::this_thread::get_id() == thread_id_);
 
     // Return from the object pool if we find the object there.
@@ -54,13 +55,17 @@ public:
       }
     }
 
+    std::cout << "Create ptr" << std::endl;
     // Create a shared_ptr and add the object to the object_pool.
     auto this_shared_ptr = this->shared_from_this();
+    std::cout << "Check" << std::endl;
+    std::cout << "Type: " << typeid(this_shared_ptr).name()  << std::endl;
     std::shared_ptr<T> obj_shared(new T(obj), [this_shared_ptr](T* ptr) {
       this_shared_ptr->sync().syncPoint(ObjectSharedPool<T>::ObjectDeleterEntry);
       this_shared_ptr->deleteObject(ptr);
     });
     object_pool_.emplace(obj_shared);
+    std::cout << "Type: " << typeid(obj_shared).name()  << std::endl;
     return obj_shared;
   }
 

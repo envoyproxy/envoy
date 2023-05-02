@@ -372,7 +372,16 @@ public:
   */
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
   getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) override {
-    return common_lb_config_pool_.getObject(common_lb_config);
+    try {
+      std::cout << "getCommonLbConfigPtr";
+      auto temp_common_lb_config = common_lb_config_pool_.getObject(common_lb_config);
+      std::cout << "Type: " << typeid(temp_common_lb_config).name()  << std::endl;
+      return common_lb_config_pool_.getObject(common_lb_config);
+    } catch (const std::exception& e) {
+      std::cout << e.what();
+      return nullptr;
+    }
+
   }
 
 protected:
