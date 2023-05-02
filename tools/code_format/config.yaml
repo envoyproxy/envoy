@@ -319,4 +319,5 @@ visibility_excludes:
 - source/extensions/health_checkers/BUILD
 - source/extensions/config_subscription/rest/BUILD
 - source/extensions/config_subscription/filesystem/BUILD
+- source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD

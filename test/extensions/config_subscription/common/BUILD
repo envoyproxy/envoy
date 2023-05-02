@@ -17,6 +17,8 @@ envoy_cc_test(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//test/config:v2_link_hacks",
         "//test/mocks/config:config_mocks",

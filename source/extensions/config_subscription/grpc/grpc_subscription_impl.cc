@@ -1,4 +1,4 @@
-#include "source/common/config/grpc_subscription_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 
 #include <chrono>
 

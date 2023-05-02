@@ -88,6 +88,9 @@ occurs.
 
 .. _xds_protocol_streaming_grpc_subscriptions:
 
+.. _extension_envoy.config_subscription.grpc:
+.. _extension_envoy.config_subscription.aggregated_grpc_collection:
+
 Streaming gRPC subscriptions
 ----------------------------
 
@@ -771,6 +774,9 @@ This feature is gated by the *xds.config.supports-resource-in-sotw* client featu
 
 Aggregated Discovery Service
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _extension_envoy.config_subscription.ads:
+.. _extension_envoy.config_subscription.ads_collection:
+
 
 It's challenging to provide the above guarantees on sequencing to avoid
 traffic drop when management servers are distributed. ADS allow a single
@@ -792,6 +798,8 @@ An example minimal ``bootstrap.yaml`` fragment for ADS configuration is:
 .. literalinclude:: ../_include/ads.yaml
 
 .. _xds_protocol_delta:
+.. _extension_envoy.config_subscription.delta_grpc:
+.. _extension_envoy.config_subscription.aggregated_delta_grpc_collection:
 
 Incremental xDS
 ~~~~~~~~~~~~~~~
