@@ -14,7 +14,6 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.util.Arrays;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.FileUtils;
 import org.chromium.net.testing.NativeTestServer;
@@ -53,7 +52,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Crashing on Android Cronet Builder, see crbug.com/601409.
   public void testReadOnlyStorageDirectory() throws Exception {
     mReadOnlyStoragePath = PathUtils.getDataDirectory() + "/read_only";
@@ -98,7 +96,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Crashing on Android Cronet Builder, see crbug.com/601409.
   public void testPurgeOldVersion() throws Exception {
     String testStorage = getTestStorage();
@@ -161,7 +158,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that if cache version is current, Cronet does not purge the directory.
   public void testCacheVersionCurrent() throws Exception {
     // Initialize a CronetEngine and shut it down.
