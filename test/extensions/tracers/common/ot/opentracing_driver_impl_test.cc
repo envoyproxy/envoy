@@ -6,6 +6,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
@@ -185,7 +186,7 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
-  SystemTime start_time_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   std::unique_ptr<TestDriver> driver_;
   Stats::TestUtil::TestStore stats_;
@@ -196,8 +197,8 @@ public:
 TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->setTag("abc", "123");
   first_span->finishSpan();
 
@@ -212,8 +213,8 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
 TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   const auto timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   first_span->log(timestamp, "abc");
@@ -229,8 +230,8 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
 TEST_F(OpenTracingDriverTest, FlushSpanWithBaggage) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->setBaggage("abc", "123");
   first_span->finishSpan();
 
@@ -243,8 +244,8 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithBaggage) {
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
   setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, false});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, false});
   first_span->finishSpan();
 
   const std::map<std::string, opentracing::Value> expected_tags = {
@@ -258,8 +259,8 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByFlag) {
   setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->setSampled(false);
   first_span->finishSpan();
 
@@ -276,8 +277,8 @@ TEST_F(OpenTracingDriverTest, TagSpanKindClient) {
 
   ON_CALL(config_, operationName()).WillByDefault(testing::Return(Tracing::OperationName::Egress));
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->finishSpan();
 
   const std::map<std::string, opentracing::Value> expected_tags = {
@@ -292,8 +293,8 @@ TEST_F(OpenTracingDriverTest, TagSpanKindServer) {
 
   ON_CALL(config_, operationName()).WillByDefault(testing::Return(Tracing::OperationName::Ingress));
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->finishSpan();
 
   const std::map<std::string, opentracing::Value> expected_tags = {
@@ -311,8 +312,8 @@ TEST_F(OpenTracingDriverTest, InjectFailure) {
     propagation_options.inject_error_code = std::make_error_code(std::errc::bad_message);
     setupValidDriver(propagation_mode, propagation_options);
 
-    Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                               start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
 
     const auto span_context_injection_error_count =
         stats_.counter("tracing.opentracing.span_context_injection_error").value();
@@ -329,12 +330,12 @@ TEST_F(OpenTracingDriverTest, ExtractWithUnindexedHeader) {
   propagation_options.propagation_key = "unindexed-header";
   setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, propagation_options);
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->injectContext(request_headers_, nullptr);
 
-  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                    start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr second_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   second_span->finishSpan();
   first_span->finishSpan();
 
@@ -345,8 +346,8 @@ TEST_F(OpenTracingDriverTest, ExtractWithUnindexedHeader) {
 TEST_F(OpenTracingDriverTest, GetTraceId) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr first_span = driver_->startSpan(
+      config_, request_headers_, stream_info_, operation_name_, {Tracing::Reason::Sampling, true});
   first_span->setTag("abc", "123");
   first_span->finishSpan();
 
@@ -360,7 +361,7 @@ TEST_F(OpenTracingDriverTest, ExtractUsingForeach) {
 
   // Starting a new span, given the `request_headers_`, will visit the headers
   // using "for each." We can immediately discard the span.
-  driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+  driver_->startSpan(config_, request_headers_, stream_info_, operation_name_,
                      {Tracing::Reason::Sampling, true});
 
   for (const auto& [key, value] : extracted_headers) {
