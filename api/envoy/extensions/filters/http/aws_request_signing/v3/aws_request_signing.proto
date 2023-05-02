@@ -67,9 +67,6 @@ message AwsRequestSigning {
 
 
 message AwsRequestSigningPerRoute {
-  option (udpa.annotations.versioning).previous_message_type =
-    "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigningPerRoute";
-
   // Override the global configuration of the filter with this new config.
   AwsRequestSigning aws_request_signing = 1;
 
