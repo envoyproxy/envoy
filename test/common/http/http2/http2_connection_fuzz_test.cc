@@ -173,10 +173,10 @@ envoy::config::core::v3::Http2ProtocolOptions http2Settings() {
 
 class Http2Harness {
 public:
-  Http2Harness() : server_settings(http2Settings()) {
-    ON_CALL(mock_server_callbacks, newStream(_, _))
+  Http2Harness() : server_settings_(http2Settings()) {
+    ON_CALL(mock_server_callbacks_, newStream(_, _))
         .WillByDefault(Invoke(
-            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder; }));
+            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
   }
 
   void fuzz_request(std::vector<Http2Frame>& frames, bool use_oghttp2) {
@@ -186,10 +186,10 @@ public:
     } else {
       scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
     }
-    Stats::Scope& scope = *stats_store.rootScope();
+    Stats::Scope& scope = *stats_store_.rootScope();
     server_ = std::make_unique<Http2::ServerConnectionImpl>(
-        mock_server_connection, mock_server_callbacks,
-        Http2::CodecStats::atomicGet(http2_stats, scope), random, server_settings,
+        mock_server_connection_, mock_server_callbacks_,
+        Http2::CodecStats::atomicGet(http2_stats_, scope), random_, server_settings_,
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
         envoy::config::core::v3::HttpProtocolOptions::ALLOW);
 
@@ -204,14 +204,14 @@ public:
   }
 
 private:
-  const envoy::config::core::v3::Http2ProtocolOptions server_settings;
-  Stats::IsolatedStoreImpl stats_store;
-  Http2::CodecStats::AtomicPtr http2_stats;
+  const envoy::config::core::v3::Http2ProtocolOptions server_settings_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Http2::CodecStats::AtomicPtr http2_stats_;
 
-  NiceMock<MockRequestDecoder> orphan_request_decoder;
-  NiceMock<Network::MockConnection> mock_server_connection;
-  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks;
-  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockRequestDecoder> orphan_request_decoder_;
+  NiceMock<Network::MockConnection> mock_server_connection_;
+  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks_;
+  NiceMock<Random::MockRandomGenerator> random_;
 
   ServerConnectionPtr server_;
 };
