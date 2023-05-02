@@ -991,7 +991,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+  Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -1148,10 +1148,8 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                  bool added_via_api, TimeSource& time_source);
+  ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,

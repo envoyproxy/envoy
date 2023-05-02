@@ -20,7 +20,7 @@ void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
                                         StreamInfo::StreamInfo& stream_info) {
   stream_info.onRequestComplete();
   for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
+    access_log->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 }
 

@@ -63,7 +63,8 @@ Driver::Driver(const XRayConfiguration& config,
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, Envoy::SystemTime start_time,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
   // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
@@ -105,7 +106,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(config, operation_name, start_time,
+    return tracer->startSpan(config, operation_name, stream_info.startTime(),
                              header.has_value() ? absl::optional<XRayHeader>(xray_header)
                                                 : absl::nullopt,
                              trace_context.getByKey(XForwardedForHeader));

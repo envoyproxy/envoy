@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/api/api_impl.h"
@@ -33,6 +34,7 @@
 #include "test/integration/ssl_utility.h"
 #endif
 #include "test/mocks/common.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -128,7 +130,6 @@ private:
   bool connected_{false};
 };
 
-#ifdef ENVOY_ENABLE_YAML
 Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
@@ -140,9 +141,15 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+#ifdef ENVOY_ENABLE_YAML
   initializeUpstreamTlsContextConfig(
       Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
       *tls_context);
+#else
+  UNREFERENCED_PARAMETER(tls_context);
+  UNREFERENCED_PARAMETER(san_to_match);
+  RELEASE_ASSERT(0, "unsupported");
+#endif // ENVOY_ENABLE_YAML
 
   envoy::config::core::v3::TransportSocket message;
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
@@ -200,9 +207,14 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
-      time_system)};
+  Upstream::HostDescriptionConstSharedPtr host_description =
+      std::make_shared<Upstream::HostDescriptionImpl>(
+          cluster, "",
+          Network::Utility::resolveUrl(
+              fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
+          nullptr, envoy::config::core::v3::Locality().default_instance(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+          time_system);
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,
@@ -259,7 +271,6 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
-#endif // ENVOY_ENABLE_YAML
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
                                          ReadCallback response_data_callback,
@@ -306,6 +317,27 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     return true;
   });
   client_->connect();
+}
+
+Http::HeaderValidatorFactoryPtr
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
+#ifdef ENVOY_ENABLE_UHV
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
+      "envoy.http.header_validators.envoy_default");
+  ASSERT(factory != nullptr);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
+  ON_CALL(server_context, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
+
+  TestUtility::loadFromYaml(std::string(config), typed_config);
+
+  return factory->createFromProto(typed_config.typed_config(), server_context);
+#else
+  return nullptr;
+#endif
 }
 
 RawConnectionDriver::~RawConnectionDriver() = default;
