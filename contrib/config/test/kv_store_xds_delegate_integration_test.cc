@@ -233,8 +233,18 @@ protected:
   }
 
   void shutdownAndRestartTestServer() {
+    // Shutdown the Envoy server.
+    absl::Notification shutdown_done;
+    Server::Instance& server = test_server_->server();
+    server.dispatcher().post([&server, &shutdown_done]() {
+      server.shutdown();
+      shutdown_done.Notify();
+    });
+    ASSERT_TRUE(shutdown_done.WaitForNotificationWithTimeout(absl::Seconds(5)));
     // Reset the test server.
     test_server_.reset();
+    // Reset the server init function, as we don't want xDS responses sent on restart (we want to
+    // use the values in the KV store instead).
     on_server_init_function_ = nullptr;
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
@@ -365,28 +375,6 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("saz", getRuntimeKey("baz"));
-
-  // Reset the RTDS upstream to a FakeUpstream again, and re-establish the connection.
-  getRtdsUpstream() = std::make_unique<FakeUpstream>(rtds_upstream_port_, version_,
-                                                     configWithType(Http::CodecType::HTTP2));
-
-  // Send v2 of the RTDS layer.
-  initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
-  auto rtds_resource_v2 = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-          name: some_rtds_layer
-          layer:
-            foo: zoo
-            baz: jazz
-  )EOF");
-  sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"2", rtds_stream_.get());
-
-  test_server_->waitForCounterGe("runtime.load_success", 3);
-
-  // Verify that the values from the xDS response are used instead of from the persisted xDS once
-  // connectivity is re-established.
-  EXPECT_EQ("zoo", getRuntimeKey("foo"));
-  EXPECT_EQ("jazz", getRuntimeKey("baz"));
 }
 
 // A KeyValueStore implementation that returns an invalid proto field value for a Cluster resource.

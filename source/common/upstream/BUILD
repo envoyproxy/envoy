@@ -85,7 +85,6 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":od_cds_api_lib",
-        ":maglev_lb_lib",
         ":ring_hash_lb_lib",
         ":host_utility_lib",
         "//envoy/api:api_interface",
@@ -381,19 +380,6 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "maglev_lb_lib",
-    srcs = ["maglev_lb.cc"],
-    hdrs = ["maglev_lb.h"],
-    deps = [
-        ":thread_aware_lb_lib",
-        ":upstream_lib",
-        "//source/common/common:bit_array_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
     ],
 )
 

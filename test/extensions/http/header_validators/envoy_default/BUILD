@@ -99,7 +99,7 @@ envoy_extension_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
         "//test/mocks/http:header_validator_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -125,7 +125,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
-        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
