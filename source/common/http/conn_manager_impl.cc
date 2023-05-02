@@ -96,9 +96,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
-      random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
-      local_info_(local_info), cluster_manager_(cluster_manager),
-      listener_stats_(config_.listenerStats()),
+      random_generator_(random_generator), runtime_(runtime), local_info_(local_info),
+      cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()),
       overload_state_(overload_manager.getThreadLocalOverloadState()),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
