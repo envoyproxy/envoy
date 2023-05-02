@@ -158,7 +158,7 @@ The following core load shed points are supported:
 
   * - envoy.load_shed_points.http1_server_abort_dispatch
     - Envoy will reject processing HTTP1 at the codec level. If a response has
-      not yet started, we will send a local reply. We will then close the
+      not yet started, Envoy will send a local reply. Envoy will then close the
       connection.
 
 .. _config_overload_manager_reducing_timeouts:

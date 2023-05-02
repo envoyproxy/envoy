@@ -525,9 +525,11 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenNewReq
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
-// We use 100-continue to already start the response before doing triggering
-// Overload.
-TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenResponseStarted) {
+// Test using 100-continue to start the response before doing triggering Overload.
+// Even though Envoy has encoded the 1xx headers, 1xx headers are not the actual response
+// so Envoy should still send the local reply when shedding load.
+TEST_P(LoadShedPointIntegrationTest,
+       Http1ServerDispatchAbortShedsLoadWithLocalReplyWhen1xxResponseStarted) {
   // Test only applies to HTTP1.
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
     return;
@@ -540,6 +542,7 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenRespon
           threshold:
             value: 0.90
     )EOF"));
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
 
   // Start the 100-continue request
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -567,6 +570,83 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenRespon
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "500");
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+}
+
+TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchShouldNotAbortEncodingUpstreamResponse) {
+  // Test only applies to HTTP1.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_abort_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Put envoy in overloaded state, the response should succeed.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 100);
+  upstream_request_->encodeData(100, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
+}
+
+TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortClosesConnectionWhenResponseStarted) {
+  // Test only applies to HTTP1.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_abort_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/dynamo/url"},
+      {":scheme", "http"},
+      {":authority", "sni.lyft.com"},
+  });
+
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Put envoy in overloaded state, the next dispatch should fail.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 100);
+
+  Buffer::OwnedImpl data("hello world");
+  request_encoder_->encodeData(data, true);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_FALSE(response->complete());
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 }
 
 } // namespace Envoy

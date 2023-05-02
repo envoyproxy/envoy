@@ -130,7 +130,7 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
-  // We don't consider 100-continue responses as the actual response.
+  // Don't consider 100-continue responses as the actual response.
   started_response_ = false;
 }
 
@@ -1311,8 +1311,8 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
 Status ServerConnectionImpl::sendOverloadError() {
   const bool latched_dispatching = dispatching_;
 
-  // We might be in the early stages of Server dispatching where this isn't yet
-  // flipped.
+  // The codec might be in the early stages of server dispatching where this isn't yet
+  // flipped to true.
   dispatching_ = true;
   error_code_ = Http::Code::InternalServerError;
   auto status = sendProtocolError(Envoy::StreamInfo::ResponseCodeDetails::get().Overload);
