@@ -15,7 +15,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  ::Envoy::Http::HeaderValidatorPtr
+  ::Envoy::Http::ServerHeaderValidatorPtr
   createServerHeaderValidator(::Envoy::Http::Protocol protocol,
                               ::Envoy::Http::HeaderValidatorStats& stats) override;
 

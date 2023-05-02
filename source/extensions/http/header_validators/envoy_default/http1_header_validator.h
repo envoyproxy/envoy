@@ -15,16 +15,16 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
 
 protected:
@@ -56,7 +56,7 @@ private:
 };
 
 class ServerHttp1HeaderValidator : public Http1HeaderValidator,
-                                   public ::Envoy::Http::HeaderValidator {
+                                   public ::Envoy::Http::ServerHeaderValidator {
 public:
   ServerHttp1HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&

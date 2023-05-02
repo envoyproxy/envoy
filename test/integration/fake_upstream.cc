@@ -441,7 +441,7 @@ Http::Protocol codeTypeToProtocol(Http::CodecType codec_type) {
 }
 } // namespace
 
-Http::HeaderValidatorPtr FakeHttpConnection::makeHeaderValidator() {
+Http::ServerHeaderValidatorPtr FakeHttpConnection::makeHeaderValidator() {
   return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
                                          codeTypeToProtocol(type_), header_validator_stats_)
                                    : nullptr;

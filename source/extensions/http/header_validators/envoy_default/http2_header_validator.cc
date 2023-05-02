@@ -26,7 +26,7 @@ using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
+using ValidationResult = ::Envoy::Http::HeaderValidator::ValidationResult;
 
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
@@ -425,7 +425,7 @@ ValidationResult Http2HeaderValidator::validateResponseTrailers(
   return result;
 }
 
-::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult
+::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
 ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeHeadersWithUnderscores(header_map);
   if (!config_.uri_path_normalization_options().skip_path_normalization()) {
@@ -440,10 +440,10 @@ ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
   if (::Envoy::Http::Utility::isH2UpgradeRequest(header_map)) {
     ::Envoy::Http::Utility::transformUpgradeRequestFromH2toH1(header_map);
   }
-  return ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::success();
+  return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::ResponseHeadersTransformationResult
+::Envoy::Http::ServerHeaderValidator::ResponseHeadersTransformationResult
 ServerHttp2HeaderValidator::transformResponseHeaders(
     const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Check if the response is for the the H/1 UPGRADE and transform it to the H/2 extended CONNECT

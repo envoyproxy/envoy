@@ -15,7 +15,7 @@ using ::Envoy::Http::Protocol;
 HeaderValidatorFactory::HeaderValidatorFactory(const HeaderValidatorConfig& config)
     : config_(config) {}
 
-::Envoy::Http::HeaderValidatorPtr
+::Envoy::Http::ServerHeaderValidatorPtr
 HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
   switch (protocol) {

@@ -18,11 +18,11 @@ using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
+using ServerHeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
-  HeaderValidatorPtr createBase(absl::string_view config_yaml) {
+  ServerHeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);

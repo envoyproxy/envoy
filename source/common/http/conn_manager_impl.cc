@@ -948,7 +948,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
       failure = !transformation_result.ok();
       redirect = transformation_result.action() ==
-                 Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
+                 Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
       failure_details = std::string(transformation_result.details());
     }
     if (failure) {

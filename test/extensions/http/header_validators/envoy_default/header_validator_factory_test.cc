@@ -23,7 +23,7 @@ using ::testing::NiceMock;
 
 class HeaderValidatorFactoryTest : public testing::Test {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr create(absl::string_view config_yaml, Protocol protocol) {
+  ::Envoy::Http::ServerHeaderValidatorPtr create(absl::string_view config_yaml, Protocol protocol) {
     auto* factory =
         Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
             "envoy.http.header_validators.envoy_default");

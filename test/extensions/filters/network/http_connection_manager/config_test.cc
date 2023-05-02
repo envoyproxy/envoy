@@ -2967,7 +2967,7 @@ public:
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
+            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
     return header_validator;
   }
 };
@@ -3002,7 +3002,7 @@ public:
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
+            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
     return header_validator;
   }
 

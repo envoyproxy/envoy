@@ -389,8 +389,8 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
   EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
-      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
-          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // Invalid response should cause stream reset
   EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
@@ -444,8 +444,8 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
   EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
-      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
-          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // By default H/2 and H/3 connections are disconnected on protocol errors
   EXPECT_CALL(*connection_, close(_));
   inner_decoder->decodeHeaders(std::move(response_headers), true);

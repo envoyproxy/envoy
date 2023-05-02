@@ -21,7 +21,7 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 class HttpCommonValidationTest : public HeaderValidatorTest,
                                  public testing::TestWithParam<Protocol> {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr createUhv(absl::string_view config_yaml) {
+  ::Envoy::Http::ServerHeaderValidatorPtr createUhv(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);

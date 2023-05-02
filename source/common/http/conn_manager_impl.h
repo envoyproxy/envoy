@@ -491,7 +491,7 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-    Http::HeaderValidatorPtr header_validator_;
+    Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
 
