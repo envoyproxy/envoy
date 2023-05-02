@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/http/header_validator.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -19,7 +19,7 @@ class HeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactor
 public:
   ::Envoy::Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override;
+                  Server::Configuration::ServerFactoryContext& server_context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

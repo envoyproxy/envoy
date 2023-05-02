@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/api/api_impl.h"
@@ -33,6 +34,7 @@
 #include "test/integration/ssl_utility.h"
 #endif
 #include "test/mocks/common.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -315,6 +317,27 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     return true;
   });
   client_->connect();
+}
+
+Http::HeaderValidatorFactoryPtr
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
+#ifdef ENVOY_ENABLE_UHV
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
+      "envoy.http.header_validators.envoy_default");
+  ASSERT(factory != nullptr);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
+  ON_CALL(server_context, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
+
+  TestUtility::loadFromYaml(std::string(config), typed_config);
+
+  return factory->createFromProto(typed_config.typed_config(), server_context);
+#else
+  return nullptr;
+#endif
 }
 
 RawConnectionDriver::~RawConnectionDriver() = default;

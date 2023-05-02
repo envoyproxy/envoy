@@ -30,6 +30,11 @@ public:
   virtual ~TransportSocketFactoryContext() = default;
 
   /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() PURE;
+
+  /**
    * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
   virtual OptRef<Server::Admin> admin() PURE;

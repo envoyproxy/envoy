@@ -518,7 +518,7 @@ HeaderValidator::HeaderEntryValidationResult HeaderValidator::validateGenericReq
 // For H/1 the codec will never produce H/2 pseudo headers and per
 // https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
 // As a result this common function can cover trailer validation for all protocols.
-HeaderValidator::ValidationResult
+::Envoy::Http::HeaderValidatorBase::ValidationResult
 HeaderValidator::validateTrailers(const ::Envoy::Http::HeaderMap& trailers) {
   std::string reject_details;
   trailers.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
@@ -541,10 +541,10 @@ HeaderValidator::validateTrailers(const ::Envoy::Http::HeaderMap& trailers) {
   });
 
   if (!reject_details.empty()) {
-    return {ValidationResult::Action::Reject, reject_details};
+    return {::Envoy::Http::HeaderValidatorBase::ValidationResult::Action::Reject, reject_details};
   }
 
-  return ValidationResult::success();
+  return ::Envoy::Http::HeaderValidatorBase::ValidationResult::success();
 }
 
 void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map) {

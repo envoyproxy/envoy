@@ -72,6 +72,7 @@ EXTENSIONS = {
 
     "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
+    "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
 
     #
     # Network Matchers
@@ -438,6 +439,12 @@ EXTENSIONS = {
     "envoy.config_subscription.rest": "//source/extensions/config_subscription/rest:http_subscription_lib",
     "envoy.config_subscription.filesystem": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
     "envoy.config_subscription.filesystem_collection": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+    "envoy.config_subscription.grpc": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.delta_grpc": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.ads": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.aggregated_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+    "envoy.config_subscription.aggregated_delta_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+    "envoy.config_subscription.ads_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

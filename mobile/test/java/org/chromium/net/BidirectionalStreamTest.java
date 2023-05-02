@@ -36,7 +36,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.MetricsTestUtil.TestRequestFinishedListener;
 import org.chromium.net.testing.TestBidirectionalStreamCallback.FailureType;
@@ -147,11 +146,7 @@ public class BidirectionalStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testBuilderCheck() throws Exception {
-    if (mTestRule.testingJavaImpl()) {
-      runBuilderCheckJavaImpl();
-    } else {
-      runBuilderCheckNativeImpl();
-    }
+    runBuilderCheckNativeImpl();
   }
 
   private void runBuilderCheckNativeImpl() throws Exception {
@@ -198,24 +193,9 @@ public class BidirectionalStreamTest {
     }
   }
 
-  private void runBuilderCheckJavaImpl() {
-    try {
-      TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
-      CronetTestRule.createJavaEngineBuilder(CronetTestRule.getContext())
-          .build()
-          .newBidirectionalStreamBuilder(Http2TestServer.getServerUrl(), callback,
-                                         callback.getExecutor());
-      fail("JavaCronetEngine doesn't support BidirectionalStream."
-           + " Expected UnsupportedOperationException");
-    } catch (UnsupportedOperationException e) {
-      // Expected.
-    }
-  }
-
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testFailPlainHttp() throws Exception {
     String url = "http://example.com";
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -233,7 +213,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("fix expected ReceivedByteCount - quite unpredictable")
   public void testSimpleGet() throws Exception {
     // Since this is the first request on the connection, the expected received bytes count
@@ -244,7 +223,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("To be investigated - head does not work")
   public void testSimpleHead() throws Exception {
     String url = Http2TestServer.getEchoMethodUrl();
@@ -268,7 +246,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimplePost() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -307,7 +284,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimpleGetWithCombinedHeader() throws Exception {
     String url = Http2TestServer.getCombinedHeadersUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -334,7 +310,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimplePostWithFlush() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -367,7 +342,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that a delayed flush() only sends buffers that have been written
   // before it is called, and it doesn't flush buffers in mPendingQueue.
   public void testFlushData() throws Exception {
@@ -450,7 +424,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Regression test for crbug.com/692168.
   public void testCancelWhileWriteDataPending() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
@@ -506,7 +479,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimpleGetWithFlush() throws Exception {
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
@@ -559,7 +531,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimplePostWithFlushAfterOneWrite() throws Exception {
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
@@ -587,7 +558,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimplePostWithFlushTwice() throws Exception {
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
@@ -620,7 +590,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that it is legal to call read() in onStreamReady().
   public void testReadDuringOnStreamReady() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
@@ -658,7 +627,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that it is legal to call flush() when previous nativeWritevData has
   // yet to complete.
   public void testSimplePostWithFlushBeforePreviousWriteCompleted() throws Exception {
@@ -698,7 +666,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimplePut() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     callback.addWriteData("Put This Data!".getBytes());
@@ -716,7 +683,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBadMethod() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
@@ -733,7 +699,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBadHeaderName() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
@@ -752,7 +717,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBadHeaderValue() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
@@ -769,7 +733,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testAddHeader() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     String headerName = "header-name";
@@ -787,7 +750,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Cronet does not support multi-headers - EM does")
   public void testMultiRequestHeaders() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -816,7 +778,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("okhttp returns :status as a header")
   public void testEchoTrailers() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -837,7 +798,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testCustomUserAgent() throws Exception {
     String userAgentName = "User-Agent";
     String userAgentValue = "User-Agent-Value";
@@ -855,7 +815,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testCustomCronetEngineUserAgent() throws Exception {
     String userAgentName = "User-Agent";
     String userAgentValue = "User-Agent-Value";
@@ -877,7 +836,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testDefaultUserAgent() throws Exception {
     String userAgentName = "User-Agent";
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -894,7 +852,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testEchoStream() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -923,7 +880,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testEchoStreamEmptyWrite() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -941,7 +897,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testDoubleWrite() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback() {
@@ -970,7 +925,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testDoubleRead() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback() {
@@ -1003,7 +957,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Disabled due to timeout. See crbug.com/591112")
   public void testReadAndWrite() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
@@ -1036,7 +989,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testEchoStreamWriteFirst() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -1080,7 +1032,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testEchoStreamStepByStep() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -1125,7 +1076,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testSimpleGetBufferUpdates() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     callback.setAutoAdvance(false);
@@ -1220,7 +1170,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testBadBuffers() throws Exception {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     callback.setAutoAdvance(false);
@@ -1329,7 +1278,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Flaky: crashes EM")
   public void testFailures() throws Exception {
     // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192): start/end time are not set.
@@ -1353,7 +1301,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testThrowOnSucceeded() {
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
     callback.setFailure(FailureType.THROW_SYNC, ResponseStep.ON_SUCCEEDED);
@@ -1373,7 +1320,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testExecutorShutdownBeforeStreamIsDone() {
     // Test that stream is destroyed even if executor is shut down and rejects posting tasks.
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -1440,7 +1386,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testCronetEngineShutdown() throws Exception {
     // Test that CronetEngine cannot be shut down if there are any active streams.
     TestBidirectionalStreamCallback callback = new ShutdownTestBidirectionalStreamCallback();
@@ -1488,7 +1433,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testCronetEngineShutdownAfterStreamFailure() throws Exception {
     // Test that CronetEngine can be shut down after stream reports a failure.
     TestBidirectionalStreamCallback callback = new ShutdownTestBidirectionalStreamCallback();
@@ -1506,7 +1450,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testCronetEngineShutdownAfterStreamCancel() throws Exception {
     // Test that CronetEngine can be shut down after stream is canceled.
     TestBidirectionalStreamCallback callback = new ShutdownTestBidirectionalStreamCallback();
@@ -1539,7 +1482,6 @@ public class BidirectionalStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @Test
-  @OnlyRunNativeCronet
   public void testErrorCodes() throws Exception {
     // Non-BidirectionalStream specific error codes.
     checkSpecificErrorCode(NetError.ERR_NAME_NOT_RESOLVED,
@@ -1589,7 +1531,6 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @RequiresMinApi(10) // Tagging support added in API level 10: crrev.com/c/chromium/src/+/937583
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1521")
   public void testTagging() throws Exception {
