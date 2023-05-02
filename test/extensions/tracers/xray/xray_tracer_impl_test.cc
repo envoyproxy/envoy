@@ -31,7 +31,7 @@ public:
   }
 
   const std::string operation_name_ = "test_operation_name";
-  // The MockStreamInfo will register the singleton time system to SymulatedTimeSystem and ignore
+  // The MockStreamInfo will register the singleton time system to SimulatedTimeSystem and ignore
   // the TestRealTimeSystem in the MockTracerFactoryContext.
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
