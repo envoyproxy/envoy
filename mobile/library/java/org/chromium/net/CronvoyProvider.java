@@ -100,12 +100,21 @@ public abstract class CronvoyProvider {
         + "enabled=" + isEnabled() + "]";
   }
 
+<<<<<<< HEAD:mobile/library/java/org/chromium/net/CronvoyProvider.java
   /** Name of the native {@link CronvoyProvider} class. */
   private static final String NATIVE_CRONVOY_PROVIDER_CLASS =
       "org.chromium.net.impl.NativeCronvoyProvider";
 
   /**
    * Returns an unmodifiable list of all available {@link CronvoyProvider}s. The providers are
+=======
+  /** Name of the native {@link CronetProvider} class. */
+  private static final String NATIVE_CRONET_PROVIDER_CLASS =
+      "org.chromium.net.impl.NativeCronetProvider";
+
+  /**
+   * Returns an unmodifiable list of all available {@link CronetProvider}s. The providers are
+>>>>>>> upstream/main:mobile/library/java/org/chromium/net/CronetProvider.java
    * returned in no particular order. Some of the returned providers may be in a disabled state and
    * should be enabled by the invoker. See {@link CronvoyProvider#isEnabled()}.
    *
@@ -113,8 +122,13 @@ public abstract class CronvoyProvider {
    */
   public static List<CronvoyProvider> getAllProviders(Context context) {
     // Use LinkedHashSet to preserve the order and eliminate duplicate providers.
+<<<<<<< HEAD:mobile/library/java/org/chromium/net/CronvoyProvider.java
     Set<CronvoyProvider> providers = new LinkedHashSet<>();
     addCronvoyProviderImplByClassName(context, NATIVE_CRONVOY_PROVIDER_CLASS, providers, false);
+=======
+    Set<CronetProvider> providers = new LinkedHashSet<>();
+    addCronetProviderImplByClassName(context, NATIVE_CRONET_PROVIDER_CLASS, providers, false);
+>>>>>>> upstream/main:mobile/library/java/org/chromium/net/CronetProvider.java
     return Collections.unmodifiableList(new ArrayList<>(providers));
   }
 

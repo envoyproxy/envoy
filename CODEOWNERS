@@ -23,8 +23,8 @@ extensions/filters/common/original_src @snowp @klarose
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @stevenzzzz
-/*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/http/ext_proc @gbrail @snowp @stevenzzzz @tyxia
+/*/extensions/filters/common/mutation_rules @gbrail @snowp @chaoqin-li1123 @tyxia
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -257,9 +257,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @pradeepcrao @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @pradeepcrao @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @pradeepcrao @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @lizan
 # mongo proxy
@@ -325,6 +325,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
+/*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google

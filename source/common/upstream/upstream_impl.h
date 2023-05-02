@@ -991,7 +991,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+  Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry

@@ -67,6 +67,10 @@ public class CronetTestRuleTest {
   public void testRunOnlyNativeMustRun() {
     assertFalse(mTestWasRun);
     mTestWasRun = true;
+<<<<<<< HEAD
     assertEquals(mTestFramework.mCronetEngine.getClass(), CronvoyUrlRequestContext.class);
+=======
+    assertEquals(mTestFramework.mCronetEngine.getClass(), CronetUrlRequestContext.class);
+>>>>>>> upstream/main
   }
 }
