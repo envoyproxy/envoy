@@ -90,12 +90,8 @@ private:
         return std::make_pair(absl::nullopt, use_old_style_encoding);
       }
     } else {
-      static bool generate_log = true;
-      if (generate_log) {
-        ENVOY_LOG_MISC(
-            warn, "Non-proto cookie format detected. This format will be rejected in the future.");
-        generate_log = false;
-      }
+      ENVOY_LOG_ONCE_MISC(
+          warn, "Non-proto cookie format detected. This format will be rejected in the future.");
       // Treat this as "old" style cookie.
       address = decoded_value;
       use_old_style_encoding = true;
