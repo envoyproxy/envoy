@@ -69,7 +69,7 @@ public:
         });
   }
 
-  void sendRequestAndValidateResponse() {
+  void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response =
@@ -80,7 +80,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterEq("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
+                                   times_called);
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
