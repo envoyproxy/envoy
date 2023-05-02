@@ -53,8 +53,7 @@ private:
                const Http::ResponseHeaderMap& response_headers,
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info,
-               Envoy::AccessLog::AccessLogType access_log_type =
-                   Envoy::AccessLog::AccessLogType::NotSet) override;
+               Envoy::AccessLog::AccessLogType access_log_type) override;
 
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
