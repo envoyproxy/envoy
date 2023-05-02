@@ -194,7 +194,7 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
   }
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(-1), "UNKNOWN_ERROR"),
-                   "Unknown BoringSSL error had occurred");
+                   "BoringSSL error had occurred: SSL_error_description() returned nullptr");
 }
 
 TEST(UtilityTest, TestGetX509ErrorInfo) {

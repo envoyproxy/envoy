@@ -11,7 +11,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local_object.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/thread.h"

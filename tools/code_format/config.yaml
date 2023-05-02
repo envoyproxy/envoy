@@ -101,6 +101,7 @@ paths:
   json_string_to_message:
     include:
     - source/common/protobuf/utility.cc
+    - source/common/protobuf/yaml_utility.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -192,10 +193,11 @@ paths:
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
-    - source/server/admin/prometheus_stats.h
-    - source/server/admin/prometheus_stats.cc
+    - source/server/admin/grouped_stats_request.cc
+    - source/server/admin/ungrouped_stats_request.cc
+    - source/server/admin/prometheus_stats_render.h
+    - source/server/admin/prometheus_stats_render.cc
     - source/server/admin/stats_params.h
-    - source/server/admin/stats_request.cc
     - source/server/admin/utils.h
     - source/server/admin/utils.cc
     - tools/clang_tools/api_booster/main.cc
@@ -317,3 +319,4 @@ visibility_excludes:
 - source/extensions/health_checkers/BUILD
 - source/extensions/config_subscription/rest/BUILD
 - source/extensions/config_subscription/filesystem/BUILD
+- source/extensions/load_balancing_policies/subset/BUILD

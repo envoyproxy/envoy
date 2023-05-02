@@ -9,6 +9,7 @@ load(
     "envoy_proto_library",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
+    "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
     "envoy_sh_test",
 )
@@ -545,6 +546,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -564,6 +566,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -891,6 +894,7 @@ envoy_cc_test_library(
         "fake_upstream.h",
     ],
     deps = [
+        ":utility_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//envoy/api:api_interface",
@@ -923,6 +927,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+        "//test/mocks/http:header_validator_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
@@ -947,6 +952,7 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
+        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
@@ -1000,21 +1006,19 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = [
         "server.cc",
-        "ssl_utility.cc",
         "utility.cc",
-    ],
+    ] + envoy_select_enable_yaml(["ssl_utility.cc"]),
     hdrs = [
         "server.h",
-        "ssl_utility.h",
         "utility.h",
-    ],
+    ] + envoy_select_enable_yaml(["ssl_utility.h"]),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
         ":tcp_dump",
         "//envoy/api:api_interface",
         "//envoy/http:codec_interface",
-        "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_factory_interface",
         "//envoy/network:filter_interface",
         "//envoy/server:options_interface",
         "//envoy/server:process_context_interface",
@@ -1041,11 +1045,10 @@ envoy_cc_test_library(
         "//source/server:options_lib",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
-        "//test/common/upstream:utility_lib",
-        "//test/config:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
@@ -1054,13 +1057,15 @@ envoy_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
-        "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_yaml([
+        "//test/common/upstream:utility_lib",
+        "//test/config:utility_lib",
+    ]),
 )
 
 envoy_cc_test_library(
@@ -1535,6 +1540,7 @@ envoy_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",

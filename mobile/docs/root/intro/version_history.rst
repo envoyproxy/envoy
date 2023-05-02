@@ -13,10 +13,11 @@ Breaking changes:
 - Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
 - swift/kotlin: remove `gauge`, `timer`, and `distribution` methods from the PulseClient.
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
+- swift/kotlin: Replace `close` method of `GRPCStream` with `cancel` method (:issue:`#24780 <24780>` :issue:`#26683 <26683>`).
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
 - java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
-- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: remove ``addVirtualClusters`` APIs.
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 - api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
@@ -26,6 +27,7 @@ Breaking changes:
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
 - listeners: switched the default listener from Envoy's TCP listener to a lightweight API listener by default. (:issue: `#25899 <25899>`).
 - headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
+- build: the minimum supported iOS version is now 13.0 and minimum MacOS version is 10.15 (:issue: `#24994 <24994>`).
 
 Bugfixes:
 
