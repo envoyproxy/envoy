@@ -21,8 +21,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level,
-                           const std::string admin_address_path) {
+envoy_status_t Engine::run(const std::string config, const std::string log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -33,9 +32,6 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
     options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
   }
   options->setConcurrency(1);
-  if (!admin_address_path.empty()) {
-    options->setAdminAddressPath(admin_address_path);
-  }
   return run(std::move(options));
 }
 
@@ -183,28 +179,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   std::string name = Stats::Utility::sanitizeStatsName(elements);
   Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
       .add(count);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
-                                     envoy_data& out) {
-  ENVOY_LOG(trace, "admin call {} {}", method, path);
-  if (!server_->admin()) {
-    ENVOY_LOG(warn, "admin support compiled out.");
-    return ENVOY_FAILURE;
-  }
-
-  ASSERT(dispatcher_->isThreadSafe(), "admin calls must be run from the dispatcher's context");
-  auto response_headers = Http::ResponseHeaderMapImpl::create();
-  std::string body;
-  const auto code = server_->admin()->request(path, method, *response_headers, body);
-  if (code != Http::Code::OK) {
-    ENVOY_LOG(warn, "admin call failed with status {} body {}", static_cast<uint64_t>(code), body);
-    return ENVOY_FAILURE;
-  }
-
-  out = Data::Utility::copyToBridgeData(body);
-
   return ENVOY_SUCCESS;
 }
 
