@@ -1079,7 +1079,6 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use_current_size;
     const HostSharedPtr& sampled_host = hosts->at(rand_idx);
-    std::cout <<"pick: " << sampled_host->address()->asString() << "\n";
 
     // Swap selected host with latest one and skip latest one  on next iteration 
     // so we don't repeat the selection when there are enough hosts.
@@ -1091,10 +1090,6 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
       --hosts_to_use_current_size;
     
       hosts->at(rand_idx) = hosts->at(last_host_idx);
-      std::cout << "Modified\n";
-      for (auto& it : *hosts) {
-        std::cout << it->address()->asString() << "\n";
-      }
     }
 
     if (candidate_host == nullptr) {
@@ -1111,8 +1106,6 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
     }
   }
 
-
-  std::cout << "CHOSEN " << candidate_host->address()->asString() << "\n";
   return candidate_host;
 }
 
