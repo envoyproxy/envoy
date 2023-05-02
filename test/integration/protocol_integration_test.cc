@@ -431,10 +431,8 @@ TEST_P(ProtocolIntegrationTest, AccessLogTest) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  if (downstream_protocol_ != Http::CodecType::HTTP3) {
-    EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
-              waitForAccessLog(access_log_name_, 1, true));
-  }
+  EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
+            waitForAccessLog(access_log_name_, 1, true));
 }
 
 TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
