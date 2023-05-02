@@ -274,14 +274,34 @@ void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
 // Handle an absolutely awful corner case where we explicitly shove a yaml percent in a proto string
 // value.
 void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator:")) {
+  if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
+    return;
+  }
+
+  const std::regex numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
+
+  std::cmatch match;
+  if (!std::regex_match(entry.raw_string_value_.c_str(), match, numerator_re)) {
+    return;
+  }
+
+  uint32_t numerator;
+  if (!absl::SimpleAtoi(match.str(1), &numerator)) {
     return;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  TRY_ASSERT_MAIN_THREAD { entry.fractional_percent_value_ = converted_fractional_percent; }
-  END_TRY
-  catch (const ProtoValidationException& ex) {
+  converted_fractional_percent.set_numerator(numerator);
+  entry.fractional_percent_value_ = converted_fractional_percent;
+
+  if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
     return;
+  }
+  if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
+    entry.fractional_percent_value_->set_denominator(
+        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  }
+  if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
+    entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   }
 }
 
