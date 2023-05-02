@@ -388,4 +388,101 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
+class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                     public HttpProtocolIntegrationTest {
+protected:
+  void initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, LoadShedPointIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
+                              Http::CodecClient::Type::HTTP3},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
+  // QUIC uses UDP, not TCP.
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_listener_accept"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it rejects the new client connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overload_reject", 1);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_overload_reject", 1);
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Disable overload, we should allow connections.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+TEST_P(LoadShedPointIntegrationTest, AcceptNewHttpStreamShedsLoad) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it sends a local reply for the
+  // new stream.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent", 100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response_that_will_be_local_reply =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(response_that_will_be_local_reply->waitForEndStream());
+  EXPECT_EQ(response_that_will_be_local_reply->headers().getStatusValue(), "503");
+
+  // Disable overload, Envoy should proxy the request.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent", 0);
+
+  auto response_that_will_be_proxied =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_that_will_be_proxied->waitForEndStream());
+  EXPECT_EQ(response_that_will_be_proxied->headers().getStatusValue(), "200");
+  // Should not be incremented as we didn't reject the request.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+}
+
 } // namespace Envoy

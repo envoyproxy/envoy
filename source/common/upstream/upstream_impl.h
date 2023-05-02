@@ -42,6 +42,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/callback_impl.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/packed_struct.h"
@@ -964,7 +965,9 @@ public:
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
 
-  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
+  const std::string& edsServiceName() const override {
+    return eds_service_name_ != nullptr ? *eds_service_name_ : EMPTY_STRING;
+  }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   std::vector<Http::Protocol>
@@ -988,7 +991,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+  Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -1026,6 +1029,7 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   std::unique_ptr<const std::string> observability_name_;
+  std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
@@ -1056,7 +1060,6 @@ private:
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  absl::optional<std::string> eds_service_name_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
@@ -1145,10 +1148,8 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                  bool added_via_api, TimeSource& time_source);
+  ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,

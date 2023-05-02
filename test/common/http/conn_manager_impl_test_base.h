@@ -125,7 +125,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::HttpTracerSharedPtr tracer() override { return tracer_; }
+  Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -160,7 +160,7 @@ public:
     return proxy_status_config_.get();
   }
   HeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
-    return header_validator_factory_.create(protocol, header_validator_stats_);
+    return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
@@ -186,7 +186,12 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void expectUhvTrailerCheckFail();
+  void
+  expectUhvHeaderCheck(HeaderValidatorBase::ValidationResult validation_result,
+                       HeaderValidator::RequestHeadersTransformationResult transformation_result);
+  void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
+                             HeaderValidator::TransformationResult transformation_result,
+                             bool expect_response = true);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

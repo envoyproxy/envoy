@@ -32,7 +32,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/buffer/watermark_buffer.h"
@@ -314,8 +314,12 @@ private:
     void blockRouteCache();
     // Return true if the cached route is blocked.
     bool routeCacheBlocked() const {
-      ENVOY_BUG(!route_cache_blocked_, "Should never try to refresh or clear the route cache when "
-                                       "it is blocked!");
+      ENVOY_BUG(!route_cache_blocked_,
+                "Should never try to refresh or clear the route cache when "
+                "it is blocked! To temporarily ignore this new constraint, "
+                "set runtime flag "
+                "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
+                "to `false`");
       return route_cache_blocked_;
     }
 
@@ -539,7 +543,7 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::HttpTracer& tracer() { return *config_.tracer(); }
+  Tracing::Tracer& tracer() { return *config_.tracer(); }
   void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag,
@@ -571,6 +575,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   Server::ThreadLocalOverloadState& overload_state_;
+  Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a
   // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
