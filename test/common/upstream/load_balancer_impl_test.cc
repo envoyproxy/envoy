@@ -2062,7 +2062,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
 
-
   // Verify correct host chosen in P3C scenario.
   EXPECT_CALL(random_, random())
       .Times(3)
@@ -2071,12 +2070,10 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       .WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
 
-
   // When the number of hosts is smaller or equal to the number of choices we don't call
   // random() since we do a full table scan.
   EXPECT_CALL(random_, random()).Times(0);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_4.chooseHost(nullptr));
-
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
