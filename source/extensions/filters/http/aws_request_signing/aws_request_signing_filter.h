@@ -34,7 +34,7 @@ struct FilterStats {
 /**
  * Abstract filter configuration.
  */
-class FilterConfig: public Router::RouteSpecificFilterConfig {
+class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   virtual ~FilterConfig() = default;
 

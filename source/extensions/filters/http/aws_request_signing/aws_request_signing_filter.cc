@@ -99,8 +99,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 FilterConfig& Filter::getConfig() const {
-  auto* config =
-      const_cast<FilterConfig*>(Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_));
+  auto* config = const_cast<FilterConfig*>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_));
   if (config) {
     return *config;
   }

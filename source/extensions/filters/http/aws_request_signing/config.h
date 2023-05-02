@@ -20,18 +20,21 @@ using AwsRequestSigningProtoPerRouteConfig =
  * Config registration for the AWS request signing filter.
  */
 class AwsRequestSigningFilterFactory
-    : public Common::FactoryBase<AwsRequestSigningProtoConfig, AwsRequestSigningProtoPerRouteConfig> {
+    : public Common::FactoryBase<AwsRequestSigningProtoConfig,
+                                 AwsRequestSigningProtoPerRouteConfig> {
 public:
   AwsRequestSigningFilterFactory() : FactoryBase("envoy.filters.http.aws_request_signing") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const AwsRequestSigningProtoConfig& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const AwsRequestSigningProtoConfig& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-    const AwsRequestSigningProtoPerRouteConfig& perRouteConfig,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) override;
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& perRouteConfig,
+                                       Server::Configuration::ServerFactoryContext& context,
+                                       ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace AwsRequestSigningFilter
