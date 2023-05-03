@@ -50,7 +50,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private boolean mEnableDrainPostDnsRefresh = false;
   private boolean mEnableGzipDecompression = true;
   private boolean mEnableSocketTag = true;
-  private boolean mEnableHappyEyeballs = true;
   private boolean mEnableInterfaceBinding = false;
   private boolean mEnableProxying = false;
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
@@ -138,14 +137,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
         mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
         mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(),
-        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
-        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
-        mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
-        mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
-        keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
-        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
-        mCdsTimeoutSeconds, mEnableCds);
+        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableInterfaceBinding,
+        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
+        mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
+        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
+        platformFilterChain, stringAccessors, keyValueStores, statSinks, runtimeGuards,
+        mEnablePlatformCertificatesValidation, mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress,
+        mAdsPort, mAdsToken, mAdsTokenLifetime, mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone,
+        mNodeSubZone, mCdsResourcesLocator, mCdsTimeoutSeconds, mEnableCds);
   }
 }
