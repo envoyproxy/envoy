@@ -3,9 +3,6 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/platform/quiche_logging_impl.h"
-#include "source/common/quic/server_codec_impl.h"
 
 #include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 #include "test/common/quic/envoy_quic_h3_fuzz_helper.h"
@@ -15,11 +12,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 
-#include "quiche/common/quiche_data_writer.h"
-#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
-#include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -28,10 +22,10 @@ namespace Quic {
 
 using namespace test::common::quic;
 
+// The following classes essentially mock the `QUIC` handshake
 class ProofSourceDetailsSetter {
 public:
   virtual ~ProofSourceDetailsSetter() = default;
-
   virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
 };
 
@@ -39,21 +33,16 @@ class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream,
                                    public ProofSourceDetailsSetter {
 public:
   ~TestQuicCryptoServerStream() override = default;
-
   explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                       quic::QuicCompressedCertsCache* compressed_certs_cache,
                                       quic::QuicSession* session,
                                       quic::QuicCryptoServerStreamBase::Helper* helper)
       : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
-
   bool encryption_established() const override { return true; }
-
   const EnvoyQuicProofSourceDetails* ProofSourceDetails() const override { return details_.get(); }
-
   void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
-
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
@@ -62,14 +51,12 @@ class TestEnvoyQuicTlsServerHandshaker : public quic::TlsServerHandshaker,
                                          public ProofSourceDetailsSetter {
 public:
   ~TestEnvoyQuicTlsServerHandshaker() override = default;
-
   TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
                                    const quic::QuicCryptoServerConfig& crypto_config)
       : quic::TlsServerHandshaker(session, &crypto_config),
         params_(new quic::QuicCryptoNegotiatedParameters) {
     params_->cipher_suite = 1;
   }
-
   bool encryption_established() const override { return true; }
   const EnvoyQuicProofSourceDetails* ProofSourceDetails() const override { return details_.get(); }
   void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
@@ -78,7 +65,6 @@ public:
   const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
     return *params_;
   }
-
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
   quiche::QuicheReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
@@ -114,9 +100,17 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
   return {QUIC_DISPATCHER_STATS(POOL_COUNTER_PREFIX(store, "quic.dispatcher"))};
 }
 
+// `FuzzDispatcher` implements a `QuicDispatcher`, creating a session when a
+// `QUIC` packet is received. It creates an `EnvoyQuicServerConnection`, where
+// a no op encrypter and a no op decrypter are installed. The session is
+// created and subsequently fuzzed by submitting a collection of `QUIC` and
+// `HTTP/3` packets serialized to wire format to the `ProcessPacket` method.
+// The fuzzer should be able to cover all code below the
+// `EnvoyQuicServerSession` class, including the `QUIC` and `HTTP/3` codecs.
+
 class FuzzDispatcher : public quic::QuicDispatcher {
 public:
-  FuzzDispatcher(quic::ParsedQuicVersion quic_version, quic::QuicVersionManager* version_manager,
+  FuzzDispatcher(const quic::ParsedQuicVersion quic_version, quic::QuicVersionManager* version_manager,
                  std::unique_ptr<quic::QuicConnectionHelperInterface> connection_helper,
                  std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
                  Event::Dispatcher& dispatcher)
@@ -167,9 +161,13 @@ public:
         quic::QuicReceivedPacket p(payload, size, receipt_time, false);
         ProcessPacket(srv_addr_, cli_addr_, p);
         });
+  }
+
+  void reset() {
     packetizer_.reset();
     Shutdown();
   }
+
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
                           quic::ConnectionCloseSource source) override {
@@ -201,7 +199,7 @@ protected:
         connection_id_generator());
 
     auto decrypter = std::make_unique<FuzzDecrypter>();
-    auto encrypter = std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT);
+    auto encrypter = std::make_unique<FuzzEncrypter>();
     connection->InstallDecrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
                                  std::move(decrypter));
     connection->SetEncrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
@@ -239,7 +237,7 @@ private:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   quic::ParsedQuicVersion quic_version_;
   QuicPacketizer packetizer_;
-  quic::QuicCryptoServerConfig crypto_config_;
+  const quic::QuicCryptoServerConfig crypto_config_;
   NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
@@ -260,9 +258,14 @@ private:
 
 struct Harness {
   Harness(quic::ParsedQuicVersion quic_version)
-      : quic_version_(quic_version), version_manager_(quic::CurrentSupportedHttp3Versions()) {
-    api_ = Api::createApiForTest();
-    dispatcher_ = api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread");
+      : quic_version_(quic_version),
+      api_(Api::createApiForTest()),
+      dispatcher_(api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread")),
+      version_manager_(quic::CurrentSupportedHttp3Versions()) {
+        createDispatcher();
+      }
+
+  void createDispatcher() {
     auto connection_helper = std::unique_ptr<quic::QuicConnectionHelperInterface>(
         new EnvoyQuicConnectionHelper(*dispatcher_.get()));
     auto alarm_factory = std::unique_ptr<quic::QuicAlarmFactory>(
@@ -271,7 +274,13 @@ struct Harness {
                                                        std::move(connection_helper),
                                                        std::move(alarm_factory), *dispatcher_.get());
   }
-  quic::ParsedQuicVersion quic_version_;
+
+  void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
+    fuzz_dispatcher_->fuzzQuic(input);
+    fuzz_dispatcher_->reset();
+  }
+
+  const quic::ParsedQuicVersion quic_version_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<FuzzDispatcher> fuzz_dispatcher_;
@@ -282,11 +291,10 @@ std::unique_ptr<Harness> harness;
 static void resetHarness() { harness = nullptr; };
 DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase& input) {
   if (harness == nullptr) {
-    quiche::setVerbosityLogThreshold(0);
     harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
     atexit(resetHarness);
   }
-  harness->fuzz_dispatcher_->fuzzQuic(input);
+  harness->fuzz(input);
 }
 
 } // namespace Quic
