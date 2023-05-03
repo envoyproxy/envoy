@@ -81,7 +81,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
     return FilterPtr{new MetadataFilter(config.metadata_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
-    return FilterPtr{new MetadataFilter(config.metadata_filter())};
+    return FilterPtr{new LogTypeFilter(config.log_type_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
@@ -277,6 +277,21 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
     envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const {
   return static_cast<Grpc::Status::GrpcStatus>(status);
+}
+
+LogTypeFilter::LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& config) {
+  for (int i = 0; i < config.types_size(); i++) {
+    types_.insert(config.types(i));
+  }
+
+  exclude_ = config.exclude();
+}
+
+bool LogTypeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
+                             const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                             AccessLogType access_log_type) const {
+  const bool found = types_.find(access_log_type) != types_.end();
+  return exclude_ ? !found : found;
 }
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
