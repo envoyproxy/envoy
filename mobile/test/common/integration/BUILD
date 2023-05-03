@@ -160,7 +160,10 @@ envoy_cc_test_library(
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
-    ] + envoy_select_signal_trace(["@envoy//source/common/signal:sigaction_lib"], "@envoy"),
+    ] + envoy_select_signal_trace(
+        ["@envoy//source/common/signal:sigaction_lib"],
+        "@envoy",
+    ),
 )
 
 envoy_cc_test_library(
