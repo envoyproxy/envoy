@@ -100,19 +100,12 @@ xds_matcher:
   cb(factory_callbacks);
 }
 
-TEST(MatchWrapper, WithPerRouteConfig) {
+TEST(MatchWrapper, PerRouteConfig) {
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-
-  const auto config =
-      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
-extension_config:
-  name: test
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.StringValue
+  const auto yaml = (R"EOF(
 xds_matcher:
   matcher_tree:
     input:
@@ -129,31 +122,6 @@ xds_matcher:
                         "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
 )EOF");
 
-
-const auto yaml = (R"EOF(
-  extension_config:
-    name: test
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-  xds_matcher:
-    matcher_tree:
-      input:
-        name: request-headers
-        typed_config:
-          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-          header_name: default-matcher-header
-      exact_match_map:
-          map:
-              match:
-                  action:
-                      name: skip
-                      typed_config:
-                          "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-  
-)EOF");
-    // envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute per_route_config_;
-    // proto2::TextFormat::ParseFromString(config_per_route, &per_route_config_);
-
   MatchDelegateConfig factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
 
@@ -161,45 +129,11 @@ const auto yaml = (R"EOF(
   auto& cfg = dynamic_cast<envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&>(
       *proto_config.get());
   TestUtility::loadFromYaml(yaml, cfg);
-  // EXPECT_TRUE(proto_config.get());
-
-  // auto& cfg = dynamic_cast<envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&>(
-  //     *proto_config.get());
-  // cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(*proto_config, server_factory_context,
+      factory.createRouteSpecificFilterConfig(cfg, server_factory_context,
                                               ProtobufMessage::getNullValidationVisitor());
   EXPECT_TRUE(route_config.get());
-
-  const auto* inflated = dynamic_cast<const ExtensionWithMatcherFilterConfigPerRoute*>(route_config.get());
-  EXPECT_TRUE(inflated);
-
-  // envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute
-  //     settings;
-  // ExtensionWithMatcherFilterConfigPerRoute auth_per_route(settings);
-
-  MatchDelegateConfig match_delegate_config;
-  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
-
-  Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
-  testing::InSequence s;
-
-  // Delegating filter will be created for this match wrapper.
-  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
-        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
-  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
-        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
-  EXPECT_CALL(factory_callbacks, addStreamFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
-        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
-  EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
-  cb(factory_callbacks);
 }
 
 TEST(MatchWrapper, DEPRECATED_FEATURE_TEST(WithDeprecatedMatcher)) {

@@ -1,3 +1,4 @@
+#include "config.h"
 #include "source/common/http/match_delegate/config.h"
 
 #include <memory>
@@ -257,15 +258,12 @@ DelegatingStreamFilter::FilterMatchState& DelegatingStreamFilter::getMatchState(
   }
 
   const auto* per_route_config =
-      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<
-          ExtensionWithMatcherFilterConfigPerRoute>(callbacks);
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
 
   if (per_route_config != nullptr) {
+    per_route_config->setBaseFilter(base_filter_);
     auto per_route_match_state = per_route_config->matchState();
-    if (per_route_match_state.hasMatchTree()) {
-      per_route_match_state.setBaseFilter(base_filter_);
-      return match_state_;
-    }
+    return *per_route_match_state;
   }
   return match_state_;
 }
@@ -313,29 +311,21 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 MatchDelegateConfig::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&
-        proto_config,
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<ExtensionWithMatcherFilterConfigPerRoute>(
-      proto_config, server_context);
+  return std::make_shared<FilterConfigPerRoute>(proto_config, server_context);
 }
 
-Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
-ExtensionWithMatcherFilterConfigPerRoute::createFilterMatchState(
-    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute&
-        proto_config,
+MatchStateSharedPtr FilterConfigPerRoute::createFilterMatchState(
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& server_context) {
   auto requirements =
-      std::make_unique<envoy::extensions::filters::common::dependency::v3::
-                           MatchingRequirements>();
+      std::make_unique<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   Server::Configuration::FactoryContext* context =
-        reinterpret_cast<Server::Configuration::FactoryContext*>(
-            &server_context);
+      reinterpret_cast<Server::Configuration::FactoryContext*>(&server_context);
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      server_context.scope().symbolTable().toString(
-          server_context.scope().prefix()),
-      *context};
+      server_context.scope().symbolTable().toString(server_context.scope().prefix()), *context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
@@ -343,7 +333,7 @@ ExtensionWithMatcherFilterConfigPerRoute::createFilterMatchState(
       matcher_factory(action_context, server_context, validation_visitor);
   Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb =
       matcher_factory.create(proto_config.xds_matcher());
-  return factory_cb();
+  return std::make_shared<DelegatingStreamFilter::FilterMatchState>(factory_cb());
 }
 
 /**
