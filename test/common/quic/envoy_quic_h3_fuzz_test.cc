@@ -12,10 +12,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
-#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
@@ -291,12 +291,12 @@ struct Harness {
 };
 
 std::unique_ptr<Harness> harness;
-static void resetHarness() { harness = nullptr; };
+//static void resetHarness() { harness = nullptr; };
 DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase& input) {
-  if (harness == nullptr) {
+  //if (harness == nullptr) {
     harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
-    atexit(resetHarness);
-  }
+    //atexit(resetHarness);
+  //}
   harness->fuzz(input);
 }
 
