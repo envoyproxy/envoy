@@ -33,8 +33,11 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          input->mutable_config()->clear_typed_config();
-          input->mutable_config()->set_name(std::string(filter_name));
+          if (filter_name != input->config().name()) {
+            // Clear old config, or unpacking non-suitable value may crash.
+            input->mutable_config()->clear_typed_config();
+            input->mutable_config()->set_name(std::string(filter_name));
+          }
         }
         // Set the corresponding type_url for Any.
         auto& factory = factories.at(input->config().name());
