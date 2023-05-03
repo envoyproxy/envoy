@@ -30,7 +30,6 @@ open class EngineBuilder: NSObject {
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
-  private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
 #if ENVOY_ENABLE_QUIC
@@ -215,18 +214,6 @@ open class EngineBuilder: NSObject {
   public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
     self.enableDNSCache = enableDNSCache
     self.dnsCacheSaveIntervalSeconds = saveInterval
-    return self
-  }
-
-  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-  /// true.
-  ///
-  /// - parameter enableHappyEyeballs: whether to enable RFC 6555 handling for IPv4/IPv6.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableHappyEyeballs(_ enableHappyEyeballs: Bool) -> Self {
-    self.enableHappyEyeballs = enableHappyEyeballs
     return self
   }
 
@@ -728,7 +715,6 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
@@ -802,7 +788,6 @@ private extension EngineBuilder {
     cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
     cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
     cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
-    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
 #endif

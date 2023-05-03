@@ -212,21 +212,6 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
-TEST(TestConfig, EnableHappyEyeballs) {
-  EngineBuilder engine_builder;
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  std::string bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, Not(HasSubstr("dns_lookup_family: V4_PREFERRED")));
-  EXPECT_THAT(bootstrap_str, HasSubstr("dns_lookup_family: ALL"));
-
-  engine_builder.enableHappyEyeballs(false);
-  bootstrap = engine_builder.generateBootstrap();
-  bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("dns_lookup_family: V4_PREFERRED"));
-  EXPECT_THAT(bootstrap_str, Not(HasSubstr("dns_lookup_family: ALL")));
-}
-
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 

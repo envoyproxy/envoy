@@ -61,7 +61,6 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
 #endif
@@ -180,7 +179,6 @@ private:
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
   bool admin_interface_enabled_ = false;
-  bool enable_happy_eyeballs_ = true;
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;

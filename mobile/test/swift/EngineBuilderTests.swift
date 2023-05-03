@@ -96,20 +96,6 @@ final class EngineBuilderTests: XCTestCase {
   }
 #endif
 
-  func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.enableHappyEyeballs)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableHappyEyeballs(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testEnablingInterfaceBindingAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled interface binding")
     MockEnvoyEngine.onRunWithConfig = { config, _ in

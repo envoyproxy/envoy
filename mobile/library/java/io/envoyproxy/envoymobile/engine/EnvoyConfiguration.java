@@ -44,7 +44,6 @@ public class EnvoyConfiguration {
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
-  public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
   public final Integer h2ConnectionKeepaliveTimeoutSeconds;
@@ -114,8 +113,6 @@ public class EnvoyConfiguration {
    *     decompression.
    *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
-   * @param enableHappyEyeballs                           whether to enable RFC 6555 handling for
-   *     IPv4/IPv6.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
    *                                                      pings on stream creation.
@@ -163,7 +160,7 @@ public class EnvoyConfiguration {
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
       boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
@@ -195,7 +192,6 @@ public class EnvoyConfiguration {
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
-    this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
         h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -262,14 +258,14 @@ public class EnvoyConfiguration {
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
         dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
         enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
-        stats_sinks, enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests,
-        runtime_guards, rtdsLayerName, rtdsTimeoutSeconds, adsAddress, adsPort, adsToken,
-        adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone, nodeSubZone,
-        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests, runtime_guards,
+        rtdsLayerName, rtdsTimeoutSeconds, adsAddress, adsPort, adsToken, adsTokenLifetime,
+        adsRootCerts, nodeId, nodeRegion, nodeZone, nodeSubZone, cdsResourcesLocator,
+        cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

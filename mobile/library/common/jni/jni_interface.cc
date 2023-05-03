@@ -1202,8 +1202,8 @@ void configureBuilder(
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
     jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
@@ -1238,7 +1238,6 @@ void configureBuilder(
   builder.enableGzipDecompression(enable_gzip_decompression == JNI_TRUE);
   builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
-  builder.enableHappyEyeballs(enable_happy_eyeballs == JNI_TRUE);
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(enable_http3 == JNI_TRUE);
 #endif
@@ -1304,8 +1303,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
     jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
@@ -1324,11 +1323,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
       dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3,
       enable_gzip_decompression, enable_brotli_decompression, enable_socket_tagging,
-      enable_happy_eyeballs, enable_interface_binding,
-      h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
-      max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
-      per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, filter_chain,
-      stat_sinks, enable_platform_certificates_validation,
+      enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
+      h2_connection_keepalive_timeout_seconds, max_connections_per_host, stats_flush_seconds,
+      stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
+      trust_chain_verification, filter_chain, stat_sinks, enable_platform_certificates_validation,
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
       rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
       node_id, node_region, node_zone, node_sub_zone, cds_resources_locator, cds_timeout_seconds,
