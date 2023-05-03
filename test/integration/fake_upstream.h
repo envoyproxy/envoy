@@ -268,7 +268,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
-  Http::HeaderValidatorPtr header_validator_;
+  Http::ServerHeaderValidatorPtr header_validator_;
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -497,7 +497,7 @@ public:
   void writeRawData(absl::string_view data);
   ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
-  Http::HeaderValidatorPtr makeHeaderValidator();
+  Http::ServerHeaderValidatorPtr makeHeaderValidator();
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

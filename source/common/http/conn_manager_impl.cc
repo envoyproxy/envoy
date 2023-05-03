@@ -96,9 +96,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
-      random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
-      local_info_(local_info), cluster_manager_(cluster_manager),
-      listener_stats_(config_.listenerStats()), overload_manager_(overload_manager),
+      random_generator_(random_generator), runtime_(runtime), local_info_(local_info),
+      cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()),
+      overload_manager_(overload_manager),
       overload_state_(overload_manager.getThreadLocalOverloadState()),
       accept_new_http_stream_(overload_manager.getLoadShedPoint(
           "envoy.load_shed_points.http_connection_manager_decode_headers")),
@@ -707,7 +707,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
               if (scope_exist) {
                 parent_.refreshCachedRoute();
               }
-              (*cb)(scope_exist && parent_.hasCachedRoute());
+              (*cb)(scope_exist&& parent_.hasCachedRoute());
             }
           });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -964,7 +964,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
       failure = !transformation_result.ok();
       redirect = transformation_result.action() ==
-                 Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
+                 Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
       failure_details = std::string(transformation_result.details());
     }
     if (failure) {

@@ -516,7 +516,7 @@ public:
    * @return pointer to the header validator.
    *         If nullptr, header validation will not be done.
    */
-  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
+  virtual ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
 
   /**
    * @return whether to append the x-forwarded-port header.

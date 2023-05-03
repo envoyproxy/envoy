@@ -170,15 +170,6 @@ private:
     const Network::Connection* connection();
     uint64_t streamId() { return stream_id_; }
 
-    // This is a helper function for encodeHeaders and responseDataTooLarge which allows for
-    // shared code for the two headers encoding paths. It does header munging, updates timing
-    // stats, and sends the headers to the encoder.
-    void encodeHeadersInternal(ResponseHeaderMap& headers, bool end_stream);
-    // This is a helper function for encodeData and responseDataTooLarge which allows for shared
-    // code for the two data encoding paths. It does stats updates and tracks potential end of
-    // stream.
-    void encodeDataInternal(Buffer::Instance& data, bool end_stream);
-
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason,
                        absl::string_view transport_failure_reason) override;
@@ -491,7 +482,7 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-    Http::HeaderValidatorPtr header_validator_;
+    Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
 
@@ -571,7 +562,6 @@ private:
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Random::RandomGenerator& random_generator_;
-  Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
