@@ -26,18 +26,7 @@
 namespace Envoy {
 namespace Quic {
 
-const size_t kMaxNumPackets = 10;
-
-const size_t kMaxQuicPacketSize = 1460;
-static char quic_packets[kMaxNumPackets][kMaxQuicPacketSize];
-static size_t quic_packet_sizes[kMaxNumPackets];
-
-const size_t kMaxH3PacketSize = 1024;
-static char h3_packet[kMaxH3PacketSize];
-
 static uint64_t clampU64(uint64_t in) { return in & ((1ULL << 62) - 1); }
-
-std::set<uint32_t> open_h3_streams;
 
 using namespace test::common::quic;
 class H3Packetizer {
@@ -53,12 +42,13 @@ private:
   };
 
 public:
-  size_t serialize(bool unidirectional, uint32_t type, uint32_t id, const H3Frame& h3frame) {
-    quiche::QuicheDataWriter dw(kMaxH3PacketSize, h3_packet);
+  H3Packetizer(std::set<uint32_t> &streams) : open_h3_streams_(streams) {};
+  size_t serialize(char *buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id, const H3Frame& h3frame) {
+    quiche::QuicheDataWriter dw(buffer_len, buffer);
     if (unidirectional) {
-      if (open_h3_streams.find(id) == open_h3_streams.end()) {
+      if (open_h3_streams_.find(id) == open_h3_streams_.end()) {
         dw.WriteVarInt62(static_cast<uint64_t>(type));
-        open_h3_streams.insert(id);
+        open_h3_streams_.insert(id);
       }
     }
     switch (h3frame.frame_case()) {
@@ -166,6 +156,7 @@ private:
     valid &= dw.WriteBytes(headers.data(), headers.size());
     return valid ? dw.length() : 0;
   }
+  std::set<uint32_t> &open_h3_streams_;
 };
 
 class FuzzEncrypter : public quic::QuicEncrypter {
@@ -201,7 +192,8 @@ public:
       : quic_version_(quic_version), connection_helper_(connection_helper), packet_number_(0),
         destination_connection_id_(quic::test::TestConnectionId()),
         framer_({quic_version_}, connection_helper_->GetClock()->Now(),
-                quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength) {
+                quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength),
+        h3packetizer_(open_h3_streams_) {
     framer_.SetEncrypter(quic::ENCRYPTION_INITIAL,
                          std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
     framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE,
@@ -214,17 +206,25 @@ public:
 
   void serializePackets(const QuicH3FuzzCase& input) {
     for (auto& quic_frame_or_junk : input.frames()) {
-      if (idx_ >= kMaxNumPackets) {
+      if (idx_ >= sizeof(quic_packet_sizes_)/sizeof(quic_packet_sizes_[0])) {
         return;
       }
       if (quic_frame_or_junk.has_qframe()) {
         serializePacket(quic_frame_or_junk.qframe());
       } else if (quic_frame_or_junk.has_junk()) {
         const std::string& junk = quic_frame_or_junk.junk();
-        size_t len = std::min(junk.size(), kMaxQuicPacketSize);
-        std::memcpy(quic_packets[idx_], junk.data(), len);
-        quic_packet_sizes[idx_] = len;
+        size_t len = std::min(junk.size(), sizeof(quic_packets_[0]));
+        std::memcpy(quic_packets_[idx_], junk.data(), len);
+        quic_packet_sizes_[idx_] = len;
         idx_++;
+      }
+    }
+  }
+
+  void foreach(std::function<void(const char *, size_t)> cb) {
+    for(size_t i = 0; i < idx_; i++) {
+      if (quic_packet_sizes_[i] > 0) {
+        cb(quic_packets_[i], quic_packet_sizes_[i]);
       }
     }
   }
@@ -232,13 +232,16 @@ public:
   void reset() {
     idx_ = 0;
     packet_number_ = quic::QuicPacketNumber(0);
-    for (unsigned long& quic_packet_size : quic_packet_sizes) {
+    for (unsigned long& quic_packet_size : quic_packet_sizes_) {
       quic_packet_size = 0;
     }
+    open_h3_streams_.clear();
   }
 
 private:
   void serializePacket(const QuicFrame& frame) {
+    char buffer[1024];
+
     std::unique_ptr<quic::QuicCryptoFrame> crypto_frame = nullptr;
     std::unique_ptr<quic::QuicRstStreamFrame> reset_stream_frame = nullptr;
     std::unique_ptr<quic::QuicConnectionCloseFrame> connection_close_frame = nullptr;
@@ -274,19 +277,18 @@ private:
       uint64_t offset = clampU64(stream.offset());
       if (stream.has_h3frame()) {
         const auto& f = stream.h3frame();
-        H3Packetizer h3packetizer;
-        len = h3packetizer.serialize(unidirectional, type, id, f);
+        len = h3packetizer_.serialize(buffer, sizeof(buffer), unidirectional, type, id, f);
         if (len == 0) {
           return;
         }
       } else if (stream.has_junk()) {
         auto junk = stream.junk();
-        len = std::min(junk.size(), sizeof(h3_packet));
-        memcpy(h3_packet, junk.data(), len);
+        len = std::min(junk.size(), sizeof(buffer));
+        memcpy(buffer, junk.data(), len);
       } else {
         return;
       }
-      frames.push_back(quic::QuicFrame(quic::QuicStreamFrame(id, fin, offset, h3_packet, len)));
+      frames.push_back(quic::QuicFrame(quic::QuicStreamFrame(id, fin, offset, buffer, len)));
     } break;
     case QuicFrame::kHandshakeDone: {
       const auto& f = frame.handshake_done();
@@ -294,10 +296,10 @@ private:
     } break;
     case QuicFrame::kCrypto: {
       const auto& f = frame.crypto();
-      uint16_t len = std::min(f.data().size(), sizeof(h3_packet));
-      memcpy(h3_packet, f.data().data(), len);
+      uint16_t len = std::min(f.data().size(), sizeof(buffer));
+      memcpy(buffer, f.data().data(), len);
       crypto_frame = std::make_unique<quic::QuicCryptoFrame>(
-          quic::EncryptionLevel::ENCRYPTION_INITIAL, clampU64(f.offset()), h3_packet, len);
+          quic::EncryptionLevel::ENCRYPTION_INITIAL, clampU64(f.offset()), buffer, len);
       frames.push_back(quic::QuicFrame(crypto_frame.get()));
     } break;
     case QuicFrame::kAck: {
@@ -393,16 +395,16 @@ private:
     } break;
     case QuicFrame::kMessageFrame: {
       const auto& f = frame.message_frame();
-      size_t len = std::min(f.data().size(), sizeof(h3_packet));
-      memcpy(h3_packet, f.data().data(), len);
-      message_frame = std::make_unique<quic::QuicMessageFrame>(h3_packet, len);
+      size_t len = std::min(f.data().size(), sizeof(buffer));
+      memcpy(buffer, f.data().data(), len);
+      message_frame = std::make_unique<quic::QuicMessageFrame>(buffer, len);
       frames.push_back(quic::QuicFrame(message_frame.get()));
     } break;
     case QuicFrame::kNewToken: {
       const auto& f = frame.new_token();
-      size_t len = std::min(f.token().size(), sizeof(h3_packet));
-      memcpy(h3_packet, f.token().data(), len);
-      absl::string_view token(h3_packet, len);
+      size_t len = std::min(f.token().size(), sizeof(buffer));
+      memcpy(buffer, f.token().data(), len);
+      absl::string_view token(buffer, len);
       new_token = std::make_unique<quic::QuicNewTokenFrame>(f.control_frame_id(), token);
       frames.push_back(quic::QuicFrame(new_token.get()));
     } break;
@@ -422,8 +424,8 @@ private:
 
     framer.SetEncrypter(quic::ENCRYPTION_INITIAL,
                         std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
-    quic_packet_sizes[idx_] =
-        framer.BuildDataPacket(header, frames, quic_packets[idx_], kMaxQuicPacketSize,
+    quic_packet_sizes_[idx_] =
+        framer.BuildDataPacket(header, frames, quic_packets_[idx_], sizeof(quic_packets_[idx_]),
                                quic::EncryptionLevel::ENCRYPTION_INITIAL);
     idx_++;
   }
@@ -457,11 +459,17 @@ private:
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;
   quic::QuicPacketNumber packet_number_;
-  size_t idx_{0};
 
   // For fuzzing
   quic::QuicConnectionId destination_connection_id_;
   quic::QuicFramer framer_;
+
+  H3Packetizer h3packetizer_;
+  std::set<uint32_t> open_h3_streams_;
+
+  char quic_packets_[10][1460];
+  size_t quic_packet_sizes_[10] = {0};
+  size_t idx_{0};
 };
 
 class ProofSourceDetailsSetter {
@@ -630,16 +638,11 @@ public:
     ProcessChlo(chlo, &chlo_packet_info);
 
     packetizer_.serializePackets(input);
-    for (size_t i = 0; i < kMaxNumPackets; i++) {
-      const char* payload = quic_packets[i];
-      size_t size = quic_packet_sizes[i];
-      if (size == 0) {
-        continue;
-      }
-      auto receipt_time = helper()->GetClock()->Now();
-      quic::QuicReceivedPacket p(payload, size, receipt_time, false);
-      ProcessPacket(srv_addr_, cli_addr_, p);
-    }
+    packetizer_.foreach([this] (const char *payload, size_t size) {
+        auto receipt_time = helper()->GetClock()->Now();
+        quic::QuicReceivedPacket p(payload, size, receipt_time, false);
+        ProcessPacket(srv_addr_, cli_addr_, p);
+        });
     packetizer_.reset();
     Shutdown();
   }
