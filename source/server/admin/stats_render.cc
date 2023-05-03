@@ -39,6 +39,11 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
+  if (!histogram.used()) {
+    response.addFragments({name, ": No recorded values\n"});
+    return;
+  }
+
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::NoBuckets:
     response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
@@ -54,7 +59,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     addDetail(histogram.detailedTotalBuckets(64), response);
     response.add("\n  intervals=");
     addDetail(histogram.detailedIntervalBuckets(64), response);
-    response.addFragments({"\n  summary=", histogram.quantileSummary()});
+    response.addFragments({"\n  summary=", histogram.quantileSummary(), "\n"});
     break;
   }
 }
