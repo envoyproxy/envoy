@@ -9,7 +9,24 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 struct Http2HeaderValidatorConfig {
-  const bool allow_extended_ascii_in_path_{false};
+  // Relax validation of the :path header by allowing extended ASCII characters for HTTP/2 protocol
+  // only. This option also causes the extended ASCII to be URL encoded during path normalization,
+  // if it is enabled.
+  //
+  // This option currently is `true` by default and can be overridden using the
+  // "envoy.uhv.allow_extended_ascii_in_path_for_http2" runtime value. Note that the default value
+  // will be changed to `false` in the future to make Envoy behavior standard compliant and
+  // consistent across all HTTP protocol versions.
+  //
+  // This option provides backward compatibility with the existing (pre header validator) Envoy
+  // behavior. HTTP/2 codec was not compliant with the
+  // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 by allowing extended ASCII in the
+  // :path header. Envoy would later URL encode extended ASCII in URI path portion (but not in query
+  // or fragment portions) during path normalization (this is the behavior of the Chromium library
+  // Envoy uses for URL path normalization).
+  //
+  // With header validator enabled requests with extended ASCII in the :path header are rejected.
+  const bool allow_extended_ascii_in_path_{true};
 };
 
 class Http2HeaderValidator : public HeaderValidator {
@@ -60,9 +77,10 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
-  // Relax validation of character set in URL path, query and fragment by allowing extended ASCII
-  // characters. This method is called iff
-  // `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true
+  // Relax validation of character set in the :path header by allowing extended ASCII
+  // characters. This method is called iff `envoy.uhv.allow_extended_ascii_in_path_for_http2` is
+  // `true`, which is the default value. Note the default will be switched to `false` in the future
+  // for standard compliance.
   HeaderValidator::HeaderValueValidationResult
   validatePathHeaderCharactersExtendedAsciiAllowed(const ::Envoy::Http::HeaderString& value);
 
@@ -114,7 +132,10 @@ public:
 
 private:
   // URL-encode extended ASCII characters in URL path. This method is called iff
-  // `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true
+  // `envoy.uhv.allow_extended_ascii_in_path_for_http2` is true.
+  // This method is provided for backward compatibility with Envoy's pre header validator
+  // behavior. See comments in the Http2HeaderValidatorConfig declaration for more
+  // information.
   void encodeExtendedAsciiInPath(::Envoy::Http::RequestHeaderMap& header_map);
 };
 
