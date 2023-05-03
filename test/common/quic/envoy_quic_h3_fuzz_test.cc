@@ -104,7 +104,7 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
 
 // `FuzzDispatcher` implements a `QuicDispatcher`, creating a session when a
 // `QUIC` packet is received. It creates an `EnvoyQuicServerConnection`, where
-// a no op encrypter and a no op decrypter are installed. The session is
+// a no op `encrypter` and a no op `decrypter` are installed. The session is
 // created and subsequently fuzzed by submitting a collection of `QUIC` and
 // `HTTP/3` packets serialized to wire format to the `ProcessPacket` method.
 // The fuzzer should be able to cover all code below the
