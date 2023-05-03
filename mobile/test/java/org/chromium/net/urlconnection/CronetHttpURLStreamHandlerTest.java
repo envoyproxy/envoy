@@ -47,8 +47,8 @@ public class CronetHttpURLStreamHandlerTest {
   @Feature({"Cronet"})
   public void testOpenConnectionHttp() throws Exception {
     URL url = new URL(NativeTestServer.getEchoMethodURL());
-    CronetHttpURLStreamHandler streamHandler =
-        new CronetHttpURLStreamHandler(mTestFramework.mCronetEngine);
+    CronvoyHttpURLStreamHandler streamHandler =
+        new CronvoyHttpURLStreamHandler(mTestFramework.mCronetEngine);
     HttpURLConnection connection = (HttpURLConnection)streamHandler.openConnection(url);
     assertEquals(200, connection.getResponseCode());
     assertEquals("OK", connection.getResponseMessage());
@@ -61,8 +61,8 @@ public class CronetHttpURLStreamHandlerTest {
   @Feature({"Cronet"})
   public void testOpenConnectionHttps() throws Exception {
     URL url = new URL("https://example.com");
-    CronetHttpURLStreamHandler streamHandler =
-        new CronetHttpURLStreamHandler(mTestFramework.mCronetEngine);
+    CronvoyHttpURLStreamHandler streamHandler =
+        new CronvoyHttpURLStreamHandler(mTestFramework.mCronetEngine);
     HttpURLConnection connection = (HttpURLConnection)streamHandler.openConnection(url);
     assertNotNull(connection);
   }
@@ -72,8 +72,8 @@ public class CronetHttpURLStreamHandlerTest {
   @Feature({"Cronet"})
   public void testOpenConnectionProtocolNotSupported() throws Exception {
     URL url = new URL("ftp://example.com");
-    CronetHttpURLStreamHandler streamHandler =
-        new CronetHttpURLStreamHandler(mTestFramework.mCronetEngine);
+    CronvoyHttpURLStreamHandler streamHandler =
+        new CronvoyHttpURLStreamHandler(mTestFramework.mCronetEngine);
     try {
       streamHandler.openConnection(url);
       fail();
@@ -87,8 +87,8 @@ public class CronetHttpURLStreamHandlerTest {
   @Feature({"Cronet"})
   public void testOpenConnectionWithProxy() throws Exception {
     URL url = new URL(NativeTestServer.getEchoMethodURL());
-    CronetHttpURLStreamHandler streamHandler =
-        new CronetHttpURLStreamHandler(mTestFramework.mCronetEngine);
+    CronvoyHttpURLStreamHandler streamHandler =
+        new CronvoyHttpURLStreamHandler(mTestFramework.mCronetEngine);
     Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 8080));
     try {
       streamHandler.openConnection(url, proxy);

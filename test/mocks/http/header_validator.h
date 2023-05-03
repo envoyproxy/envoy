@@ -7,9 +7,9 @@
 namespace Envoy {
 namespace Http {
 
-class MockHeaderValidator : public HeaderValidator {
+class MockServerHeaderValidator : public ServerHeaderValidator {
 public:
-  ~MockHeaderValidator() override = default;
+  ~MockServerHeaderValidator() override = default;
   MOCK_METHOD(ValidationResult, validateRequestHeaders, (const RequestHeaderMap& header_map));
   MOCK_METHOD(ValidationResult, validateResponseHeaders, (const ResponseHeaderMap& header_map));
   MOCK_METHOD(ValidationResult, validateRequestTrailers, (const RequestTrailerMap& header_map));
@@ -42,7 +42,7 @@ public:
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {
 public:
-  MOCK_METHOD(HeaderValidatorPtr, createServerHeaderValidator,
+  MOCK_METHOD(ServerHeaderValidatorPtr, createServerHeaderValidator,
               (Protocol protocol, HeaderValidatorStats& stats));
   MOCK_METHOD(ClientHeaderValidatorPtr, createClientHeaderValidator,
               (Protocol protocol, HeaderValidatorStats& stats));

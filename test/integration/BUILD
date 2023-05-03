@@ -313,6 +313,7 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
     ],
 )
 
@@ -446,6 +447,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/integration/filters:encode1xx_local_reply_config_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
@@ -952,8 +954,10 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
-        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
         ":autonomous_upstream_lib",

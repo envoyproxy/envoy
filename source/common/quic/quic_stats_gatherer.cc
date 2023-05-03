@@ -26,7 +26,7 @@ void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   const Http::ResponseTrailerMap* response_trailers = response_trailer_map_.get();
   for (const AccessLog::InstanceSharedPtr& log_handler : access_log_handlers_) {
     log_handler->log(request_headers, response_headers, response_trailers, *stream_info_,
-                     AccessLog::AccessLogType::NotSet);
+                     AccessLog::AccessLogType::DownstreamEnd);
   }
 }
 
