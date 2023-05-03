@@ -959,13 +959,13 @@ std::string ParentHistogramImpl::bucketSummary() const {
 }
 
 std::vector<Stats::ParentHistogram::Bucket>
-    ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets,
-                                                const histogram_t& histogram) {
+ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram) {
+  uint32_t index = 0;
   return Utility::interpolateHistogramBuckets(
       max_buckets, hist_num_buckets(&histogram),
-      [&histogram](uint32_t index) -> Stats::ParentHistogram::Bucket {
+      [&histogram, &index]() -> Stats::ParentHistogram::Bucket {
         ParentHistogram::Bucket bucket;
-        hist_bucket_idx(&histogram, index, &bucket.value_, &bucket.count_);
+        hist_bucket_idx(&histogram, index++, &bucket.value_, &bucket.count_);
         return bucket;
       });
 }

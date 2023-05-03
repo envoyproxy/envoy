@@ -297,9 +297,10 @@ protected:
   using BucketVec = std::vector<Bucket>;
 
   BucketVec interpolate(uint32_t max_buckets, const BucketVec& buckets) {
+    uint32_t index = 0;
     return Utility::interpolateHistogramBuckets(
         max_buckets, buckets.size(),
-        [&buckets](uint32_t index) -> const Bucket& { return buckets[index]; });
+        [&buckets, &index]() -> const Bucket& { return buckets[index++]; });
   }
 };
 

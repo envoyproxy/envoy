@@ -125,10 +125,10 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
 }
 
-std::vector<ParentHistogram::Bucket> interpolateHistogramBuckets(
-    uint32_t max_buckets, uint32_t num_src_buckets,
-    std::function<ParentHistogram::Bucket(uint32_t)> get_bucket) {
-  if (max_buckets == 0) {
+std::vector<ParentHistogram::Bucket>
+interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
+                            std::function<ParentHistogram::Bucket()> next_bucket) {
+  if (max_buckets == InterpolateRetainAllBuckets) {
     max_buckets = num_src_buckets;
   }
   const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
@@ -151,7 +151,7 @@ std::vector<ParentHistogram::Bucket> interpolateHistogramBuckets(
     }
     for (uint32_t i = 0; i < merges; ++i, ++src) {
       ASSERT(src < num_src_buckets);
-      ParentHistogram::Bucket src_bucket = get_bucket(src);
+      ParentHistogram::Bucket src_bucket = next_bucket();
       bucket.count_ += src_bucket.count_;
       bucket.value_ += src_bucket.value_;
     }

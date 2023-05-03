@@ -232,11 +232,31 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-std::vector<ParentHistogram::Bucket> interpolateHistogramBuckets(
-    uint32_t max_buckets, uint32_t num_src_buckets,
-    std::function<ParentHistogram::Bucket(uint32_t)> get_bucket);
+/**
+ * Transforms a vector of buckets into a possibly smaller vector, interpolating
+ * the data by combining adjacent buckets until the right number of buckets is
+ * obtained. Buckets are combined by adding counts and averaging values.
+ *
+ * If max_buckets is InterpolateRetainAllBuckets, or num_src_buckets <= max_buckets,
+ * than the returned array is
+ * buckets is smaller then all buckets are retained
+ * regardless of num_src_buckets.
+ *
+ * The buckets are provided to interpolateHistogramBuckets via a lambda, which
+ * will be called exactly num_src_buckets times to obtain all the buckets.
+ *
+ * @param max_buckets the desired maximum number of buckets, or InterpolateRetainAllBuckets.
+ * @param num_src_buckets the exact number of source buckets to interpolate
+ * @param next_bucket lambda to call to obtain each bucket
+ * @return the interpolated buckets
+ */
+std::vector<ParentHistogram::Bucket>
+interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
+                            std::function<ParentHistogram::Bucket()> next_bucket);
 
 } // namespace Utility
+
+constexpr uint32_t InterpolateRetainAllBuckets = 0;
 
 /**
  * Holds a reference to a stat by name. Note that the stat may not be created

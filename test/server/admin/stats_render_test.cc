@@ -45,6 +45,19 @@ TEST_F(StatsRenderTest, TextHistogramDisjoint) {
   EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
 }
 
+TEST_F(StatsRenderTest, TextHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1:\n"
+      "  totals=200:1, 300:2\n"
+      "  intervals=200:1, 300:2\n"
+      "  summary=P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) P90(308.5,308.5) "
+      "P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) P99.9(309.985,309.985) "
+      "P100(310,310)";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
 TEST_F(StatsRenderTest, JsonInt) {
   StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF({"stats":[ {"value":42, "name":"name"}]})EOF";
@@ -290,6 +303,35 @@ TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
         }]
     }]
 }
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": {
+            "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "details": [{
+                "name": "h1",
+                "percentiles": [
+                    {"cumulative": 200, "interval": 200},
+                    {"cumulative": 207.5, "interval": 207.5},
+                    {"cumulative": 302.5, "interval": 302.5},
+                    {"cumulative": 306.25, "interval": 306.25},
+                    {"cumulative": 308.5, "interval": 308.5},
+                    {"cumulative": 309.25, "interval": 309.25},
+                    {"cumulative": 309.85, "interval": 309.85},
+                    {"cumulative": 309.925, "interval": 309.925},
+                    {"cumulative": 309.985, "interval": 309.985},
+                    {"cumulative": 310, "interval": 310}
+                ],
+                "totals": [{"value": 200, "count": 1},{"count": 2, "value": 300}],
+                "intervals":[{"value": 200, "count": 1},{"value": 300, "count": 2}]}]}}]}
   )EOF";
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               JsonStringEq(expected));

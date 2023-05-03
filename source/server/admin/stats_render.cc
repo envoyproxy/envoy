@@ -50,12 +50,25 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     addDisjointBuckets(name, histogram, response);
     break;
   case Utility::HistogramBucketsMode::Detailed:
-    // addDetailedBuckets(name, histogram, response);
+    response.addFragments({name, ":\n  totals="});
+    addDetail(histogram.detailedTotalBuckets(64), response);
+    response.add("\n  intervals=");
+    addDetail(histogram.detailedIntervalBuckets(64), response);
+    response.addFragments({"\n  summary=", histogram.quantileSummary()});
     break;
   }
 }
 
 void StatsTextRender::finalize(Buffer::Instance&) {}
+
+void StatsTextRender::addDetail(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                Buffer::Instance& response) {
+  absl::string_view delim = "";
+  for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
+    response.addFragments({delim, absl::StrCat(bucket.value_, ":", bucket.count_)});
+    delim = ", ";
+  }
+}
 
 // Computes disjoint buckets as text and adds them to the response buffer.
 void StatsTextRender::addDisjointBuckets(const std::string& name,

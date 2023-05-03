@@ -66,6 +66,9 @@ private:
   void addDisjointBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                           Buffer::Instance& response);
 
+  void addDetail(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                 Buffer::Instance& response);
+
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
 };
 
