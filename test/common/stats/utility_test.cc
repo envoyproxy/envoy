@@ -12,10 +12,17 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
+using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Stats {
+
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b) {
+  return a.count_ == b.count_ && std::abs(a.value_ - b.value_) < 0.001;
+}
+
 namespace {
 
 // All the tests should be run for both IsolatedStore and ThreadLocalStore.
@@ -280,6 +287,74 @@ TEST_P(StatsUtilityTest, SanitizeStatsName) {
   EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+}
+
+// Helper class to directly test the bucket interpolation algorithm without
+// having to involve the `circlhist` code.
+class BucketTest : public testing::Test {
+protected:
+  using Bucket = ParentHistogram::Bucket;
+  using BucketVec = std::vector<Bucket>;
+
+  BucketVec interpolate(uint32_t max_buckets, const BucketVec& buckets) {
+    return Utility::interpolateHistogramBuckets(
+        max_buckets, buckets.size(),
+        [&buckets](uint32_t index) -> const Bucket& { return buckets[index]; });
+  }
+};
+
+TEST_F(BucketTest, NoInterpolation) {
+  // Verifies that if the desired number of buckets is 0 (meaning retain all buckets)
+  // that we do so.
+  EXPECT_THAT(interpolate(0, BucketVec{{1.0, 10}, {2.0, 20}}),
+              ElementsAre(Bucket{1.0, 10}, Bucket{2.0, 20}));
+
+  // Verifies that if we ask for exactly the right number of buckets, we get them.
+  EXPECT_THAT(interpolate(2, BucketVec{{1.0, 10}, {2.0, 20}}),
+              ElementsAre(Bucket{1.0, 10}, Bucket{2.0, 20}));
+
+  // Verifies that if we ask for more than the available number of buckets, we get them.
+  EXPECT_THAT(interpolate(100, BucketVec{{1.0, 10}, {2.0, 20}}),
+              ElementsAre(Bucket{1.0, 10}, Bucket{2.0, 20}));
+
+  // Finally, verifies that even with 4 buckets we get this behavior, just to
+  // prove it doesn't only work with 2.
+  EXPECT_THAT(interpolate(4, BucketVec{{1.0, 10}, {2.0, 20}, {3.0, 40}, {4.0, 80}}),
+              ElementsAre(Bucket{1.0, 10}, Bucket{2.0, 20}, Bucket{3.0, 40}, Bucket{4.0, 80}));
+}
+
+TEST_F(BucketTest, SymmetricInterpolation) {
+  // Verifies that when we ask for 1 bucket, we sum the all counts and average the values.
+  EXPECT_THAT(interpolate(1, BucketVec{{1.0, 10}, {2.0, 20}}), ElementsAre(Bucket{1.5, 30}));
+  EXPECT_THAT(interpolate(1, BucketVec{{1.0, 10}, {2.0, 20}, {6.0, 40}}),
+              ElementsAre(Bucket{3.0, 70}));
+  EXPECT_THAT(interpolate(1, BucketVec{{1.0, 10}, {2.0, 20}, {3.0, 40}, {4.0, 80}}),
+              ElementsAre(Bucket{2.5, 150}));
+
+  // Verifies that when we ask for 2 of 4 buckets, we return the (average, sum) of both pairs.
+  EXPECT_THAT(interpolate(2, BucketVec{{1.0, 10}, {2.0, 20}, {3.0, 40}, {4.0, 80}}),
+              ElementsAre(Bucket{1.5, 30}, Bucket{3.5, 120}));
+}
+
+TEST_F(BucketTest, AsymmetricInterpolation) {
+  // Verifies that when we ask for 2 of 3 buckets: the first 2 get (average, sum) and
+  // the last one is unchanged.
+  EXPECT_THAT(interpolate(2, BucketVec{{1.0, 10}, {2.0, 20}, {3.0, 40}}),
+              ElementsAre(Bucket{1.5, 30}, Bucket{3.0, 40}));
+
+  // Verifies that when we ask for 3 of 11 buckets: 1-4, 5-8, and 9-11 get (average, sum).
+  EXPECT_THAT(interpolate(3, BucketVec{{1.0, 1},
+                                       {2.0, 2},
+                                       {3.0, 4},
+                                       {4.0, 8},
+                                       {5.0, 16},
+                                       {6.0, 32},
+                                       {7.0, 64},
+                                       {8.0, 128},
+                                       {9.0, 256},
+                                       {10.0, 512},
+                                       {11.0, 1024}}),
+              ElementsAre(Bucket{2.5, 15}, Bucket{6.5, 240}, Bucket{10.0, 1792}));
 }
 
 } // namespace
