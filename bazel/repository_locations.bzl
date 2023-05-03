@@ -218,8 +218,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     com_github_circonus_labs_libcircllhist = dict(
         project_name = "libcircllhist",
-        project_desc = "An implementation of Circonus log-linear histograms",
-        project_url = "https://github.com/circonus-labs/libcircllhist",
+        project_desc = "An implementation of OpenHistogram log-linear histograms",
+        project_url = "https://github.com/openhistogram/libcircllhist",
         version = "39f9db724a81ba78f5d037f1cae79c5a07107c8e",
         sha256 = "fd2492f6cc1f8734f8f57be8c2e7f2907e94ee2a4c02445ce59c4241fece144b",
         strip_prefix = "libcircllhist-{version}",
@@ -228,7 +228,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-05-21",
         cpe = "N/A",
         license = "Apache-2.0",
-        license_url = "https://github.com/circonus-labs/libcircllhist/blob/{version}/LICENSE",
+        license_url = "https://github.com/openhistogram/libcircllhist/blob/{version}/LICENSE",
     ),
     com_github_cyan4973_xxhash = dict(
         project_name = "xxHash",
