@@ -262,7 +262,7 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --google_default_credentials=true
 build:remote --remote_download_toplevel
-build:remote --nobuild_runfile_links
+# build:remote --nobuild_runfile_links
 
 # Windows bazel does not allow sandboxed as a spawn strategy
 build:remote-windows --spawn_strategy=remote,local
