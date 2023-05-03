@@ -736,22 +736,22 @@ private:
 
 struct Harness {
   Harness(quic::ParsedQuicVersion quic_version)
-      : quic_version_(quic_version), version_manager(quic::CurrentSupportedHttp3Versions()) {
-    api = Api::createApiForTest();
-    dispatcher = api->allocateDispatcher("envoy_quic_h3_fuzzer_thread");
+      : quic_version_(quic_version), version_manager_(quic::CurrentSupportedHttp3Versions()) {
+    api_ = Api::createApiForTest();
+    dispatcher_ = api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread");
     auto connection_helper = std::unique_ptr<quic::QuicConnectionHelperInterface>(
-        new EnvoyQuicConnectionHelper(*dispatcher.get()));
+        new EnvoyQuicConnectionHelper(*dispatcher_.get()));
     auto alarm_factory = std::unique_ptr<quic::QuicAlarmFactory>(
-        new EnvoyQuicAlarmFactory(*dispatcher.get(), *connection_helper->GetClock()));
-    fuzz_dispatcher = std::make_unique<FuzzDispatcher>(quic_version_, &version_manager,
+        new EnvoyQuicAlarmFactory(*dispatcher_.get(), *connection_helper->GetClock()));
+    fuzz_dispatcher_ = std::make_unique<FuzzDispatcher>(quic_version_, &version_manager_,
                                                        std::move(connection_helper),
-                                                       std::move(alarm_factory), *dispatcher.get());
+                                                       std::move(alarm_factory), *dispatcher_.get());
   }
   quic::ParsedQuicVersion quic_version_;
-  Api::ApiPtr api;
-  Event::DispatcherPtr dispatcher;
-  std::unique_ptr<FuzzDispatcher> fuzz_dispatcher;
-  quic::QuicVersionManager version_manager;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<FuzzDispatcher> fuzz_dispatcher_;
+  quic::QuicVersionManager version_manager_;
 };
 
 std::unique_ptr<Harness> harness;
@@ -762,7 +762,7 @@ DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase& input) {
     harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
     atexit(resetHarness);
   }
-  harness->fuzz_dispatcher->fuzzQuic(input);
+  harness->fuzz_dispatcher_->fuzzQuic(input);
   fflush(stdout);
 }
 
