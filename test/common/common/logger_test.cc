@@ -120,6 +120,7 @@ public:
 
   void expectLogMessage(const std::string& pattern, const std::string& message,
                         const std::string& expected) {
+    StderrSinkDelegate stacked(Envoy::Logger::Registry::getSink());
     auto formatter = std::make_unique<spdlog::pattern_formatter>();
     formatter
         ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
