@@ -43,6 +43,7 @@ public:
   void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
+
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
@@ -65,6 +66,7 @@ public:
   const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
     return *params_;
   }
+
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
   quiche::QuicheReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
@@ -110,7 +112,8 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
 
 class FuzzDispatcher : public quic::QuicDispatcher {
 public:
-  FuzzDispatcher(const quic::ParsedQuicVersion quic_version, quic::QuicVersionManager* version_manager,
+  FuzzDispatcher(const quic::ParsedQuicVersion quic_version,
+                 quic::QuicVersionManager* version_manager,
                  std::unique_ptr<quic::QuicConnectionHelperInterface> connection_helper,
                  std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
                  Event::Dispatcher& dispatcher)
@@ -156,11 +159,11 @@ public:
     ProcessChlo(chlo, &chlo_packet_info);
 
     packetizer_.serializePackets(input);
-    packetizer_.foreach([this] (const char *payload, size_t size) {
-        auto receipt_time = helper()->GetClock()->Now();
-        quic::QuicReceivedPacket p(payload, size, receipt_time, false);
-        ProcessPacket(srv_addr_, cli_addr_, p);
-        });
+    packetizer_.foreach ([this](const char* payload, size_t size) {
+      auto receipt_time = helper()->GetClock()->Now();
+      quic::QuicReceivedPacket p(payload, size, receipt_time, false);
+      ProcessPacket(srv_addr_, cli_addr_, p);
+    });
   }
 
   void reset() {
@@ -258,21 +261,20 @@ private:
 
 struct Harness {
   Harness(quic::ParsedQuicVersion quic_version)
-      : quic_version_(quic_version),
-      api_(Api::createApiForTest()),
-      dispatcher_(api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread")),
-      version_manager_(quic::CurrentSupportedHttp3Versions()) {
-        createDispatcher();
-      }
+      : quic_version_(quic_version), api_(Api::createApiForTest()),
+        dispatcher_(api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread")),
+        version_manager_(quic::CurrentSupportedHttp3Versions()) {
+    createDispatcher();
+  }
 
   void createDispatcher() {
     auto connection_helper = std::unique_ptr<quic::QuicConnectionHelperInterface>(
         new EnvoyQuicConnectionHelper(*dispatcher_.get()));
     auto alarm_factory = std::unique_ptr<quic::QuicAlarmFactory>(
         new EnvoyQuicAlarmFactory(*dispatcher_.get(), *connection_helper->GetClock()));
-    fuzz_dispatcher_ = std::make_unique<FuzzDispatcher>(quic_version_, &version_manager_,
-                                                       std::move(connection_helper),
-                                                       std::move(alarm_factory), *dispatcher_.get());
+    fuzz_dispatcher_ = std::make_unique<FuzzDispatcher>(
+        quic_version_, &version_manager_, std::move(connection_helper), std::move(alarm_factory),
+        *dispatcher_.get());
   }
 
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {

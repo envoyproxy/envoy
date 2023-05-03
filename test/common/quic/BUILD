@@ -390,8 +390,8 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "envoy_quic_h3_fuzz_helper_lib",
-    hdrs = ["envoy_quic_h3_fuzz_helper.h"],
     srcs = ["envoy_quic_h3_fuzz_helper.cc"],
+    hdrs = ["envoy_quic_h3_fuzz_helper.h"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_proto_cc_proto",

@@ -1,17 +1,21 @@
-#include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 #include <set>
 
-#include "quiche/quic/core/quic_versions.h"
+#include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
+
 #include "quiche/quic/core/quic_connection.h"
+#include "quiche/quic/core/quic_versions.h"
+
+namespace Envoy {
+namespace Quic {
 
 class H3Packetizer {
 public:
-  H3Packetizer(std::set<uint32_t> &streams) : open_h3_streams_(streams) {};
-  size_t serialize(char *buffer, size_t buffer_len, bool unidirectional,
-      uint32_t type, uint32_t id, const test::common::quic::H3Frame& h3frame);
-  
+  H3Packetizer(std::set<uint32_t>& streams) : open_h3_streams_(streams){};
+  size_t serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id,
+                   const test::common::quic::H3Frame& h3frame);
+
 private:
-  std::set<uint32_t> &open_h3_streams_;
+  std::set<uint32_t>& open_h3_streams_;
 };
 
 class QuicPacketizer {
@@ -19,7 +23,7 @@ public:
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
   void serializePackets(const test::common::quic::QuicH3FuzzCase& input);
-  void foreach(std::function<void(const char *, size_t)> cb);
+  void foreach (std::function<void(const char*, size_t)> cb);
   void reset();
 
 private:
@@ -97,3 +101,6 @@ public:
     return std::numeric_limits<quic::QuicPacketCount>::max();
   }
 };
+
+} // namespace Quic
+} // namespace Envoy

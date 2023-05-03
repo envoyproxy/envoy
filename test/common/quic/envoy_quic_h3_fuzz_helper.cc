@@ -1,6 +1,10 @@
 #include "test/common/quic/envoy_quic_h3_fuzz_helper.h"
+
 #include "quiche/common/quiche_data_writer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+
+namespace Envoy {
+namespace Quic {
 
 static uint64_t clampU64(uint64_t in) { return in & ((1ULL << 62) - 1); }
 
@@ -44,7 +48,7 @@ static size_t buildVarIntFrame(quiche::QuicheDataWriter& dw, Type type, uint64_t
 }
 
 static size_t buildSettingsFrame(quiche::QuicheDataWriter& dw,
-                          std::vector<std::pair<uint64_t, uint64_t>>& settings) {
+                                 std::vector<std::pair<uint64_t, uint64_t>>& settings) {
   bool valid = true;
   uint64_t slen = 0;
   for (auto pair : settings) {
@@ -61,7 +65,7 @@ static size_t buildSettingsFrame(quiche::QuicheDataWriter& dw,
 }
 
 static size_t buildPushPromiseFrame(quiche::QuicheDataWriter& dw, uint64_t push_id,
-                             const std::string& headers) {
+                                    const std::string& headers) {
   bool valid = true;
   uint64_t s = quiche::QuicheDataWriter::GetVarInt62Len(clampU64(push_id));
   s += headers.size();
@@ -73,8 +77,8 @@ static size_t buildPushPromiseFrame(quiche::QuicheDataWriter& dw, uint64_t push_
   return valid ? dw.length() : 0;
 }
 
-
-size_t H3Packetizer::serialize(char *buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id, const H3Frame& h3frame) {
+size_t H3Packetizer::serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type,
+                               uint32_t id, const H3Frame& h3frame) {
   quiche::QuicheDataWriter dw(buffer_len, buffer);
   if (unidirectional) {
     if (open_h3_streams_.find(id) == open_h3_streams_.end()) {
@@ -131,8 +135,7 @@ size_t H3Packetizer::serialize(char *buffer, size_t buffer_len, bool unidirectio
 }
 
 static quic::QuicConnectionId toConnectionId(const std::string& data) {
-  uint8_t size =
-      std::min(static_cast<uint8_t>(data.size()), quic::kQuicDefaultConnectionIdLength);
+  uint8_t size = std::min(static_cast<uint8_t>(data.size()), quic::kQuicDefaultConnectionIdLength);
   return {data.data(), size};
 }
 
@@ -157,11 +160,11 @@ static quic::QuicPathFrameBuffer toPathFrameBuffer(const std::string& data) {
 static quic::QuicErrorCode toErrorCode(uint32_t) { return quic::QuicErrorCode::QUIC_NO_ERROR; }
 
 QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
-               quic::QuicConnectionHelperInterface* connection_helper)
+                               quic::QuicConnectionHelperInterface* connection_helper)
     : quic_version_(quic_version), connection_helper_(connection_helper), packet_number_(0),
       destination_connection_id_(quic::test::TestConnectionId()),
-      framer_({quic_version_}, connection_helper_->GetClock()->Now(),
-              quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength),
+      framer_({quic_version_}, connection_helper_->GetClock()->Now(), quic::Perspective::IS_CLIENT,
+              quic::kQuicDefaultConnectionIdLength),
       h3packetizer_(open_h3_streams_) {
   framer_.SetEncrypter(quic::ENCRYPTION_INITIAL,
                        std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
@@ -175,7 +178,7 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
 
 void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
   for (auto& quic_frame_or_junk : input.frames()) {
-    if (idx_ >= sizeof(quic_packet_sizes_)/sizeof(quic_packet_sizes_[0])) {
+    if (idx_ >= sizeof(quic_packet_sizes_) / sizeof(quic_packet_sizes_[0])) {
       return;
     }
     if (quic_frame_or_junk.has_qframe()) {
@@ -190,8 +193,8 @@ void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
   }
 }
 
-void QuicPacketizer::foreach(std::function<void(const char *, size_t)> cb) {
-  for(size_t i = 0; i < idx_; i++) {
+void QuicPacketizer::foreach (std::function<void(const char*, size_t)> cb) {
+  for (size_t i = 0; i < idx_; i++) {
     if (quic_packet_sizes_[i] > 0) {
       cb(quic_packets_[i], quic_packet_sizes_[i]);
     }
@@ -322,7 +325,8 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   } break;
   case QuicFrame::kBlocked: {
     const auto& f = frame.blocked();
-    frames.push_back(quic::QuicFrame(quic::QuicBlockedFrame(f.control_frame_id(), f.stream_id(), clampU64(f.offset()))));
+    frames.push_back(quic::QuicFrame(
+        quic::QuicBlockedFrame(f.control_frame_id(), f.stream_id(), clampU64(f.offset()))));
   } break;
   case QuicFrame::kNewConnectionId: {
     const auto& f = frame.new_connection_id();
@@ -339,27 +343,30 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   } break;
   case QuicFrame::kMaxStreams: {
     const auto& f = frame.max_streams();
-    frames.push_back(quic::QuicFrame(quic::QuicMaxStreamsFrame(f.control_frame_id(), f.stream_count(), f.unidirectional())));
+    frames.push_back(quic::QuicFrame(
+        quic::QuicMaxStreamsFrame(f.control_frame_id(), f.stream_count(), f.unidirectional())));
   } break;
   case QuicFrame::kStreamsBlocked: {
     const auto& f = frame.streams_blocked();
     frames.push_back(quic::QuicFrame(
-          quic::QuicStreamsBlockedFrame(f.control_frame_id(), f.stream_count(),
-                                       f.unidirectional())));
+        quic::QuicStreamsBlockedFrame(f.control_frame_id(), f.stream_count(), f.unidirectional())));
   } break;
   case QuicFrame::kPathResponse: {
     const auto& f = frame.path_response();
-    frames.push_back(quic::QuicFrame(quic::QuicPathResponseFrame(f.control_frame_id(), toPathFrameBuffer(f.data()))));
+    frames.push_back(quic::QuicFrame(
+        quic::QuicPathResponseFrame(f.control_frame_id(), toPathFrameBuffer(f.data()))));
   } break;
   case QuicFrame::kPathChallenge: {
     const auto& f = frame.path_challenge();
-    frames.push_back(quic::QuicFrame(quic::QuicPathChallengeFrame(f.control_frame_id(), toPathFrameBuffer(f.data()))));
+    frames.push_back(quic::QuicFrame(
+        quic::QuicPathChallengeFrame(f.control_frame_id(), toPathFrameBuffer(f.data()))));
   } break;
   case QuicFrame::kStopSending: {
     const auto& f = frame.stop_sending();
     quic::QuicRstStreamErrorCode error_code =
         static_cast<quic::QuicRstStreamErrorCode>(f.error_code());
-    frames.push_back(quic::QuicFrame(quic::QuicStopSendingFrame(f.control_frame_id(), f.stream_id(), error_code)));
+    frames.push_back(quic::QuicFrame(
+        quic::QuicStopSendingFrame(f.control_frame_id(), f.stream_id(), error_code)));
   } break;
   case QuicFrame::kMessageFrame: {
     const auto& f = frame.message_frame();
@@ -380,8 +387,7 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
     const auto& f = frame.ack_frequency();
     auto delta = quic::QuicTime::Delta::FromMilliseconds(clampU64(f.milliseconds()));
     ack_frequency = std::make_unique<quic::QuicAckFrequencyFrame>(
-        f.control_frame_id(), clampU64(f.sequence_number()), clampU64(f.packet_tolerance()),
-        delta);
+        f.control_frame_id(), clampU64(f.sequence_number()), clampU64(f.packet_tolerance()), delta);
     frames.push_back(quic::QuicFrame(ack_frequency.get()));
   } break;
   default:
@@ -397,3 +403,6 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
                              quic::EncryptionLevel::ENCRYPTION_INITIAL);
   idx_++;
 }
+
+} // namespace Quic
+} // namespace Envoy
