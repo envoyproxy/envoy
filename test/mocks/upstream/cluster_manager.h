@@ -3,7 +3,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "test/mocks/config/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tcp/mocks.h"
@@ -109,7 +108,6 @@ public:
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
