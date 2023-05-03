@@ -191,6 +191,7 @@ build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
 build:test-coverage --test_arg="-l trace"
+build:test-coverage --test_arg="--log-path /dev/null"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
