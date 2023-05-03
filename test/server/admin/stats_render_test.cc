@@ -54,7 +54,7 @@ TEST_F(StatsRenderTest, TextHistogramDetailed) {
       "  intervals=200:1, 300:2\n"
       "  summary=P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) P90(308.5,308.5) "
       "P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) P99.9(309.985,309.985) "
-      "P100(310,310)";
+      "P100(310,310)\n";
   EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
 }
 
