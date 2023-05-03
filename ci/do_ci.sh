@@ -32,7 +32,7 @@ fi
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
-  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
+  mv -f "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
   ((build_profile_count++))
 }
 
@@ -225,21 +225,30 @@ case $CI_TARGET in
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
         mkdir -p "$ENVOY_BINARY_DIR"
 
+        # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
+        # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
+        # `--stripopt=--strip-all -c opt`
+        BAZEL_RELEASE_OPTIONS=(
+            --stripopt=--strip-all
+            -c opt)
+
         # Run release tests
-        echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal -c opt "${TEST_TARGETS[@]}"
+        echo "Testing with:"
+        echo "  targets: ${TEST_TARGETS[*]}"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
+        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal "${BAZEL_RELEASE_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
         # Build release binaries
-        # As the binary build package enforces `-c opt`, adding here to ensure the distribution build reuses
-        # any already compiled artefacts, the bundle itself will always be compiled `-c opt`
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution/binary:release
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" //distribution/binary:release
 
         # Copy release binaries to binary export directory
         cp -a "bazel-bin/distribution/binary/release.tar.zst" "${ENVOY_BINARY_DIR}/release.tar.zst"
 
         # Grab the schema_validator_tool
         # TODO(phlax): bundle this with the release when #26390 is resolved
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel --stripopt=--strip-all -c opt //test/tools/schema_validator:schema_validator_tool.stripped
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel "${BAZEL_RELEASE_OPTIONS[@]}" //test/tools/schema_validator:schema_validator_tool.stripped
 
         # Copy schema_validator_tool to binary export directory
         cp -a bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped "${ENVOY_BINARY_DIR}/schema_validator_tool"
@@ -502,7 +511,7 @@ case $CI_TARGET in
         ;;
     fuzz)
         setup_clang_toolchain
-        FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
+        FUZZ_TEST_TARGETS=("$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
         echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
         echo "Building envoy fuzzers and executing 100 fuzz iterations..."
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
