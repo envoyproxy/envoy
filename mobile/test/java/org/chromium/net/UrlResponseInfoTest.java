@@ -9,7 +9,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.chromium.net.impl.UrlResponseInfoImpl;
+import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.Feature;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,9 +38,9 @@ public class UrlResponseInfoTest {
     final String proxyServer = "example.com";
     final long receivedByteCount = 42;
 
-    final UrlResponseInfo info =
-        new UrlResponseInfoImpl(urlChain, httpStatusCode, httpStatusText, allHeadersList, wasCached,
-                                negotiatedProtocol, proxyServer, receivedByteCount);
+    final UrlResponseInfo info = new CronvoyUrlResponseInfoImpl(
+        urlChain, httpStatusCode, httpStatusText, allHeadersList, wasCached, negotiatedProtocol,
+        proxyServer, receivedByteCount);
     assertEquals(info.getUrlChain(), urlChain);
     try {
       info.getUrlChain().add("example.com");

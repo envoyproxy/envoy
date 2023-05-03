@@ -1,7 +1,7 @@
 package org.chromium.net.testing;
 
 import org.chromium.net.ExperimentalCronetEngine;
-import org.chromium.net.impl.NativeCronetEngineBuilderImpl;
+import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 
 /**
  * Utilities for Cronet testing
@@ -12,9 +12,9 @@ public final class CronetTestUtil {
     getCronetEngineBuilderImpl(builder).setMockCertVerifierForTesting();
   }
 
-  public static NativeCronetEngineBuilderImpl
+  public static NativeCronvoyEngineBuilderImpl
   getCronetEngineBuilderImpl(ExperimentalCronetEngine.Builder builder) {
-    return (NativeCronetEngineBuilderImpl)builder.getBuilderDelegate();
+    return (NativeCronvoyEngineBuilderImpl)builder.getBuilderDelegate();
   }
 
   public static boolean nativeCanGetTaggedBytes() {
