@@ -511,8 +511,8 @@ void GrpcHealthCheckFuzz::expectClientCreate() {
 void GrpcHealthCheckFuzz::expectStreamCreate() {
   test_session_->request_encoder_.stream_.callbacks_.clear();
   EXPECT_CALL(*test_session_->codec_, newStream(_))
-      .WillOnce(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
-                      ReturnRef(test_session_->request_encoder_)));
+      .WillRepeatedly(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
+                            ReturnRef(test_session_->request_encoder_)));
 }
 
 Network::ConnectionEvent
