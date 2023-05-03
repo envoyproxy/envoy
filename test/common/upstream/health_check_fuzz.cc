@@ -172,6 +172,10 @@ void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   }
   if (expect_client_create) {
     expectClientCreate(0);
+  } else if (test_sessions_[0]->client_connection_->state() != Network::Connection::State::Open) {
+    // No client connection to reuse.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
@@ -269,6 +273,10 @@ void TcpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   if (expect_client_create) {
     ENVOY_LOG_MISC(trace, "Creating client");
     expectClientCreate();
+  } else if (connection_->state() != Network::Connection::State::Open) {
+    // Without a client no interval timer possible.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   interval_timer_->invokeCallback();
@@ -447,6 +455,10 @@ void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   if (expect_client_create) {
     expectClientCreate();
     ENVOY_LOG_MISC(trace, "Created client");
+  } else if (test_session_->client_connection_->state() != Network::Connection::State::Open) {
+    // No client connection to reuse.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   expectStreamCreate();
   ENVOY_LOG_MISC(trace, "Created stream");
