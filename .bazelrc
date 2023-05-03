@@ -44,6 +44,8 @@ build --test_summary=terse
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
+test --test_verbose_timeout_warnings
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
