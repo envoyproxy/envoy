@@ -45,7 +45,6 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
-#include "source/common/upstream/ring_hash_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -907,10 +906,11 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
+      cluster_entry_it->second->thread_aware_lb_ =
+          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
+                         random_, time_source_);
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {

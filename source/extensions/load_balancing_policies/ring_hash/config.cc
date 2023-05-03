@@ -1,6 +1,6 @@
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
-#include "source/common/upstream/ring_hash_lb.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,10 +16,12 @@ Upstream::ThreadAwareLoadBalancerPtr Factory::create(const Upstream::ClusterInfo
       dynamic_cast<const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash*>(
           cluster_info.loadBalancingPolicy().get());
 
-  // The load balancing policy configuration will be loaded and validated in the main thread when we
-  // load the cluster configuration. So we can assume the configuration is valid here.
-  ASSERT(typed_config != nullptr,
-         "Invalid load balancing policy configuration for ring hash load balancer");
+  // Assume legacy config.
+  if (!typed_config) {
+    return std::make_unique<Upstream::RingHashLoadBalancer>(
+        priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
+        cluster_info.lbRingHashConfig(), cluster_info.lbConfig());
+  }
 
   return std::make_unique<Upstream::RingHashLoadBalancer>(
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
