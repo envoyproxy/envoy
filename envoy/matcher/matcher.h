@@ -162,7 +162,7 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param  Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
+   * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
    * lookup failed.
    */
   virtual bool match(const Matcher::MatchingDataType& input) PURE;
@@ -173,7 +173,6 @@ public:
    * string only. Override this function to provide matcher specific supported data input types.
    */
   virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
-
     return absl::flat_hash_set<std::string>{typeid(std::string).name()};
   }
 };
