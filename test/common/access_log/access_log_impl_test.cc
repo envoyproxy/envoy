@@ -1244,7 +1244,7 @@ typed_config:
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
 }
-
+/////////////////////////////////////////////////////////////////
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
   const std::string yaml_template = R"EOF(
 name: accesslog
@@ -1437,6 +1437,94 @@ typed_config:
   response_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterUnsupportedValue) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - NOT_A_VALID_CODE
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          EnvoyException, "NOT_A_VALID_CODE");
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterBlock) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpConnectionEnd); // Blocked
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterAllow) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(2);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpUpstreamConnected); // Allowed
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::DownstreamEnd); // Allowed
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::UpstreamPoolReady); // Blocked
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterExclude) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    exclude: true
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpUpstreamConnected); // Blocked
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::DownstreamEnd); // Blocked
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::UpstreamPoolReady); // Allowed
 }
 
 TEST_F(AccessLogImplTest, MetadataFilter) {
