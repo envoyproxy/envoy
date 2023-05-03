@@ -7,8 +7,8 @@
 #include "envoy/router/router.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/upstream/ring_hash_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
