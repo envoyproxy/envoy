@@ -112,6 +112,10 @@ def envoy_select_hot_restart(xs, repository = ""):
 def envoy_select_signal_trace(xs, repository = ""):
     return select({
         repository + "//bazel:disable_signal_trace": [],
+        # Disable signal trace on Android/Apple platforms until we figure out
+        # why some tests crash when signal trace is enabled.
+        repository + "//bazel:android": [],
+        repository + "//bazel:apple": [],
         "//conditions:default": xs,
     })
 
