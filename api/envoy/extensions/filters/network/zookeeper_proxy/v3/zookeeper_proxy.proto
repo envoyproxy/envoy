@@ -54,7 +54,7 @@ message ZooKeeperProxy {
   // If the threshold override of one opcode is not set, it will fallback to the default latency
   // threshold.
   // Specifying latency threshold overrides multiple times for one opcode is not allowed.
-  repeated LatencyThresholdOverride latency_threshold_overrides = 5 [(validate.rules).repeated = {max_items: 27}];
+  repeated LatencyThresholdOverride latency_threshold_overrides = 5 [(validate.rules).repeated = {max_items: 26}];
 }
 
 message LatencyThresholdOverride {
