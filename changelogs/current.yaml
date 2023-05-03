@@ -20,6 +20,14 @@ minor_behavior_changes:
 - area: custom response
   change: |
     The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
+- area: http1
+  change: |
+    The HTTP1 server-side codec no longer considers encoding 1xx headers as
+    starting the response. This allows the codec to raise protocol errors,
+    sending detailed local replies instead of just closing the connection. This
+    behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers``
+    to false.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
