@@ -1244,7 +1244,7 @@ typed_config:
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
 }
-/////////////////////////////////////////////////////////////////
+
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
   const std::string yaml_template = R"EOF(
 name: accesslog
