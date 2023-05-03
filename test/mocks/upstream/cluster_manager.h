@@ -89,7 +89,7 @@ public:
    */
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
-    // Check if value equvilant to common_lb_config_a_
+    // Check if value equivalent to common_lb_config_a_
     if (common_lb_config_a_ == nullptr) {
       common_lb_config_a_ =
           std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
