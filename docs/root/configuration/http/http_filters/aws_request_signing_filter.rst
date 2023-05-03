@@ -48,6 +48,8 @@ Example filter configuration:
     - exact: x-amzn-trace-id
 
 
+.. include:: _include/aws_credentials.rst
+
 Statistics
 ----------
 

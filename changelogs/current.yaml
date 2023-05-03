@@ -35,6 +35,11 @@ minor_behavior_changes:
     Default sanitize host header prior to direct invocation of a lambda.  This behavior can reverted by setting runtime flag 
     ``envoy.reloadable_features.lambda_sanitize_host_headers`` to false, in which case requests will retain the originating header to the 
     AWS invocation lambda API, causing a signature mismatch error to be returned.  This is only applicable when using the Lambda Invocation Filter.
+- area: aws
+  change: |
+    Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched
+    from environment variables. This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
