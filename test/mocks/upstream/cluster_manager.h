@@ -85,20 +85,22 @@ public:
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
   /*
-  * Mimic the behavior of a shared common_lb_config by storing it in a shared pointer
-  */
-  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
-  getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) override {
-    //Check if value equvilant to common_lb_config_a_
-    if(common_lb_config_a_ == nullptr) {
-      common_lb_config_a_ = std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(common_lb_config);
+   * Mimic the behavior of a shared common_lb_config by storing it in a shared pointer
+   */
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
+    // Check if value equvilant to common_lb_config_a_
+    if (common_lb_config_a_ == nullptr) {
+      common_lb_config_a_ =
+          std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
+              common_lb_config);
       return common_lb_config_a_;
-    }
-    else if (Protobuf::util::MessageDifferencer::Equivalent(common_lb_config, *common_lb_config_a_)) {
+    } else if (Protobuf::util::MessageDifferencer::Equivalent(common_lb_config,
+                                                              *common_lb_config_a_)) {
       return common_lb_config_a_;
-    }
-    else {
-      return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(common_lb_config);
+    } else {
+      return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
+          common_lb_config);
     }
   }
 

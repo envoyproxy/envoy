@@ -436,9 +436,9 @@ public:
    * @param common_lb_config The config field to be stored
    * @return shared_ptr to the CommonLbConfig
    */
- virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
- getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) PURE;
-
+  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
