@@ -15,6 +15,7 @@
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
@@ -202,7 +203,7 @@ protected:
         connection_id_generator());
 
     auto decrypter = std::make_unique<FuzzDecrypter>();
-    auto encrypter = std::make_unique<FuzzEncrypter>();
+    auto encrypter = std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT);
     connection->InstallDecrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
                                  std::move(decrypter));
     connection->SetEncrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
