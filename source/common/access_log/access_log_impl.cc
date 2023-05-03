@@ -80,6 +80,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
     return FilterPtr{new MetadataFilter(config.metadata_filter())};
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
+    return FilterPtr{new MetadataFilter(config.metadata_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {

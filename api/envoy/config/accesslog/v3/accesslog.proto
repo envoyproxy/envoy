@@ -89,8 +89,8 @@ message AccessLogFilter {
     // Metadata Filter
     MetadataFilter metadata_filter = 12;
 
-    // Access Log Type Filter
-    AccessLogTypeFilter access_log_type_filter = 13;
+    // Log Type Filter
+    LogTypeFilter log_type_filter = 13;
   }
 }
 
@@ -315,7 +315,7 @@ message MetadataFilter {
 }
 
 // Filters based on access log type.
-message AccessLogTypeFilter {
+message LogTypeFilter {
   // Logs only records which their type is one of the types defined in this field.
   repeated data.accesslog.v3.AccessLogType types = 1
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
