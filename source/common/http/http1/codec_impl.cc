@@ -440,8 +440,11 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
+#ifndef ENVOY_ENABLE_UHV
+  // These checks are now part of UHV
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+#endif
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();

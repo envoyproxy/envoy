@@ -1424,6 +1424,7 @@ TEST_P(IntegrationTest, PipelineInline) {
 }
 
 TEST_P(IntegrationTest, NoHost) {
+  disable_client_header_validation_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -2019,6 +2020,7 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -2197,6 +2199,7 @@ TEST_P(IntegrationTest, QuitQuitQuit) {
 // stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is left open on invalid
 // HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -2221,6 +2224,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIs
 // stream_error_on_invalid_http_message=true: test that HTTP/1.1 connection is left open on invalid
 // HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
@@ -2240,6 +2244,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNot
 // stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is terminated on
 // invalid HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
