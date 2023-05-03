@@ -301,7 +301,12 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
   // set by multiple code paths. handleFailure() turns on interval and turns off timeout. However,
   // other action of the fuzzer account for this by explicitly invoking a client after
   // expect_close_ gets set to true, turning expect_close_ back to false.
-  connection_->raiseEvent(event_type);
+  if (event_type == Network::ConnectionEvent::Connected &&
+      connection_->state() != Network::Connection::State::Open) {
+    ENVOY_LOG_MISC(trace, "Event CONNECTED on closed connection; ignoring");
+  } else {
+    connection_->raiseEvent(event_type);
+  }
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     if (!interval_timer_->enabled_) {
       return;
