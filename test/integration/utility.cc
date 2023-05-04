@@ -342,8 +342,8 @@ public:
     real_factory_ = factory->createFromProto(typed_config.typed_config(), server_context_);
   }
 
-  Http::HeaderValidatorPtr createServerHeaderValidator(Http::Protocol protocol,
-                                                       Http::HeaderValidatorStats& stats) override {
+  Http::ServerHeaderValidatorPtr
+  createServerHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
     return real_factory_->createServerHeaderValidator(protocol, stats);
   }
   Http::ClientHeaderValidatorPtr
