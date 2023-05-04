@@ -72,6 +72,7 @@ EXTENSIONS = {
 
     "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
+    "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
 
     #
     # Network Matchers
@@ -214,6 +215,7 @@ EXTENSIONS = {
     "envoy.stat_sinks.graphite_statsd":                 "//source/extensions/stat_sinks/graphite_statsd:config",
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
+    "envoy.stat_sinks.open_telemetry":                  "//source/extensions/stat_sinks/open_telemetry:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
     "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
@@ -424,6 +426,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
+    "envoy.load_balancing_policies.subset":       "//source/extensions/load_balancing_policies/subset:config",
 
     #
     # HTTP Early Header Mutation
@@ -436,6 +439,12 @@ EXTENSIONS = {
     "envoy.config_subscription.rest": "//source/extensions/config_subscription/rest:http_subscription_lib",
     "envoy.config_subscription.filesystem": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
     "envoy.config_subscription.filesystem_collection": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+    "envoy.config_subscription.grpc": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.delta_grpc": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.ads": "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    "envoy.config_subscription.aggregated_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+    "envoy.config_subscription.aggregated_delta_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+    "envoy.config_subscription.ads_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

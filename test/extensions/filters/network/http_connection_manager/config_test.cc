@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -290,7 +291,7 @@ http_filters:
   )EOF";
 
   // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // there is no reason to obtain an actual HttpTracer.
+  // there is no reason to obtain an actual Tracer.
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(_)).Times(0);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -331,7 +332,7 @@ http_filters:
   context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // there is no reason to obtain an actual HttpTracer.
+  // there is no reason to obtain an actual Tracer.
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(_)).Times(0);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -369,16 +370,16 @@ http_filters:
   )EOF";
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // an actual HttpTracer must be obtained from the HttpTracerManager.
-  EXPECT_CALL(tracer_manager_, getOrCreateTracer(nullptr)).WillOnce(Return(http_tracer_));
+  // an actual Tracer must be obtained from the HttpTracerManager.
+  EXPECT_CALL(tracer_manager_, getOrCreateTracer(nullptr)).WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  // Actual HttpTracer must be obtained from the HttpTracerManager.
-  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
+  // Actual Tracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(tracer_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingIsEnabledAndThereIsTracingConfigInBootstrap) {
@@ -411,17 +412,17 @@ http_filters:
   context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // an actual HttpTracer must be obtained from the HttpTracerManager.
+  // an actual Tracer must be obtained from the HttpTracerManager.
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(Pointee(ProtoEq(tracing_config.http()))))
-      .WillOnce(Return(http_tracer_));
+      .WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  // Actual HttpTracer must be obtained from the HttpTracerManager.
-  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
+  // Actual Tracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(tracer_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingIsEnabledAndThereIsInlinedTracerProvider) {
@@ -471,18 +472,18 @@ http_filters:
   inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // an actual HttpTracer must be obtained from the HttpTracerManager.
+  // an actual Tracer must be obtained from the HttpTracerManager.
   // Expect inlined tracer provider configuration to take precedence over bootstrap configuration.
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(Pointee(ProtoEq(inlined_tracing_config))))
-      .WillOnce(Return(http_tracer_));
+      .WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  // Actual HttpTracer must be obtained from the HttpTracerManager.
-  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
+  // Actual Tracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(tracer_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
@@ -2961,12 +2962,12 @@ public:
     return std::make_unique<test::http_connection_manager::CustomHeaderValidator>();
   }
 
-  Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
-                                                  ProtobufMessage::ValidationVisitor&) override {
+  Http::HeaderValidatorFactoryPtr
+  createFromProto(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
+            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
     return header_validator;
   }
 };
@@ -2988,19 +2989,20 @@ public:
 
   Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& message,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+                  Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
+        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(
-            *mptr, validation_visitor);
+            *mptr, server_context.messageValidationVisitor());
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
+            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
     return header_validator;
   }
 

@@ -100,6 +100,8 @@ private:
 
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
+    bool connectionRateLimitEnabled() const override { return false; }
+    uint32_t connectionRateLimitPerSec() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

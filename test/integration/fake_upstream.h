@@ -36,7 +36,9 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
@@ -47,6 +49,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -265,6 +268,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
+  Http::ServerHeaderValidatorPtr header_validator_;
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -493,6 +497,8 @@ public:
   void writeRawData(absl::string_view data);
   ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
+  Http::ServerHeaderValidatorPtr makeHeaderValidator();
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
@@ -523,7 +529,10 @@ private:
   const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+  testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
+  Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;

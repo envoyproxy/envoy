@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
@@ -463,7 +464,8 @@ public:
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -522,6 +524,7 @@ private:
   void onBody(Buffer::Instance& data) override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
+  Status sendOverloadError();
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
   HeaderMap& headersOrTrailers() override {
@@ -571,6 +574,7 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  Server::LoadShedPoint* abort_dispatch_{nullptr};
 };
 
 /**

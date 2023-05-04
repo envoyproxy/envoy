@@ -44,10 +44,7 @@
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
-#include "source/common/upstream/ring_hash_lb.h"
-#include "source/common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -405,7 +402,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -418,7 +415,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -438,7 +435,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -453,7 +450,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -909,17 +906,19 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
+      cluster_entry_it->second->thread_aware_lb_ =
+          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
+                         random_, time_source_);
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
+      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.maglev");
+      cluster_entry_it->second->thread_aware_lb_ =
+          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
+                         random_, time_source_);
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
@@ -1549,12 +1548,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_ = std::make_unique<SubsetLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->lbStats(),
-        cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
-        parent_.thread_local_dispatcher_.timeSource());
+    auto& factory = Config::Utility::getAndCheckFactoryByName<NonThreadAwareLoadBalancerFactory>(
+        "envoy.load_balancing_policies.subset");
+    lb_ = factory.create(*cluster, priority_set_, parent_.local_priority_set_,
+                         parent.parent_.runtime_, parent.parent_.random_,
+                         parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1867,9 +1865,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
-      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
-      http_context_, grpc_context_, router_context_, server_)};
+      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(),
+      context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
+      context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
+      context_.routerContext(), server_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1975,11 +1974,8 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
-                                        ssl_context_manager_, outlier_event_logger, added_via_api,
-                                        added_via_api
-                                            ? validation_context_.dynamicValidationVisitor()
-                                            : validation_context_.staticValidationVisitor());
+  return ClusterFactoryImplBase::create(cluster, context_, cm, dns_resolver_fn_,
+                                        ssl_context_manager_, outlier_event_logger, added_via_api);
 }
 
 CdsApiPtr
@@ -1988,7 +1984,7 @@ ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
-                            validation_context_.dynamicValidationVisitor());
+                            context_.messageValidationContext().dynamicValidationVisitor());
 }
 
 } // namespace Upstream

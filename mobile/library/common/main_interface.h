@@ -211,8 +211,9 @@ envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char*
  * terminated engine is illegal.
  * @param engine, handle to the engine to terminate.
  * @param release, set to true to release the engine from memory.
+ * @return envoy_status_t, the resulting status of the operation.
  */
-void terminate_engine(envoy_engine_t engine, bool release);
+envoy_status_t terminate_engine(envoy_engine_t engine, bool release);
 
 /**
  * Refresh DNS, and drain connections associated with an engine.

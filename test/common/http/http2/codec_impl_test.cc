@@ -75,7 +75,7 @@ public:
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::HeaderValidator* header_validator) {
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
     header_validator_ = header_validator;
   }
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
@@ -106,7 +106,7 @@ public:
   }
 
 private:
-  Http::HeaderValidator* header_validator_{nullptr};
+  Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
 } // namespace
@@ -405,9 +405,9 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ =
-        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
-            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats());
     request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }
@@ -457,7 +457,7 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -3633,6 +3633,10 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#26490) : this test needs UHV for both client and server
+  return;
+#endif
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
@@ -4386,10 +4390,8 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
 TEST_P(Http2CodecImplTest, BadResponseHeader) {
   initialize();
 #ifdef ENVOY_ENABLE_UHV
-  // UHV mode makes no effect on nghttp2
-  if (http2_implementation_ != Http2Impl::Oghttp2) {
-    return;
-  }
+  // TODO(#26490): this test needs UHV for both client and server codecs
+  return;
 #endif
 
   InSequence s;
