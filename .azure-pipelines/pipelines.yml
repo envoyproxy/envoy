@@ -532,7 +532,7 @@ stages:
       displayName: 'Download maintainer GPG key'
       inputs:
         # NB: This is the path to the key and **must** be set on a per-pipeline basis
-        secureFile: '$(maintainerGPGKey)'
+        secureFile: '$(MaintainerGPGKeySecureFileDownloadPath)'
 
     - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
       displayName: "Publish release to Github"
