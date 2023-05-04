@@ -6,10 +6,16 @@ parameters:
   default: ""
 
 ## Timeouts
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
 - name: timeoutDockerPublish
   displayName: "Timout Docker publish"
   type: number
-  default: 10
+  # in seconds
+  default: 15
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
 
 # Auth
 - name: authGCP
@@ -89,13 +95,7 @@ jobs:
     inputs:
       buildType: current
       artifactName: "bazel.release"
-      itemPattern: "bazel.release/bin/*"
-      targetPath: $(Build.StagingDirectory)
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "bazel.release.arm64"
-      itemPattern: "bazel.release.arm64/bin/*"
+      itemPattern: "bazel.release/**/bin/*"
       targetPath: $(Build.StagingDirectory)
   - bash: |
       set -e
@@ -103,12 +103,12 @@ jobs:
       mkdir -p linux/amd64 linux/arm64
 
       # x64
-      cp -a $(Build.StagingDirectory)/bazel.release/bin/release.tar.zst linux/amd64/release.tar.zst
-      cp -a $(Build.StagingDirectory)/bazel.release/bin/schema_validator_tool linux/amd64/schema_validator_tool
+      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
+      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
 
       # arm64
-      cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/release.tar.zst linux/arm64/release.tar.zst
-      cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
+      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
+      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
 
       # Debug what files appear to have been downloaded
       find linux -type f -name "*" | xargs ls -l
@@ -121,6 +121,7 @@ jobs:
       AZP_SHA1: $(Build.SourceVersion)
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+      DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
   - bash: |
       echo "disk space at end of build:"
       df -h
@@ -149,7 +150,7 @@ jobs:
     inputs:
       buildType: current
       artifactName: "bazel.release"
-      itemPattern: "bazel.release/bin/*"
+      itemPattern: "bazel.release/x64/bin/*"
       targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
@@ -166,8 +167,8 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release.arm64"
-      itemPattern: "bazel.release.arm64/bin/*"
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/arm64/bin/*"
       targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:

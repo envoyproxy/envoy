@@ -17,7 +17,7 @@ Breaking changes:
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
 - java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
-- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: remove ``addVirtualClusters`` APIs.
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 - api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
@@ -48,6 +48,7 @@ Features:
 - api: Add support for String Accessors to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
+- api: removed ``enableHappyEyeballs`` turning up happy eyeballs by default.
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
 - build: Add a build feature ``envoy_http_datagrams`` to allow disabling HTTP Datagram support. (:issue:`#23564 <23564>`)
 - build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)

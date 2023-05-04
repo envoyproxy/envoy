@@ -24,6 +24,7 @@
 
 #include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -41,13 +42,17 @@ namespace Envoy {
 
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
-    : parent_(parent), encoder_(encoder), time_system_(time_system) {
+    : parent_(parent), encoder_(encoder), time_system_(time_system),
+      header_validator_(parent.makeHeaderValidator()) {
   encoder.getStream().addCallbacks(*this);
 }
 
 void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
+  if (header_validator_) {
+    header_validator_->transformRequestHeaders(*headers_);
+  }
   setEndStream(end_stream);
 }
 
@@ -96,6 +101,14 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().connectionInfoProvider().localAddress()->asString());
+  }
+
+  if (header_validator_) {
+    // Ignore validation results
+    auto result = header_validator_->transformResponseHeaders(*headers_copy);
+    if (result.new_headers) {
+      headers_copy = std::move(result.new_headers);
+    }
   }
 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {
@@ -342,13 +355,28 @@ public:
   }
 };
 
+namespace {
+// Fake upstream codec will not do path normalization, so the tests can observe
+// the path forwarded by Envoy.
+constexpr absl::string_view fake_upstream_header_validator_config = R"EOF(
+    name: envoy.http.header_validators.envoy_default
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+        uri_path_normalization_options:
+          skip_path_normalization: true
+          skip_merging_slashes: true
+)EOF";
+} // namespace
+
 FakeHttpConnection::FakeHttpConnection(
     FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Http::CodecType type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system), type_(type) {
+    : FakeConnectionBase(shared_connection, time_system), type_(type),
+      header_validator_factory_(
+          IntegrationUtil::makeHeaderValidationFactory(fake_upstream_header_validator_config)) {
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
@@ -397,6 +425,26 @@ AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
+}
+
+namespace {
+Http::Protocol codeTypeToProtocol(Http::CodecType codec_type) {
+  switch (codec_type) {
+  case Http::CodecType::HTTP1:
+    return Http::Protocol::Http11;
+  case Http::CodecType::HTTP2:
+    return Http::Protocol::Http2;
+  case Http::CodecType::HTTP3:
+    return Http::Protocol::Http3;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+} // namespace
+
+Http::ServerHeaderValidatorPtr FakeHttpConnection::makeHeaderValidator() {
+  return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                         codeTypeToProtocol(type_), header_validator_stats_)
+                                   : nullptr;
 }
 
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {

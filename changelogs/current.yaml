@@ -2,6 +2,14 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: build
+  change: |
+    Moved the subset, ring_hash, and maglev LB code into extensions. If you use these load balancers and override
+    extensions_build_config.bzl you will need to include them explicitly.
+- area: build
+  change: |
+    Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
+    need to include the new config_subscriptions explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -22,15 +30,29 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: aws
+  change: |
+    Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched
+    from environment variables. This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tls
+  change: |
+    Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
+    removed runtime key ``envoy.reloadable_features.closer_shadow_behavior`` and legacy code paths.
+- area: http
+  change: |
     removed runtime key ``envoy.reloadable_features.allow_upstream_filters`` and legacy code paths.
+- area: quic
+  change: |
+    removed runtime key ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
@@ -40,13 +62,33 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.http_response_half_close`` and legacy code paths.
+- area: udp
+  change: |
+    removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
 
 new_features:
+- area: access_log
+  change: |
+    added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
+    recorded. Please refer to the access log configuration documentation for more information.
+- area: dynamic_forward_proxy
+  change: |
+    added :ref:`sub_clusters_config
+    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
+    independent sub cluster for each host:port, with STRICT_DNS cluster type.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
+    by sending a local reply.
+- area: matchers
+  change: |
+    Added :ref:`RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>` input
+    matcher. It allows matching hash of the input on a runtime key.
 - area: stat_sinks
   change: |
     Added ``envoy.stat_sinks.open_telemetry`` stats_sink, that supports flushing metrics by the OTLP protocol,
@@ -56,10 +98,19 @@ new_features:
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
-- area: dynamic_forward_proxy
+- area: ratelimit
   change: |
-    added :ref:`sub_clusters_config
-    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
-    independent sub cluster for each host:port, with STRICT_DNS cluster type.
+    added new configuration field :ref:`domain
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
+    per-route basis.
+- area: redis_proxy
+  change: |
+    added new field :ref:`connection_rate_limit
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
+    to limit reconnection rate to redis server to avoid reconnection storm.
 
 deprecated:
+- area: access_log
+  change: |
+    deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
+    in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
