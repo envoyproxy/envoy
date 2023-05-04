@@ -98,6 +98,9 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: admin
+  change: |
+    Adds a new admin stats html bucket-mode `disabled` to generate all recorded buckets and summary percentiles.
 
 deprecated:
 - area: access_log
