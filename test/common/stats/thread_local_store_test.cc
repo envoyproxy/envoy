@@ -1668,7 +1668,6 @@ TEST_F(HistogramTest, ParentHistogramBucketManyBucketDetail) {
     histogram.recordValue(value);
   }
   store_->mergeHistograms([]() -> void {});
-  std::vector<Bucket> expected_buckets{Bucket{10.0, 1}};
   EXPECT_LT(100, parent_histogram->detailedTotalBuckets().size());
   for (uint32_t i = 1; i < 100; ++i) {
     EXPECT_EQ(i, parent_histogram->detailedTotalBuckets(i).size());
