@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 
+// [#next-free-field: 6]
 message ZooKeeperProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy";
@@ -46,15 +47,15 @@ message ZooKeeperProxy {
   // https://sre.google/workbook/implementing-slos/
   //
   // If it is not set, the default value is 100 milliseconds.
-  google.protobuf.Duration default_latency_threshold = 4 [(validate.rules).duration = {
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration default_latency_threshold = 4
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // List of latency threshold overrides for opcodes.
   // If the threshold override of one opcode is not set, it will fallback to the default latency
   // threshold.
   // Specifying latency threshold overrides multiple times for one opcode is not allowed.
-  repeated LatencyThresholdOverride latency_threshold_overrides = 5 [(validate.rules).repeated = {max_items: 26}];
+  repeated LatencyThresholdOverride latency_threshold_overrides = 5
+      [(validate.rules).repeated = {max_items: 26}];
 }
 
 message LatencyThresholdOverride {
