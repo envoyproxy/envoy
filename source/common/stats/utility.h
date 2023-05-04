@@ -238,8 +238,7 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  * obtained. Buckets are combined by adding counts and averaging values.
  *
  * If max_buckets is InterpolateRetainAllBuckets, or num_src_buckets <= max_buckets,
- * than the returned array is
- * buckets is smaller then all buckets are retained
+ * than the returned array is buckets is smaller then all buckets are retained
  * regardless of num_src_buckets.
  *
  * The buckets are provided to interpolateHistogramBuckets via a lambda, which

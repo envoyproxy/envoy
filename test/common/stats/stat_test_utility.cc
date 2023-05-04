@@ -5,6 +5,15 @@
 
 namespace Envoy {
 namespace Stats {
+
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b) {
+  return a.count_ == b.count_ && std::abs(a.value_ - b.value_) < 0.001;
+}
+
+std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket) {
+  return out << "(value=" << bucket.value_ << ", count=" << bucket.count_ << ")";
+}
+
 namespace TestUtil {
 
 void forEachSampleStat(int num_clusters, bool include_other_stats,

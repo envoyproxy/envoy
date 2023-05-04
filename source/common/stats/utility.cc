@@ -133,6 +133,17 @@ interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
   }
   const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
   uint32_t num_src_buckets_per_bucket = 1;
+
+  // Determine how we will map source buckets to destination buckets.
+  // Consider 3 cases:
+  //  1. if we have 15 source buckets and 5 destination buckets we'll
+  //     combine groups of 3 adjacent source buckets into one destination
+  //     bucket, and they'll be no remainder.
+  //  2. If we have 17 source buckets and 5 destination buckets, we'll
+  //     still combine 3 adjacent source buckets for each destination
+  //     bucket. However we'll have a remainder of two source buckets.
+  //  3. If we have more destination buckets than source buckets then
+  //     we'll just go 1:1 and have no remainder.
   uint32_t remainder = 0;
   if (num_src_buckets > num_buckets) {
     num_src_buckets_per_bucket = num_src_buckets / num_buckets;
@@ -145,10 +156,18 @@ interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
   for (uint32_t dest = 0; dest < num_buckets; ++dest) {
     ParentHistogram::Bucket& bucket = buckets[dest];
     uint32_t merges = num_src_buckets_per_bucket;
+
+    // If there is still a remainder we'll consume one extra
+    // source bucket for the current destination bucket and
+    // decrement the remainder. Thus we'll distribute the
+    // remainder evenly among the first destination buckets.
     if (remainder > 0) {
       ++merges;
       --remainder;
     }
+
+    // Finally we save the aggregated counts and averaged values
+    // into the destination bucket.
     for (uint32_t i = 0; i < merges; ++i, ++src) {
       ASSERT(src < num_src_buckets);
       ParentHistogram::Bucket src_bucket = next_bucket();
@@ -157,6 +176,7 @@ interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
     }
     bucket.value_ /= merges;
   }
+
   ASSERT(src == num_src_buckets);
   return buckets;
 }

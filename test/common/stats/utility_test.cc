@@ -7,6 +7,8 @@
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -18,11 +20,6 @@ using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Stats {
-
-bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b) {
-  return a.count_ == b.count_ && std::abs(a.value_ - b.value_) < 0.001;
-}
-
 namespace {
 
 // All the tests should be run for both IsolatedStore and ThreadLocalStore.

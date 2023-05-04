@@ -130,6 +130,7 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
+  using Bucket = ParentHistogram::Bucket;
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest()
@@ -1630,15 +1631,6 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
-}
-
-using Bucket = ParentHistogram::Bucket;
-bool operator==(const Bucket& a, const Bucket& b) {
-  return a.count_ == b.count_ && std::abs(a.value_ - b.value_) < 0.001;
-}
-
-std::ostream& operator<<(std::ostream& out, const Bucket& bucket) {
-  return out << "(value=" << bucket.value_ << ", count=" << bucket.count_ << ")";
 }
 
 TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
