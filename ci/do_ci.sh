@@ -268,18 +268,6 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
 
-        # By default the packages will be signed by the first available key.
-        # If there is no key available, a throwaway key is created
-        # and the packages signed with it, for the purpose of testing only.
-        if ! gpg --list-secret-keys "*"; then
-            export PACKAGES_MAINTAINER_NAME="Envoy CI"
-            export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
-            BAZEL_BUILD_OPTIONS+=(
-                "--action_env=PACKAGES_GEN_KEY=1"
-                "--action_env=PACKAGES_MAINTAINER_NAME"
-                "--action_env=PACKAGES_MAINTAINER_EMAIL")
-        fi
-
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -591,6 +579,22 @@ case $CI_TARGET in
                 # from the current commit (as this only happens on non-PRs we are safe from merges)
                 BUILD_SHA="$(git rev-parse HEAD)"
                 bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+
+                # TODO(phlax): move this to pytooling
+                mkdir -p linux/amd64 linux/arm64 publish
+
+                # linux/amd64
+                tar xf /build/bazel.release/release.tar.zst -C ./linux/amd64
+                cp -a linux/amd64/envoy "publish/envoy-${version}-linux-x86_64"
+                cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${version}-linux-x86_64"
+
+                # linux/arm64
+                tar xf /build/bazel.release.arm64/release.tar.zst -C ./linux/arm64
+                cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
+                cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
+
+                "${ENVOY_SRCDIR}ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
+
                 exit 0
             fi
         fi
