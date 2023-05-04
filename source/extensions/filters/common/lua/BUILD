@@ -3,6 +3,8 @@ load(
     "envoy_cc_library",
     "envoy_extension_package",
 )
+load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 licenses(["notice"])  # Apache 2
 
@@ -24,9 +26,6 @@ envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
-    external_deps = [
-        "luajit",
-    ],
     deps = [
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
