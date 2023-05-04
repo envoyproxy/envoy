@@ -87,7 +87,7 @@ message LatencyThresholdOverride {
     SetWatches2 = 25;
   }
 
-  // The ZooKeeper opcode defined in decoder.h. You can find them from the ZooKeeper source code:
+  // The ZooKeeper opcodes. Can be found as part of the ZooKeeper source code:
   //
   // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java
   //

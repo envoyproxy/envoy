@@ -123,36 +123,8 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_coun
 }
 
 int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode opcode) {
-  static absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t> opcode_map = {
-      {LatencyThresholdOverride::Connect, 0},
-      {LatencyThresholdOverride::Create, 1},
-      {LatencyThresholdOverride::Delete, 2},
-      {LatencyThresholdOverride::Exists, 3},
-      {LatencyThresholdOverride::GetData, 4},
-      {LatencyThresholdOverride::SetData, 5},
-      {LatencyThresholdOverride::GetAcl, 6},
-      {LatencyThresholdOverride::SetAcl, 7},
-      {LatencyThresholdOverride::GetChildren, 8},
-      {LatencyThresholdOverride::Sync, 9},
-      {LatencyThresholdOverride::Ping, 11},
-      {LatencyThresholdOverride::GetChildren2, 12},
-      {LatencyThresholdOverride::Check, 13},
-      {LatencyThresholdOverride::Multi, 14},
-      {LatencyThresholdOverride::Create2, 15},
-      {LatencyThresholdOverride::Reconfig, 16},
-      {LatencyThresholdOverride::CheckWatches, 17},
-      {LatencyThresholdOverride::RemoveWatches, 18},
-      {LatencyThresholdOverride::CreateContainer, 19},
-      {LatencyThresholdOverride::CreateTtl, 21},
-      {LatencyThresholdOverride::Close, -11},
-      {LatencyThresholdOverride::SetAuth, 100},
-      {LatencyThresholdOverride::SetWatches, 101},
-      {LatencyThresholdOverride::GetEphemerals, 103},
-      {LatencyThresholdOverride::GetAllChildrenNumber, 104},
-      {LatencyThresholdOverride::SetWatches2, 105}};
-
-  ASSERT(opcode_map.find(opcode) != opcode_map.end());
-  return opcode_map[opcode];
+  ASSERT(opcodeMap().find(opcode) != opcodeMap().end());
+  return opcodeMap().at(opcode);
 }
 
 absl::flat_hash_map<int32_t, std::chrono::milliseconds>

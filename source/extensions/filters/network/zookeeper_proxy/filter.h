@@ -151,6 +151,7 @@ enum class ErrorBudgetResponseType { FAST, SLOW };
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride;
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride_Opcode;
 using LatencyThresholdOverrideList = Protobuf::RepeatedPtrField<LatencyThresholdOverride>;
+using OpcodeMap = absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t>;
 
 /**
  * Configuration for the ZooKeeper proxy filter.
@@ -200,6 +201,36 @@ private:
   }
 
   int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
+
+  static const OpcodeMap& opcodeMap() {
+    CONSTRUCT_ON_FIRST_USE(OpcodeMap, {{LatencyThresholdOverride::Connect, 0},
+                                       {LatencyThresholdOverride::Create, 1},
+                                       {LatencyThresholdOverride::Delete, 2},
+                                       {LatencyThresholdOverride::Exists, 3},
+                                       {LatencyThresholdOverride::GetData, 4},
+                                       {LatencyThresholdOverride::SetData, 5},
+                                       {LatencyThresholdOverride::GetAcl, 6},
+                                       {LatencyThresholdOverride::SetAcl, 7},
+                                       {LatencyThresholdOverride::GetChildren, 8},
+                                       {LatencyThresholdOverride::Sync, 9},
+                                       {LatencyThresholdOverride::Ping, 11},
+                                       {LatencyThresholdOverride::GetChildren2, 12},
+                                       {LatencyThresholdOverride::Check, 13},
+                                       {LatencyThresholdOverride::Multi, 14},
+                                       {LatencyThresholdOverride::Create2, 15},
+                                       {LatencyThresholdOverride::Reconfig, 16},
+                                       {LatencyThresholdOverride::CheckWatches, 17},
+                                       {LatencyThresholdOverride::RemoveWatches, 18},
+                                       {LatencyThresholdOverride::CreateContainer, 19},
+                                       {LatencyThresholdOverride::CreateTtl, 21},
+                                       {LatencyThresholdOverride::Close, -11},
+                                       {LatencyThresholdOverride::SetAuth, 100},
+                                       {LatencyThresholdOverride::SetWatches, 101},
+                                       {LatencyThresholdOverride::GetEphemerals, 103},
+                                       {LatencyThresholdOverride::GetAllChildrenNumber, 104},
+                                       {LatencyThresholdOverride::SetWatches2, 105}});
+  }
+
   absl::flat_hash_map<int32_t, std::chrono::milliseconds>
   parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 

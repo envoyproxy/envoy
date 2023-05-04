@@ -30,20 +30,10 @@ class ZooKeeperFilterTest : public testing::Test {
 public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
-  void initialize() {
-    std::chrono::milliseconds default_latency_threshold(100);
-    LatencyThresholdOverrideList latency_threshold_overrides;
-
-    initializeHelper(default_latency_threshold, latency_threshold_overrides);
-  }
-
-  void initialize(std::chrono::milliseconds default_latency_threshold,
-                  LatencyThresholdOverrideList& latency_threshold_overrides) {
-    initializeHelper(default_latency_threshold, latency_threshold_overrides);
-  }
-
-  void initializeHelper(std::chrono::milliseconds default_latency_threshold,
-                        LatencyThresholdOverrideList& latency_threshold_overrides) {
+  void
+  initialize(std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
+             const LatencyThresholdOverrideList& latency_threshold_overrides =
+                 LatencyThresholdOverrideList()) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
         stat_prefix_, 1048576, default_latency_threshold, latency_threshold_overrides, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
