@@ -82,6 +82,8 @@ jobs:
       - template: ../gpg.yml
         parameters:
           condition: and(not(canceled()), eq(variables['CI_TARGET'], 'docs'))
+          # Reuse key downloaded above
+          downloadKey: false
           authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
           authGPGPath: ${{ parameters.authGPGPath }}
           authGPGKey: ${{ parameters.authGPGKey }}

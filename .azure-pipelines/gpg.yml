@@ -1,5 +1,9 @@
 
 parameters:
+- name: downloadKey
+  type: bool
+  default: true
+
 # Auth
 - name: authGPGPassphrase
   type: string
@@ -40,6 +44,7 @@ steps:
   condition: |
     and(succeeded(),
         ${{ parameters.condition }},
+        eq(${{ parameters.downloadKey }}, true),
         eq(variables['Build.DefinitionName'], 'envoy-postsubmit'))
   inputs:
     # NB: This is the path to the key and **must** be set on a per-pipeline basis
@@ -56,6 +61,7 @@ steps:
   condition: |
     and(succeeded(),
         ${{ parameters.condition }},
+        eq(${{ parameters.downloadKey }}, true),
         ne(variables['Build.DefinitionName'], 'envoy-postsubmit'))
 
 - script: $(Build.SourcesDirectory)/.azure-pipelines/gpg/activate-key.sh
