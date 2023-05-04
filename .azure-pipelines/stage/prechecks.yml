@@ -84,7 +84,7 @@ jobs:
           condition: and(not(canceled()), eq(variables['CI_TARGET'], 'docs'))
           # Reuse key downloaded above
           downloadKey: false
-          name: MaintainerGPGKey2
+          nameDownloadTask: MaintainerGPGKey2
           authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
           authGPGPath: ${{ parameters.authGPGPath }}
           authGPGKey: ${{ parameters.authGPGKey }}

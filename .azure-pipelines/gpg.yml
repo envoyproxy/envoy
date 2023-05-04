@@ -1,6 +1,6 @@
 
 parameters:
-- name: name
+- name: nameDownloadTask
   type: string
   default: MaintainerGPGKey
 - name: downloadKey
