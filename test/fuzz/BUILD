@@ -4,6 +4,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_signal_trace",
 )
 load(
     "@rules_fuzzing//fuzzing:cc_defs.bzl",
@@ -36,10 +37,7 @@ envoy_cc_test_library(
         "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/common/signal:sigaction_lib"],
-    }),
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
 envoy_cc_test_library(
