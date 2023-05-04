@@ -64,13 +64,15 @@ Note that this filter also supports per route configuration:
         typed_per_filter_config:
           envoy.filters.http.aws_request_signing:
             "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
-            service_name: s3
-            region: us-west-2
-            use_unsigned_payload: true
-            match_excluded_headers:
-            - prefix: x-envoy
-            - prefix: x-forwarded
-            - exact: x-amzn-trace-id
+            aws_request_signing:
+              service_name: s3
+              region: us-west-2
+              use_unsigned_payload: true
+              match_excluded_headers:
+              - prefix: x-envoy
+              - prefix: x-forwarded
+              - exact: x-amzn-trace-id
+            stat_prefix: some-prefix
 
 This can be used to either override the global configuration
 
