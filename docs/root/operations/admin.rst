@@ -674,7 +674,8 @@ modify different aspects of the server:
 
   Example output:
 
-  .. code-block:: jason
+  .. code-block:: json
+
     {
       "stats": [
         {
