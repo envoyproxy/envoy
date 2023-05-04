@@ -1,7 +1,7 @@
 
 parameters:
 - name: downloadKey
-  type: bool
+  type: boolean
   default: true
 
 # Auth
