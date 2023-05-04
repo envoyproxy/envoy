@@ -12,6 +12,18 @@
 # - https://github.com/bazelbuild/rules_go/pull/2542
 # - https://github.com/envoyproxy/envoy/issues/11657
 #
+diff --git a/go/private/platforms.bzl b/go/private/platforms.bzl
+index a16e2993..21a62e90 100644
+--- a/go/private/platforms.bzl
++++ b/go/private/platforms.bzl
+@@ -30,7 +30,6 @@ BAZEL_GOARCH_CONSTRAINTS = {
+     "amd64": "@platforms//cpu:x86_64",
+     "arm": "@platforms//cpu:arm",
+     "arm64": "@platforms//cpu:aarch64",
+-    "ppc64": "@platforms//cpu:ppc",
+     "ppc64le": "@platforms//cpu:ppc",
+     "s390x": "@platforms//cpu:s390x",
+ }
 diff --git a/go/private/rules/binary.bzl b/go/private/rules/binary.bzl
 index 91748eda..c1aeb91e 100644
 --- a/go/private/rules/binary.bzl

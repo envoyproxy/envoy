@@ -1,0 +1,205 @@
+diff --git a/build.py b/build.py
+new file mode 100644
+index 00000000..c6d6f024
+--- /dev/null
++++ b/build.py
+@@ -0,0 +1,35 @@
++#!/usr/bin/env python3
++
++import argparse
++import os
++import shutil
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--prefix")
++    args = parser.parse_args()
++    src_dir = os.path.dirname(os.path.realpath(__file__))
++    shutil.copytree(src_dir, os.path.basename(src_dir))
++    os.chdir(os.path.basename(src_dir))
++
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
++    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
++    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
++    os.environ["CFLAGS"] = ""
++    os.environ["LDFLAGS"] = ""
++
++    # Don't strip the binary - it doesn't work when cross-compiling, and we don't use it anyway.
++    os.environ["TARGET_STRIP"] = "@echo"
++
++    # Remove LuaJIT from ASAN for now.
++    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
++    if "ENVOY_CONFIG_ASAN" in os.environ or "ENVOY_CONFIG_MSAN" in os.environ:
++      os.environ["TARGET_CFLAGS"] += " -fsanitize-blacklist=%s/com_github_luajit2_luajit2/clang-asan-blocklist.txt" % os.environ["PWD"]
++      with open("clang-asan-blocklist.txt", "w") as f:
++        f.write("fun:*\n")
++
++    os.system('make -j{} V=1 PREFIX="{}" install'.format(os.cpu_count(), args.prefix))
++
++main()
++
+diff --git a/src/Makefile b/src/Makefile
+index 68a9a7cd..ed9f98cf 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -27,7 +27,7 @@ NODOTABIVER= 51
+ DEFAULT_CC = gcc
+ #
+ # LuaJIT builds as a native 32 or 64 bit binary by default.
+-CC= $(DEFAULT_CC)
++CC?= $(DEFAULT_CC)
+ #
+ # Use this if you want to force a 32 bit build on a 64 bit multilib OS.
+ #CC= $(DEFAULT_CC) -m32
+@@ -71,10 +71,10 @@ CCWARN= -Wall
+ # as dynamic mode.
+ #
+ # Mixed mode creates a static + dynamic library and a statically linked luajit.
+-BUILDMODE= mixed
++#BUILDMODE= mixed
+ #
+ # Static mode creates a static library and a statically linked luajit.
+-#BUILDMODE= static
++BUILDMODE= static
+ #
+ # Dynamic mode creates a dynamic library and a dynamically linked luajit.
+ # Note: this executable will only run when the library is installed!
+@@ -99,7 +99,7 @@ XCFLAGS=
+ # enabled by default. Some other features that *might* break some existing
+ # code (e.g. __pairs or os.execute() return values) can be enabled here.
+ # Note: this does not provide full compatibility with Lua 5.2 at this time.
+-#XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
++XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
+ #
+ # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
+ #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+@@ -212,7 +212,7 @@ TARGET_STCC= $(STATIC_CC)
+ TARGET_DYNCC= $(DYNAMIC_CC)
+ TARGET_LD= $(CROSS)$(CC)
+ TARGET_AR= $(CROSS)ar rcus
+-TARGET_STRIP= $(CROSS)strip
++TARGET_STRIP?= $(CROSS)strip
+ 
+ TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
+ TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
+@@ -617,7 +617,7 @@ endif
+ 
+ Q= @
+ E= @echo
+-#Q=
++Q=
+ #E= @:
+ 
+ ##############################################################################
+diff --git a/src/lj_arch.h b/src/lj_arch.h
+index 326c7148..840eb644 100644
+--- a/src/lj_arch.h
++++ b/src/lj_arch.h
+@@ -498,6 +498,16 @@
+ #error "Need at least GCC 4.8 or newer"
+ #endif
+ #endif
++#elif LUAJIT_ARCH_PPC
++#if __clang__
++#if ((__clang_major__ < 3) || ((__clang_major__ == 3) && __clang_minor__ < 5)) && !defined(__NX_TOOLCHAIN_MAJOR__)
++#error "Need at least Clang 3.5 or newer"
++#endif
++#else
++#if (__GNUC__ < 4) || ((__GNUC__ == 4) && __GNUC_MINOR__ < 8)
++#error "Need at least GCC 4.8 or newer"
++#endif
++#endif
+ #elif !LJ_TARGET_PS3
+ #if __clang__
+ #if ((__clang_major__ < 3) || ((__clang_major__ == 3) && __clang_minor__ < 5))
+diff --git a/src/lj_err.c b/src/lj_err.c
+index afaa4666..1eba627c 100644
+--- a/src/lj_err.c
++++ b/src/lj_err.c
+@@ -123,7 +123,11 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
+ 	return cf;
+       }
+     }
++#if LJ_FR2
+     if (frame <= tvref(L->stack)+LJ_FR2)
++#else
++    if (frame < tvref(L->stack))
++#endif
+       break;
+     switch (frame_typep(frame)) {
+     case FRAME_LUA:  /* Lua frame. */
+diff --git a/src/vm_ppc.dasc b/src/vm_ppc.dasc
+index 14a7f821..63a4212f 100644
+--- a/src/vm_ppc.dasc
++++ b/src/vm_ppc.dasc
+@@ -977,8 +977,11 @@ static void build_subroutines(BuildCtx *ctx)
+   |.if FFI
+   |  cmplwi TMP0, 1
+   |.endif
+-  |     lwz PC, -16(RB)			// Restore PC from [cont|PC].
+-  |   subi TMP2, RD, 8
++  |// PC value corrected to avoid segfault
++  |   lwz PC, FRAME_CONTPC(RB)        // Restore PC from [cont|PC].
++  |	addi BASEP4, BASE, 4 
++  |	addi TMP2, RD, WORD_HI-8
++  |	lwz TMP1, LFUNC:TMP1->pc
+   |   stwx TISNIL, RA, TMP2		// Ensure one valid arg.
+   |.if P64
+   |   ld TMP3, 0(DISPATCH)
+@@ -986,7 +989,9 @@ static void build_subroutines(BuildCtx *ctx)
+   |.if FFI
+   |  ble >1
+   |.endif
+-  |    lwz TMP1, LFUNC:TMP1->pc
++  |.if P64
++  |  add TMP0, TMP0, TMP3
++  |.endif
+   |    lwz KBASE, PC2PROTO(k)(TMP1)
+   |  // BASE = base, RA = resultptr, RB = meta base
+   |  mtctr TMP0
+@@ -1715,14 +1720,23 @@ static void build_subroutines(BuildCtx *ctx)
+   |
+   |//-- Base library: iterators -------------------------------------------
+   |
+-  |.ffunc_1 next
+-  |   stwx TISNIL, BASE, NARGS8:RC	// Set missing 2nd arg to nil.
+-  |  checktab CARG3
++  |.ffunc next
++  |  cmplwi NARGS8:RC, 8
++  |    lwz TAB:CARG1, WORD_LO(BASE)
++  |  blt ->fff_fallback
++  |.if ENDIAN_LE
++  |   add TMP1, BASE, NARGS8:RC
++  |   stw TISNIL, WORD_HI(TMP1)         // Set missing 2nd arg to nil.
++  |.else
++  |   stwx TISNIL, BASE, NARGS8:RC      // Set missing 2nd arg to nil.
++  |.endif
+   |   lwz PC, FRAME_PC(BASE)
+-  |  bne ->fff_fallback
++  |   stp BASE, L->base                 // Add frame since C call can throw.
++  |   stp BASE, L->top                  // Dummy frame length is ok.
+   |  la CARG2, 8(BASE)
+   |  la CARG3, -8(BASE)
+-  |  bl extern lj_tab_next		// (GCtab *t, cTValue *key, TValue *o)
++  |   stw PC, SAVE_PC
++  |  bl extern lj_tab_next      // (GCtab *t, cTValue *key,TValue *o)
+   |  // Returns 1=found, 0=end, -1=error.
+   |  cmpwi CRET1, 0
+   |   la RA, -8(BASE)
+@@ -5667,10 +5681,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
+     |  crand 4*cr0+eq, 4*cr0+eq, 4*cr7+eq
+     |    add TMP3, PC, TMP0
+     |  bne cr0, >5
+-    |  lus TMP1, (LJ_KEYINDEX >> 16)
+-    |  ori TMP1, TMP1, (LJ_KEYINDEX & 0xffff)
+-    |  stw ZERO, -4(RA)			// Initialize control var.
+-    |  stw TMP1, -8(RA)
++    |  lus TMP1, 0xfffe
++    |  ori TMP1, TMP1, 0x7fff
++    |  stw ZERO, WORD_LO-8(RA)          // Initialize control var.
++    |  stw TMP1, WORD_HI-8(RA)
+     |    addis PC, TMP3, -(BCBIAS_J*4 >> 16)
+     |1:
+     |  ins_next
+

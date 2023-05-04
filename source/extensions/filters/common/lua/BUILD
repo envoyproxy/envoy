@@ -8,6 +8,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+bool_flag(
+    name = "luajit2",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "with_luajit2",
+    flag_values = {
+        ":luajit2": "True",
+    },
+)
+
 envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
@@ -22,7 +34,10 @@ envoy_cc_library(
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
-    ],
+    ] + select({
+        ":with_luajit2": [envoy_external_dep_path("luajit2")],
+        "//conditions:default": [envoy_external_dep_path("luajit")],
+    }),
 )
 
 envoy_cc_library(

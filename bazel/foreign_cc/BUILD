@@ -98,6 +98,25 @@ configure_make(
 )
 
 configure_make(
+    name = "luajit2",
+    configure_command = "build.py",
+    env = select({
+        # This shouldn't be needed! See
+        # https://github.com/envoyproxy/envoy/issues/6084
+        # TODO(htuch): Remove when #6084 is fixed
+        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
+        "//conditions:default": {},
+    }),
+    lib_source = "@com_github_luajit2_luajit2//:all",
+    out_include_dir = "include/luajit-2.1",
+    out_static_libs = ["libluajit-5.1.a"],
+    targets = [],
+    tags = ["skip_on_windows"],
+)
+
+
+configure_make(
     name = "colm",
     autogen = True,
     configure_in_place = True,
