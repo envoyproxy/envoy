@@ -146,7 +146,7 @@ stages:
       authGCP: $(GcpServiceAccountKey)
       authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
-      authGPGKey: $(MaintainerGPGKey)
+      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       authNetlifyURL: $(NetlifyTriggerURL)
       authSSHDocsKeyPublic: $(DocsPublicKey)
