@@ -22,7 +22,7 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
+using ValidationResult = ::Envoy::Http::HeaderValidator::ValidationResult;
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -295,7 +295,7 @@ void Http1HeaderValidator::sanitizeContentLength(::Envoy::Http::RequestHeaderMap
   }
 }
 
-::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult
+::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
 ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
@@ -305,7 +305,7 @@ ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
       return path_result;
     }
   }
-  return ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::success();
+  return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }
 
 ValidationResult
