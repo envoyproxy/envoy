@@ -31,6 +31,7 @@ load(
     _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_signal_trace = "envoy_select_signal_trace",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
@@ -240,6 +241,7 @@ envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
+envoy_select_signal_trace = _envoy_select_signal_trace
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
