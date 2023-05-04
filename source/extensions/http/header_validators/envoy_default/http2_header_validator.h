@@ -37,16 +37,16 @@ public:
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
       const Http2HeaderValidatorConfig& http2_config);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
 
 protected:
@@ -92,7 +92,7 @@ private:
 };
 
 class ServerHttp2HeaderValidator : public Http2HeaderValidator,
-                                   public ::Envoy::Http::HeaderValidator {
+                                   public ::Envoy::Http::ServerHeaderValidator {
 public:
   ServerHttp2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&

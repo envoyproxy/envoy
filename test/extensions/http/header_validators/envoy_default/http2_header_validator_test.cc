@@ -25,7 +25,7 @@ using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http2HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr createH2ServerUhv(absl::string_view config_yaml) {
+  ::Envoy::Http::ServerHeaderValidatorPtr createH2ServerUhv(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
@@ -695,8 +695,9 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   // Path normalization should result in redirect
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_EQ(result.action(),
-            ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
+  EXPECT_EQ(
+      result.action(),
+      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }

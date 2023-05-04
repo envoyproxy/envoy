@@ -301,22 +301,18 @@ public:
 
 TEST_F(TracerImplTest, BasicFunctionalityNullSpan) {
   EXPECT_CALL(config_, operationName()).Times(2);
-  EXPECT_CALL(stream_info_, startTime());
   const std::string operation_name = "ingress";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, stream_info_.start_time_, _))
-      .WillOnce(Return(nullptr));
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, operation_name, _)).WillOnce(Return(nullptr));
   tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
 }
 
 TEST_F(TracerImplTest, BasicFunctionalityNodeSet) {
-  EXPECT_CALL(stream_info_, startTime());
   EXPECT_CALL(local_info_, nodeName());
   EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, stream_info_.start_time_, _))
-      .WillOnce(Return(span));
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, operation_name, _)).WillOnce(Return(span));
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
 
@@ -324,14 +320,12 @@ TEST_F(TracerImplTest, BasicFunctionalityNodeSet) {
 }
 
 TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
-  EXPECT_CALL(stream_info_, startTime());
   EXPECT_CALL(local_info_, nodeName());
   EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, stream_info_.start_time_, _))
-      .WillOnce(Return(span));
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, operation_name, _)).WillOnce(Return(span));
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
 

@@ -1,5 +1,6 @@
 * See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 * See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines and maintainer responsibilities.
+* See [CODEOWNERS](CODEOWNERS) for a detailed list of owners for the various source directories.
 
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.

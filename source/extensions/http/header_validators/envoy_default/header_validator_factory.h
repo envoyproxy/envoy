@@ -17,7 +17,7 @@ public:
           config,
       Server::Configuration::ServerFactoryContext& server_context);
 
-  ::Envoy::Http::HeaderValidatorPtr
+  ::Envoy::Http::ServerHeaderValidatorPtr
   createServerHeaderValidator(::Envoy::Http::Protocol protocol,
                               ::Envoy::Http::HeaderValidatorStats& stats) override;
 

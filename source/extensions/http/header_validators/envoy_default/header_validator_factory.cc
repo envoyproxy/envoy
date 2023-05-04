@@ -17,7 +17,7 @@ HeaderValidatorFactory::HeaderValidatorFactory(
     Server::Configuration::ServerFactoryContext& server_context)
     : config_(config), server_context_(server_context) {}
 
-::Envoy::Http::HeaderValidatorPtr
+::Envoy::Http::ServerHeaderValidatorPtr
 HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
   switch (protocol) {

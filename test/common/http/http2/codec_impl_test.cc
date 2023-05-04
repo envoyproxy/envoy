@@ -75,7 +75,7 @@ public:
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::HeaderValidator* header_validator) {
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
     header_validator_ = header_validator;
   }
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
@@ -106,7 +106,7 @@ public:
   }
 
 private:
-  Http::HeaderValidator* header_validator_{nullptr};
+  Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
 } // namespace
@@ -459,7 +459,7 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
