@@ -475,6 +475,25 @@ modify different aspects of the server:
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
 
+  .. http:get:: /stats?histogram_buckets=detail
+
+  Shows histograms as both percentile summary data, and raw bucket
+  data, up to 64 buckets. If the raw bucket data has more than 64
+  buckets, then adjacent buckets are combined until 64 is reached.
+
+  Example output
+  .. code-block:: text
+    http.admin.downstream_rq_time:
+      totals=1:25, 2:9
+      intervals=1:2, 2:3
+      summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.0055555555555555) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)
+    
+  Each bucket is shown as `value:count`. In the above example there are two buckets. `totals` 
+  contains the accumulated data-points since the binary was started. `intervals` shows the
+  new data points since the previous stats flush.
+
+  Compatible with ``usedonly`` and ``filter``.
+
   .. http:get:: /stats?format=html
 
   Renders stats using HTML for a web browser, providing form fields to incrementally
@@ -647,7 +666,107 @@ modify different aspects of the server:
       ]
     }
 
-.. http:get:: /stats?format=prometheus
+  .. http:get:: /stats?format=json&histogram_buckets=detail
+
+  Shows histograms as both percentile summary data, and raw bucket
+  data, up to 64 buckets. If the raw bucket data has more than 64
+  buckets, then adjacent buckets are combined until 64 is reached.
+
+  Example output:
+
+  .. code-block:: jason
+    {
+      "stats": [
+        {
+          "histograms": {
+            "supported_percentiles": [
+              0,
+              25,
+              50,
+              75,
+              90,
+              95,
+              99,
+              99.5,
+              99.9,
+              100
+            ],
+            "details": [
+              {
+                "name": "http.admin.downstream_rq_time",
+                "percentiles": [
+                  {
+                    "interval": null,
+                    "cumulative": 1
+                  },
+                  {
+                    "interval": null,
+                    "cumulative": 1.0351851851851852
+                  },
+                  {
+                    "cumulative": 1.0703703703703704,
+                    "interval": null
+                  },
+                  {
+                    "interval": null,
+                    "cumulative": 2.0136363636363637
+                  },
+                  {
+                    "cumulative": 2.0654545454545454,
+                    "interval": null
+                  },
+                  {
+                    "cumulative": 2.0827272727272725,
+                    "interval": null
+                  },
+                  {
+                    "cumulative": 2.0965454545454545,
+                    "interval": null
+                  },
+                  {
+                    "interval": null,
+                    "cumulative": 2.098272727272727
+                  },
+                  {
+                    "interval": null,
+                    "cumulative": 2.0996545454545457
+                  },
+                  {
+                    "cumulative": 2.1,
+                    "interval": null
+                  }
+                ],
+                "totals": [
+                  {
+                    "value": 1,
+                    "count": 25
+                  },
+                  {
+                    "value": 2
+                    "count": 9,
+                  }
+                ],
+                "intervals": [
+                  {
+                    "value": 1,
+                    "count": 2
+                  },
+                  {
+                    "value": 2
+                    "count": 3,
+                  }
+                ],
+              },
+            ]
+          }
+        }
+      ]
+    }
+
+  Compatible with ``usedonly`` and ``filter``.
+
+
+  .. http:get:: /stats?format=prometheus
 
   or alternatively,
 
