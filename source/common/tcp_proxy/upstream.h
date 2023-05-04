@@ -157,12 +157,8 @@ public:
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
-    // RouteEntryImpl(Upstream::ClusterInfoConstSharedPtr cluster) :
-    // cluster_name_(cluster->name())
-    // {
     RouteEntryImpl(Upstream::ThreadLocalCluster& thread_local_cluster)
         : cluster_name_(thread_local_cluster.info()->name()) {
-      //: cluster_name_(thread_local_cluster.info()->name()), parent_(parent), context_(context) {
       retry_policy_ = std::make_unique<Router::RetryPolicyImpl>();
     }
 
@@ -275,7 +271,6 @@ public:
 
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
-    // Upstream::LoadBalancerContext* context_;
 
     absl::optional<std::chrono::milliseconds> timeout_;
     const std::string route_name_;
@@ -478,7 +473,6 @@ private:
   const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
   TimeSource& timeSource() override { throw std::logic_error("Not implemented"); }
 
-  // UpstreamRequestPtr upstream_request_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   HttpConnPool& parent_;
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;

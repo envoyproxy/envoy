@@ -28,8 +28,6 @@ const std::multimap<std::string, std::string> HttpConnPool::RouteEntryImpl::opaq
 const HttpConnPool::NullPathMatchCriterion HttpConnPool::RouteEntryImpl::path_match_criterion_;
 const HttpConnPool::RouteEntryImpl::ConnectConfigOptRef
     HttpConnPool::RouteEntryImpl::connect_config_nullopt_;
-// const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
-//     HttpConnPool::RouteEntryImpl::connect_config_nullopt_;
 const std::list<Http::LowerCaseString> HttpConnPool::NullConfig::internal_only_headers_;
 
 using TunnelingConfig =
@@ -289,9 +287,7 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
       upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info),
-      route_(std::make_shared<RouteImpl>(thread_local_cluster,
-                                         context /*options.timeout,options.hash_policy,)
-options.retry_policy*/)) {
+      route_(std::make_shared<RouteImpl>(thread_local_cluster, context)) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -399,6 +395,7 @@ bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (Http::Utility::getResponseStatus(headers) != 200) {
     return false;
   }
+
   return true;
 }
 

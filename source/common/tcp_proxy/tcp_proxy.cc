@@ -208,7 +208,6 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
       cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(this)),
       upstream_decoder_filter_callbacks_(HttpStreamDecoderFilterCallbacks(this)) {
-  // upstream_decoder_filter_callbacks_(new HttpStreamDecoderFilterCallbacks(this)) {
   ASSERT(config != nullptr);
 }
 

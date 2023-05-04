@@ -156,9 +156,7 @@ class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
 public:
   TunnelingConfigHelperImpl(
       const Stats::ScopeSharedPtr scope,
-      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&
-          // const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
-          config_message,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
@@ -485,15 +483,10 @@ public:
     Event::Dispatcher& dispatcher() override {
       return parent_->read_callbacks_->connection().dispatcher();
     }
-    // void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
-    //                  absl::string_view transport_failure_reason = "") override {
     void resetStream(Http::StreamResetReason, absl::string_view) override {
       PANIC("not implemented");
     };
-    Router::RouteConstSharedPtr route() override {
-      // return parent_->route_;
-      return nullptr;
-    } // how to convert tcp rote to http route
+    Router::RouteConstSharedPtr route() override { return nullptr; }
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
       return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
           ->info();
