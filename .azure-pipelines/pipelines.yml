@@ -59,6 +59,11 @@ stages:
 # Presubmit/default
 - ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
+    parameters:
+      buildStageDeps:
+      - env
+      checkStageDeps:
+      - env
 
 # Scheduled run anywhere
 - ${{ if eq(variables.pipelineScheduled, true) }}:
