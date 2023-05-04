@@ -237,6 +237,7 @@ build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
 build:remote-ci-linux-coverage --noremote_accept_cached
 build:remote-ci-linux-coverage --config=remote-ci-common
+build:remote-ci-linux-coverage --build_runfile_links
 # IPv6 tests fail on CI
 build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
