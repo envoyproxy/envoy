@@ -156,6 +156,11 @@ The following core load shed points are supported:
       right after the http codec has finished parsing headers but before the
       :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
 
+  * - envoy.load_shed_points.http1_server_abort_dispatch
+    - Envoy will reject processing HTTP1 at the codec level. If a response has
+      not yet started, Envoy will send a local reply. Envoy will then close the
+      connection.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
