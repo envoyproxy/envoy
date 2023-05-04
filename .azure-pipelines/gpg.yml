@@ -35,6 +35,7 @@ parameters:
 steps:
 # Secure key - postsubmit
 - task: DownloadSecureFile@1
+  name: MaintainerGPGKey
   displayName: 'Download maintainer GPG key'
   condition: |
     and(succeeded(),
