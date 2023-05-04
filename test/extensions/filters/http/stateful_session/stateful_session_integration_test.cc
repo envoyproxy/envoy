@@ -1060,8 +1060,8 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
   }
 }
 
-// Test verifies that if a client sends a cookie in "old", non-proto format, the
-// reply is also in the "old" non-proto format.
+// Test verifies that if a client sends an invalid cookie in "old", non-proto format, the
+// reply is in the new proto format.
 TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionBackwardCompatibility) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
@@ -1092,12 +1092,10 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionBackwardCompati
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
-  // The selected upstream server address would be selected to the response headers.
   EXPECT_EQ(
-      Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/test",
-                                               std::chrono::seconds(120), true),
-      response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+      ProtoCookieObject(
+          response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView()),
+      ProtoCookieObject(address_string, 120, "/test", "HttpOnly"));
 
   cleanupUpstreamAndDownstream();
 }

@@ -31,13 +31,11 @@ public:
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
     void onUpdate(const Upstream::HostDescription& host,
                   Envoy::Http::ResponseHeaderMap& headers) override;
-    void setEncodeStyle(bool style) { use_old_style_encoding_ = style; }
 
   private:
     absl::optional<std::string> upstream_address_;
     const CookieBasedSessionStateFactory& factory_;
     TimeSource& time_source_;
-    bool use_old_style_encoding_{false};
   };
 
   CookieBasedSessionStateFactory(const CookieBasedSessionStateProto& config,
@@ -49,10 +47,7 @@ public:
     }
 
     const auto address = parseAddress(headers);
-    auto sessionState = std::make_unique<SessionStateImpl>(address.first, *this, time_source_);
-    if (address.first != absl::nullopt) {
-      sessionState->setEncodeStyle(address.second);
-    }
+    auto sessionState = std::make_unique<SessionStateImpl>(address, *this, time_source_);
     return sessionState;
   }
 
@@ -62,12 +57,10 @@ public:
   }
 
 private:
-  std::pair<absl::optional<std::string>, bool>
-  parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    bool use_old_style_encoding = false;
+  absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
     const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     if (cookie_value.empty()) {
-      return std::make_pair(absl::nullopt, use_old_style_encoding);
+      return absl::nullopt;
     }
     const std::string decoded_value = Envoy::Base64::decode(cookie_value);
     std::string address;
@@ -78,7 +71,7 @@ private:
     if (cookie.ParseFromString(decoded_value)) {
       address = cookie.address();
       if (address.empty() || (cookie.expires() == 0)) {
-        return std::make_pair(absl::nullopt, use_old_style_encoding);
+        return absl::nullopt;
       }
 
       std::chrono::seconds expiry_time(cookie.expires());
@@ -87,19 +80,15 @@ private:
       if (now > expiry_time) {
         // Ignore the address extracted from the cookie. This will cause
         // upstream cluster to select a new host and new cookie will be generated.
-        return std::make_pair(absl::nullopt, use_old_style_encoding);
+        return absl::nullopt;
       }
     } else {
       ENVOY_LOG_ONCE_MISC(
           warn, "Non-proto cookie format detected. This format will be rejected in the future.");
-      // Treat this as "old" style cookie.
       address = decoded_value;
-      use_old_style_encoding = true;
     }
 
-    return std::make_pair(!address.empty() ? absl::make_optional(std::move(address))
-                                           : absl::nullopt,
-                          use_old_style_encoding);
+    return address.empty() ? absl::nullopt : absl::make_optional(std::move(address));
   }
 
   std::string makeSetCookie(const std::string& address) const {
