@@ -349,7 +349,7 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "bazel TSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-        bazel_with_collection test --config=rbe-toolchain-tsan "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --build_tests_only --remote_download_minimal "${TEST_TARGETS[@]}"
+        bazel_with_collection test --config=remote-tsan "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --build_tests_only --remote_download_minimal "${TEST_TARGETS[@]}"
         if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
             echo "Building and testing envoy-filter-example tests..."
             pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
@@ -361,7 +361,7 @@ case $CI_TARGET in
         ENVOY_STDLIB=libc++
         setup_clang_toolchain
         # rbe-toolchain-msan must comes as first to win library link order.
-        BAZEL_BUILD_OPTIONS=("--config=rbe-toolchain-msan" "${BAZEL_BUILD_OPTIONS[@]}" "-c" "dbg" "--build_tests_only" "--remote_download_minimal")
+        BAZEL_BUILD_OPTIONS=("--config=remote-msan" "${BAZEL_BUILD_OPTIONS[@]}" "-c" "dbg" "--build_tests_only" "--remote_download_minimal")
         echo "bazel MSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -- "${TEST_TARGETS[@]}"
