@@ -69,7 +69,7 @@ public:
         });
   }
 
-  void sendRequestAndValidateResponse() {
+  void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response =
@@ -80,7 +80,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
+                                   times_called);
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -113,8 +114,8 @@ TEST_P(ShadowPolicyIntegrationTest, Basic) {
   initialConfigSetup("cluster_1", "");
   initialize();
 
-  sendRequestAndValidateResponse();
-  sendRequestAndValidateResponse();
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
 
   test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
@@ -133,8 +134,8 @@ TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   });
   initialize();
 
-  sendRequestAndValidateResponse();
-  sendRequestAndValidateResponse();
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
 
   test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
@@ -761,14 +762,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
 
   cleanupUpstreamAndDownstream();
 
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
-                ->value(),
-            1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", 1);
   // Main cluster saw no reset; shadow cluster saw remote reset.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_completed", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
 }
 
 // Test request mirroring / shadowing with the cluster name in policy.
