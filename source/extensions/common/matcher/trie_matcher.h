@@ -62,7 +62,8 @@ template <class DataType> class TrieMatcher : public MatchTree<DataType> {
 public:
   TrieMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
               const std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>& trie)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {}
+      : data_input_(std::move(validateDataInput(data_input))), on_no_match_(std::move(on_no_match)),
+        trie_(trie) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -105,6 +106,15 @@ public:
   }
 
 private:
+  static DataInputPtr<DataType>& validateDataInput(DataInputPtr<DataType>& data_input) {
+    auto input_type = data_input->dataInputType();
+    if (input_type != typeid(std::string).name()) {
+      throw EnvoyException(
+          absl::StrCat("Unsupported data input type: ", input_type,
+                       ", currently only string type is supported in trie matcher"));
+    }
+    return data_input;
+  }
   const DataInputPtr<DataType> data_input_;
   const absl::optional<OnMatch<DataType>> on_no_match_;
   std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
