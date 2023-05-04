@@ -111,13 +111,13 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
 // The fuzzer should be able to cover all code below the
 // `EnvoyQuicServerSession` class, including the `QUIC` and `HTTP/3` codecs.
 
-class FuzzDispatcher : public quic::QuicDispatcher {
+class FuzzQuicDispatcher : public quic::QuicDispatcher {
 public:
-  FuzzDispatcher(const quic::ParsedQuicVersion quic_version,
-                 quic::QuicVersionManager* version_manager,
-                 std::unique_ptr<quic::QuicConnectionHelperInterface> connection_helper,
-                 std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-                 Event::Dispatcher& dispatcher)
+  FuzzQuicDispatcher(const quic::ParsedQuicVersion quic_version,
+                     quic::QuicVersionManager* version_manager,
+                     std::unique_ptr<quic::QuicConnectionHelperInterface> connection_helper,
+                     std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
+                     Event::Dispatcher& dispatcher)
       : quic::QuicDispatcher(
             &quic_config_, &crypto_config_, version_manager, std::move(connection_helper),
             std::make_unique<EnvoyQuicCryptoServerStreamHelper>(), std::move(alarm_factory),
@@ -273,30 +273,30 @@ struct Harness {
         new EnvoyQuicConnectionHelper(*dispatcher_.get()));
     auto alarm_factory = std::unique_ptr<quic::QuicAlarmFactory>(
         new EnvoyQuicAlarmFactory(*dispatcher_.get(), *connection_helper->GetClock()));
-    fuzz_dispatcher_ = std::make_unique<FuzzDispatcher>(
+    fuzz_quic_dispatcher_ = std::make_unique<FuzzQuicDispatcher>(
         quic_version_, &version_manager_, std::move(connection_helper), std::move(alarm_factory),
         *dispatcher_.get());
   }
 
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
-    fuzz_dispatcher_->fuzzQuic(input);
-    fuzz_dispatcher_->reset();
+    fuzz_quic_dispatcher_->fuzzQuic(input);
+    fuzz_quic_dispatcher_->reset();
   }
 
   const quic::ParsedQuicVersion quic_version_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::unique_ptr<FuzzDispatcher> fuzz_dispatcher_;
+  std::unique_ptr<FuzzQuicDispatcher> fuzz_quic_dispatcher_;
   quic::QuicVersionManager version_manager_;
 };
 
 std::unique_ptr<Harness> harness;
-//static void resetHarness() { harness = nullptr; };
+static void resetHarness() { harness = nullptr; };
 DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase& input) {
-  //if (harness == nullptr) {
+  if (harness == nullptr) {
     harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
-    //atexit(resetHarness);
-  //}
+    atexit(resetHarness);
+  }
   harness->fuzz(input);
 }
 
