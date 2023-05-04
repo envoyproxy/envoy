@@ -487,8 +487,8 @@ modify different aspects of the server:
       totals=1:25, 2:9
       intervals=1:2, 2:3
       summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.005) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)
-    
-  Each bucket is shown as `value:count`. In the above example there are two buckets. `totals` 
+
+  Each bucket is shown as `value:count`. In the above example there are two buckets. `totals`
   contains the accumulated data-points since the binary was started. `intervals` shows the
   new data points since the previous stats flush.
 
