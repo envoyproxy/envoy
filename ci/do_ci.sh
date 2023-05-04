@@ -417,13 +417,13 @@ case $CI_TARGET in
 
         # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -433,7 +433,7 @@ case $CI_TARGET in
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
         echo "Building binary with wasm=wavm... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild @envoy//source/exe:envoy-static --build_tag_filters=-nofips
         collect_build_profile build
         ;;
     api)
