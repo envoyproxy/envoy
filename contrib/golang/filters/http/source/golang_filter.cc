@@ -750,7 +750,7 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
 }
 
 CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
-  if (has_destroyed_ {
+  if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
