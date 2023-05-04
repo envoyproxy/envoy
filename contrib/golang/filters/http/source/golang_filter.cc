@@ -598,12 +598,12 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
     auto value = std::string(header.value().getStringView());
 
     auto len = key.length();
-    // go_strs is the heap memory of go, and the length is twice the number of headers. So range
-    // it is safe.
+    // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
+    // is safe.
     go_strs[i].n = len;
     go_strs[i].p = go_buf;
-    // go_buf is the heap memory of go, and the length is the total length of all keys and values
-    // in the header. So use memcpy is safe.
+    // go_buf is the heap memory of go, and the length is the total length of all keys and values in
+    // the header. So use memcpy is safe.
     memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
     go_buf += len;
     i++;
@@ -679,8 +679,8 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
 
     auto weak_ptr = weak_from_this();
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
-    // safety. otherwise, there might be race between reading in the envoy worker thread and
-    // writing in the Go thread.
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
@@ -734,8 +734,8 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
 
     auto weak_ptr = weak_from_this();
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
-    // safety. otherwise, there might be race between reading in the envoy worker thread and
-    // writing in the Go thread.
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, key_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
@@ -764,8 +764,8 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
     return CAPIStatus::CAPIInvalidPhase;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
-    // data is the heap memory of go, and the length is the total length of buffer. So use memcpy
-    // is safe.
+    // data is the heap memory of go, and the length is the total length of buffer. So use memcpy is
+    // safe.
     memcpy(data, static_cast<const char*>(slice.mem_), slice.len_); // NOLINT(safe-memcpy)
     data += slice.len_;
   }
