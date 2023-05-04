@@ -11,11 +11,10 @@ namespace Http {
 
 /**
  * Common interface for server and client header validators.
- * TODO(yanavlasov): rename interfaces in the next PR to `HeaderValidator`
  */
-class HeaderValidatorBase {
+class HeaderValidator {
 public:
-  virtual ~HeaderValidatorBase() = default;
+  virtual ~HeaderValidator() = default;
 
   // A class that holds either success condition or an error condition with tuple of
   // action and error details.
@@ -78,11 +77,10 @@ public:
 
 /**
  * Interface for server header validators.
- * TODO(yanavlasov): rename interfaces in the next PR to `ServerHeaderValidator`
  */
-class HeaderValidator : public HeaderValidatorBase {
+class ServerHeaderValidator : public HeaderValidator {
 public:
-  ~HeaderValidator() override = default;
+  ~ServerHeaderValidator() override = default;
 
   /**
    * Transform the entire request header map.
@@ -127,7 +125,7 @@ public:
 /**
  * Interface for server header validators.
  */
-class ClientHeaderValidator : public HeaderValidatorBase {
+class ClientHeaderValidator : public HeaderValidator {
 public:
   ~ClientHeaderValidator() override = default;
 
@@ -161,7 +159,7 @@ public:
   virtual TransformationResult transformResponseHeaders(ResponseHeaderMap& header_map) PURE;
 };
 
-using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
+using ServerHeaderValidatorPtr = std::unique_ptr<ServerHeaderValidator>;
 using ClientHeaderValidatorPtr = std::unique_ptr<ClientHeaderValidator>;
 
 /**
@@ -187,8 +185,8 @@ public:
   /**
    * Create a new header validator for the specified protocol.
    */
-  virtual HeaderValidatorPtr createServerHeaderValidator(Protocol protocol,
-                                                         HeaderValidatorStats& stats) PURE;
+  virtual ServerHeaderValidatorPtr createServerHeaderValidator(Protocol protocol,
+                                                               HeaderValidatorStats& stats) PURE;
   virtual ClientHeaderValidatorPtr createClientHeaderValidator(Protocol protocol,
                                                                HeaderValidatorStats& stats) PURE;
 };
