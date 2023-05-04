@@ -1,5 +1,8 @@
 
 parameters:
+- name: name
+  type: string
+  default: MaintainerGPGKey
 - name: downloadKey
   type: boolean
   default: true
@@ -39,7 +42,7 @@ parameters:
 steps:
 # Secure key - postsubmit
 - task: DownloadSecureFile@1
-  name: MaintainerGPGKey
+  name: ${{ parameters.name }}
   displayName: 'Download maintainer GPG key'
   condition: |
     and(succeeded(),
