@@ -2,17 +2,26 @@
 
 set -o pipefail
 
+# The key configured here can either be the snakeoil key created
+# in CI, or in PostSubmit its the actual maintainer key downloaded
+# from an azp SecureFile
+
+# If the intended destination of the `.gnupg` file is not the same
+# as where it is configured (ie configuring on the host for use in a
+# container), GNUPGHOME_CONFIGURED can be set pointing to where `.gnupg`
+# will be.
+
 GNUPGHOME="${GNUPGHOME:-${HOME}/.gnupg}"
 GPG_PASSPHRASE="${GPG_PASSPHRASE:-HACKME}"
 GPG_KEYFILE="${GPG_KEYFILE:-test.env/ci.snakeoil.gpg.key}"
 
-# Azp leaves non existent vars as they are (???)
+# In the case of non-PostSubmit AZP leaves the `secureFilePath` variable
+# uniterpolated, so matching here is matching that its not set.
 #
 # shellcheck disable=SC2016
 if [[ "$GPG_KEYFILE" == '$(MaintainerGPGKey.secureFilePath)' ]]; then
     GPG_PASSPHRASE=HACKME
     GPG_KEYFILE="test.env/ci.snakeoil.gpg.key"
-
 fi
 
 # The configured home, may be different if the configuration
