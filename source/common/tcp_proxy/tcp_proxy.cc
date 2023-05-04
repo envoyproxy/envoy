@@ -29,10 +29,12 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/router/shadow_writer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -82,7 +84,7 @@ Config::SharedConfig::SharedConfig(
   }
   if (config.has_tunneling_config()) {
     tunneling_config_helper_ =
-        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config(), context);
+        std::make_unique<TunnelingConfigHelperImpl>(stats_scope_, config, context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -202,8 +204,11 @@ UpstreamDrainManager& Config::drainManager() {
 }
 
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
-    : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)) {
+    : tracing_config_(Tracing::EgressConfig::get()), config_(config),
+      cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+      upstream_callbacks_(new UpstreamCallbacks(this)),
+      upstream_decoder_filter_callbacks_(HttpStreamDecoderFilterCallbacks(this)) {
+  // upstream_decoder_filter_callbacks_(new HttpStreamDecoderFilterCallbacks(this)) {
   ASSERT(config != nullptr);
 }
 
@@ -510,8 +515,9 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
-                                                      this, *upstream_callbacks_, getStreamInfo());
+  generic_conn_pool_ = factory->createGenericConnPool(
+      cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
+      upstream_decoder_filter_callbacks_, getStreamInfo());
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -551,14 +557,20 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 Upstream::HostDescriptionConstSharedPtr& host,
                                 const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
-  upstream_info.setUpstreamHost(host);
-  upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
-  upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
-  upstream_info.setUpstreamSslConnection(ssl_info);
+  // No need to set information using address_provider in case routing via Router::UpstreamRequest
+  // because in that case the information is already set in the
+  // Router::UpstreamRequest::onPoolReady.
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+    upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
+    upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
+    upstream_info.setUpstreamHost(host);
+    upstream_info.setUpstreamSslConnection(ssl_info);
+  }
   onUpstreamConnection();
   read_callbacks_->continueReading();
   if (info) {
@@ -605,14 +617,22 @@ const std::string& TunnelResponseTrailers::key() {
 }
 
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
-    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
-        config_message,
+    const Stats::ScopeSharedPtr stats_scope,
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
-    : use_post_(config_message.use_post()),
-      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
-      propagate_response_headers_(config_message.propagate_response_headers()),
-      propagate_response_trailers_(config_message.propagate_response_trailers()),
-      post_path_(config_message.post_path()) {
+    : use_post_(config_message.tunneling_config().use_post()),
+      header_parser_(Envoy::Router::HeaderParser::configure(
+          config_message.tunneling_config().headers_to_add())),
+      propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
+      propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
+      post_path_(config_message.tunneling_config().post_path()),
+      prefix_(config_message.stat_prefix(), context.scope().symbolTable()),
+      router_config_(prefix_.statName(), context.localInfo(), *stats_scope.get(),
+                     context.clusterManager(), context.runtime(), context.api().randomGenerator(),
+                     std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), true,
+                     false, false, false, false, false, {}, context.api().timeSource(),
+                     context.httpContext(), context.routerContext()),
+      stream_id_(context.api().randomGenerator().random()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }
@@ -620,7 +640,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
-      config_message.hostname());
+      config_message.tunneling_config().hostname());
   hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
       substitution_format_config, context);
 }
@@ -873,6 +893,9 @@ void Filter::disableIdleTimer() {
     idle_timer_.reset();
   }
 }
+
+Filter::HttpStreamDecoderFilterCallbacks::HttpStreamDecoderFilterCallbacks(Filter* parent)
+    : parent_(parent) {}
 
 UpstreamDrainManager::~UpstreamDrainManager() {
   // If connections aren't closed before they are destructed an ASSERT fires,
