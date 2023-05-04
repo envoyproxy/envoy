@@ -8,6 +8,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
+import io.envoyproxy.envoymobile.utilities.ContextUtils;
 
 import java.util.Map;
 
@@ -22,6 +23,9 @@ public class AndroidEngineImpl implements EnvoyEngine {
                            EnvoyLogger logger, EnvoyEventTracker eventTracker,
                            Boolean enableProxying) {
     this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker);
+    if (ContextUtils.getApplicationContext() == null) {
+      ContextUtils.initApplicationContext(context.getApplicationContext());
+    }
     AndroidJniLibrary.load(context);
     AndroidNetworkMonitor.load(context, envoyEngine);
     if (enableProxying) {

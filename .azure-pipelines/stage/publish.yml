@@ -155,6 +155,19 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
+
 - job: package_arm64
   displayName: Linux debs (arm64)
   dependsOn: []
@@ -170,6 +183,7 @@ jobs:
       artifactName: "bazel.release"
       itemPattern: "bazel.release/arm64/bin/*"
       targetPath: $(Build.StagingDirectory)
+
   - template: ../bazel.yml
     parameters:
       managedAgent: false
@@ -177,6 +191,18 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
 
 - job: success
   dependsOn: ["docker", "package_x64", "package_arm64"]
@@ -277,44 +303,19 @@ jobs:
       artifactName: "bazel.release.arm64"
       itemPattern: "bazel.release.arm64/bin/*"
       targetPath: $(Build.StagingDirectory)
-
-  - task: DownloadSecureFile@1
-    name: MaintainerGPGKey
-    displayName: 'Download maintainer GPG key'
-    inputs:
-      # NB: This is the path to the key and **must** be set on a per-pipeline basis
-      secureFile: '${{ parameters.authGPGKey }}'
-
+  - template: ../gpg.yml
+    parameters:
+      authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+      authGPGPath: ${{ parameters.authGPGPath }}
+      authGPGKey: ${{ parameters.authGPGKey }}
+      pathGPGConfiguredHome: /build/.gnupg
+      pathGPGHome: $(Build.StagingDirectory)/.gnupg
   - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
     displayName: "Publish release to Github"
     workingDirectory: $(Build.SourcesDirectory)
     env:
       AZP_BRANCH: $(Build.SourceBranch)
       GITHUB_TOKEN: ${{ parameters.authGithub }}
-
-  # TODO(phlax): combine this with publish step
   - bash: |
       set -e
-
-      VERSION="$(cat VERSION.txt)"
-
-      mkdir -p linux/amd64 linux/arm64 publish
-
-      # linux/amd64
-      tar xf $(Build.StagingDirectory)/bazel.release/release.tar.zst -C ./linux/amd64
-      cp -a linux/amd64/envoy "publish/envoy-${VERSION}-linux-x86_64"
-      cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-x86_64"
-
-      # linux/arm64
-      tar xf $(Build.StagingDirectory)/bazel.release.arm64/release.tar.zst -C ./linux/arm64
-      cp -a linux/arm64/envoy "publish/envoy-${VERSION}-linux-aarch_64"
-      cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-aarch_64"
-
-      echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$MAINTAINER_GPG_KEY_PATH"
-
-      ci/publish_github_assets.sh "v${VERSION}" "${PWD}/publish"
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      GITHUB_TOKEN: ${{ parameters.authGithub }}
-      MAINTAINER_GPG_KEY_PASSPHRASE: ${{ parameters.authGPGPassphrase }}
-      MAINTAINER_GPG_KEY_PATH: ${{ parameters.authGPGPath }}
+      rm -rf $(Build.StagingDirectory)/.gnupg
