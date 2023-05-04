@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "ssl_socket_test",
+    timeout = "long",
     srcs = [
         "ssl_certs_test.h",
         "ssl_socket_test.cc",
