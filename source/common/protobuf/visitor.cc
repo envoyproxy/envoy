@@ -33,8 +33,12 @@ convertTypedStruct(const Protobuf::Message& message) {
   absl::string_view target_type_url = typed_struct->type_url();
   // inner_message might be invalid as we did not previously check type_url during loading.
   if (inner_message != nullptr) {
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
                              *inner_message);
+#else
+    throw EnvoyException("JSON and YAML support compiled out.");
+#endif
   }
   return {std::move(inner_message), target_type_url};
 }

@@ -42,7 +42,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testInterrupt() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     Future future = mExecutorService.submit(new Runnable() {
       @Override
@@ -85,7 +85,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testTaskFailed() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     Future future = mExecutorService.submit(new Runnable() {
       @Override
@@ -136,7 +136,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testLoopWithTimeout() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     // The MessageLoop queue is empty. Use a timeout of 100ms to check that
     // it doesn't block forever.

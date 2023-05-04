@@ -208,6 +208,8 @@ public:
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                            Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);
+
+  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(absl::string_view config);
 };
 
 // A set of connection callbacks which tracks connection state.

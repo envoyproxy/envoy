@@ -56,6 +56,7 @@ build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
+build:ios --test_timeout=390,750,1500,5700
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
@@ -138,6 +139,7 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 # to add platform-specific options. Avoid using this config directly and
 # instead use a platform-specific config
 #############################################################################
+build:remote-ci-common --config=ci
 build:remote-ci-common --config=remote
 build:remote-ci-common --google_default_credentials=false
 build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com
@@ -235,6 +237,7 @@ build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
 build:remote-ci-linux-coverage --noremote_accept_cached
 build:remote-ci-linux-coverage --config=remote-ci-common
+build:remote-ci-linux-coverage --build_runfile_links
 # IPv6 tests fail on CI
 build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################

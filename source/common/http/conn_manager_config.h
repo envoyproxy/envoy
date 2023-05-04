@@ -9,7 +9,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/date_provider.h"
@@ -228,11 +228,14 @@ public:
    * @param connection supplies the owning connection.
    * @param data supplies the currently available read data.
    * @param callbacks supplies the callbacks to install into the codec.
+   * @param overload_manager supplies overload manager that the codec can
+   * integrate with.
    * @return a codec or nullptr if no codec can be created.
    */
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
-                                          ServerConnectionCallbacks& callbacks) PURE;
+                                          ServerConnectionCallbacks& callbacks,
+                                          Server::OverloadManager& overload_manager) PURE;
 
   /**
    * @return DateProvider& the date provider to use for
@@ -417,9 +420,9 @@ public:
   virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
-   *  @return HttpTracerSharedPtr HttpTracer to use.
+   *  @return TracerSharedPtr Tracer to use.
    */
-  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
+  virtual Tracing::TracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.
@@ -513,7 +516,7 @@ public:
    * @return pointer to the header validator.
    *         If nullptr, header validation will not be done.
    */
-  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
+  virtual ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
 
   /**
    * @return whether to append the x-forwarded-port header.

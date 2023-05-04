@@ -20,6 +20,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -93,14 +94,14 @@ struct HTTPStringTestCase {
 // validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderShimWithUhv(Http::HeaderValidator* header_validator,
+  MockRequestDecoderShimWithUhv(Http::ServerHeaderValidator* header_validator,
                                 Network::MockConnection& connection)
       : header_validator_(header_validator), connection_(connection) {}
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::HeaderValidator* header_validator) {
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
     header_validator_ = header_validator;
   }
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
@@ -129,7 +130,7 @@ public:
   }
 
 private:
-  Http::HeaderValidator* header_validator_;
+  Http::ServerHeaderValidator* header_validator_;
   Network::MockConnection& connection_;
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
@@ -151,6 +152,7 @@ protected:
   NiceMock<Http1Settings> codec_settings_;
   Stats::TestUtil::TestStore store_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 class Http1ServerConnectionImplTest : public Http1CodecTestBase {
@@ -159,7 +161,7 @@ public:
     createHeaderValidator();
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_);
+        max_request_headers_count_, headers_with_underscores_action_, overload_manager_);
   }
 
   ~Http1ServerConnectionImplTest() override {
@@ -220,9 +222,9 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ =
-        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, http1CodecStats());
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
+        header_validator_config_, Protocol::Http11, http1CodecStats());
   }
 
 protected:
@@ -232,7 +234,7 @@ protected:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
@@ -243,7 +245,8 @@ void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
   codec_settings_.allow_absolute_url_ = true;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -271,7 +274,8 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        overload_manager_);
   }
 
   MockRequestDecoder decoder;
@@ -292,7 +296,8 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        overload_manager_);
   }
 
   InSequence sequence;
@@ -328,7 +333,8 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   codec_settings_.enable_trailers_ = enable_trailers;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
@@ -406,7 +412,8 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   createHeaderValidator();
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
 
   MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -805,7 +812,8 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
   codec_settings_.stream_error_on_invalid_http_message_ = true;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -824,7 +832,8 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
   codec_settings_.stream_error_on_invalid_http_message_ = false;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -1226,36 +1235,48 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   EXPECT_TRUE(isCodecProtocolError(status));
 }
 
-TEST_P(Http1ServerConnectionImplTest, CustomMethod) {
-  bool reject_custom_methods = true;
-#ifdef ENVOY_ENABLE_UHV
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // When both BalsaParser and UHV are enabled, custom methods are allowed by
-    // default.
-    reject_custom_methods = false;
-  }
-#endif
-
+TEST_P(Http1ServerConnectionImplTest, RejectCustomMethod) {
   initialize();
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  if (reject_custom_methods) {
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  }
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
-  if (reject_custom_methods) {
-    // http-parser rejects unknown methods.
-    // This behavior was observed during CVE-2019-18801 and helped to limit the
-    // scope of affected Envoy configurations.
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+}
+
+TEST_P(Http1ServerConnectionImplTest, RejectInvalidCharacterInMethod) {
+  codec_settings_.allow_custom_methods_ = true;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+
+  Buffer::OwnedImpl buffer("B{}D / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+}
+
+TEST_P(Http1ServerConnectionImplTest, AllowCustomMethod) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
     return;
   }
 
+  codec_settings_.allow_custom_methods_ = true;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(buffer);
   ASSERT_TRUE(status.ok());
 
   TestRequestHeaderMapImpl expected_headers{
@@ -2313,6 +2334,49 @@ TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength1) {
 TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100) {
   // content-length greater than POST body size
   testServerAllowChunkedContentLength(100, true);
+}
+
+TEST_P(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchOfNewStream) {
+  Server::MockLoadShedPoint mock_abort_dispatch;
+  EXPECT_CALL(overload_manager_, getLoadShedPoint(_)).WillOnce(Return(&mock_abort_dispatch));
+
+  initialize();
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(true));
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  const auto status = codec_->dispatch(buffer);
+
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(isEnvoyOverloadError(status));
+}
+
+TEST_P(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchOfContinuingStream) {
+  Server::MockLoadShedPoint mock_abort_dispatch;
+  EXPECT_CALL(overload_manager_, getLoadShedPoint(_)).WillOnce(Return(&mock_abort_dispatch));
+
+  initialize();
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(false));
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl request_line_buffer("GET / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(request_line_buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, request_line_buffer.length());
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  EXPECT_CALL(decoder, decodeHeaders_(_, true)).Times(0);
+  Buffer::OwnedImpl headers_buffer("final-header: value\r\n\r\n");
+  status = codec_->dispatch(headers_buffer);
+
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(isEnvoyOverloadError(status));
 }
 
 TEST_P(Http1ServerConnectionImplTest,

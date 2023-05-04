@@ -16,20 +16,21 @@ fi
 ROOT=./external/boringssl_fips
 pushd "$ROOT"
 
-# Build tools requirements:
-# - Clang compiler version 7.0.1 (https://releases.llvm.org/download.html)
-# - Go programming language version 1.12.7 (https://golang.org/dl/)
-# - Ninja build system version 1.9.0 (https://github.com/ninja-build/ninja/releases)
+# Build tools requirements (from section 12.1 of https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4407.pdf):
+# - Clang compiler version 12.0.0 (https://releases.llvm.org/download.html)
+# - Go programming language version 1.16.5 (https://golang.org/dl/)
+# - Ninja build system version 1.10.2 (https://github.com/ninja-build/ninja/releases)
+# - Cmake version 3.20.1 (https://cmake.org/download/)
 
 # Override $PATH for build tools, to avoid picking up anything else.
 export PATH="$(dirname `which cmake`):/usr/bin:/bin"
 
-# Clang 7.0.1
-VERSION=7.0.1
-SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
-PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
+# Clang
+VERSION=12.0.0
+SHA256=a9ff205eb0b73ca7c86afc6432eed1c2d49133bd0d49e47b15be59bbf0dd292e
+PLATFORM="x86_64-linux-gnu-ubuntu-20.04"
 
-curl -sLO https://releases.llvm.org/"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz \
+curl -sLO https://github.com/llvm/llvm-project/releases/download/llvmorg-"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz \
   && echo "$SHA256" clang+llvm-"$VERSION"-"$PLATFORM".tar.xz | sha256sum --check
 tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
 
@@ -42,9 +43,9 @@ if [[ `clang --version | head -1 | awk '{print $3}'` != "$VERSION" ]]; then
   exit 1
 fi
 
-# Go 1.12.7
-VERSION=1.12.7
-SHA256=66d83bfb5a9ede000e33c6579a91a29e6b101829ad41fffb5c5bb6c900e109d9
+# Go
+VERSION=1.16.5
+SHA256=b12c23023b68de22f74c0524f10b753e7b08b1504cb7e417eccebdd3fae49061
 PLATFORM="linux-amd64"
 
 curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
@@ -60,9 +61,9 @@ if [[ `go version | awk '{print $3}'` != "go$VERSION" ]]; then
   exit 1
 fi
 
-# Ninja 1.9.0
-VERSION=1.9.0
-SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
+# Ninja
+VERSION=1.10.2
+SHA256=763464859c7ef2ea3a0a10f4df40d2025d3bb9438fcb1228404640410c0ec22d
 PLATFORM="linux"
 
 curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$VERSION"/ninja-"$PLATFORM".zip \
@@ -76,6 +77,22 @@ if [[ `ninja --version` != "$VERSION" ]]; then
   exit 1
 fi
 
+# CMake
+VERSION=3.20.1
+SHA256=b8c141bd7a6d335600ab0a8a35e75af79f95b837f736456b5532f4d717f20a09
+PLATFORM="linux-x86_64"
+
+curl -sLO https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION"-"$PLATFORM".tar.gz \
+  && echo "$SHA256" cmake-"$VERSION"-"$PLATFORM".tar.gz | sha256sum --check
+tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+
+export PATH="$PWD/cmake-$VERSION-$PLATFORM/bin:$PATH"
+
+if [[ `cmake --version | head -n1` != "cmake version $VERSION" ]]; then
+  echo "ERROR: CMake version doesn't match."
+  exit 1
+fi
+
 # Clean after previous build.
 rm -rf boringssl/build
 
@@ -84,6 +101,7 @@ cd boringssl
 mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
 ninja run_tests
+./crypto/crypto_test
 
 # Verify correctness of the FIPS build.
 if [[ `tool/bssl isfips` != "1" ]]; then
