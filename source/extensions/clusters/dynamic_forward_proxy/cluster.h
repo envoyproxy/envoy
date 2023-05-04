@@ -8,6 +8,7 @@
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -16,7 +17,7 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 class Cluster : public Upstream::BaseDynamicClusterImpl,
-                public Upstream::DfpCluster,
+                public Extensions::Common::DynamicForwardProxy::DfpCluster,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,

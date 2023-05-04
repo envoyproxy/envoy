@@ -56,5 +56,10 @@ new_features:
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
+- area: dynamic_forward_proxy
+  change: |
+    added :ref:`sub_clusters_config
+    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
+    independent sub cluster for each host:port, with STRICT_DNS cluster type.
 
 deprecated:

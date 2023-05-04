@@ -7,6 +7,7 @@
 
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -46,10 +47,10 @@ public:
   bool saveUpstreamAddress() const { return save_upstream_address_; };
   const std::chrono::milliseconds clusterInitTimeout() const { return cluster_init_timeout_; };
 
-  LoadClusterEntryHandlePtr addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
-                                              const std::string& cluster_name,
-                                              const std::string& host, const int port,
-                                              LoadClusterEntryCallbacks& callback);
+  LoadClusterEntryHandlePtr
+  addDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
+                    const std::string& cluster_name, const std::string& host, const int port,
+                    LoadClusterEntryCallbacks& callback);
   // run in each worker thread.
   Upstream::ClusterUpdateCallbacksHandlePtr addThreadLocalClusterUpdateCallbacks();
 
@@ -121,9 +122,9 @@ public:
                                           bool end_stream) override;
   void onDestroy() override;
 
-  Http::FilterHeadersStatus loadDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
-                                               Http::RequestHeaderMap& headers,
-                                               uint16_t default_port);
+  Http::FilterHeadersStatus
+  loadDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
+                     Http::RequestHeaderMap& headers, uint16_t default_port);
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
   void onLoadDnsCacheComplete(

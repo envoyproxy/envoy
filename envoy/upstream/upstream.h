@@ -1268,35 +1268,6 @@ using ClusterSharedPtr = std::shared_ptr<Cluster>;
 using ClusterWeakPtr = std::weak_ptr<Cluster>;
 using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
-class DfpCluster {
-public:
-  virtual ~DfpCluster() = default;
-
-  /**
-   * @return the cluster enabled subCluster configuration or not.
-   */
-  virtual bool enableSubCluster() const PURE;
-
-  /**
-   * Create a full cluster config for the cluster_name, with the specified host and port.
-   * @return true and nullptr when the subCluster with the specified cluster_name already
-   *         created, or true and the created cluster config when it not exists and not
-   *         reach the limitation of max_sub_clusters, otherwise, return false and nullptr.
-   */
-  virtual std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
-  createSubClusterConfig(const std::string& cluster_name, const std::string& host,
-                         const int port) PURE;
-
-  /**
-   * Update the last used time of the subCluster with the specified cluster_name.
-   * @return true if the subCluster is existing.
-   */
-  virtual bool touch(const std::string& cluster_name) PURE;
-};
-
-using DfpClusterSharedPtr = std::shared_ptr<DfpCluster>;
-using DfpClusterWeakPtr = std::weak_ptr<DfpCluster>;
-
 } // namespace Upstream
 } // namespace Envoy
 

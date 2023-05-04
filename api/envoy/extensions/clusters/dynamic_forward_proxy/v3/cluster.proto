@@ -35,14 +35,14 @@ message ClusterConfig {
     common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
 
     // Configuration for sub clusters, when this configuration is enabled,
-    // Envoy will create a independent sub cluster dynamically for each host:port.
+    // Envoy will create an independent sub cluster dynamically for each host:port.
     // Most of the configuration of a sub cluster is inherited from the current cluster,
     // i.e. health_checks, dns_resolvers and etc.
     // And the load_assignment will be set to the only one endpoint, host:port.
     //
     // Compared to the dns_cache_config, it has the following advantages:
     //
-    // 1. a sub cluster could be specified with the STRICT_DNS DiscoveryType,
+    // 1. sub clusters will be ceated with the STRICT_DNS DiscoveryType,
     //    so that Envoy will use all of the IPs resolved from the host.
     //
     // 2. each sub cluster is full featured cluster, with lb_policy and health check and etc enabled.
@@ -77,7 +77,6 @@ message ClusterConfig {
 }
 
 // Configuration for sub clusters. Hard code STRICT_DNS cluster type now.
-// We may also support LOGICAL_DNS, when we deprecate the dns_cache_config configuration.
 message SubClustersConfig {
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in a sub cluster. Note that CLUSTER_PROVIDED is not allowed here.

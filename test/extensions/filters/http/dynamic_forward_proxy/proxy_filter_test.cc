@@ -46,8 +46,10 @@ public:
         Network::UpstreamTransportSocketFactoryPtr(transport_socket_factory_));
     factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
         ->transport_socket_matcher_.reset(transport_socket_match_);
-    dfp_cluster_ = std::make_shared<NiceMock<Upstream::MockDfpCluster>>();
-    auto cluster = std::dynamic_pointer_cast<Upstream::DfpCluster>(dfp_cluster_);
+    dfp_cluster_ =
+        std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDfpCluster>>();
+    auto cluster = std::dynamic_pointer_cast<Extensions::Common::DynamicForwardProxy::DfpCluster>(
+        dfp_cluster_);
     Common::DynamicForwardProxy::DFPClusterStore::save("fake_cluster", cluster);
   }
 
@@ -96,7 +98,7 @@ public:
       new Network::MockTransportSocketFactory()};
   NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::shared_ptr<NiceMock<Upstream::MockDfpCluster>> dfp_cluster_;
+  std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDfpCluster>> dfp_cluster_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;

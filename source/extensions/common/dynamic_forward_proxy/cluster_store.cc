@@ -5,7 +5,7 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-Upstream::DfpClusterSharedPtr DFPClusterStore::load(const std::string cluster_name) {
+DfpClusterSharedPtr DFPClusterStore::load(const std::string cluster_name) {
   ClusterStoreType& clusterStore = getClusterStore();
   absl::ReaderMutexLock lock(&clusterStore.mutex_);
   auto it = clusterStore.map_.find(cluster_name);
@@ -15,7 +15,7 @@ Upstream::DfpClusterSharedPtr DFPClusterStore::load(const std::string cluster_na
   return nullptr;
 }
 
-void DFPClusterStore::save(const std::string cluster_name, Upstream::DfpClusterSharedPtr cluster) {
+void DFPClusterStore::save(const std::string cluster_name, DfpClusterSharedPtr cluster) {
   ClusterStoreType& clusterStore = getClusterStore();
   absl::WriterMutexLock lock(&clusterStore.mutex_);
   clusterStore.map_[cluster_name] = std::move(cluster);
