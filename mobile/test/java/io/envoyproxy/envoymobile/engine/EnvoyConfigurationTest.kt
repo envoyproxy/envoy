@@ -84,7 +84,6 @@ class EnvoyConfigurationTest {
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
-    enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
@@ -134,7 +133,6 @@ class EnvoyConfigurationTest {
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -185,7 +183,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("base_interval: 345s")
     assertThat(resolvedTemplate).contains("max_interval: 456s")
     assertThat(resolvedTemplate).contains("dns_query_timeout: 321s")
-    assertThat(resolvedTemplate).contains("dns_lookup_family: V4_PREFERRED")
+    assertThat(resolvedTemplate).contains("dns_lookup_family: ALL")
     assertThat(resolvedTemplate).contains("dns_min_refresh_rate: 12s")
     assertThat(resolvedTemplate).contains("preresolve_hostnames:")
     assertThat(resolvedTemplate).contains("hostname1")
@@ -255,7 +253,6 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
-      enableHappyEyeballs = true,
       enableHttp3 = false,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
@@ -282,9 +279,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
     // dnsCacheSaveIntervalSeconds = 101
     assertThat(resolvedTemplate).contains("save_interval: 101")
-
-    // enableHappyEyeballs = true
-    assertThat(resolvedTemplate).contains("dns_lookup_family: ALL")
 
     // enableHttp3 = false
     assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
