@@ -50,6 +50,30 @@ Example filter configuration:
 
 .. include:: _include/aws_credentials.rst
 
+Note that this filter also supports per route configuration:
+
+.. code-block:: yaml
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      routes:
+      - match: { prefix: "/some-route-match" }
+        route: { cluster: service }
+        typed_per_filter_config:
+          envoy.filters.http.aws_request_signing:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
+            service_name: s3
+            region: us-west-2
+            use_unsigned_payload: true
+            match_excluded_headers:
+            - prefix: x-envoy
+            - prefix: x-forwarded
+            - exact: x-amzn-trace-id
+
+This can be used to either override the global configuration
+
 Statistics
 ----------
 
