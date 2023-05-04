@@ -70,7 +70,7 @@ stages:
       authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGCP: $(GcpServiceAccountKey)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
-      authGPGKey: $(MaintainerGPGKey)
+      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
       checkDeps: variables['CHECK_DEPS']
