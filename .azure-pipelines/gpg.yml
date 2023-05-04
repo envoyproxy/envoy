@@ -42,7 +42,7 @@ parameters:
 steps:
 # Secure key - postsubmit
 - task: DownloadSecureFile@1
-  name: ${{ parameters.name }}
+  name: ${{ parameters.nameDownloadTask }}
   displayName: 'Download maintainer GPG key'
   condition: |
     and(succeeded(),
