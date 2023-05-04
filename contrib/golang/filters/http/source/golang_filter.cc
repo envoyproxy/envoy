@@ -640,7 +640,6 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
 // It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, headerAction act) {
-  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -750,6 +749,8 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
 }
 
 CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -839,6 +840,7 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
 }
 
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
