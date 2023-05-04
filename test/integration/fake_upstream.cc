@@ -387,7 +387,7 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager_);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
@@ -636,6 +636,7 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
     handler_->addListener(absl::nullopt, listener_, runtime_);
