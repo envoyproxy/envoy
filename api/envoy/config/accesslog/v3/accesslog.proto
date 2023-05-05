@@ -288,7 +288,7 @@ message GrpcStatusFilter {
   // Logs only responses that have any one of the gRPC statuses in this field.
   repeated Status statuses = 1 [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
-  // If this field is set to true, the filter will instead block all responses
+  // If included and set to true, the filter will instead block all responses
   // with a gRPC status or inferred gRPC status enumerated in statuses, and
   // allow all other responses.
   bool exclude = 2;
