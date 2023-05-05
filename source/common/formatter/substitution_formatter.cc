@@ -1879,11 +1879,20 @@ absl::optional<std::string> GrpcStatusFormatter::format(
 }
 
 ProtobufWkt::Value GrpcStatusFormatter::formatValue(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
-    absl::string_view, AccessLog::AccessLogType) const {
-  const auto grpc_status =
+    absl::string_view, AccessLog::AccessLogType) const { 
+  if(isGrpcRequestHeaders(request_headers)){
+    const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
+  }else{
+    return absl::nullopt;
+  }
+
+  if (!grpc_status.has_value()) {
+    return unspecifiedValue();
+  }
+  
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
   }
