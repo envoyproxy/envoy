@@ -49,6 +49,10 @@ bug_fixes:
 - area: tls
   change: |
     Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
+- area: router
+  change: |
+    Fixed the bug that updating :ref:`<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
+    of SRDS config doesn't work and multiple HCM share the same `scope_key_builder`.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
