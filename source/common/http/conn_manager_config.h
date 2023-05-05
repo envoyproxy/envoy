@@ -338,11 +338,10 @@ public:
   virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
 
   /**
-   * @return Router::ScopeKeyBuilder* the scope key builder to calculate the scope key.
-   * Pointer ownership is _not_ transferred to the caller of this function. This will return
-   * nullptr when scoped routing is not enabled.
+   * @return OptRef<Router::ScopeKeyBuilder> the scope key builder to calculate the scope key.
+   * This will return nullptr when scoped routing is not enabled.
    */
-  virtual const Router::ScopeKeyBuilder* scopeKeyBuilder() PURE;
+  virtual OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.

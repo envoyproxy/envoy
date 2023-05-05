@@ -617,7 +617,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
   MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
   MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
-  MOCK_METHOD(Router::ScopeKeyBuilder*, scopeKeyBuilder, ());
+  MOCK_METHOD(OptRef<const Router::ScopeKeyBuilder>, scopeKeyBuilder, ());
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));

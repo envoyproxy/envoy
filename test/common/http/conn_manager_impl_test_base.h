@@ -104,11 +104,11 @@ public:
     }
     return nullptr;
   }
-  Router::ScopeKeyBuilder* scopeKeyBuilder() override {
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
     if (use_srds_) {
-      return &scope_key_builder_;
+      return scope_key_builder_;
     }
-    return nullptr;
+    return {};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -203,7 +203,7 @@ public:
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
-  NiceMock<Router::MockScopeKeyBuilder> scope_key_builder_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;

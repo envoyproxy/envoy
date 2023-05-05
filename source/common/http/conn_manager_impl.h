@@ -126,7 +126,7 @@ private:
         : route_config_provider_(route_config_provider), parent_(parent) {}
 
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
-                                  const Router::ScopeKeyBuilder* scope_key_builder,
+                                  OptRef<const Router::ScopeKeyBuilder> scope_key_builder,
                                   ActiveStream& parent)
         // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
         // implemented. Inline provider will be cast to nullptr here but it is not full implemented
@@ -148,7 +148,7 @@ private:
   private:
     Router::RouteConfigProvider* route_config_provider_;
     Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
-    const Router::ScopeKeyBuilder* scope_key_builder_;
+    OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
     ActiveStream& parent_;
   };
 

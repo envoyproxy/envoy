@@ -146,9 +146,7 @@ fragments:
             filter_config = filter_chain->mutable_filters(i);
           }
         }
-        if (!filter_config) {
-          return;
-        }
+        ASSERT(filter_config != nullptr);
         auto* config = filter_config->mutable_typed_config();
         auto filter =
             MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::

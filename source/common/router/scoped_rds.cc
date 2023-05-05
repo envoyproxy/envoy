@@ -169,6 +169,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
             *this, resource_decoder_);
   }
 
+  // TODO(tony612): consider not using the callback here.
   initialize([]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>();
   });

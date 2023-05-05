@@ -220,7 +220,7 @@ scoped_routes:
         key:
           fragments: { string_key: foo-key-2 }
 )EOF");
-  auto config =
+  const auto config =
       parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes"));
   Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
       config, server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);

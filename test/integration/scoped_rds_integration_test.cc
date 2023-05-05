@@ -564,6 +564,8 @@ key:
       /*cluster_0*/ 0);
 }
 
+// Two listeners with the same rds config but different scope_key_builder should use their own
+// scope_key_builder to calculate the scope key and routes.
 TEST_P(ScopedRdsIntegrationTest, ListenersWithDifferentScopeKeyBuilder) {
   constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
@@ -592,6 +594,7 @@ key:
     // CreateRdsStream waits for connection which is fired by RDS subscription.
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   };
+  // add listener_1 with different scope_key_builder
   add_listener_ = true;
   initialize();
   registerTestServerPorts({"http", "listener_1"});

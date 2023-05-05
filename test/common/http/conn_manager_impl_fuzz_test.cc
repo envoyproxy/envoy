@@ -170,11 +170,11 @@ public:
     }
     return nullptr;
   }
-  Router::ScopeKeyBuilder* scopeKeyBuilder() override {
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
     if (use_srds_) {
-      return &scope_key_builder_;
+      return scope_key_builder_;
     }
-    return nullptr;
+    return {};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
