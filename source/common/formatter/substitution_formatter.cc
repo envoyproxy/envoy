@@ -1890,6 +1890,9 @@ ProtobufWkt::Value GrpcStatusFormatter::formatValue(
   if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
     return unspecifiedValue();
   }
+  if (!grpc_status.has_value()) {
+    return unspecifiedValue();
+  }
 
   switch (format_) {
   case CamelString: {
