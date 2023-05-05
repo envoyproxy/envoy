@@ -53,6 +53,7 @@ Example filter configuration:
 Note that this filter also supports per route configuration:
 
 .. code-block:: yaml
+
   route_config:
     name: local_route
     virtual_hosts:
