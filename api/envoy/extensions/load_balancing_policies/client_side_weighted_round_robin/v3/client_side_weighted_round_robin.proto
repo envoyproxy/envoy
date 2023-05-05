@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3";
 option java_outer_classname = "ClientSideWeightedRoundRobinProto";
@@ -65,5 +66,6 @@ message ClientSideWeightedRoundRobin {
   // The multiplier used to adjust endpoint weights with the error rate
   // calculated as eps/qps. Configuration is rejected if this value is negative.
   // Default is 1.0.
-  google.protobuf.FloatValue error_utilization_penalty = 6;
+  google.protobuf.FloatValue error_utilization_penalty = 6
+      [(validate.rules).float.gte = 0];
 }
