@@ -170,8 +170,8 @@ public:
 private:
   static DataInputPtr<DataType>& validateInputAndMatcher(DataInputPtr<DataType>& data_input,
                                                          InputMatcherPtr& input_matcher) {
-    auto supported_dataInput = input_matcher->supportedDataInputTypes();
-    if (supported_dataInput.find(data_input->dataInputType()) == supported_dataInput.end()) {
+    auto supported_input_types = input_matcher->supportedDataInputTypes();
+    if (supported_input_types.find(data_input->dataInputType()) == supported_input_types.end()) {
       throw EnvoyException(
           absl::StrCat("Unsupported data input type: ", data_input->dataInputType()));
     }

@@ -17,7 +17,8 @@ template <class DataType>
 class MapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {}
+      : data_input_(std::move(validateDataInput(data_input))),
+        on_no_match_(std::move(on_no_match)) {}
 
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;

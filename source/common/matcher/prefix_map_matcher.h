@@ -14,8 +14,7 @@ template <class DataType> class PrefixMapMatcher : public MapMatcher<DataType> {
 public:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
                    absl::optional<OnMatch<DataType>> on_no_match)
-      : MapMatcher<DataType>(std::move(MapMatcher<DataType>::validateDataInput(data_input)),
-                             std::move(on_no_match)) {}
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match)) {}
 
   void addChild(std::string value, OnMatch<DataType>&& on_match) override {
     children_.add(value, std::make_shared<OnMatch<DataType>>(std::move(on_match)));
