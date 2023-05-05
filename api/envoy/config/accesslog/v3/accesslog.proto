@@ -320,7 +320,7 @@ message LogTypeFilter {
   repeated data.accesslog.v3.AccessLogType types = 1
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
-  // If included and set to true, the filter will instead block all records
+  // If this field is set to true, the filter will instead block all records
   // with a access log type in types field, and allow all other records.
   bool exclude = 2;
 }
