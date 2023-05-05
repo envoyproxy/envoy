@@ -29,12 +29,12 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
-#include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {

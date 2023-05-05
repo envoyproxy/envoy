@@ -1,7 +1,7 @@
 #include "source/common/tcp_proxy/upstream.h"
 
-#include "envoy/upstream/cluster_manager.h"
 #include "envoy/http/header_map.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/codec_client.h"
 #include "source/common/http/codes.h"

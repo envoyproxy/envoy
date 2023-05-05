@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
@@ -13,12 +15,11 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/hash_policy.h"
-#include "source/common/router/header_parser.h"
-#include "source/common/router/config_impl.h"
-#include "source/common/router/router.h"
 #include "source/common/network/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/router/router.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
-#include <memory>
 
 namespace Envoy {
 namespace TcpProxy {

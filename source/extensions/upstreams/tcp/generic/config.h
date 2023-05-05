@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/tcp/upstream.h"
-#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Extensions {
