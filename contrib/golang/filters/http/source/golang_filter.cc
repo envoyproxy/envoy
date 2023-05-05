@@ -498,6 +498,7 @@ CAPIStatus
 Filter::sendLocalReply(Http::Code response_code, std::string body_text,
                        std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                        Grpc::Status::GrpcStatus grpc_status, std::string details) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -513,11 +514,8 @@ Filter::sendLocalReply(Http::Code response_code, std::string body_text,
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post(
       [this, &state, weak_ptr, response_code, body_text, modify_headers, grpc_status, details] {
-        ASSERT(state.isThreadSafe());
-        // TODO: do not need lock here, since it's the work thread now.
-        Thread::ReleasableLockGuard lock(mutex_);
-        if (!weak_ptr.expired() && !has_destroyed_) {
-          lock.release();
+        if (!weak_ptr.expired() && !hasDestroyed()) {
+          ASSERT(state.isThreadSafe());
           sendLocalReplyInternal(response_code, body_text, modify_headers, grpc_status, details);
         } else {
           ENVOY_LOG(debug, "golang filter has gone or destroyed in sendLocalReply");
@@ -539,6 +537,7 @@ CAPIStatus Filter::sendPanicReply(absl::string_view details) {
 }
 
 CAPIStatus Filter::continueStatus(GolangStatus status) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -556,11 +555,8 @@ CAPIStatus Filter::continueStatus(GolangStatus status) {
   // TODO: skip post event to dispatcher, and return continue in the caller,
   // when it's invoked in the current envoy thread, for better performance & latency.
   state.getDispatcher().post([this, &state, weak_ptr, status] {
-    ASSERT(state.isThreadSafe());
-    // TODO: do not need lock here, since it's the work thread now.
-    Thread::ReleasableLockGuard lock(mutex_);
-    if (!weak_ptr.expired() && !has_destroyed_) {
-      lock.release();
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      ASSERT(state.isThreadSafe());
       continueStatusInternal(status);
     } else {
       ENVOY_LOG(debug, "golang filter has gone or destroyed in continueStatus event");
@@ -685,8 +681,8 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
-      Thread::LockGuard lock(mutex_);
-      if (!weak_ptr.expired() && !has_destroyed_) {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
         switch (act) {
         case HeaderAdd:
           headers_->addCopy(Http::LowerCaseString(key_str), value_str);
@@ -740,8 +736,8 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, key_str] {
-      Thread::LockGuard lock(mutex_);
-      if (!weak_ptr.expired() && !has_destroyed_) {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
         headers_->remove(Http::LowerCaseString(key_str));
         onHeadersModified();
       } else {
@@ -753,6 +749,7 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
 }
 
 CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -778,6 +775,7 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
 
 CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                                    bufferAction action) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -842,6 +840,7 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
 }
 
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -879,6 +878,7 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
 }
 
 CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -937,6 +937,7 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
 
 CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
                                       absl::string_view buf) {
+  // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -955,11 +956,8 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
     // of the buffer slice and pass that to the dispatcher.
     auto buff_copy = std::string(buf);
     state.getDispatcher().post([this, &state, weak_ptr, filter_name, key, buff_copy] {
-      ASSERT(state.isThreadSafe());
-      // TODO: do not need lock here, since it's the work thread now.
-      Thread::ReleasableLockGuard lock(mutex_);
-      if (!weak_ptr.expired() && !has_destroyed_) {
-        lock.release();
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        ASSERT(state.isThreadSafe());
         setDynamicMetadataInternal(state, filter_name, key, buff_copy);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");

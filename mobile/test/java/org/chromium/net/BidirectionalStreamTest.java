@@ -20,8 +20,8 @@ import android.util.Log;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
-import org.chromium.net.impl.BidirectionalStreamNetworkException;
-import org.chromium.net.impl.CronetBidirectionalStream;
+import org.chromium.net.impl.CronvoyBidirectionalStreamNetworkException;
+import org.chromium.net.impl.CronvoyBidirectionalStream;
 import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestUtil;
@@ -40,7 +40,7 @@ import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.MetricsTestUtil.TestRequestFinishedListener;
 import org.chromium.net.testing.TestBidirectionalStreamCallback.FailureType;
 import org.chromium.net.testing.TestBidirectionalStreamCallback.ResponseStep;
-import org.chromium.net.impl.UrlResponseInfoImpl;
+import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
@@ -111,7 +111,7 @@ public class BidirectionalStreamTest {
       headersList.add(
           new AbstractMap.SimpleImmutableEntry<String, String>(headers[i], headers[i + 1]));
     }
-    UrlResponseInfoImpl urlResponseInfo = new UrlResponseInfoImpl(
+    CronvoyUrlResponseInfoImpl urlResponseInfo = new CronvoyUrlResponseInfoImpl(
         Arrays.asList(urls), statusCode, message, headersList, false, "h2", null, receivedBytes);
     return urlResponseInfo;
   }
@@ -365,7 +365,7 @@ public class BidirectionalStreamTest {
         if (mNumWriteCompleted <= 3) {
           // "6" is in pending queue.
           List<ByteBuffer> pendingData =
-              ((CronetBidirectionalStream)stream).getPendingDataForTesting();
+              ((CronvoyBidirectionalStream)stream).getPendingDataForTesting();
           assertEquals(1, pendingData.size());
           ByteBuffer pendingBuffer = pendingData.get(0);
           byte[] content = new byte[pendingBuffer.remaining()];
@@ -373,11 +373,11 @@ public class BidirectionalStreamTest {
           assertTrue(Arrays.equals("6".getBytes(), content));
 
           // "4" and "5" have been flushed.
-          assertEquals(0, ((CronetBidirectionalStream)stream).getFlushDataForTesting().size());
+          assertEquals(0, ((CronvoyBidirectionalStream)stream).getFlushDataForTesting().size());
         } else if (mNumWriteCompleted == 5) {
           // Now flush "6", which is still in pending queue.
           List<ByteBuffer> pendingData =
-              ((CronetBidirectionalStream)stream).getPendingDataForTesting();
+              ((CronvoyBidirectionalStream)stream).getPendingDataForTesting();
           assertEquals(1, pendingData.size());
           ByteBuffer pendingBuffer = pendingData.get(0);
           byte[] content = new byte[pendingBuffer.remaining()];
@@ -386,8 +386,8 @@ public class BidirectionalStreamTest {
 
           stream.flush();
 
-          assertEquals(0, ((CronetBidirectionalStream)stream).getPendingDataForTesting().size());
-          assertEquals(0, ((CronetBidirectionalStream)stream).getFlushDataForTesting().size());
+          assertEquals(0, ((CronvoyBidirectionalStream)stream).getPendingDataForTesting().size());
+          assertEquals(0, ((CronvoyBidirectionalStream)stream).getFlushDataForTesting().size());
         }
       }
     };
@@ -397,8 +397,8 @@ public class BidirectionalStreamTest {
     callback.addWriteData("4".getBytes(), false);
     callback.addWriteData("5".getBytes(), true);
     callback.addWriteData("6".getBytes(), false);
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)mCronetEngine
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)mCronetEngine
             .newBidirectionalStreamBuilder(url, callback, callback.getExecutor())
             .addHeader("foo", "bar")
             .addHeader("empty", "")
@@ -467,8 +467,8 @@ public class BidirectionalStreamTest {
         return dummyData;
       }
     };
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)mCronetEngine
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)mCronetEngine
             .newBidirectionalStreamBuilder(url, callback, callback.getExecutor())
             .build();
     stream.start();
@@ -1326,8 +1326,8 @@ public class BidirectionalStreamTest {
     callback.setAutoAdvance(false);
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
         Http2TestServer.getEchoMethodUrl(), callback, callback.getExecutor());
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)builder.setHttpMethod("GET").build();
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)builder.setHttpMethod("GET").build();
     stream.start();
     callback.waitForNextReadStep();
     assertFalse(callback.isDone());
@@ -1394,8 +1394,8 @@ public class BidirectionalStreamTest {
     callback.setAutoAdvance(false);
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
         Http2TestServer.getEchoMethodUrl(), callback, callback.getExecutor());
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)builder.setHttpMethod("GET").build();
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)builder.setHttpMethod("GET").build();
     stream.start();
     try {
       mCronetEngine.shutdown();
@@ -1438,8 +1438,8 @@ public class BidirectionalStreamTest {
     TestBidirectionalStreamCallback callback = new ShutdownTestBidirectionalStreamCallback();
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
         Http2TestServer.getEchoMethodUrl(), callback, callback.getExecutor());
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)builder.setHttpMethod("GET").build();
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)builder.setHttpMethod("GET").build();
     stream.start();
     callback.setFailure(FailureType.THROW_SYNC, ResponseStep.ON_READ_COMPLETED);
     callback.blockForDone();
@@ -1455,8 +1455,8 @@ public class BidirectionalStreamTest {
     TestBidirectionalStreamCallback callback = new ShutdownTestBidirectionalStreamCallback();
     BidirectionalStream.Builder builder = mCronetEngine.newBidirectionalStreamBuilder(
         Http2TestServer.getEchoMethodUrl(), callback, callback.getExecutor());
-    CronetBidirectionalStream stream =
-        (CronetBidirectionalStream)builder.setHttpMethod("GET").build();
+    CronvoyBidirectionalStream stream =
+        (CronvoyBidirectionalStream)builder.setHttpMethod("GET").build();
 
     // Block callback when response starts to verify that shutdown fails
     // if there are active requests.
@@ -1522,7 +1522,7 @@ public class BidirectionalStreamTest {
   private static void checkSpecificErrorCode(NetError netError, int errorCode,
                                              boolean immediatelyRetryable) throws Exception {
     NetworkException exception =
-        new BidirectionalStreamNetworkException("", errorCode, netError.getErrorCode());
+        new CronvoyBidirectionalStreamNetworkException("", errorCode, netError.getErrorCode());
     assertEquals(immediatelyRetryable, exception.immediatelyRetryable());
     assertEquals(netError.getErrorCode(), exception.getCronetInternalErrorCode());
     assertEquals(errorCode, exception.getErrorCode());

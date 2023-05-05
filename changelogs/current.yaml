@@ -4,8 +4,12 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: build
   change: |
-    Moved the subset and maglev LB code into extensions. If you use these load balancers and override
+    Moved the subset, ring_hash, and maglev LB code into extensions. If you use these load balancers and override
     extensions_build_config.bzl you will need to include them explicitly.
+- area: build
+  change: |
+    Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
+    need to include the new config_subscriptions explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -16,6 +20,14 @@ minor_behavior_changes:
 - area: custom response
   change: |
     The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
+- area: http1
+  change: |
+    The HTTP1 server-side codec no longer considers encoding 1xx headers as
+    starting the response. This allows the codec to raise protocol errors,
+    sending detailed local replies instead of just closing the connection. This
+    behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers``
+    to false.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
@@ -26,6 +38,16 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: ext_proc
+  change: |
+    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check
+    for header mutations beforce clearing the route cache. Failures due to this check will be counted under the
+    clear_route_cache_ignored stat.
+- area: aws
+  change: |
+    Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched
+    from environment variables. This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -71,6 +93,9 @@ new_features:
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
     by sending a local reply.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.http1_server_abort_dispatch`` that rejects HTTP1 server processing of requests.
 - area: matchers
   change: |
     Added :ref:`RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>` input
@@ -93,6 +118,12 @@ new_features:
   change: |
     added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
     to filter access log records based on the type of the record.
+- area: ext_proc
+  change: |
+    added new configuration field
+    :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
+    clear_route_cache_disabled stat.
 - area: redis_proxy
   change: |
     added new field :ref:`connection_rate_limit

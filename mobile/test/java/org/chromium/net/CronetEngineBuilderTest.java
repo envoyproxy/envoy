@@ -1,7 +1,7 @@
 package org.chromium.net;
 
-import static org.chromium.net.CronetProvider.PROVIDER_NAME_APP_PACKAGED;
-import static org.chromium.net.CronetProvider.PROVIDER_NAME_FALLBACK;
+import static org.chromium.net.CronvoyProvider.PROVIDER_NAME_APP_PACKAGED;
+import static org.chromium.net.CronvoyProvider.PROVIDER_NAME_FALLBACK;
 import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -52,15 +52,15 @@ public class CronetEngineBuilderTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testProviderOrdering() {
-    final CronetProvider[] availableProviders = new CronetProvider[] {
+    final CronvoyProvider[] availableProviders = new CronvoyProvider[] {
         createMockCronetProvider(PROVIDER_NAME_APP_PACKAGED, "99.77", true),
         createMockCronetProvider(PROVIDER_NAME_FALLBACK, "99.99", true),
         createMockCronetProvider("Some other provider", "99.88", true),
     };
 
-    ArrayList<CronetProvider> providers = new ArrayList<>(Arrays.asList(availableProviders));
-    List<CronetProvider> orderedProviders =
-        CronetEngine.Builder.getEnabledCronetProviders(getContext(), providers);
+    ArrayList<CronvoyProvider> providers = new ArrayList<>(Arrays.asList(availableProviders));
+    List<CronvoyProvider> orderedProviders =
+        CronetEngine.Builder.getEnabledCronvoyProviders(getContext(), providers);
 
     // Check the result
     assertEquals(availableProviders[2], orderedProviders.get(0));
@@ -76,15 +76,15 @@ public class CronetEngineBuilderTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testThatDisabledProvidersAreExcluded() {
-    final CronetProvider[] availableProviders = new CronetProvider[] {
+    final CronvoyProvider[] availableProviders = new CronvoyProvider[] {
         createMockCronetProvider(PROVIDER_NAME_FALLBACK, "99.99", true),
         createMockCronetProvider(PROVIDER_NAME_APP_PACKAGED, "99.77", true),
         createMockCronetProvider("Some other provider", "99.88", false),
     };
 
-    ArrayList<CronetProvider> providers = new ArrayList<>(Arrays.asList(availableProviders));
-    List<CronetProvider> orderedProviders =
-        CronetEngine.Builder.getEnabledCronetProviders(getContext(), providers);
+    ArrayList<CronvoyProvider> providers = new ArrayList<>(Arrays.asList(availableProviders));
+    List<CronvoyProvider> orderedProviders =
+        CronetEngine.Builder.getEnabledCronvoyProviders(getContext(), providers);
 
     assertEquals("Unexpected number of providers in the list", 2, orderedProviders.size());
     assertEquals(PROVIDER_NAME_APP_PACKAGED, orderedProviders.get(0).getName());
@@ -113,9 +113,9 @@ public class CronetEngineBuilderTest {
     fail("Expected IllegalArgumentException");
   }
 
-  private static CronetProvider createMockCronetProvider(String mName, String mVersion,
-                                                         boolean mEnabled) {
-    CronetProvider mock = mock(CronetProvider.class);
+  private static CronvoyProvider createMockCronetProvider(String mName, String mVersion,
+                                                          boolean mEnabled) {
+    CronvoyProvider mock = mock(CronvoyProvider.class);
     when(mock.getName()).thenReturn(mName);
     when(mock.getVersion()).thenReturn(mVersion);
     when(mock.isEnabled()).thenReturn(mEnabled);
