@@ -158,7 +158,8 @@ public:
   }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
@@ -245,7 +246,8 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+  Http::ServerHeaderValidatorPtr
+  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV
     return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
                                            protocol, getHeaderValidatorStats(protocol))

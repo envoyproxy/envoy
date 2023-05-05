@@ -24,7 +24,7 @@ envoy_cc_extension(
         "//envoy/http:codec_interface",
         "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
-        "//envoy/http:header_validator_interface",
+        "//envoy/http:header_validator_factory_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/registry",

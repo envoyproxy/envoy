@@ -133,7 +133,7 @@ public:
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -231,7 +231,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Protocol) override {
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Protocol) override {
     // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
     // be changed too
     return nullptr;
