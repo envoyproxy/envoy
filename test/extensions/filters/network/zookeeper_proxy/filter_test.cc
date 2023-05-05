@@ -642,8 +642,6 @@ public:
     EXPECT_EQ(0UL, resp_slow_counter.value());
     EXPECT_EQ(20UL * response_count, config_->stats().response_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-
-    const std::string opname = metadata_values[0].find("opname")->second;
     const auto histogram_name =
         fmt::format("test.zookeeper.{}_latency", metadata_values[0].find("opname")->second);
     EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
@@ -687,7 +685,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) {
-  // Set default latency threshold as 200 milliseconds. Set latency threshold override for Multi
+  // Set default latency threshold as 100 milliseconds. Set latency threshold override for Multi
   // opcode as 200 milliseconds. The latency thresholds of all other opcode fallback to the default
   // threshold.
   std::chrono::milliseconds default_latency_threshold(100);
