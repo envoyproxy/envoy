@@ -180,6 +180,10 @@ public:
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
 
 private:
+  bool hasDestroyed() {
+    Thread::LockGuard lock(mutex_);
+    return has_destroyed_;
+  };
   ProcessorState& getProcessorState();
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
