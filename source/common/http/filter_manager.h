@@ -757,11 +757,6 @@ public:
    */
   virtual void executeLocalReplyIfPrepared() PURE;
 
-  /**
-   * Whether the Filter Manager has a prepared local reply that it has not sent.
-   */
-  virtual bool hasPreparedLocalReply() const PURE;
-
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
 
@@ -1116,8 +1111,6 @@ private:
    * Executes a prepared local reply along the encoder filters.
    */
   void executeLocalReplyIfPrepared() override;
-
-  bool hasPreparedLocalReply() const override { return prepared_local_reply_ != nullptr; }
 
   /**
    * Sends a local reply by constructing a response and skipping the encoder filters. The

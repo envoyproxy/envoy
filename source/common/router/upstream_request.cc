@@ -75,7 +75,6 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
-  bool hasPreparedLocalReply() const override { return false; }
   UpstreamRequest& upstream_request_;
 };
 

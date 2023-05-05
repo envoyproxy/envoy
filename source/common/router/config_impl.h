@@ -1610,7 +1610,6 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const {
     return shared_config_->shadowPolicies();
   }
-  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
   bool ignorePathParametersInPathMatching() const {
     return shared_config_->ignorePathParametersInPathMatching();
   }
