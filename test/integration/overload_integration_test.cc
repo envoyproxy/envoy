@@ -696,6 +696,7 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortClosesConnectionWhe
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
 
   // Put envoy in overloaded state, the next dispatch should fail.
   updateResource(0.95);
