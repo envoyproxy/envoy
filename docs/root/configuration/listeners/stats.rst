@@ -49,6 +49,11 @@ are rooted at *listener.<address>.tcp_stats.*:
 
 .. include:: ../../_include/tcp_stats.rst
 
+.. note::
+  Above metrics can be included in the access logs of listener and command operators (DYNAMIC_METADATA) are used to extract values
+  that will be inserted into the access logs. These metrics can be found in ``envoy.tcp_stats`` namespace of DYNAMIC_METADATA.
+  For example, to log ``cx_tx_segments`` one can use ``%DYNAMIC_METADATA(envoy.tcp_stats:cx_tx_segments)%``.
+
 .. _config_listener_stats_udp:
 
 UDP statistics
