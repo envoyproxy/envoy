@@ -24,6 +24,10 @@ public:
     config_helper_.renameListener("tcp_proxy");
     BaseIntegrationTest::initialize();
   }
+
+  // Multiplier for increasing timeouts in this test. It was empirically determined by running a
+  // debug build with CPU oversubscribed by a factor of 5 on 3GHz CPU.
+  static constexpr int timeout_scaling_factor_ = 20;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyManyConnectionsTest,
@@ -36,7 +40,7 @@ TEST_P(TcpProxyManyConnectionsTest, TcpProxyManyConnections) {
     auto* static_resources = bootstrap.mutable_static_resources();
     for (int i = 0; i < static_resources->clusters_size(); ++i) {
       auto* cluster = static_resources->mutable_clusters(i);
-      cluster->mutable_connect_timeout()->set_seconds(20);
+      cluster->mutable_connect_timeout()->set_seconds(timeout_scaling_factor_);
       auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
       thresholds->mutable_max_connections()->set_value(1027);
       thresholds->mutable_max_pending_requests()->set_value(1027);
@@ -56,7 +60,7 @@ TEST_P(TcpProxyManyConnectionsTest, TcpProxyManyConnections) {
   for (int i = 0; i < num_connections; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
     test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_active", i,
-                                 TestUtility::DefaultTimeout * 20);
+                                 TestUtility::DefaultTimeout * timeout_scaling_factor_);
   }
   for (int i = 0; i < num_connections; ++i) {
     IntegrationTcpClientPtr& tcp_client = clients[i];
@@ -66,7 +70,7 @@ TEST_P(TcpProxyManyConnectionsTest, TcpProxyManyConnections) {
     ASSERT_TRUE(tcp_client->write(
         "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
         false));
-    tcp_client->waitForHalfClose(TestUtility::DefaultTimeout * 20);
+    tcp_client->waitForHalfClose(TestUtility::DefaultTimeout * timeout_scaling_factor_);
     tcp_client->close();
     EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
   }

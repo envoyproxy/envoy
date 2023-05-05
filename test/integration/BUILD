@@ -1570,6 +1570,9 @@ envoy_cc_test(
         "tcp_proxy_many_connections_test.cc",
     ],
     shard_count = 1,
+    tags = [
+        "cpu:4",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
