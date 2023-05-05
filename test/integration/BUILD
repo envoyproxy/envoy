@@ -1564,6 +1564,33 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_proxy_many_connections_test",
+    size = "large",
+    srcs = [
+        "tcp_proxy_many_connections_test.cc",
+    ],
+    shard_count = 1,
+    deps = [
+        ":integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_tunneling_integration_test",
     size = "large",
     srcs = [
