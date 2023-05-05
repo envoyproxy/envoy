@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("//bazel:utils.bzl", "json_data")
+load("@envoy_api//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
@@ -22,6 +22,18 @@ exports_files([
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],
+)
+
+# Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
+# is set, otherwise the git commit
+genrule(
+    name = "volatile-scm-hash",
+    outs = ["volatile-scm-hash.txt"],
+    cmd = """
+    grep BUILD_SCM_HASH bazel-out/volatile-status.txt > $@
+    """,
+    stamp = 1,
+    tags = ["no-remote-exec"],
 )
 
 genrule(
@@ -354,8 +366,23 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_envoy_mobile_stats_reporting",
+    values = {"define": "envoy_mobile_stats_reporting=disabled"},
+)
+
+config_setting(
+    name = "disable_yaml",
+    values = {"define": "envoy_yaml=disabled"},
+)
+
+config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
+    name = "disable_http_datagrams",
+    values = {"define": "enable_http_datagrams=disabled"},
 )
 
 config_setting(

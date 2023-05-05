@@ -6,10 +6,10 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.v3";
 option java_outer_classname = "CacheProto";
@@ -20,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: HTTP Cache Filter]
 
 // [#extension: envoy.filters.http.cache]
+// [#next-free-field: 6]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2alpha.CacheConfig";
@@ -49,9 +50,17 @@ message CacheConfig {
     repeated config.route.v3.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
-  // Config specific to the cache storage implementation.
+  // Config specific to the cache storage implementation. Required unless ``disabled``
+  // is true.
   // [#extension-category: envoy.http.cache]
-  google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
+  google.protobuf.Any typed_config = 1;
+
+  // When true, the cache filter is a no-op filter.
+  //
+  // Possible use-cases for this include:
+  // - Turning a filter on and off with :ref:`ECDS <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
+  // [#comment: once route-specific overrides are implemented, they are the more likely use-case.]
+  google.protobuf.BoolValue disabled = 5;
 
   // List of matching rules that defines allowed ``Vary`` headers.
   //

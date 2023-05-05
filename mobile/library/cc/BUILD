@@ -40,6 +40,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
+        "@envoy_mobile//library/common/types:matcher_data_lib",
     ] + envoy_select_envoy_mobile_request_compression(
         [
             "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
@@ -76,7 +77,6 @@ envoy_cc_library(
         "stream_client.cc",
         "stream_prototype.cc",
         "string_accessor.cc",
-        "upstream_http_protocol.cc",
     ],
     hdrs = [
         "bridge_utility.h",
@@ -105,7 +105,6 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
         "trailers.h",
-        "upstream_http_protocol.h",
     ],
     external_deps = ["abseil_optional"],
     repository = "@envoy",

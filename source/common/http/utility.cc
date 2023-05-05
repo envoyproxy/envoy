@@ -17,6 +17,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/status.h"
+#include "source/common/http/character_set_validation.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -188,7 +189,7 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -271,7 +272,7 @@ const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }
@@ -391,6 +392,10 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
+bool Utility::Url::containsFragment() { return (component_bitmap_ & (1 << UcFragment)); }
+
+bool Utility::Url::containsUserinfo() { return (component_bitmap_ & (1 << UcUserinfo)); }
+
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
@@ -400,10 +405,13 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   if (result != 0) {
     return false;
   }
+
   if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
       (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
     return false;
   }
+
+  component_bitmap_ = u.field_set;
   scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
                               u.field_data[UF_SCHEMA].len);
 
@@ -609,6 +617,10 @@ bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty() &&
          headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
+}
+
+bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
+  return isH2UpgradeRequest(headers);
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
@@ -984,8 +996,12 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
 
 const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
-  case Http::StreamResetReason::ConnectionFailure:
-    return "connection failure";
+  case Http::StreamResetReason::LocalConnectionFailure:
+    return "local connection failure";
+  case Http::StreamResetReason::RemoteConnectionFailure:
+    return "remote connection failure";
+  case Http::StreamResetReason::ConnectionTimeout:
+    return "connection timeout";
   case Http::StreamResetReason::ConnectionTermination:
     return "connection termination";
   case Http::StreamResetReason::LocalReset:
@@ -1023,6 +1039,10 @@ void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
@@ -1034,6 +1054,10 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers) {
+  transformUpgradeResponseFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
@@ -1043,6 +1067,10 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.removeProtocol();
 }
 
+void Utility::transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH2toH1(headers);
+}
+
 void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
                                                  absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
@@ -1050,6 +1078,11 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
+}
+
+void Utility::transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
+  transformUpgradeResponseFromH2toH1(headers, upgrade);
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value,
@@ -1123,7 +1156,7 @@ namespace {
 // %-encode all ASCII character codepoints, EXCEPT:
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
-constexpr uint32_t kUrlEncodedCharTable[] = {
+constexpr std::array<uint32_t, 8> kUrlEncodedCharTable = {
     // control characters
     0b11111111111111111111111111111111,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -1139,7 +1172,7 @@ constexpr uint32_t kUrlEncodedCharTable[] = {
     0b11111111111111111111111111111111,
 };
 
-constexpr uint32_t kUrlDecodedCharTable[] = {
+constexpr std::array<uint32_t, 8> kUrlDecodedCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -1155,14 +1188,9 @@ constexpr uint32_t kUrlDecodedCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
-bool testChar(const uint32_t table[8], char c) {
-  uint8_t uc = static_cast<uint8_t>(c);
-  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
-}
+bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
 
-bool shouldPercentEncodeChar(char c) { return testChar(kUrlEncodedCharTable, c); }
-
-bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c); }
+bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
 std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
@@ -1398,6 +1426,53 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   }
 
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
+}
+
+bool Utility::isValidRefererValue(absl::string_view value) {
+
+  // First, we try to parse it as an absolute URL and
+  // ensure that there is no fragment or userinfo.
+  // If that fails, we can just parse it as a relative reference
+  // and expect no fragment
+  // NOTE: "about:blank" is incorrectly rejected here, because
+  // url.initialize uses http_parser_parse_url, which requires
+  // a host to be present if there is a schema.
+  Utility::Url url;
+
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_allow_partial_urls_in_referer")) {
+    if (url.initialize(value, false)) {
+      return true;
+    }
+    return false;
+  }
+
+  if (url.initialize(value, false)) {
+    return !(url.containsFragment() || url.containsUserinfo());
+  }
+
+  bool seen_slash = false;
+
+  for (char c : value) {
+    switch (c) {
+    case ':':
+      if (!seen_slash) {
+        // First path segment cannot contain ':'
+        // https://www.rfc-editor.org/rfc/rfc3986#section-3.3
+        return false;
+      }
+      continue;
+    case '/':
+      seen_slash = true;
+      continue;
+    default:
+      if (!testCharInTable(kUriQueryAndFragmentCharTable, c)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 } // namespace Http

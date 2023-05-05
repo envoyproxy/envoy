@@ -16,6 +16,10 @@ namespace GenericProxy {
 
 using ServiceDataInputProto =
     envoy::extensions::filters::network::generic_proxy::matcher::v3::ServiceMatchInput;
+using HostDataInputProto =
+    envoy::extensions::filters::network::generic_proxy::matcher::v3::HostMatchInput;
+using PathDataInputProto =
+    envoy::extensions::filters::network::generic_proxy::matcher::v3::PathMatchInput;
 using MethodDataInputProto =
     envoy::extensions::filters::network::generic_proxy::matcher::v3::MethodMatchInput;
 using PropertyDataInputProto =
@@ -24,10 +28,8 @@ using PropertyDataInputProto =
 class ServiceMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.host());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.host())};
   }
 };
 
@@ -47,13 +49,59 @@ public:
   std::string name() const override { return "envoy.matching.generic_proxy.input.service"; }
 };
 
+class HostMatchDataInput : public Matcher::DataInput<Request> {
+public:
+  Matcher::DataInputGetResult get(const Request& data) const override {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.host())};
+  }
+};
+
+class HostMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+public:
+  HostMatchDataInputFactory() = default;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<HostDataInputProto>();
+  }
+
+  Matcher::DataInputFactoryCb<Request>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return []() { return std::make_unique<HostMatchDataInput>(); };
+  }
+
+  std::string name() const override { return "envoy.matching.generic_proxy.input.host"; }
+};
+
+class PathMatchDataInput : public Matcher::DataInput<Request> {
+public:
+  Matcher::DataInputGetResult get(const Request& data) const override {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.path())};
+  }
+};
+
+class PathMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+public:
+  PathMatchDataInputFactory() = default;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<PathDataInputProto>();
+  }
+
+  Matcher::DataInputFactoryCb<Request>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return []() { return std::make_unique<PathMatchDataInput>(); };
+  }
+
+  std::string name() const override { return "envoy.matching.generic_proxy.input.path"; }
+};
+
 class MethodMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.method());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.method())};
   }
 };
 
@@ -78,15 +126,11 @@ public:
   PropertyMatchDataInput(const std::string& property_name) : name_(property_name) {}
 
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-
     const auto value = data.getByKey(name_);
-
-    if (value.has_value()) {
-      result.data_.emplace(value.value());
-    }
-    return result;
+    Matcher::MatchingDataType matching_data =
+        value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
+                          : absl::monostate();
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, matching_data};
   }
 
 private:

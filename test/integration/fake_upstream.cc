@@ -15,6 +15,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_codec_impl.h"
@@ -23,6 +24,7 @@
 
 #include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -40,13 +42,17 @@ namespace Envoy {
 
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
-    : parent_(parent), encoder_(encoder), time_system_(time_system) {
+    : parent_(parent), encoder_(encoder), time_system_(time_system),
+      header_validator_(parent.makeHeaderValidator()) {
   encoder.getStream().addCallbacks(*this);
 }
 
 void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
+  if (header_validator_) {
+    header_validator_->transformRequestHeaders(*headers_);
+  }
   setEndStream(end_stream);
 }
 
@@ -95,6 +101,14 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().connectionInfoProvider().localAddress()->asString());
+  }
+
+  if (header_validator_) {
+    // Ignore validation results
+    auto result = header_validator_->transformResponseHeaders(*headers_copy);
+    if (result.new_headers) {
+      headers_copy = std::move(result.new_headers);
+    }
   }
 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {
@@ -341,22 +355,39 @@ public:
   }
 };
 
+namespace {
+// Fake upstream codec will not do path normalization, so the tests can observe
+// the path forwarded by Envoy.
+constexpr absl::string_view fake_upstream_header_validator_config = R"EOF(
+    name: envoy.http.header_validators.envoy_default
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+        uri_path_normalization_options:
+          skip_path_normalization: true
+          skip_merging_slashes: true
+)EOF";
+} // namespace
+
 FakeHttpConnection::FakeHttpConnection(
     FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Http::CodecType type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system), type_(type) {
+    : FakeConnectionBase(shared_connection, time_system), type_(type),
+      header_validator_factory_(
+          IntegrationUtil::makeHeaderValidationFactory(fake_upstream_header_validator_config)) {
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
+    http1_settings.use_balsa_parser_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager_);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
@@ -396,6 +427,26 @@ AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milli
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
 }
 
+namespace {
+Http::Protocol codeTypeToProtocol(Http::CodecType codec_type) {
+  switch (codec_type) {
+  case Http::CodecType::HTTP1:
+    return Http::Protocol::Http11;
+  case Http::CodecType::HTTP2:
+    return Http::Protocol::Http2;
+  case Http::CodecType::HTTP3:
+    return Http::Protocol::Http3;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+} // namespace
+
+Http::ServerHeaderValidatorPtr FakeHttpConnection::makeHeaderValidator() {
+  return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                         codeTypeToProtocol(type_), header_validator_stats_)
+                                   : nullptr;
+}
+
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
   absl::MutexLock lock(&lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
@@ -403,20 +454,20 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 }
 
 void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", static_cast<int>(code));
 }
 
 void FakeHttpConnection::encodeGoAway() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   if (type_ == Http::CodecType::HTTP2) {
     postToConnectionThread([this, max_streams]() {
@@ -438,7 +489,7 @@ void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
 }
 
 void FakeHttpConnection::encodeProtocolError() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
@@ -585,6 +636,7 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
     handler_->addListener(absl::nullopt, listener_, runtime_);
@@ -869,9 +921,9 @@ void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
 FakeRawConnection::~FakeRawConnection() {
   // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
   // access it.
-  if (auto filter = read_filter_.lock(); filter != nullptr) {
+  if (read_filter_ != nullptr) {
     EXPECT_TRUE(shared_connection_.executeOnDispatcher(
-        [filter = std::move(filter)](Network::Connection& connection) {
+        [filter = std::move(read_filter_)](Network::Connection& connection) {
           connection.removeReadFilter(filter);
         }));
   }
@@ -879,14 +931,13 @@ FakeRawConnection::~FakeRawConnection() {
 
 void FakeRawConnection::initialize() {
   FakeConnectionBase::initialize();
-  Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
-  read_filter_ = filter;
+  read_filter_ = std::make_shared<ReadFilter>(*this);
   if (!shared_connection_.connected()) {
     ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
     return;
   }
   ASSERT(shared_connection_.dispatcher().isThreadSafe());
-  shared_connection_.connection().addReadFilter(filter);
+  shared_connection_.connection().addReadFilter(read_filter_);
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

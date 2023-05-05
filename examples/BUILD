@@ -14,6 +14,7 @@ filegroup(
             "**/*.yaml",
         ],
         exclude = [
+            "cache/ci-responses.yaml",
             "cache/responses.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",

@@ -75,9 +75,10 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   }
 
   std::vector<std::string> subject_alt_names;
-  if (transport_socket_options != nullptr) {
+  if (transport_socket_options != nullptr &&
+      !transport_socket_options->verifySubjectAltNameListOverride().empty()) {
     subject_alt_names = transport_socket_options->verifySubjectAltNameListOverride();
-  } else {
+  } else if (!hostname.empty()) {
     subject_alt_names = {std::string(hostname)};
   }
 
@@ -114,8 +115,10 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   }
 
   absl::string_view error_details;
-  // Verify that host name matches leaf cert.
-  success = DefaultCertValidator::verifySubjectAltName(leaf_cert.get(), subject_alt_names);
+  if (!subject_alt_names.empty()) {
+    // Verify that host name matches leaf cert.
+    success = DefaultCertValidator::verifySubjectAltName(leaf_cert.get(), subject_alt_names);
+  }
   if (!success) {
     error_details = "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.";
     ENVOY_LOG(debug, error_details);

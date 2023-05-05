@@ -50,7 +50,8 @@ enum class OpCodes {
   SetAuth = 100,
   SetWatches = 101,
   GetEphemerals = 103,
-  GetAllChildrenNumber = 104
+  GetAllChildrenNumber = 104,
+  SetWatches2 = 105
 };
 
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
@@ -94,6 +95,7 @@ public:
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
+  virtual void onSetWatches2Request() PURE;
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
@@ -137,10 +139,16 @@ private:
     MonotonicTime start_time;
   };
 
-  // decodeAfterBuffer waits until the buffer contains all data for one or more packets before
-  // decoding.
-  Network::FilterStatus decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype);
-  void decode(Buffer::Instance& data, DecodeType dtype);
+  // decodeAndBuffer
+  // (1) prepends previous partial data to the current buffer,
+  // (2) decodes all full packet(s),
+  // (3) adds the rest of the data to the ZooKeeper filter buffer,
+  // (4) removes the prepended data.
+  Network::FilterStatus decodeAndBuffer(Buffer::Instance& data, DecodeType dtype,
+                                        Buffer::OwnedImpl& zk_filter_buffer);
+  void decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
+                             Buffer::OwnedImpl& zk_filter_buffer);
+  void decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
   void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -158,6 +166,7 @@ private:
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipString(Buffer::Instance& data, uint64_t& offset);
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
@@ -175,6 +184,8 @@ private:
   BufferHelper helper_;
   TimeSource& time_source_;
   absl::node_hash_map<int32_t, RequestBegin> requests_by_xid_;
+  Buffer::OwnedImpl zk_filter_read_buffer_;
+  Buffer::OwnedImpl zk_filter_write_buffer_;
 };
 
 } // namespace ZooKeeperProxy

@@ -1,55 +1,22 @@
 #include "source/server/admin/stats_request.h"
 
-#ifdef ENVOY_ADMIN_HTML
-#include "source/server/admin/stats_html_render.h"
-#endif
-
 namespace Envoy {
 namespace Server {
 
-StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
-                           UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {
-  switch (params_.type_) {
-  case StatsType::TextReadouts:
-  case StatsType::All:
-    phase_ = Phase::TextReadouts;
-    break;
-  case StatsType::Counters:
-  case StatsType::Gauges:
-    phase_ = Phase::CountersAndGauges;
-    break;
-  case StatsType::Histograms:
-    phase_ = Phase::Histograms;
-    break;
-  }
-}
+template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
+StatsRequest<TextReadoutType, CounterType, GaugeType, HistogramType>::StatsRequest(
+    Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn)
+    : params_(params), url_handler_fn_(url_handler_fn), stats_(stats) {}
 
-Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
-  switch (params_.format_) {
-  case StatsFormat::Json:
-    render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
-    break;
-  case StatsFormat::Text:
-    render_ = std::make_unique<StatsTextRender>(params_);
-    break;
+template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
+Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start(
+    Http::ResponseHeaderMap& response_headers) {
+  setRenderPtr(response_headers);
 #ifdef ENVOY_ADMIN_HTML
-  case StatsFormat::Html: {
-    auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setSubmitOnChange(true);
-    html_render->tableBegin(response_);
-    html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
-    html_render->tableEnd(response_);
-    html_render->startPre(response_);
-    render_ = std::move(html_render);
-    break;
+  if (params_.format_ == StatsFormat::ActiveHtml) {
+    return Http::Code::OK;
   }
 #endif
-  case StatsFormat::Prometheus:
-    // TODO(#16139): once Prometheus shares this algorithm here, this becomes a legitimate choice.
-    IS_ENVOY_BUG("reached Prometheus case in switch unexpectedly");
-    return Http::Code::BadRequest;
-  }
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
   // We will have to de-dup, but we can do that after sorting.
@@ -64,7 +31,9 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
   return Http::Code::OK;
 }
 
-bool StatsRequest::nextChunk(Buffer::Instance& response) {
+template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
+bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextChunk(
+    Buffer::Instance& response) {
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
     response.move(response_);
@@ -73,38 +42,35 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
 
   // nextChunk's contract is to add up to chunk_size_ additional bytes. The
   // caller is not required to drain the bytes after each call to nextChunk.
+  StatsRenderBase& stats_render = render();
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
-        render_->noStats(response, phase_string_);
+        stats_render.noStats(response, phase_labels_[phases_.at(phase_index_)]);
       } else {
         phase_stat_count_ = 0;
       }
       if (params_.type_ != StatsType::All) {
-        render_->finalize(response);
+        stats_render.finalize(response);
         return false;
       }
-      switch (phase_) {
-      case Phase::TextReadouts:
-        phase_ = Phase::CountersAndGauges;
-        phase_string_ = "Counters and Gauges";
-        startPhase();
-        break;
-      case Phase::CountersAndGauges:
-        phase_ = Phase::Histograms;
-        phase_string_ = "Histograms";
-        startPhase();
-        break;
-      case Phase::Histograms:
-        render_->finalize(response);
+
+      // Check if we are at the last phase: in that case, we are done;
+      // if not, increment phase index and start next phase.
+      if (phase_index_ == phases_.size() - 1) {
+        stats_render.finalize(response);
         return false;
+      } else {
+        phase_index_++;
+        startPhase();
       }
     }
 
     auto iter = stat_map_.begin();
     StatOrScopes variant = std::move(iter->second);
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
+
     switch (index) {
     case StatOrScopesIndex::Scopes:
       // Erase the current element before adding new ones, as absl::btree_map
@@ -115,100 +81,78 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
-      renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
+      processTextReadout(iter->first, response, variant);
       stat_map_.erase(iter);
-      ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Counter:
-      renderStat<Stats::CounterSharedPtr>(iter->first, response, variant);
+      processCounter(iter->first, response, variant);
       stat_map_.erase(iter);
-      ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Gauge:
-      renderStat<Stats::GaugeSharedPtr>(iter->first, response, variant);
+      processGauge(iter->first, response, variant);
       stat_map_.erase(iter);
-      ++phase_stat_count_;
       break;
-    case StatOrScopesIndex::Histogram: {
-      auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-      if (parent_histogram != nullptr) {
-        render_->generate(response, iter->first, *parent_histogram);
-        ++phase_stat_count_;
-      }
+    case StatOrScopesIndex::Histogram:
+      processHistogram(iter->first, response, variant);
       stat_map_.erase(iter);
-    }
+      break;
     }
   }
   return true;
 }
 
-void StatsRequest::startPhase() {
+template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
+void StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::startPhase() {
   ASSERT(stat_map_.empty());
 
   // Insert all the scopes in the alphabetically ordered map. As we iterate
   // through the map we'll erase the scopes and replace them with the stats held
   // in the scopes.
   for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
+    // The operator[] of btree_map runs a try_emplace behind the scenes,
+    // inserting the variant into the map when the lookup key does not exist.
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
-    if (variant.index() == absl::variant_npos) {
-      variant = ScopeVec();
-    }
+    ASSERT(static_cast<StatOrScopesIndex>(variant.index()) == StatOrScopesIndex::Scopes);
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
 }
 
-void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
-  switch (phase_) {
-  case Phase::TextReadouts:
-    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
-    break;
-  case Phase::CountersAndGauges:
-    if (params_.type_ != StatsType::Gauges) {
-      populateStatsFromScopes<Stats::Counter>(scope_vec);
-    }
-    if (params_.type_ != StatsType::Counters) {
-      populateStatsFromScopes<Stats::Gauge>(scope_vec);
-    }
-    break;
-  case Phase::Histograms:
-    populateStatsFromScopes<Stats::Histogram>(scope_vec);
-    break;
-  }
-}
-
-template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
-  Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    if (params_.used_only_ && !stat->used()) {
-      return true;
-    }
-
-    // Capture the name if we did not early-exit due to used_only -- we'll use
-    // the name for both filtering and for capturing the stat in the map.
-    // stat->name() takes a symbol table lock and builds a string, so we only
-    // want to call it once.
-    //
-    // This duplicates logic in shouldShowMetric in prometheus_stats.cc, but
-    // differs in that Prometheus only uses stat->name() for filtering, not
-    // rendering, so it only grab the name if there's a filter.
-    std::string name = stat->name();
-    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
-      return true;
-    }
-    stat_map_[name] = stat;
-    return true;
-  };
+template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
+void StatsRequest<TextReadoutTyoe, CounterType, GaugeType,
+                  HistogramType>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
+  Phase current_phase = phases_.at(phase_index_);
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    scope->iterate(check_stat);
+    switch (current_phase) {
+    case Phase::TextReadouts:
+      scope->iterate(saveMatchingStatForTextReadout());
+      break;
+    case Phase::CountersAndGauges:
+      if (params_.type_ != StatsType::Gauges) {
+        scope->iterate(saveMatchingStatForCounter());
+      }
+      if (params_.type_ != StatsType::Counters) {
+        scope->iterate(saveMatchingStatForGauge());
+      }
+      break;
+    case Phase::Counters:
+      scope->iterate(saveMatchingStatForCounter());
+      break;
+    case Phase::Gauges:
+      scope->iterate(saveMatchingStatForGauge());
+      break;
+    case Phase::Histograms:
+      scope->iterate(saveMatchingStatForHistogram());
+      break;
+    }
   }
 }
 
-template <class SharedStatType>
-void StatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
-                              StatOrScopes& variant) {
-  auto stat = absl::get<SharedStatType>(variant);
-  render_->generate(response, name, stat->value());
-}
+template class StatsRequest<Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
+                            Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
+
+template class StatsRequest<
+    std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>,
+    std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>>;
 
 } // namespace Server
 } // namespace Envoy

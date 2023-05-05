@@ -52,8 +52,8 @@ public final class MockStream: Stream {
   /// - parameter headers:   Response headers to receive.
   /// - parameter endStream: Whether this is a headers-only response.
   public func receiveHeaders(_ headers: ResponseHeaders, endStream: Bool) {
-    self.mockStream.callbacks.onHeaders(headers.caseSensitiveHeaders(), endStream,
-                                        EnvoyStreamIntel())
+    self.mockStream.callbacks.onHeaders?(headers.caseSensitiveHeaders(), endStream,
+                                         EnvoyStreamIntel())
   }
 
   /// Simulate response data coming back over the stream.
@@ -61,27 +61,27 @@ public final class MockStream: Stream {
   /// - parameter data:      Response data to receive.
   /// - parameter endStream: Whether this is the last data frame.
   public func receiveData(_ data: Data, endStream: Bool) {
-    self.mockStream.callbacks.onData(data, endStream, EnvoyStreamIntel())
+    self.mockStream.callbacks.onData?(data, endStream, EnvoyStreamIntel())
   }
 
   /// Simulate trailers coming back over the stream.
   ///
   /// - parameter trailers: Response trailers to receive.
   public func receiveTrailers(_ trailers: ResponseTrailers) {
-    self.mockStream.callbacks.onTrailers(trailers.caseSensitiveHeaders(), EnvoyStreamIntel())
+    self.mockStream.callbacks.onTrailers?(trailers.caseSensitiveHeaders(), EnvoyStreamIntel())
   }
 
   /// Simulate the stream receiving a cancellation signal from Envoy.
   public func receiveCancel() {
-    self.mockStream.callbacks.onCancel(EnvoyStreamIntel(), EnvoyFinalStreamIntel())
+    self.mockStream.callbacks.onCancel?(EnvoyStreamIntel(), EnvoyFinalStreamIntel())
   }
 
   /// Simulate Envoy returning an error.
   ///
   /// - parameter error: The error to receive.
   public func receiveError(_ error: EnvoyError) {
-    self.mockStream.callbacks.onError(error.errorCode, error.message,
-                                      Int32(error.attemptCount ?? 0),
-                                      EnvoyStreamIntel(), EnvoyFinalStreamIntel())
+    self.mockStream.callbacks.onError?(error.errorCode, error.message,
+                                       Int32(error.attemptCount ?? 0),
+                                       EnvoyStreamIntel(), EnvoyFinalStreamIntel())
   }
 }

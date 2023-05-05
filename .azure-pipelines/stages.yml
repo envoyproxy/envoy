@@ -1,0 +1,191 @@
+
+parameters:
+## Build stages
+# NB: all stages _must_ depend on `env`
+- name: buildStageDeps
+  displayName: "Build stage dependencies"
+  type: object
+  default:
+  - env
+  - prechecks
+- name: macBuildStageDeps
+  displayName: "macOS stage dependencies"
+  type: object
+  default:
+  - env
+  - prechecks
+- name: windowsBuildStageDeps
+  displayName: "Windows stage dependencies"
+  type: object
+  default:
+  - env
+  - prechecks
+- name: checkStageDeps
+  displayName: "Check stage dependencies"
+  type: object
+  default:
+  - env
+  - linux_x64
+- name: concurrencyChecks
+  displayName: "Check concurrency"
+  type: number
+  default: 3
+- name: concurrencyPrechecks
+  displayName: "Prechecks concurrency"
+  type: number
+  default: 10
+
+## Timeouts
+- name: timeoutDockerPublish
+  displayName: "Timout Docker publish"
+  type: number
+  default: 10
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
+
+## Build settings
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
+
+stages:
+- stage: env
+  displayName: Environment
+  jobs:
+  - template: env.yml
+
+- stage: prechecks
+  displayName: Prechecks
+  dependsOn: ["env"]
+  variables:
+    CHECK_DEPS: $[stageDependencies.env.repo.outputs['changed.requirements']]
+  jobs:
+  - template: stage/prechecks.yml
+    parameters:
+      concurrencyPrechecks: ${{ parameters.concurrencyPrechecks }}
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      authGithub: $(GitHubPublicRepoOnlyAccessToken)
+      authGCP: $(GcpServiceAccountKey)
+      authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
+      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
+      authGPGPath: $(MaintainerGPGKey.secureFilePath)
+      bucketGCP: $(GcsArtifactBucket)
+      checkDeps: variables['CHECK_DEPS']
+
+- stage: sync
+  condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+  dependsOn: []
+  jobs:
+  - template: stage/sync.yml
+    parameters:
+      authGCP: $(GcpServiceAccountKey)
+      authSSHDataPlaneApiKeyPublic: $(DataPlaneApiPublicKey)
+      authSSHDataPlaneApiKey: $(DataPlaneApiPrivateKey)
+      authSSHGoControlPlaneKeyPublic: $(GoControlPlanePublicKey)
+      authSSHGoControlPlaneKey: $(GoControlPlanePrivateKey)
+      authSSHFilterExampleKeyPublic: $(FilterExamplePublicKey)
+      authSSHFilterExampleKey: $(FilterExamplePrivateKey)
+      authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
+
+- stage: linux_x64
+  displayName: Linux x64
+  dependsOn: ${{ parameters.buildStageDeps }}
+  variables:
+    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+  jobs:
+  - template: stage/linux.yml
+    parameters:
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      runBuild: variables['RUN_BUILD']
+
+- stage: linux_arm64
+  displayName: Linux arm64
+  dependsOn: ${{ parameters.buildStageDeps }}
+  variables:
+    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+  jobs:
+  - template: stage/linux.yml
+    parameters:
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      rbe: false
+      artifactSuffix: .arm64
+      timeoutBuild: 180
+      pool: envoy-arm-large
+      runBuild: variables['RUN_BUILD']
+
+- stage: check
+  displayName: Checks (Linux x64)
+  dependsOn: ${{ parameters.checkStageDeps }}
+  variables:
+    # Skip checks if only mobile/ or docs/ have changed.
+    RUN_CHECKS: $[stageDependencies.env.repo.outputs['run.checks']]
+  jobs:
+  - template: stage/checks.yml
+    parameters:
+      concurrencyChecks: ${{ parameters.concurrencyChecks }}
+      authGCP: $(GcpServiceAccountKey)
+      bucketGCP: $(GcsArtifactBucket)
+      runChecks: variables['RUN_CHECKS']
+
+- stage: publish
+  displayName: Publish
+  dependsOn: ["env", "linux_x64", "linux_arm64"]
+  variables:
+    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
+    RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
+    PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
+    PUBLISH_NETLIFY: $[stageDependencies.env.repo.outputs['publish.netlify']]
+  jobs:
+  - template: stage/publish.yml
+    parameters:
+      authDockerUser: $(DockerUsername)
+      authDockerPassword: $(DockerPassword)
+      authGCP: $(GcpServiceAccountKey)
+      authGithub: $(GitHubPublicRepoOnlyAccessToken)
+      authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
+      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
+      authGPGPath: $(MaintainerGPGKey.secureFilePath)
+      authNetlifyURL: $(NetlifyTriggerURL)
+      authSSHDocsKeyPublic: $(DocsPublicKey)
+      authSSHDocsKey: $(DocsPrivateKey)
+      authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
+      bucketGCP: $(GcsArtifactBucket)
+      timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
+      timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
+      runDocker: variables['RUN_DOCKER']
+      runPackaging: variables['RUN_PACKAGING']
+      publishNetlify: variables['PUBLISH_NETLIFY']
+      publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
+
+- stage: verify
+  displayName: Verify
+  dependsOn: ["env", "publish"]
+  jobs:
+  - template: stage/verify.yml
+    parameters:
+      authGCP: $(GcpServiceAccountKey)
+
+- stage: macos
+  displayName: macOS
+  dependsOn: ${{ parameters.macBuildStageDeps }}
+  variables:
+    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+  jobs:
+  - template: stage/macos.yml
+    parameters:
+      authGCP: $(GcpServiceAccountKey)
+      runBuild: variables['RUN_BUILD']
+
+- stage: windows
+  displayName: Windows
+  dependsOn: ${{ parameters.windowsBuildStageDeps }}
+  variables:
+    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+  jobs:
+  - template: stage/windows.yml
+    parameters:
+      authGCP: $(GcpServiceAccountKey)
+      runBuild: variables['RUN_BUILD']

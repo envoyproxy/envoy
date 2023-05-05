@@ -84,10 +84,6 @@ declare_python_abi(
     python_version = "3",
 )
 
-load("@mobile_pip3//:requirements.bzl", pip_dependencies = "install_deps")
-
-pip_dependencies()
-
 load("//bazel:android_configure.bzl", "android_configure")
 
 android_configure(

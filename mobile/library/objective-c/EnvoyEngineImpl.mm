@@ -517,7 +517,14 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  auto bootstrap = [config generateBootstrap];
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
+  if (config.bootstrapPointer > 0) {
+    bootstrap = absl::WrapUnique(
+        reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap *>(config.bootstrapPointer));
+  } else {
+    bootstrap = [config generateBootstrap];
+  }
+
   if (bootstrap == nullptr) {
     return kEnvoyFailure;
   }
@@ -532,8 +539,7 @@ static void ios_track_event(envoy_map map, const void *context) {
     options->setConcurrency(1);
     return reinterpret_cast<Envoy::Engine *>(_engineHandle)->run(std::move(options));
   } @catch (NSException *exception) {
-    NSLog(@"[Envoy] exception caught: %@", exception);
-    [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
+    [self logException:exception];
     return kEnvoyFailure;
   }
 }
@@ -547,8 +553,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   @try {
     return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String, "");
   } @catch (NSException *exception) {
-    NSLog(@"[Envoy] exception caught: %@", exception);
-    [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
+    [self logException:exception];
     return kEnvoyFailure;
   }
 }
@@ -609,6 +614,18 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (void)terminateNotification:(NSNotification *)notification {
   NSLog(@"[Envoy %ld] terminating engine (%@)", _engineHandle, notification.name);
   terminate_engine(_engineHandle, /* release */ false);
+}
+
+- (void)logException:(NSException *)exception {
+  NSLog(@"[Envoy] exception caught: %@", exception);
+
+  NSString *message = [NSString stringWithFormat:@"%@;%@;%@", exception.name, exception.reason,
+                                                 exception.callStackSymbols.description];
+  ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc), error,
+                            "handled_cxx_exception", [message UTF8String]);
+
+  [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyHandledCXXException"
+                                                    object:exception];
 }
 
 @end

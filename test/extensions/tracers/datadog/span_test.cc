@@ -22,6 +22,7 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_data.h"
 #include "datadog/tags.h"
+#include "datadog/trace_segment.h"
 #include "datadog/tracer.h"
 #include "gtest/gtest.h"
 
@@ -69,6 +70,17 @@ struct MockCollector : public datadog::tracing::Collector {
   std::vector<std::vector<std::unique_ptr<datadog::tracing::SpanData>>> chunks;
 };
 
+class MockIDGenerator : public datadog::tracing::IDGenerator {
+  std::uint64_t id_;
+
+public:
+  explicit MockIDGenerator(std::uint64_t id) : id_(id) {}
+
+  std::uint64_t span_id() const override { return id_; }
+
+  datadog::tracing::TraceID trace_id() const override { return datadog::tracing::TraceID{id_}; }
+};
+
 class DatadogTracerSpanTest : public testing::Test {
 public:
   DatadogTracerSpanTest()
@@ -77,7 +89,7 @@ public:
         tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
             // IDs are 0xcafebabe.
-            *datadog::tracing::finalize_config(config_), [this]() { return id_; },
+            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_),
             datadog::tracing::default_clock),
         span_(tracer_.create_span()) {}
 
@@ -198,6 +210,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledTrue) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
@@ -224,6 +241,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be kept (until we override it by calling
+    // `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_KEEP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());

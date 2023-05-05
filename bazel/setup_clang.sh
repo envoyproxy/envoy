@@ -1,18 +1,22 @@
-#!/bin/bash
+#!/bin/bash -e
 
-BAZELRC_FILE="${BAZELRC_FILE:-$(bazel info workspace)/clang.bazelrc}"
+BAZELRC_FILE="${BAZELRC_FILE:-./clang.bazelrc}"
 
 LLVM_PREFIX=$1
 
 if [[ ! -e "${LLVM_PREFIX}/bin/llvm-config" ]]; then
-  echo "Error: cannot find llvm-config in ${LLVM_PREFIX}."
+  echo "Error: cannot find local llvm-config in ${LLVM_PREFIX}."
   exit 1
 fi
 
 PATH="$("${LLVM_PREFIX}"/bin/llvm-config --bindir):${PATH}"
 export PATH
 
-RT_LIBRARY_PATH="$(llvm-config --libdir)/clang/$(llvm-config --version)/lib/$(llvm-config --host-target)"
+LLVM_VERSION="$(llvm-config --version)"
+LLVM_LIBDIR="$(llvm-config --libdir)"
+LLVM_TARGET="$(llvm-config --host-target)"
+
+RT_LIBRARY_PATH="${LLVM_LIBDIR}/clang/${LLVM_VERSION}/lib/${LLVM_TARGET}"
 
 echo "# Generated file, do not edit. If you want to disable clang, just delete this file.
 build:clang --action_env='PATH=${PATH}'

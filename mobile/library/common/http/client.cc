@@ -257,6 +257,7 @@ void Client::DirectStreamCallbacks::closeStream() {
 }
 
 void Client::DirectStreamCallbacks::onComplete() {
+  direct_stream_.notifyAdapter(DirectStream::AdapterSignal::EncodeComplete);
   http_client_.removeStream(direct_stream_.stream_handle_);
   remote_end_stream_forwarded_ = true;
   ENVOY_LOG(debug, "[S{}] complete stream (success={})", direct_stream_.stream_handle_, success_);
@@ -279,6 +280,7 @@ void Client::DirectStreamCallbacks::onComplete() {
 }
 
 void Client::DirectStreamCallbacks::onError() {
+  direct_stream_.notifyAdapter(DirectStream::AdapterSignal::Error);
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
 
@@ -600,6 +602,7 @@ void Client::cancelStream(envoy_stream_t stream) {
     bool stream_was_open =
         getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS) != nullptr;
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
+    direct_stream->notifyAdapter(DirectStream::AdapterSignal::Cancel);
     removeStream(direct_stream->stream_handle_);
 
     ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
@@ -673,7 +676,6 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 namespace {
 
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
-const LowerCaseString LegacyProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
 const char* ClearTextCluster = "base_clear";
@@ -689,11 +691,6 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     cluster = ClearTextCluster;
   } else {
     cluster = BaseCluster;
-  }
-
-  auto protocol_header = headers.get(LegacyProtocolHeader);
-  if (!protocol_header.empty()) {
-    headers.remove(LegacyProtocolHeader);
   }
 
   headers.addCopy(ClusterHeader, std::string{cluster});

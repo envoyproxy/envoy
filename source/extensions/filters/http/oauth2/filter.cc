@@ -34,19 +34,8 @@ namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
-// Deleted OauthHMAC cookie.
-constexpr const char* SignoutCookieValue =
+constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-// Deleted BearerToken cookie.
-constexpr const char* SignoutBearerTokenValue =
-    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-constexpr absl::string_view SignoutIdTokenValue =
-    "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-constexpr absl::string_view SignoutRefreshTokenValue =
-    "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
 constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
 
@@ -189,7 +178,8 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
     return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
-           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_;
+           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_ ||
+           key == cookie_names_.refresh_token_;
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
@@ -284,6 +274,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
+      if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
+        sendUnauthorizedResponse();
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+
       std::string state;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
         state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(
@@ -354,9 +349,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
-  const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
-                                             *Http::ResponseTrailerMapImpl::create(),
-                                             decoder_callbacks_->streamInfo(), "");
+  const auto redirect_uri = formatter.format(
+      headers, *Http::ResponseHeaderMapImpl::create(), *Http::ResponseTrailerMapImpl::create(),
+      decoder_callbacks_->streamInfo(), "", AccessLog::AccessLogType::NotSet);
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, config_->authType());
 
@@ -410,9 +405,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
           : Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
-  const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
-                                             *Http::ResponseTrailerMapImpl::create(),
-                                             decoder_callbacks_->streamInfo(), "");
+  const auto redirect_uri = formatter.format(
+      headers, *Http::ResponseHeaderMapImpl::create(), *Http::ResponseTrailerMapImpl::create(),
+      decoder_callbacks_->streamInfo(), "", AccessLog::AccessLogType::NotSet);
   const std::string escaped_redirect_uri =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
           ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri)
@@ -444,12 +439,16 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(SignoutCookieValue, config_->cookieNames().oauth_hmac_));
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(SignoutBearerTokenValue, config_->cookieNames().bearer_token_));
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutIdTokenValue);
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutRefreshTokenValue);
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -543,6 +542,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     }
   }
 }
+
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,

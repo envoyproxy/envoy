@@ -85,6 +85,7 @@ public:
               (os_fd_t fd, const void* buffer, size_t length, off_t offset), (const));
   MOCK_METHOD(SysCallSizeResult, pread, (os_fd_t fd, void* buffer, size_t length, off_t offset),
               (const));
+  MOCK_METHOD(SysCallSizeResult, send, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
   MOCK_METHOD(SysCallIntResult, recvmmsg,

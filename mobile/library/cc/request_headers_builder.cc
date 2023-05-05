@@ -37,13 +37,6 @@ RequestHeadersBuilder& RequestHeadersBuilder::addRetryPolicy(const RetryPolicy& 
 }
 
 RequestHeadersBuilder&
-RequestHeadersBuilder::addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol) {
-  internalSet("x-envoy-mobile-upstream-protocol",
-              std::vector<std::string>{upstreamHttpProtocolToString(upstream_http_protocol)});
-  return *this;
-}
-
-RequestHeadersBuilder&
 RequestHeadersBuilder::enableRequestCompression(CompressionAlgorithm algorithm) {
   std::string value;
   switch (algorithm) {

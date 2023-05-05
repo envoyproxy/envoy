@@ -151,9 +151,14 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+    return access_log_flush_interval_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
@@ -200,7 +205,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
-  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
+  Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
   }
@@ -239,11 +244,12 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+  Http::ServerHeaderValidatorPtr
+  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV
-    return header_validator_factory_
-               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
-               : nullptr;
+    return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                           protocol, getHeaderValidatorStats(protocol))
+                                     : nullptr;
 #else
     return nullptr;
 #endif
@@ -255,14 +261,6 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
-  processDynamicFilterConfig(const std::string& name,
-                             const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories,
-                             const std::string& filter_chain_type,
-                             bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainManager& manager,
-                                     const FilterFactoriesList& filter_factories);
 
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
@@ -279,6 +277,8 @@ private:
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  bool flush_access_log_on_new_request_;
+  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
@@ -303,7 +303,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::NullTracer>()};
+  Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;

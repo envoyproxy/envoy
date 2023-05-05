@@ -26,6 +26,10 @@ typedef struct {
 
 // This config is the minimal envoy mobile config that allows for running the engine.
 const std::string MINIMAL_TEST_CONFIG = R"(
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -60,6 +64,10 @@ layered_runtime:
 )";
 
 const std::string BUFFERED_TEST_CONFIG = R"(
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener

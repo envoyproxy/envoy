@@ -13,6 +13,10 @@ namespace Envoy {
 namespace {
 
 const static std::string CONFIG = R"(
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener

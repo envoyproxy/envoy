@@ -141,14 +141,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
       scheme: http
       authority: host
+      downstream_header_bytes_received: 11
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -165,14 +170,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -214,14 +224,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -322,7 +337,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 
   // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

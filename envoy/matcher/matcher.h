@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -22,6 +23,8 @@ class ServerFactoryContext;
 } // namespace Server
 
 namespace Matcher {
+
+using MatchingDataType = absl::variant<absl::monostate, std::string>;
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
@@ -161,7 +164,7 @@ public:
    * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
    * lookup failed.
    */
-  virtual bool match(absl::optional<absl::string_view> input) PURE;
+  virtual bool match(const Matcher::MatchingDataType& input) PURE;
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
@@ -198,16 +201,20 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
-  // per data_availability_) or because no value was extracted. For example, consider a DataInput
-  // which attempts to look a key up in the map: if we don't have access to the map yet, we return
-  // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
-  // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<std::string> data_;
+  // The resulting data. This will be absl::monostate() if we don't have sufficient data available
+  // (as per data_availability_) or because no value was extracted. For example, consider a
+  // DataInput which attempts to look a key up in the map: if we don't have access to the map yet,
+  // we return absl::monostate() with NotAvailable. If we have the entire map, but the key doesn't
+  // exist in the map, we return absl::monostate() with AllDataAvailable.
+  MatchingDataType data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+    out << "data input: "
+        << (absl::holds_alternative<std::string>(result.data_)
+                ? absl::get<std::string>(result.data_)
+                : "n/a");
+
     switch (result.data_availability_) {
     case DataInputGetResult::DataAvailability::NotAvailable:
       out << " (not available)";
@@ -266,7 +273,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<std::string> get() PURE;
+  virtual MatchingDataType get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;

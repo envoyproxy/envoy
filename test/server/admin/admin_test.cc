@@ -15,7 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
-#include "source/server/admin/stats_request.h"
+#include "source/server/admin/ungrouped_stats_request.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -170,7 +170,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
-      format: Format to use; One of (html, text, json)
+      format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
   /stats/prometheus: print server stats in prometheus format
@@ -254,7 +254,8 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
   uint32_t expected_size = 0;
 
   // Declare enough counters so that we are sure to exceed the chunk size.
-  const uint32_t n = (StatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  const uint32_t n =
+      (UngroupedStatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
   for (uint32_t i = 0; i <= n; ++i) {
     const std::string name = absl::StrCat(prefix, i);
     store.counterFromString(name);
@@ -262,7 +263,7 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
   }
   EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
   EXPECT_LT(expected_size, response.length());
-  EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
+  EXPECT_LT(UngroupedStatsRequest::DefaultChunkSize, response.length());
   EXPECT_THAT(response.toString(), StartsWith(absl::StrCat(prefix, "0: 0\n", prefix)));
 }
 

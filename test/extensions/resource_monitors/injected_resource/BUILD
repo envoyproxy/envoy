@@ -14,6 +14,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "injected_resource_monitor_integration_test",
+    size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],

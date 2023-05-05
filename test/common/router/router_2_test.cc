@@ -15,7 +15,7 @@ using testing::StartsWith;
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
 public:
   RouterTestSuppressEnvoyHeaders()
-      : RouterTestBase(false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // We don't get x-envoy-expected-rq-timeout-ms or an indication to insert
@@ -107,7 +107,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
 
 class WatermarkTest : public RouterTestBase {
 public:
-  WatermarkTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+  WatermarkTest()
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
@@ -195,6 +196,109 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+  response_decoder_->decodeData(data, true);
+}
+
+// Tests that readDisabled are delayed till upstream response headers arrive.
+TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
+  sendRequest(false);
+
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+  EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
+
+  // Call watermark callbacks multiple times, but readDisable should be delayed.
+  EXPECT_CALL(stream_, readDisable(_)).Times(0u);
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  // The remaining readDisable should be called upon receiving response headers.
+  EXPECT_CALL(stream_, readDisable(true)).Times(2u);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  response_decoder_->decodeHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+  EXPECT_EQ(2u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  // Following watermark callbacks shouldn't delay readDisable.
+  EXPECT_CALL(stream_, readDisable(false));
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(true));
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(false)).Times(2u);
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_decoder_->decodeData(data, true);
+}
+
+// Tests that delayed readDisable is triggered only once if there is 1xx response followed by
+// non-1xx response.
+TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse2) {
+  sendRequest(false);
+
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+  EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
+
+  // Call watermark callbacks multiple times, but readDisable should be delayed.
+  EXPECT_CALL(stream_, readDisable(_)).Times(0u);
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  // This should cancel 1 deferred readDisable.
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  // The remaining readDisable should be called upon receiving 1xx response headers.
+  EXPECT_CALL(stream_, readDisable(true));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
+  response_decoder_->decode1xxHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "100"}}});
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+  // Receiving 200 response header shouldn't disable reading again.
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  response_decoder_->decodeHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(false));
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder_->decodeData(data, true);
 }
 
@@ -291,7 +395,11 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 class RouterTestChildSpan : public RouterTestBase {
 public:
   RouterTestChildSpan()
-      : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo())
+        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
+            cm_.thread_local_cluster_.cluster_.info_)));
+  }
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -541,7 +649,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
 class RouterTestNoChildSpan : public RouterTestBase {
 public:
   RouterTestNoChildSpan()
-      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestNoChildSpan, BasicFlow) {
@@ -592,7 +700,7 @@ class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
   RouterTestStrictCheckOneHeader()
-      : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
+      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -642,7 +750,7 @@ class RouterTestStrictCheckSomeHeaders
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
   RouterTestStrictCheckSomeHeaders()
-      : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
+      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -675,7 +783,8 @@ class RouterTestStrictCheckAllHeaders
       public testing::WithParamInterface<std::tuple<std::string, std::string>> {
 public:
   RouterTestStrictCheckAllHeaders()
-      : RouterTestBase(false, false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+      : RouterTestBase(false, false, false, false,
+                       protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,
@@ -747,7 +856,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
 class RouterTestSupressGRPCStatsEnabled : public RouterTestBase {
 public:
   RouterTestSupressGRPCStatsEnabled()
-      : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
@@ -809,7 +918,7 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
 class RouterTestSupressGRPCStatsDisabled : public RouterTestBase {
 public:
   RouterTestSupressGRPCStatsDisabled()
-      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {

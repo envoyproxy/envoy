@@ -60,7 +60,7 @@ TEST_F(AsyncTcpClientImplTest, BasicWrite) {
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  client_->close();
+  client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_FALSE(client_->connected());
 }
 
@@ -74,7 +74,7 @@ TEST_F(AsyncTcpClientImplTest, WaterMark) {
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  client_->close();
+  client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_FALSE(client_->connected());
 }
 
@@ -95,7 +95,16 @@ TEST_F(AsyncTcpClientImplTest, TestReadDisable) {
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  client_->close();
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestCloseType) {
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  client_->close(Network::ConnectionCloseType::Abort);
   ASSERT_FALSE(client_->connected());
 }
 

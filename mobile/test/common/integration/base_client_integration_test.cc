@@ -149,9 +149,6 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
       std::string(default_request_headers_.Scheme()->value().getStringView()),
       std::string(default_request_headers_.Host()->value().getStringView()),
       std::string(default_request_headers_.Path()->value().getStringView()));
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    builder.addUpstreamHttpProtocol(Platform::UpstreamHttpProtocol::HTTP2);
-  }
 
   request_headers.iterate(
       [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {

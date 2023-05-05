@@ -14,57 +14,20 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::RequestHeaderMap;
-using ::Envoy::Http::ResponseHeaderMap;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class BaseHttpHeaderValidator : public HeaderValidator {
-public:
-  BaseHttpHeaderValidator(
-      const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
-          config,
-      Protocol protocol, HeaderValidatorStats& stats)
-      : HeaderValidator(config, protocol, stats) {}
+using ServerHeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
-  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
-                                                         const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
-  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
-                                                          const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
-  RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
-    return RequestHeaderMapValidationResult::success();
-  }
-
-  ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
-    return ResponseHeaderMapValidationResult::success();
-  }
-
-  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
-    return TrailerValidationResult::success();
-  }
-
-  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
-    return TrailerValidationResult::success();
-  }
-};
-
-using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
-
-class BaseHeaderValidatorTest : public HeaderValidatorTest {
+class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
-  BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
+  ServerHeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 
@@ -153,7 +116,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testChar(kGenericHeaderNameCharTable, c)) {
+    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -169,15 +132,6 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
-  HeaderString drop_underscore{"x_foo"};
-  auto uhv = createBase(drop_headers_with_underscores_config);
-
-  auto result = uhv->validateGenericHeaderName(drop_underscore);
-  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
-  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
@@ -199,7 +153,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testChar(kGenericHeaderValueCharTable, c)) {
+    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);

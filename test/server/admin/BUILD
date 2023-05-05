@@ -12,6 +12,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test(
+    name = "admin_html_util_test",
+    srcs = ["admin_html_util_test.cc"],
+    deps = [
+        "//source/server/admin:admin_html_util",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "admin_instance_lib",
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
@@ -118,8 +127,25 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "stats_request_test",
-    srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
+    name = "ungrouped_stats_request_test",
+    srcs = envoy_select_admin_functionality(["ungrouped_stats_request_test.cc"]),
+    deps = [
+        ":stats_request_test_base",
+    ],
+)
+
+envoy_cc_test(
+    name = "grouped_stats_request_test",
+    srcs = envoy_select_admin_functionality(["grouped_stats_request_test.cc"]),
+    deps = [
+        ":stats_request_test_base",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stats_request_test_base",
+    srcs = envoy_select_admin_functionality(["stats_request_test_base.cc"]),
+    hdrs = ["stats_request_test_base.h"],
     deps = [
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:stats_request_lib",
@@ -127,6 +153,14 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "prometheus_stats_test",
+    srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
+    deps = [
+        ":stats_request_test_base",
     ],
 )
 
@@ -153,15 +187,6 @@ envoy_cc_test(
     name = "runtime_handler_test",
     srcs = envoy_select_admin_functionality(["runtime_handler_test.cc"]),
     deps = [":admin_instance_lib"],
-)
-
-envoy_cc_test(
-    name = "prometheus_stats_test",
-    srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
-    deps = [
-        "//source/server/admin:prometheus_stats_lib",
-        "//test/test_common:utility_lib",
-    ],
 )
 
 envoy_cc_test(

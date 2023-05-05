@@ -130,6 +130,11 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers")) {
+    // Don't consider 100-continue responses as the actual response.
+    started_response_ = false;
+  }
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -282,7 +287,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   }
 
   flushOutput();
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
 }
 
 void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
@@ -295,7 +300,7 @@ void StreamEncoderImpl::endEncode() {
   }
 
   flushOutput(true);
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
   if (connect_request_ || is_tcp_tunneling_ ||
@@ -305,6 +310,13 @@ void StreamEncoderImpl::endEncode() {
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
   }
+}
+
+void StreamEncoderImpl::notifyEncodeComplete() {
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
+  }
+  connection_.onEncodeComplete();
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
@@ -343,6 +355,12 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
   return bytes_encoded;
+}
+
+CodecEventCallbacks*
+StreamEncoderImpl::registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) {
+  std::swap(codec_callbacks, codec_callbacks_);
+  return codec_callbacks;
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
@@ -427,6 +445,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
+  // Verify that a filter hasn't added an invalid header key or value.
+  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -510,8 +530,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
+  if (codec_settings_.use_balsa_parser_) {
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
+                                            codec_settings_.allow_custom_methods_);
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
   }
@@ -689,7 +710,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+    if (codec_settings_.use_balsa_parser_) {
       if (parser_->errorMessage() == "headers size exceeds limit" ||
           parser_->errorMessage() == "trailers size exceeds limit") {
         error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
@@ -1032,7 +1053,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks),
@@ -1043,7 +1065,9 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
-      headers_with_underscores_action_(headers_with_underscores_action) {
+      headers_with_underscores_action_(headers_with_underscores_action),
+      abort_dispatch_(
+          overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1224,6 +1248,11 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  if (abort_dispatch_ != nullptr && abort_dispatch_->shouldShedLoad()) {
+    RETURN_IF_ERROR(sendOverloadError());
+    return envoyOverloadError("Aborting Server Dispatch");
+  }
+
   if (active_request_ != nullptr && active_request_->remote_complete_) {
     // Eagerly read disable the connection if the downstream is sending pipelined requests as we
     // serially process them. Reading from the connection will be re-enabled after the active
@@ -1280,6 +1309,18 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
     active_request_->response_encoder_.runResetCallbacks(reason);
     connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
+}
+
+Status ServerConnectionImpl::sendOverloadError() {
+  const bool latched_dispatching = dispatching_;
+
+  // The codec might be in the early stages of server dispatching where this isn't yet
+  // flipped to true.
+  dispatching_ = true;
+  error_code_ = Http::Code::InternalServerError;
+  auto status = sendProtocolError(Envoy::StreamInfo::ResponseCodeDetails::get().Overload);
+  dispatching_ = latched_dispatching;
+  return status;
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {

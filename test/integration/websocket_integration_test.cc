@@ -21,7 +21,7 @@ namespace {
 
 Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                                      uint32_t content_length = 0) {
-  return Http::TestRequestHeaderMapImpl{{":authority", "host:80"},
+  return Http::TestRequestHeaderMapImpl{{":authority", "sni.lyft.com"},
                                         {"content-length", fmt::format("{}", content_length)},
                                         {":path", "/websocket/test"},
                                         {":method", "GET"},
@@ -60,7 +60,8 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     const Http::RequestHeaderMap& original_request_headers) {
   Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(), "http");
+    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(),
+              downstreamProtocol() == Http::CodecType::HTTP3 ? "https" : "http");
     proxied_request_headers.removeForwardedProto();
   }
 
@@ -117,7 +118,7 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 }
 
 void WebsocketIntegrationTest::initialize() {
-  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -127,11 +128,30 @@ void WebsocketIntegrationTest::initialize() {
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
+  } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http3_protocol_options()
+              ->set_allow_extended_connect(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
-  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
+  } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+        });
   }
   HttpProtocolIntegrationTest::initialize();
 }
@@ -177,11 +197,6 @@ void WebsocketIntegrationTest::sendBidirectionalData() {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -200,14 +215,10 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
-
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -217,7 +228,7 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   initialize();
 
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
-  ASSERT_EQ(upstream_request_->headers().getHostValue(), "host:80");
+  ASSERT_EQ(upstream_request_->headers().getHostValue(), "sni.lyft.com");
 
   codec_client_->sendData(*request_encoder_, "bye!", false);
   codec_client_->close();
@@ -227,8 +238,8 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -274,11 +285,6 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -303,11 +309,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -336,11 +337,6 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -348,7 +344,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  auto host = config_helper_.createVirtualHost("host:80", "/websocket/test");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/websocket/test");
   host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
   config_helper_.addVirtualHost(host);
   initialize();
@@ -371,10 +367,11 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
+  // TODO(#26373) - debug and re-enable.
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 
@@ -419,13 +416,15 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
-    waitForClientDisconnectOrReset();
+    if (downstreamProtocol() != Http::CodecType::HTTP3) {
+      waitForClientDisconnectOrReset();
+    }
     codec_client_->close();
   }
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
     codec_client_->sendData(*request_encoder_, large_req_str, false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));

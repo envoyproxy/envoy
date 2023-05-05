@@ -302,11 +302,14 @@ public class JniLibrary {
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
-      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
+      boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
+      boolean enablePlatformCertificatesValidation, boolean enableSkipDNSLookupForProxiedRequests,
+      byte[][] runtimeGuards, String rtdsLayerName, long rtdsTimeoutSeconds, String adsAddress,
+      long adsPort, String adsToken, long adsTokenLifetime, String adsRootCerts, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
+      long cdsTimeoutSeconds, boolean enableCds);
 }

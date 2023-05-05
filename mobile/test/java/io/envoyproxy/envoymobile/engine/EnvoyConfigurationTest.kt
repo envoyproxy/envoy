@@ -4,6 +4,8 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig.Type
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
@@ -82,7 +84,6 @@ class EnvoyConfigurationTest {
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
-    enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
@@ -93,13 +94,27 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    rtdsLayerName: String = "",
+    rtdsTimeoutSeconds: Int = 0,
+    adsAddress: String = "",
+    adsPort: Int = 0,
+    adsJwtToken: String = "",
+    adsJwtTokenLifetimeSeconds: Int = 0,
+    adsSslRootCerts: String = "",
+    nodeId: String = "",
+    nodeRegion: String = "",
+    nodeZone: String = "",
+    nodeSubZone: String = "",
+    cdsResourcesLocator: String = "",
+    cdsTimeoutSeconds: Int = 0,
+    enableCds: Boolean = false,
+
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -118,7 +133,6 @@ class EnvoyConfigurationTest {
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -129,7 +143,6 @@ class EnvoyConfigurationTest {
       appVersion,
       appId,
       trustChainVerification,
-      virtualClusters,
       filterChain,
       platformFilterFactories,
       emptyMap(),
@@ -138,6 +151,20 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsAddress,
+      adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
+      enableCds
     )
   }
 
@@ -156,7 +183,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("base_interval: 345s")
     assertThat(resolvedTemplate).contains("max_interval: 456s")
     assertThat(resolvedTemplate).contains("dns_query_timeout: 321s")
-    assertThat(resolvedTemplate).contains("dns_lookup_family: V4_PREFERRED")
+    assertThat(resolvedTemplate).contains("dns_lookup_family: ALL")
     assertThat(resolvedTemplate).contains("dns_min_refresh_rate: 12s")
     assertThat(resolvedTemplate).contains("preresolve_hostnames:")
     assertThat(resolvedTemplate).contains("hostname1")
@@ -186,8 +213,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("os: Android")
     assertThat(resolvedTemplate).contains("app_version: v1.2.3")
     assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
-
-    assertThat(resolvedTemplate).matches(Pattern.compile(".*virtual_clusters.*name: test1.*name: test2.*", Pattern.DOTALL));
 
     // Stats
     assertThat(resolvedTemplate).contains("stats_flush_interval: 567s")
@@ -228,7 +253,6 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
-      enableHappyEyeballs = true,
       enableHttp3 = false,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
@@ -237,7 +261,6 @@ class EnvoyConfigurationTest {
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true,
       dnsPreresolveHostnames = mutableListOf(),
-      virtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
       statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
@@ -256,9 +279,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
     // dnsCacheSaveIntervalSeconds = 101
     assertThat(resolvedTemplate).contains("save_interval: 101")
-
-    // enableHappyEyeballs = true
-    assertThat(resolvedTemplate).contains("dns_lookup_family: ALL")
 
     // enableHttp3 = false
     assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
@@ -284,6 +304,11 @@ class EnvoyConfigurationTest {
 
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+
+    // ADS and RTDS not included by default
+    assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
+    assertThat(resolvedTemplate).doesNotContain("ads_config:");
+    assertThat(resolvedTemplate).doesNotContain("cds_config:");
   }
 
   @Test
@@ -297,6 +322,72 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
+  }
+
+  @Test
+  fun `test adding RTDS and ADS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("fake_rtds_layer");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
+  }
+
+  @Test
+  fun `test adding RTDS and CDS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0, enableCds = true
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s");
+  }
+
+  @Test
+  fun `test not using enableCds`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).doesNotContain("initial_fetch_timeout: 356s");
+  }
+
+  @Test
+  fun `test enableCds with default string`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableCds = true, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("cds_config:");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s");
+  }
+
+  @Test
+  fun `test RTDS default timeout`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
 
   @Test

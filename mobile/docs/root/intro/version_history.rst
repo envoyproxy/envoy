@@ -13,15 +13,21 @@ Breaking changes:
 - Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
 - swift/kotlin: remove `gauge`, `timer`, and `distribution` methods from the PulseClient.
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
+- swift/kotlin: Replace `close` method of `GRPCStream` with `cancel` method (:issue:`#24780 <24780>` :issue:`#26683 <26683>`).
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
 - java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
-- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: remove ``addVirtualClusters`` APIs.
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
+- api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
+- api: added ``setCdsLayer`` APIs for all languages (:issue: `#26122 <26122>`)
 - clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
-- clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue `#25814 <25814>`).
+- clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
+- listeners: switched the default listener from Envoy's TCP listener to a lightweight API listener by default. (:issue: `#25899 <25899>`).
+- headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
+- build: the minimum supported iOS version is now 13.0 and minimum MacOS version is 10.15 (:issue: `#24994 <24994>`).
 
 Bugfixes:
 
@@ -42,7 +48,13 @@ Features:
 - api: Add support for String Accessors to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
+- api: removed ``enableHappyEyeballs`` turning up happy eyeballs by default.
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
+- build: Add a build feature ``envoy_http_datagrams`` to allow disabling HTTP Datagram support. (:issue:`#23564 <23564>`)
+- build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)
+- swift: Add a new Swift implementation of generating the Envoy bootstrap that replaces the previous Objective-C implementation.
+  This can be enabled by setting ``useSwiftBootstrap(true)`` and requires building with ``--define=envoy_mobile_swift_cxx_interop=enabled``. (:issue:`#26111 <26111>`)
+- android: log cleared JNI exceptions to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
 
 0.5.0 (September 2, 2022)
 ===========================

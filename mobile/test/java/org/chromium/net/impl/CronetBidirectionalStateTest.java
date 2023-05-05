@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
-import org.chromium.net.impl.CronetBidirectionalState.NextAction;
-import org.chromium.net.impl.CronetBidirectionalState.Event;
+import org.chromium.net.impl.CronvoyBidirectionalState.NextAction;
+import org.chromium.net.impl.CronvoyBidirectionalState.Event;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -21,7 +21,8 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class CronetBidirectionalStateTest {
 
-  private final CronetBidirectionalState mCronetBidirectionalState = new CronetBidirectionalState();
+  private final CronvoyBidirectionalState mCronetBidirectionalState =
+      new CronvoyBidirectionalState();
 
   // ================= USER_START.* =================
 

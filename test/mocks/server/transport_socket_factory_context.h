@@ -24,6 +24,7 @@ public:
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
+  MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, ());
   MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());

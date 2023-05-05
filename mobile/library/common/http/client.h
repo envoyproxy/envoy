@@ -235,6 +235,12 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      std::swap(codec_callbacks, codec_callbacks_);
+      return codec_callbacks;
+    }
+
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
       return parent_.address_provider_;
@@ -274,6 +280,25 @@ private:
     // Latches latency info from stream info before it goes away.
     void saveFinalStreamIntel();
 
+    // Various signals to propagate to the adapter.
+    enum class AdapterSignal { EncodeComplete, Error, Cancel };
+
+    // Used to notify adapter of stream's completion.
+    void notifyAdapter(AdapterSignal signal) {
+      if (codec_callbacks_) {
+        switch (signal) {
+        case AdapterSignal::EncodeComplete:
+          codec_callbacks_->onCodecEncodeComplete();
+          break;
+        case AdapterSignal::Error:
+          FALLTHRU;
+        case AdapterSignal::Cancel:
+          codec_callbacks_->onCodecLowLevelReset();
+        }
+        registerCodecEventCallbacks(nullptr);
+      }
+    }
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
@@ -281,6 +306,9 @@ private:
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Client& parent_;
+    // Used to communicate with the HTTP Connection Manager that
+    // it can destroy the active stream.
+    CodecEventCallbacks* codec_callbacks_{nullptr};
     // Response details used by the connection manager.
     absl::string_view response_details_;
     // Tracks read disable calls. Different buffers can call read disable, and

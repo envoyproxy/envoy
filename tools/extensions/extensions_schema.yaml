@@ -65,11 +65,13 @@ categories:
 - envoy.compression.compressor
 - envoy.compression.decompressor
 - envoy.config.validators
+- envoy.config_subscription
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
 - envoy.formatter
+- envoy.geoip_providers
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
@@ -109,6 +111,7 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
 - envoy.matching.action
@@ -125,6 +128,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.router.cluster_specifier_plugin
 
 status_values:
 - name: stable
