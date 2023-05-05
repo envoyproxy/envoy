@@ -280,7 +280,7 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
 }
 
 LogTypeFilter::LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& config) {
-  for (auto type : config.types()) {
+  for (AccessLogType type : config.types()) {
     types_.insert(type);
   }
 
