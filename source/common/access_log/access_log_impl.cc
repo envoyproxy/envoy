@@ -280,8 +280,8 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
 }
 
 LogTypeFilter::LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& config) {
-  for (int i = 0; i < config.types_size(); i++) {
-    types_.insert(config.types(i));
+  for (auto type : config.types()) {
+    types_.insert(type);
   }
 
   exclude_ = config.exclude();
@@ -290,7 +290,7 @@ LogTypeFilter::LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& 
 bool LogTypeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
                              AccessLogType access_log_type) const {
-  const bool found = types_.find(access_log_type) != types_.end();
+  const bool found = types_.contains(access_log_type);
   return exclude_ ? !found : found;
 }
 

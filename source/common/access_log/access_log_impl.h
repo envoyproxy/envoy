@@ -234,7 +234,7 @@ private:
  */
 class LogTypeFilter : public Filter {
 public:
-  using LogTypeHashSet = absl::node_hash_set<AccessLogType, absl::Hash<AccessLogType>>;
+  using LogTypeHashSet = absl::flat_hash_set<AccessLogType>;
 
   LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& filter_config);
 
