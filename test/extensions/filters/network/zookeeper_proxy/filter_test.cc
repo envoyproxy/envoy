@@ -686,7 +686,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) {
   // Set default latency threshold as 100 milliseconds. Set latency threshold override for Multi
-  // opcode as 200 milliseconds. The latency thresholds of all other opcode fallback to the default
+  // opcode as 200 milliseconds. The latency thresholds of all other opcodes fallback to the default
   // threshold.
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
@@ -714,7 +714,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresholdConfigs) {
   // Set default latency threshold as 150 milliseconds. Set latency threshold for Ping opcode as 50
   // milliseconds. Set latency threshold for Create opcode as 200 milliseconds. The latency
-  // thresholds of all other opcode fallback to the default threshold.
+  // thresholds of all other opcodes fallback to the default threshold.
   std::chrono::milliseconds default_latency_threshold(150);
   LatencyThresholdOverrideList latency_threshold_overrides;
   auto* threshold_override = latency_threshold_overrides.Add();
