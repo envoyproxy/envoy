@@ -115,7 +115,6 @@ configure_make(
     tags = ["skip_on_windows"],
 )
 
-
 configure_make(
     name = "colm",
     autogen = True,

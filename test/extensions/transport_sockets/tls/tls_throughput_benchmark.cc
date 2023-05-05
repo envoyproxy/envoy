@@ -164,7 +164,7 @@ static void testThroughput(benchmark::State& state) {
         while (SSL_read(server_ssl.get(), read_buf, sizeof(read_buf)) > 0)
           ;
       } else {
-        RELEASE_ASSERT(err > 0, absl::StrCat("SSL_write got: ", err, " expected: ", len, 
+        RELEASE_ASSERT(err > 0, absl::StrCat("SSL_write got: ", err, " expected: ", len,
                                              "error: ", SSL_get_error(client_ssl.get(), err)));
         write_buf.drain(err);
         num_writes++;
