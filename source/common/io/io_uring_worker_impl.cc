@@ -272,6 +272,7 @@ void IoUringWorkerImpl::onFileEvent() {
       return;
     }
     auto req = static_cast<Request*>(user_data);
+    ENVOY_LOG(trace, "receive request completion, type = {}, req = {}", req->type(), fmt::ptr(req));
 
     switch (req->type()) {
     case RequestType::Accept:
@@ -332,6 +333,9 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 }
 
 void IoUringAcceptSocket::close(bool keep_fd_open) {
+  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}, request_count_ = {}, closed_ = {}", fd_,
+            status_, request_count_.load(), closed_.load());
+
   IoUringSocketEntry::close(keep_fd_open);
 
   // We didn't implement keep_fd_open for accept socket.
@@ -350,9 +354,10 @@ void IoUringAcceptSocket::close(bool keep_fd_open) {
   // requests_ in close(). When there is a listener draining, all server sockets in the listener
   // will be closed by the main thread. Though there may be races, it is still safe to
   // submitCancelRequest since io_uring can accept cancelling an invalid user_data.
-  for (auto req : requests_) {
+  for (auto& req : requests_) {
     if (req != nullptr) {
       parent_.submitCancelRequest(*this, req);
+      req = nullptr;
     }
   }
 }
@@ -365,9 +370,10 @@ void IoUringAcceptSocket::enable() {
 void IoUringAcceptSocket::disable() {
   IoUringSocketEntry::disable();
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
-  for (auto req : requests_) {
+  for (auto& req : requests_) {
     if (req != nullptr) {
       parent_.submitCancelRequest(*this, req);
+      req = nullptr;
     }
   }
 }
@@ -380,6 +386,10 @@ void IoUringAcceptSocket::onClose(Request* req, int32_t result, bool injected) {
 
 void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onAccept(req, result, injected);
+
+  ENVOY_LOG(trace,
+            "onAccept with result {}, fd = {}, injected = {}, status_ = {}, request_count_ = {}",
+            result, fd_, injected, status_, request_count_.load());
   ASSERT(!injected);
   // If there is no pending accept request and the socket is going to close, submit close request.
   AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);

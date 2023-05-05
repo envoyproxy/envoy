@@ -509,6 +509,35 @@ TEST(IoUringWorkerImplTest, AcceptSocketAvoidDuplicateClose) {
   delete static_cast<Request*>(close_req);
 }
 
+TEST(IoUringWorkerImplTest, AcceptSocketAvoidDuplicateCancel) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  MockIoUringHandler handler;
+
+  void* accept_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareAccept(_, _, _, _))
+      .WillOnce(DoAll(SaveArg<3>(&accept_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  IoUringAcceptSocket socket(0, worker, handler, 1, true);
+
+  // Close the socket.
+  void* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  socket.disable();
+  socket.disable();
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete static_cast<Request*>(accept_req);
+  delete static_cast<Request*>(cancel_req);
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
