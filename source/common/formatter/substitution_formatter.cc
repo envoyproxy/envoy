@@ -1888,10 +1888,6 @@ ProtobufWkt::Value GrpcStatusFormatter::formatValue(
   }else{
     return absl::nullopt;
   }
-
-  if (!grpc_status.has_value()) {
-    return unspecifiedValue();
-  }
   
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
