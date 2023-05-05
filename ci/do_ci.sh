@@ -268,18 +268,6 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
 
-        # By default the packages will be signed by the first available key.
-        # If there is no key available, a throwaway key is created
-        # and the packages signed with it, for the purpose of testing only.
-        if ! gpg --list-secret-keys "*"; then
-            export PACKAGES_MAINTAINER_NAME="Envoy CI"
-            export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
-            BAZEL_BUILD_OPTIONS+=(
-                "--action_env=PACKAGES_GEN_KEY=1"
-                "--action_env=PACKAGES_MAINTAINER_NAME"
-                "--action_env=PACKAGES_MAINTAINER_EMAIL")
-        fi
-
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -429,13 +417,13 @@ case $CI_TARGET in
 
         # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -445,7 +433,7 @@ case $CI_TARGET in
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
         echo "Building binary with wasm=wavm... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild @envoy//source/exe:envoy-static --build_tag_filters=-nofips
         collect_build_profile build
         ;;
     api)
@@ -562,7 +550,7 @@ case $CI_TARGET in
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
               --action_env=TODAY_DATE \
               -- -v warn \
-                 -c cves release_dates releases || echo "WARNING: Dependency check failed"
+                 -c cves release_dates releases
 
         # Run dependabot tests
         echo "Check dependabot ..."
@@ -591,6 +579,22 @@ case $CI_TARGET in
                 # from the current commit (as this only happens on non-PRs we are safe from merges)
                 BUILD_SHA="$(git rev-parse HEAD)"
                 bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+
+                # TODO(phlax): move this to pytooling
+                mkdir -p linux/amd64 linux/arm64 publish
+
+                # linux/amd64
+                tar xf /build/bazel.release/release.tar.zst -C ./linux/amd64
+                cp -a linux/amd64/envoy "publish/envoy-${version}-linux-x86_64"
+                cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${version}-linux-x86_64"
+
+                # linux/arm64
+                tar xf /build/bazel.release.arm64/release.tar.zst -C ./linux/arm64
+                cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
+                cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
+
+                "${ENVOY_SRCDIR}ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
+
                 exit 0
             fi
         fi
