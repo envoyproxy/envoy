@@ -234,6 +234,8 @@ public:
     return constRootScope()->iterate(fn);
   }
 
+  void extractAndAppendTags(StatName&, StatNamePool&, StatNameTagVector&) override {}
+
 protected:
   /**
    * Provides a hook for sub-classes to define how to create new scopes. When

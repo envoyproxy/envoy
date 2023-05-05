@@ -26,6 +26,7 @@ namespace Stats {
 
 class Sink;
 class SinkPredicates;
+class StatNamePool;
 
 /**
  * Store keeps track of all Scopes created in it, and the Scopes manage
@@ -172,6 +173,13 @@ public:
    * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   */
+  virtual void extractAndAppendTags(StatName& name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;
