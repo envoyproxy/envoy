@@ -23,8 +23,7 @@ JQ_VERSION = "1.6"
 YQ_VERSION = "4.24.4"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):
-    # TODO: allow building of tools for easier onboarding
-    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     envoy_download_go_sdks(go_version)
