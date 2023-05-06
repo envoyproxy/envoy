@@ -2680,7 +2680,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::CamelString);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc+proto"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc+proto"},
+                                                {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
@@ -2743,7 +2744,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::SnakeString);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc"},
+                                                {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
@@ -2818,7 +2820,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::Number);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc+json"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_header{{"content-type", "application/grpc+json"},
+                                                {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
