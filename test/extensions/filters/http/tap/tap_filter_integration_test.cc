@@ -25,6 +25,9 @@ public:
 
     // Also use HTTP/2 for upstream so that we can fully test trailers.
     setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+    sink_ptr->setShouldEscape(false);
   }
 
   void initializeFilter(const std::string& filter_config) {

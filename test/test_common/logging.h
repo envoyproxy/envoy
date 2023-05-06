@@ -207,7 +207,6 @@ using ExpectedLogMessages = std::vector<StringPair>;
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
-    sink_ptr->setShouldEscape(false);                                                              \
     std::string loglevel = loglevel_raw;                                                           \
     std::string substr = substr_raw;                                                               \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
