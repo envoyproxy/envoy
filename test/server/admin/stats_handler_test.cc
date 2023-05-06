@@ -5,7 +5,7 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
-#include "source/server/admin/ungrouped_stats_request.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
@@ -87,8 +87,7 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    StatsParams params;
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_, params);
+    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
@@ -1172,7 +1171,7 @@ protected:
   }
 
   void statsEndpoint() {
-    UngroupedStatsRequest request(*store_, StatsParams());
+    StatsRequest request(*store_, StatsParams());
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;

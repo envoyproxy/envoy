@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "test/server/admin/stats_render_test_base.h"
 
 namespace Envoy {
