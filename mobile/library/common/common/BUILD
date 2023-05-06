@@ -17,7 +17,9 @@ envoy_cc_library(
         "system_helper.h",
     ],
     repository = "@envoy",
-    deps = select({
+    deps = [
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+    ] + select({
         "@envoy//bazel:android": ["//library/common/jni:android_jni_utility_lib"],
         "//conditions:default": [],
     }),
