@@ -7,14 +7,20 @@ envoy_package()
 envoy_cc_library(
     name = "system_helper_lib",
     srcs = [
-        "default_system_helper.cc",
         "system_helper.cc",
-    ],
+    ] + select({
+        "@envoy//bazel:android": ["default_system_helper_android.cc"],
+        "//conditions:default": ["default_system_helper.cc"],
+    }),
     hdrs = [
         "default_system_helper.h",
         "system_helper.h",
     ],
     repository = "@envoy",
+    deps = select({
+        "@envoy//bazel:android": ["//library/common/jni:android_jni_utility_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
