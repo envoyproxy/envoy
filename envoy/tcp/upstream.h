@@ -145,8 +145,10 @@ public:
    */
   virtual bool startUpstreamSecureTransport() PURE;
 
-  /* Called when upstream starttls socket is converted to tls and upstream ssl info
-   *  needs to be set in connection's stream_info.
+  /**
+   * Called when upstream starttls socket is converted to tls and upstream ssl info
+   * needs to be set in the connection's stream_info.
+   * @return the const SSL connection data of upstream.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() PURE;
 };
