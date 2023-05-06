@@ -106,7 +106,8 @@ def envoy_cc_library(
         include_prefix = None,
         textual_hdrs = None,
         alwayslink = None,
-        defines = []):
+        defines = [],
+        linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -123,6 +124,7 @@ def envoy_cc_library(
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
+        linkopts = linkopts,
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,

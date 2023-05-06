@@ -14,10 +14,8 @@ public:
 
   // SystemHelper:
   bool isCleartextPermitted(absl::string_view hostname) override;
-
   envoy_cert_validation_result validateCertificateChain(const envoy_data* certs, uint8_t size,
                                                         const char* host_name) override;
-
   void cleanupAfterCertificateValidation() override;
 };
 
