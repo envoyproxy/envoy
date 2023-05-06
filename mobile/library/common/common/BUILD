@@ -5,13 +5,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "system_helper_interface_lib",
-    srcs = ["system_helper.cc"],
-    hdrs = ["system_helper.h"],
-    repository = "@envoy",
-    deps = [
-        "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cert_validator_lib",
+    name = "system_helper_lib",
+    srcs = [
+        "default_system_helper.cc",
+        "system_helper.cc",
     ],
+    hdrs = [
+        "default_system_helper.h",
+        "system_helper.h",
+    ],
+    repository = "@envoy",
 )
 
 envoy_cc_library(

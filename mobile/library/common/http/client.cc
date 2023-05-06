@@ -487,8 +487,8 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
     // This is largely a check for the android platform: is_cleartext_permitted
     // is a no-op for other platforms.
     if (internal_headers->getSchemeValue() != "https" &&
-        SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
-      //        !is_cleartext_permitted(internal_headers->getHostValue())) {
+        !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+      std::cout << "not permitted\n";
       direct_stream->request_decoder_->sendLocalReply(
           Http::Code::BadRequest, "Cleartext is not permitted", nullptr, absl::nullopt, "");
       return;

@@ -4,21 +4,20 @@
 
 #include "absl/strings/string_view.h"
 #include "envoy/common/pure.h"
-#include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
 
 namespace Envoy {
 
+namespace test {
+class SystemHelperPeer;
+}  // namespace test
+
 /**
- * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
- * It largely leverages Envoy::StrippedMainBase.
+ * SystemHelper provided a platform-agnostic API for interacting with platform-specific
+ * system APIs. The singleton helper is accessible via the `getInstance()` static
+ * method. Tests may override this singleton via `test::SystemHelperPeer` class.
  */
 class SystemHelper {
 public:
-  /**
-   * @return a reference to the current SystemHelper instance.
-   */
-  static SystemHelper& getInstance();
-
   virtual ~SystemHelper() = default;
 
   /**
@@ -27,16 +26,13 @@ public:
   virtual bool isCleartextPermitted(absl::string_view hostname) PURE;
 
   /**
-   * Invokes platform APIs to validate certificates.
+   * @return a reference to the current SystemHelper instance.
    */
-  virtual envoy_cert_validation_result validateCertificateChain(const envoy_data* certs, uint8_t size,
-                                                        const char* host_name) PURE;
-  /**
-   * Invokes platform APIs to clean up after validation is complete.
-   */
-  virtual void cleanupAfterCertificateValidation() PURE;
+  static SystemHelper& getInstance();
 
 private:
+  friend class test::SystemHelperPeer;
+
   static std::unique_ptr<SystemHelper> instance_;
 };
 

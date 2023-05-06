@@ -2,40 +2,15 @@
 
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/common/mocks/common/mocks.h"
 
 #include "library/common/data/utility.h"
 #include "library/common/main_interface.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
-#include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
-
-namespace {
-// Helper to create a envoy_cert_validation_result.
-envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_alert,
-                                         const char* error_details) {
-  envoy_cert_validation_result result;
-  result.result = status;
-  result.tls_alert = tls_alert;
-  result.error_details = error_details;
-  return result;
-}
-
-static envoy_cert_validation_result verify_cert(const envoy_data* /*certs*/, uint8_t /*num_certs*/,
-                                                const char* /*hostname*/) {
-  return make_result(ENVOY_SUCCESS, 0, "");
-}
-
-void register_test_platform_cert_verifier() {
-  envoy_cert_validator* api =
-      static_cast<envoy_cert_validator*>(safe_malloc(sizeof(envoy_cert_validator)));
-  api->validate_cert = verify_cert;
-  api->validation_cleanup = NULL;
-  register_platform_api("platform_cert_validator", api);
-}
-
-}  // namespace
-
+using testing::_;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -50,10 +25,15 @@ public:
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
   }
+
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
+
+ protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -61,14 +41,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 void ClientIntegrationTest::basicTest() {
-  register_test_platform_cert_verifier();
-  builder_.enablePlatformCertificatesValidation(true);
-
-  //upstream_tls_ = true;
-  //  default_request_headers_.setScheme("https");
-
   initialize();
-  //  default_request_headers_.setScheme("https");
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -106,9 +79,53 @@ void ClientIntegrationTest::basicTest() {
 
 TEST_P(ClientIntegrationTest, Basic) { basicTest(); }
 
-TEST_P(ClientIntegrationTest, BasicNon2xx) {
-  register_test_platform_cert_verifier();
+TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(false));
 
+  expect_data_streams_ = false;
+  initialize();
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+    if (end_stream) {
+      EXPECT_EQ(Data::Utility::copyToString(c_data), "Cleartext is not permitted");
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "400");
+  ASSERT_EQ(cc_.on_data_calls, 1);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+
+  EXPECT_EQ(0, cc_.final_intel.stream_start_ms);
+  EXPECT_EQ(0, cc_.final_intel.connect_start_ms);
+  EXPECT_EQ(0, cc_.final_intel.connect_end_ms);
+  EXPECT_EQ(0, cc_.final_intel.sending_start_ms);
+  EXPECT_EQ(0, cc_.final_intel.sending_end_ms);
+  EXPECT_EQ(0, cc_.final_intel.response_start_ms);
+  EXPECT_EQ(0, cc_.final_intel.stream_end_ms);
+  EXPECT_EQ(0, cc_.final_intel.dns_start_ms);
+  EXPECT_EQ(0, cc_.final_intel.dns_end_ms);
+}
+
+TEST_P(ClientIntegrationTest, BasicNon2xx) {
   initialize();
 
   // Set response header status to be non-2xx to test that the correct stats get charged.
