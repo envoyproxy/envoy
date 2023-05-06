@@ -14,7 +14,6 @@
 jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::string>& cert_chain,
                                         std::string auth_type, std::string host);
 
-
 envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* certs, uint8_t size,
                                                     const char* host_name);
 

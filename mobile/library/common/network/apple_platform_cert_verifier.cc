@@ -70,7 +70,7 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
 }
 
 envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
-                                                const char* /*hostname*/) {
+                                         const char* /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,

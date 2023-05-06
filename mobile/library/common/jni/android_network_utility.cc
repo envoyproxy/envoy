@@ -109,7 +109,7 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
 }
 
 envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* certs, uint8_t size,
-                                                           const char* host_name) {
+                                                    const char* host_name) {
   jni_log("[Envoy]", "verify_x509_cert_chain");
 
   envoy_cert_verify_status_t result;

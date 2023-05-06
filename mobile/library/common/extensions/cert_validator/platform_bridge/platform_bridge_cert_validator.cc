@@ -4,8 +4,8 @@
 #include <memory>
 #include <type_traits>
 
-#include "library/common/data/utility.h"
 #include "library/common/common/system_helper.h"
+#include "library/common/data/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -84,9 +84,9 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 
   ValidationJob job;
   job.result_callback_ = std::move(callback);
-  job.validation_thread_ = std::thread(&verifyCertChainByPlatform,
-                                       &(job.result_callback_->dispatcher()), std::move(certs),
-                                       std::string(host), std::move(subject_alt_names), this);
+  job.validation_thread_ =
+      std::thread(&verifyCertChainByPlatform, &(job.result_callback_->dispatcher()),
+                  std::move(certs), std::string(host), std::move(subject_alt_names), this);
   std::thread::id thread_id = job.validation_thread_.get_id();
   validation_jobs_[thread_id] = std::move(job);
   return {ValidationResults::ValidationStatus::Pending,
@@ -94,8 +94,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 }
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(
-    Event::Dispatcher* dispatcher,
-    std::vector<envoy_data> cert_chain, std::string hostname,
+    Event::Dispatcher* dispatcher, std::vector<envoy_data> cert_chain, std::string hostname,
     std::vector<std::string> subject_alt_names, PlatformBridgeCertValidator* parent) {
   ASSERT(!cert_chain.empty());
   ENVOY_LOG(trace, "Start verifyCertChainByPlatform for host {}", hostname);
@@ -103,8 +102,8 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   envoy_data leaf_cert_der = cert_chain[0];
   bssl::UniquePtr<X509> leaf_cert(d2i_X509(
       nullptr, const_cast<const unsigned char**>(&leaf_cert_der.bytes), leaf_cert_der.length));
-  envoy_cert_validation_result result =
-      SystemHelper::getInstance().validateCertificateChain(cert_chain.data(), cert_chain.size(), hostname.c_str());
+  envoy_cert_validation_result result = SystemHelper::getInstance().validateCertificateChain(
+      cert_chain.data(), cert_chain.size(), hostname.c_str());
   bool success = result.result == ENVOY_SUCCESS;
   if (!success) {
     ENVOY_LOG(debug, result.error_details);
@@ -126,14 +125,16 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
     return;
   }
   postVerifyResultAndCleanUp(success, std::move(hostname), error_details,
-                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::SUCCESS,
-                             dispatcher, parent);
+                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::SUCCESS, dispatcher,
+                             parent);
 }
 
-void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(
-    bool success, std::string hostname, absl::string_view error_details, uint8_t tls_alert,
-    ValidationFailureType failure_type,
-    Event::Dispatcher* dispatcher, PlatformBridgeCertValidator* parent) {
+void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(bool success, std::string hostname,
+                                                             absl::string_view error_details,
+                                                             uint8_t tls_alert,
+                                                             ValidationFailureType failure_type,
+                                                             Event::Dispatcher* dispatcher,
+                                                             PlatformBridgeCertValidator* parent) {
   ENVOY_LOG(trace,
             "Finished platform cert validation for {}, post result callback to network thread",
             hostname);
