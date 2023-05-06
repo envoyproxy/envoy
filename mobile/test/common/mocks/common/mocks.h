@@ -10,7 +10,7 @@ public:
   MockSystemHelper();
 
   // SystemHelper:
-  MOCK_METHOD(bool, isCleartextPermitted, (absl::string_view /*hostname*/));
+  MOCK_METHOD(bool, isCleartextPermitted, (absl::string_view hostname));
 };
 
 // SystemHelperPeer allows the replacement of the SystemHelper singleton

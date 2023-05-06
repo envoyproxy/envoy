@@ -2,6 +2,6 @@
 
 namespace Envoy {
 
-bool DefaultSystemHelper::isCleartextPermitted(absl::string_view /*hostname*/) { return false; }
+bool DefaultSystemHelper::isCleartextPermitted(absl::string_view /*hostname*/) { return true; }
 
 } // namespace Envoy
