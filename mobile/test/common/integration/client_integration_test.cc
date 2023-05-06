@@ -119,6 +119,52 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   EXPECT_EQ(0, cc_.final_intel.dns_end_ms);
 }
 
+TEST_P(ClientIntegrationTest, BasicHttps) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _)).Times(1);
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation()).Times(1);
+
+  builder_.enablePlatformCertificatesValidation(true);
+
+  upstream_tls_ = true;
+
+  initialize();
+  default_request_headers_.setScheme("https");
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+    if (end_stream) {
+      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+    } else {
+      EXPECT_EQ(c_data.length, 10);
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
   initialize();
 

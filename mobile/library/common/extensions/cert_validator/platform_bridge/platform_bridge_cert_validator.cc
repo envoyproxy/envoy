@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "library/common/data/utility.h"
+#include "library/common/common/system_helper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,13 +13,12 @@ namespace TransportSockets {
 namespace Tls {
 
 PlatformBridgeCertValidator::PlatformBridgeCertValidator(
-    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    const envoy_cert_validator* platform_validator)
+    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats)
     : allow_untrusted_certificate_(config != nullptr &&
                                    config->trustChainVerification() ==
                                        envoy::extensions::transport_sockets::tls::v3::
                                            CertificateValidationContext::ACCEPT_UNTRUSTED),
-      platform_validator_(platform_validator), stats_(stats) {
+      stats_(stats) {
   ENVOY_BUG(config != nullptr && config->caCert().empty() &&
                 config->certificateRevocationList().empty(),
             "Invalid certificate validation context config.");
@@ -84,7 +84,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 
   ValidationJob job;
   job.result_callback_ = std::move(callback);
-  job.validation_thread_ = std::thread(&verifyCertChainByPlatform, platform_validator_,
+  job.validation_thread_ = std::thread(&verifyCertChainByPlatform,
                                        &(job.result_callback_->dispatcher()), std::move(certs),
                                        std::string(host), std::move(subject_alt_names), this);
   std::thread::id thread_id = job.validation_thread_.get_id();
@@ -94,7 +94,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 }
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(
-    const envoy_cert_validator* platform_validator, Event::Dispatcher* dispatcher,
+    Event::Dispatcher* dispatcher,
     std::vector<envoy_data> cert_chain, std::string hostname,
     std::vector<std::string> subject_alt_names, PlatformBridgeCertValidator* parent) {
   ASSERT(!cert_chain.empty());
@@ -104,13 +104,12 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   bssl::UniquePtr<X509> leaf_cert(d2i_X509(
       nullptr, const_cast<const unsigned char**>(&leaf_cert_der.bytes), leaf_cert_der.length));
   envoy_cert_validation_result result =
-      platform_validator->validate_cert(cert_chain.data(), cert_chain.size(), hostname.c_str());
+      SystemHelper::getInstance().validateCertificateChain(cert_chain.data(), cert_chain.size(), hostname.c_str());
   bool success = result.result == ENVOY_SUCCESS;
   if (!success) {
     ENVOY_LOG(debug, result.error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), result.error_details, result.tls_alert,
-                               ValidationFailureType::FAIL_VERIFY_ERROR, platform_validator,
-                               dispatcher, parent);
+                               ValidationFailureType::FAIL_VERIFY_ERROR, dispatcher, parent);
     return;
   }
 
@@ -123,26 +122,24 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
     error_details = "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.";
     ENVOY_LOG(debug, error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), error_details, SSL_AD_BAD_CERTIFICATE,
-                               ValidationFailureType::FAIL_VERIFY_SAN, platform_validator,
-                               dispatcher, parent);
+                               ValidationFailureType::FAIL_VERIFY_SAN, dispatcher, parent);
     return;
   }
   postVerifyResultAndCleanUp(success, std::move(hostname), error_details,
                              SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::SUCCESS,
-                             platform_validator, dispatcher, parent);
+                             dispatcher, parent);
 }
 
 void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(
     bool success, std::string hostname, absl::string_view error_details, uint8_t tls_alert,
-    ValidationFailureType failure_type, const envoy_cert_validator* platform_validator,
+    ValidationFailureType failure_type,
     Event::Dispatcher* dispatcher, PlatformBridgeCertValidator* parent) {
   ENVOY_LOG(trace,
             "Finished platform cert validation for {}, post result callback to network thread",
             hostname);
 
-  if (platform_validator->validation_cleanup) {
-    platform_validator->validation_cleanup();
-  }
+  SystemHelper::getInstance().cleanupAfterCertificateValidation();
+
   std::weak_ptr<size_t> weak_alive_indicator(parent->alive_indicator_);
 
   dispatcher->post([weak_alive_indicator, success, hostname = std::move(hostname),
