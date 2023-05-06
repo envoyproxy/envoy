@@ -261,6 +261,7 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
+  std::string expires_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
