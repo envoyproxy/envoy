@@ -2750,7 +2750,6 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
   setup(false, "", true, true);
   setupFilterChain(1, 0); // Recreate the chain for second stream.
 
-  // EXPECT_CALL(*scopeKeyBuilder(), computeScopeKey(_)).Times(2);
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
               computeScopeKey(_))
       .Times(2);

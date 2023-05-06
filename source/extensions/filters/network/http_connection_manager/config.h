@@ -187,7 +187,9 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
-  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return *scope_key_builder_; }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return scope_key_builder_ ? *scope_key_builder_ : OptRef<const Router::ScopeKeyBuilder>{};
+  }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
