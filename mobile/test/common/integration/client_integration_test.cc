@@ -26,7 +26,8 @@ public:
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
-    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
 
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
@@ -124,6 +125,7 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   EXPECT_EQ(0, cc_.final_intel.stream_end_ms);
   EXPECT_EQ(0, cc_.final_intel.dns_start_ms);
   EXPECT_EQ(0, cc_.final_intel.dns_end_ms);
+  release_envoy_data(c_data);
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
