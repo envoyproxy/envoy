@@ -7,7 +7,6 @@
 #include <Security/SecTrust.h>
 
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
-#include "library/common/main_interface.h"
 #include "openssl/ssl.h"
 
 // NOLINT(namespace-envoy)
@@ -70,7 +69,7 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
   return result;
 }
 
-static envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
+envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
                                                 const char* /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
@@ -103,19 +102,3 @@ static envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t
   }
   return make_result(ENVOY_SUCCESS, 0, "");
 }
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void register_apple_platform_cert_verifier() {
-  envoy_cert_validator* api =
-      static_cast<envoy_cert_validator*>(safe_malloc(sizeof(envoy_cert_validator)));
-  api->validate_cert = verify_cert;
-  api->validation_cleanup = NULL;
-  register_platform_api("platform_cert_validator", api);
-}
-
-#ifdef __cplusplus
-}
-#endif

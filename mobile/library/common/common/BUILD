@@ -10,6 +10,7 @@ envoy_cc_library(
         "system_helper.cc",
     ] + select({
         "@envoy//bazel:android": ["default_system_helper_android.cc"],
+        "@envoy//bazel:apple": ["default_system_helper_apple.cc"],
         "//conditions:default": ["default_system_helper.cc"],
     }),
     hdrs = [
@@ -23,6 +24,9 @@ envoy_cc_library(
         "@envoy//bazel:android": [
             "//library/common/jni:android_jni_utility_lib",
             "//library/common/jni:android_network_utility_lib",
+        ],
+        "@envoy//bazel:apple": [
+            "//library/common/network:apple_platform_cert_verifier",
         ],
         "//conditions:default": [],
     }),
