@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.chromium.net.impl.CronetMetrics;
+import org.chromium.net.impl.CronvoyMetrics;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
@@ -360,9 +360,9 @@ public class RequestFinishedInfoTest {
     long receivedByteCount = 15;
     // Make sure nothing gets reordered inside the Metrics class
     RequestFinishedInfo.Metrics metrics =
-        new CronetMetrics(requestStart, dnsStart, dnsEnd, connectStart, connectEnd, sslStart,
-                          sslEnd, sendingStart, sendingEnd, pushStart, pushEnd, responseStart,
-                          requestEnd, socketReused, sentByteCount, receivedByteCount);
+        new CronvoyMetrics(requestStart, dnsStart, dnsEnd, connectStart, connectEnd, sslStart,
+                           sslEnd, sendingStart, sendingEnd, pushStart, pushEnd, responseStart,
+                           requestEnd, socketReused, sentByteCount, receivedByteCount);
     assertEquals(new Date(requestStart), metrics.getRequestStart());
     // -1 timestamp should translate to null
     assertNull(metrics.getDnsEnd());
