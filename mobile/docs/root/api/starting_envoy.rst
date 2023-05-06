@@ -326,20 +326,6 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

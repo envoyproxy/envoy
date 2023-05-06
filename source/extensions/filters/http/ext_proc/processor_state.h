@@ -208,6 +208,9 @@ protected:
   ChunkQueue chunk_queue_;
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
+
+private:
+  void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse& common_response);
 };
 
 class DecodingProcessorState : public ProcessorState {

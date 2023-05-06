@@ -263,6 +263,40 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
       StreamInfo::ResponseFlag::DownstreamProtocolError));
 }
 
+TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
+  std::shared_ptr<AccessLog::MockInstance> log_handler =
+      std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  access_logs_ = {log_handler};
+  setup(false, "");
+  ASSERT_EQ(0U, stats_.named_.downstream_rq_overload_close_.value());
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    conn_manager_->newStream(response_encoder_);
+    return envoyOverloadError("Envoy Overloaded");
+  }));
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  // Overload should result in local reply followed by abortive close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+
+  EXPECT_CALL(*log_handler, log(_, _, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+        EXPECT_EQ("overload_error:Envoy_Overloaded", stream_info.responseCodeDetails().value());
+      }));
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
+      StreamInfo::ResponseFlag::OverloadManager));
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
   // Not used in the test.
   delete codec_;
