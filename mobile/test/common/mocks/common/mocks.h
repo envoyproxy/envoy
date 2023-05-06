@@ -11,8 +11,8 @@ public:
 
   // SystemHelper:
   MOCK_METHOD(bool, isCleartextPermitted, (absl::string_view hostname));
-  MOCK_METHOD(envoy_cert_validation_result, validateCertificateChain, (const envoy_data* certs, uint8_t size,
-                                                                       const char* host_name));
+  MOCK_METHOD(envoy_cert_validation_result, validateCertificateChain,
+              (const envoy_data* certs, uint8_t size, const char* host_name));
   MOCK_METHOD(void, cleanupAfterCertificateValidation, ());
 };
 
