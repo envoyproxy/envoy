@@ -5922,10 +5922,12 @@ protected:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
-    EXPECT_CALL(*client_write_buffer, drain(_)).Times(2).WillOnce(Invoke([&](uint64_t n) -> void {
-      client_write_buffer->baseDrain(n);
-      dispatcher_->exit();
-    }));
+    EXPECT_CALL(*client_write_buffer, drain(_))
+        .Times(2)
+        .WillRepeatedly(Invoke([&](uint64_t n) -> void {
+          client_write_buffer->baseDrain(n);
+          dispatcher_->exit();
+        }));
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
