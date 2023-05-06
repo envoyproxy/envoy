@@ -99,15 +99,7 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
     release_envoy_data(c_data);
   });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
-
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
-
-  Platform::RequestTrailersBuilder builder;
-  std::shared_ptr<Platform::RequestTrailers> trailers =
-      std::make_shared<Platform::RequestTrailers>(builder.build());
-  stream_->close(trailers);
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
   terminal_callback_.waitReady();
 
@@ -125,7 +117,6 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   EXPECT_EQ(0, cc_.final_intel.stream_end_ms);
   EXPECT_EQ(0, cc_.final_intel.dns_start_ms);
   EXPECT_EQ(0, cc_.final_intel.dns_end_ms);
-  release_envoy_data(c_data);
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
