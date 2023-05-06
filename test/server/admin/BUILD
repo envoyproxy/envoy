@@ -161,6 +161,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
     deps = [
         ":stats_request_test_base",
+        "//source/common/stats:thread_local_store_lib",
     ],
 )
 

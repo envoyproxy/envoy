@@ -1,6 +1,7 @@
 #include "envoy/stats/histogram.h"
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/server/admin/stats_request_test_base.h"
@@ -233,6 +234,8 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   addCounter("cluster.test_cluster_1.upstream_cx_total",
              {{makeStat("a.tag-name"), makeStat("a.tag-value")}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total",
+             {{makeStat("a.tag-name"), makeStat("value2")}});
   addCounter("cluster.test_cluster_2.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addGauge("cluster.test_cluster_3.upstream_cx_total",
@@ -245,6 +248,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_cluster_1_upstream_cx_total counter
 envoy_cluster_test_cluster_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+envoy_cluster_test_cluster_1_upstream_cx_total{a_tag_name="value2"} 0
 # TYPE envoy_cluster_test_cluster_2_upstream_cx_total counter
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
 # TYPE envoy_cluster_test_cluster_3_upstream_cx_total gauge
@@ -254,6 +258,25 @@ envoy_cluster_test_cluster_4_upstream_cx_total{another_tag_name_4="another_tag_4
 )EOF";
 
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
+}
+
+TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
+  Stats::ThreadLocalStoreImpl store(alloc_);
+  Stats::StatName tag = pool_.add("tag");
+
+  //Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("x");
+  Stats::StatNameTagVector a_tags{Stats::StatNameTag{tag, pool_.add("a")}};
+  store.rootScope()->counterFromStatNameWithTags(pool_.add("x.y"), a_tags);
+
+  Stats::ScopeSharedPtr scope2 = store.rootScope()->createScope("x");
+  Stats::StatNameTagVector b_tags{Stats::StatNameTag{tag, pool_.add("b")}};
+  scope2->counterFromStatNameWithTags(pool_.add("y"), b_tags);
+
+  StatsParams params;
+  params.format_ = StatsFormat::Prometheus;
+  auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
+  request->setChunkSize(1);
+  EXPECT_EQ("", response(*request));
 }
 
 TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {

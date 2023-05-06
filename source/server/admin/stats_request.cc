@@ -77,6 +77,7 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
       // does not have stable iterators. When we hit leaf stats we will erase
       // second, so that we can use the name held as a map key, and don't need
       // to re-serialize the name from the symbol table.
+      //ENVOY_LOG_MISC(error, "Processing scope '{}' phase {}", iter->first, phase_index_);
       stat_map_.erase(iter);
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
@@ -85,10 +86,12 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Counter:
+      //ENVOY_LOG_MISC(error, "Processing counter {} phase {}", iter->first, phase_index_);
       processCounter(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Gauge:
+      //ENVOY_LOG_MISC(error, "Processing gauge {} phase {}", iter->first, phase_index_);
       processGauge(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
