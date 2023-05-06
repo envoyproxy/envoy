@@ -19,9 +19,3 @@ envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* certs, uin
                                                     const char* host_name);
 
 void jvm_detach_thread();
-
-/* Returns a group of C functions to do certificates validation using AndroidNetworkLibrary.
- */
-envoy_cert_validator* get_android_cert_validator_api();
-
-static constexpr const char* cert_validator_name = "platform_cert_validator";
