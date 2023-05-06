@@ -9,7 +9,7 @@ namespace Envoy {
  * platform-specific system APIs.
  */
 class DefaultSystemHelper : public SystemHelper {
- public:
+public:
   ~DefaultSystemHelper() override = default;
 
   // SystemHelper:

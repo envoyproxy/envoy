@@ -1,8 +1,8 @@
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "test/common/integration/base_client_integration_test.h"
-#include "test/integration/autonomous_upstream.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/integration/autonomous_upstream.h"
 
 #include "library/common/data/utility.h"
 #include "library/common/main_interface.h"
@@ -32,7 +32,7 @@ public:
 
   void basicTest();
 
- protected:
+protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 

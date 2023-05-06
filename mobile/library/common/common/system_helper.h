@@ -2,14 +2,15 @@
 
 #include <memory>
 
-#include "absl/strings/string_view.h"
 #include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 
 namespace test {
 class SystemHelperPeer;
-}  // namespace test
+} // namespace test
 
 /**
  * SystemHelper provided a platform-agnostic API for interacting with platform-specific
