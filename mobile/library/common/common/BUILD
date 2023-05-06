@@ -20,7 +20,10 @@ envoy_cc_library(
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
     ] + select({
-        "@envoy//bazel:android": ["//library/common/jni:android_jni_utility_lib"],
+        "@envoy//bazel:android": [
+            "//library/common/jni:android_jni_utility_lib",
+            "//library/common/jni:android_network_utility_lib",
+        ],
         "//conditions:default": [],
     }),
 )
