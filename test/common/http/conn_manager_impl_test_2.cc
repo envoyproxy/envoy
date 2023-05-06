@@ -3136,7 +3136,9 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_route_config_provider2_.get();
   }
-  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return *scope_key_builder2_; }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return scope_key_builder2_ ? *scope_key_builder2_ : OptRef<const Router::ScopeKeyBuilder>{};
+  }
 
   std::shared_ptr<Router::MockRouteConfigProvider> route_config_provider2_;
   std::shared_ptr<Router::MockScopedRouteConfigProvider> scoped_route_config_provider2_;
