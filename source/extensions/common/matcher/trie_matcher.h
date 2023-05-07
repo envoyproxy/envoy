@@ -108,7 +108,7 @@ public:
 private:
   static DataInputPtr<DataType>& validateDataInput(DataInputPtr<DataType>& data_input) {
     auto input_type = data_input->dataInputType();
-    if (input_type != typeid(std::string).name()) {
+    if (input_type != Envoy::Matcher::DefaultMatchingDataType) {
       throw EnvoyException(
           absl::StrCat("Unsupported data input type: ", input_type,
                        ", currently only string type is supported in trie matcher"));

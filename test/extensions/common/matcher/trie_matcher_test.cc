@@ -169,9 +169,8 @@ matcher_tree:
   loadConfig(yaml);
   auto input_factory = ::Envoy::Matcher::TestDataInputFloatFactory(3.14);
   auto match_tree = factory_.create(matcher_);
-  std::string error_message =
-      absl::StrCat("Unsupported data input type: ", typeid(float).name(),
-                   ", currently only string type is supported in trie matcher");
+  std::string error_message = absl::StrCat("Unsupported data input type: float, currently only "
+                                           "string type is supported in trie matcher");
   EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 

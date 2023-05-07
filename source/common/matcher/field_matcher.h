@@ -144,8 +144,21 @@ template <class DataType>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   SingleFieldMatcher(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher)
-      : data_input_(std::move(validateInputAndMatcher(data_input, input_matcher))),
-        input_matcher_(std::move(input_matcher)) {}
+      : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {
+    auto supported_input_types = input_matcher_->supportedDataInputTypes();
+    if (supported_input_types.find(data_input_->dataInputType()) == supported_input_types.end()) {
+      std::string supported_types;
+      for (const auto& str : supported_input_types) {
+        if (!supported_types.empty()) {
+          absl::StrAppend(&supported_types, ", ");
+        }
+        absl::StrAppend(&supported_types, str);
+      }
+      throw EnvoyException(
+          absl::StrCat("Unsupported data input type: ", data_input_->dataInputType(),
+                       ". The matcher supports input type: ", supported_types));
+    }
+  }
 
   FieldMatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -168,15 +181,6 @@ public:
   }
 
 private:
-  static DataInputPtr<DataType>& validateInputAndMatcher(DataInputPtr<DataType>& data_input,
-                                                         InputMatcherPtr& input_matcher) {
-    auto supported_input_types = input_matcher->supportedDataInputTypes();
-    if (supported_input_types.find(data_input->dataInputType()) == supported_input_types.end()) {
-      throw EnvoyException(
-          absl::StrCat("Unsupported data input type: ", data_input->dataInputType()));
-    }
-    return data_input;
-  }
   const DataInputPtr<DataType> data_input_;
   const InputMatcherPtr input_matcher_;
 };

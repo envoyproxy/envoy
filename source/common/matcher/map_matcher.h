@@ -17,8 +17,14 @@ template <class DataType>
 class MapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)
-      : data_input_(std::move(validateDataInput(data_input))),
-        on_no_match_(std::move(on_no_match)) {}
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {
+    auto input_type = data_input_->dataInputType();
+    if (input_type != DefaultMatchingDataType) {
+      throw EnvoyException(
+          absl::StrCat("Unsupported data input type: ", input_type,
+                       ", currently only string type is supported in map matcher"));
+    }
+  }
 
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
@@ -60,16 +66,6 @@ protected:
   // result was determined, the OnMatch will be returned. If a match result was determined to be no
   // match, {} will be returned.
   virtual absl::optional<OnMatch<DataType>> doMatch(const std::string& data) PURE;
-
-  static DataInputPtr<DataType>& validateDataInput(DataInputPtr<DataType>& data_input) {
-    auto input_type = data_input->dataInputType();
-    if (input_type != typeid(std::string).name()) {
-      throw EnvoyException(
-          absl::StrCat("Unsupported data input type: ", input_type,
-                       ", currently only string type is supported in map matcher"));
-    }
-    return data_input;
-  }
 };
 
 } // namespace Matcher

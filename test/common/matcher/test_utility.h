@@ -55,7 +55,7 @@ struct TestInput : public DataInput<TestData> {
 struct TestFloatInput : public DataInput<TestData> {
   explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
   DataInputGetResult get(const TestData&) const override { return result_; }
-  std::string dataInputType() const override { return typeid(float).name(); }
+  std::string dataInputType() const override { return "float"; }
   DataInputGetResult result_;
 };
 
