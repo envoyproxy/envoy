@@ -296,6 +296,7 @@ case $CI_TARGET in
         ;;
     gcc)
         BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
+
         setup_gcc_toolchain
 
         echo "Testing ${TEST_TARGETS[*]}"
@@ -322,7 +323,7 @@ case $CI_TARGET in
         ;;
     asan)
         setup_clang_toolchain
-        BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only" "--remote_download_minimal")
+        BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only" "--remote_download_minimal" "--test_tag_filters=-no-asan")
         echo "bazel ASAN/UBSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
