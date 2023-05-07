@@ -289,6 +289,18 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="a"} 0
 envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
 )EOF";
 
+  // Note: in the version of prometheus_stats_test.cc that works with the
+  // streaming GroupedStatsRequest, the test code is slightly different;
+  // it's based on the local 'store' object rather than being based on
+  // the counters_ member variable.
+  //    StatsParams params;
+  //    params.type_ = StatsType::Counters;
+  //    params.format_ = StatsFormat::Prometheus;
+  //    auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
+  //    EXPECT_EQ(expected_output, response(*request));
+  // This code is left here so that we can verify the bug is fixed if we decide to
+  // re-try the streaming Prometheus implementation.
+
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
       counters_, gauges_, histograms_, textReadouts_, response, StatsParams(), custom_namespaces);
