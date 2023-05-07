@@ -177,8 +177,21 @@ public:
   /**
    * Extracts tags from the name and appends them to the provided StatNameTagVector.
    *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
    */
-  virtual void extractAndAppendTags(StatName& name, StatNamePool& pool,
+  virtual void extractAndAppendTags(StatName name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
+   */
+  virtual void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                                     StatNameTagVector& stat_tags) PURE;
 };
 

@@ -1075,10 +1075,15 @@ void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& s
   }
 }
 
-void ThreadLocalStoreImpl::extractAndAppendTags(StatName& name, StatNamePool& pool,
+void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  extractAndAppendTags(symbolTable().toString(name), pool, stat_tags);
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                                                 StatNameTagVector& stat_tags) {
   TagVector tags;
-  tagProducer().produceTags(symbolTable().toString(name), tags);
+  tagProducer().produceTags(name, tags);
   for (const auto& tag : tags) {
     stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }
