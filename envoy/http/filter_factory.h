@@ -36,15 +36,21 @@ struct FilterContext {
 };
 
 /**
- * Additional options for creating a filter chain.
+ * Additional options for creating HTTP filter chain.
+ * TODO(wbpcode): it is possible to add more options to customize HTTP filter chain creation.
+ * For example, we can add upgrade related options here to tell FilterChainFactory to create
+ * upgrade filter chain or not.
  */
 class FilterChainOptions {
 public:
   virtual ~FilterChainOptions() = default;
 
   /**
-   * @param config_name the name of the filter configuration.
-   * @return whether the a specific filter is disabled based on the config name.
+   * Skip filter creation if the filter is explicitly disabled after the filter chain is
+   * selected.
+   *
+   * @param config_name the config name of the filter.
+   * @return whether the filter should be disabled or enabled based on the config name.
    */
   virtual bool filterDisabled(absl::string_view config_name) const PURE;
 };
