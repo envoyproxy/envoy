@@ -94,8 +94,5 @@ to service2, as well as the latency incurred at each hop.
    :ref:`Request tracing <arch_overview_tracing>`
       Learn more about using Envoy's request tracing.
 
-   :ref:`Jaeger native tracing sandbox <install_sandboxes_jaeger_native_tracing>`
-      An example of using Jaeger natively with Envoy.
-
    `Jaeger <https://jaegertracing.io/>`_
       Jaeger tracing website.
