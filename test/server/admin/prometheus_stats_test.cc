@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/prometheus_stats.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -258,6 +260,39 @@ envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
 )EOF";
 
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+// Replicate bug https://github.com/envoyproxy/envoy/issues/27173 which fails to
+// coalesce stats in different scopes with the same tag-extracted-name.
+TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  Stats::ThreadLocalStoreImpl store(alloc_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  store.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config));
+  Stats::StatName name = pool_.add("default.total_match_count");
+
+  Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("cluster.a");
+  counters_.push_back(Stats::CounterSharedPtr(&scope1->counterFromStatName(name)));
+
+  // To reproduce the problem from we will render
+  // cluster.a.default.total_match_count before we discover the existence of
+  // cluster.x.default.total_match_count. That will happen because "d" in
+  // "default" comes before "x" with
+  // https://github.com/envoyproxy/envoy/pull/24998
+  Stats::ScopeSharedPtr scope2 = store.rootScope()->createScope("cluster.x");
+  counters_.push_back(Stats::CounterSharedPtr(&scope2->counterFromStatName(name)));
+
+  constexpr absl::string_view expected_output =
+      R"EOF(# TYPE envoy_cluster_default_total_match_count counter
+envoy_cluster_default_total_match_count{envoy_cluster_name="a"} 0
+envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
+)EOF";
+
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(1, size);
   EXPECT_EQ(expected_output, response.toString());
 }
 
