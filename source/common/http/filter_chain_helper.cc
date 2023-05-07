@@ -32,10 +32,15 @@ static Http::FilterFactoryCb MissingConfigFilterFactory =
     };
 
 void FilterChainUtility::createFilterChainForFactories(
-    Http::FilterChainManager& manager,
-    const FilterChainUtility::FilterFactoriesList& filter_factories) {
+    Http::FilterChainManager& manager, const FilterChainOptions& options,
+    const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
+    // If this filter is disabled explicitly, and skip trying to create it.
+    if (options.filterDisabled(filter_config_provider->name())) {
+      continue;
+    }
+
     auto config = filter_config_provider->config();
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();

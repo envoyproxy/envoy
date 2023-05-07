@@ -2375,7 +2375,6 @@ message InternalRedirectPolicy {
 // :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`,
 // or :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
 // to add additional flags to the filter.
-// [#not-implemented-hide:]
 message FilterConfig {
   // The filter config.
   google.protobuf.Any config = 1;

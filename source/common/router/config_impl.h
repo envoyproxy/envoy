@@ -81,6 +81,11 @@ using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
+  struct FilterConfig {
+    RouteSpecificFilterConfigConstSharedPtr config_;
+    bool disabled_{};
+  };
+
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
                    const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
@@ -88,14 +93,20 @@ public:
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
+  /**
+   * @return true if the filter is explicitly disabled for this route or virtual host, false
+   * if the filter is explicitly enabled. If the filter is not explicitly enabled or disabled,
+   * returns absl::nullopt.
+   */
+  absl::optional<bool> disabled(absl::string_view name) const;
+
 private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  const OptionalHttpFilters& optional_http_filters,
+                                  bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
-
-  absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
+  absl::flat_hash_map<std::string, FilterConfig> configs_;
 };
 
 class RouteEntryImplBase;
@@ -133,6 +144,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
+  bool filterDisabled(absl::string_view) const override { return false; }
   void traversePerFilterConfig(
       const std::string&,
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
@@ -245,6 +257,7 @@ public:
     }
     return HeaderParser::defaultParser();
   }
+  bool filterDisabled(absl::string_view config_name) const;
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -782,6 +795,7 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
+  bool filterDisabled(absl::string_view config_name) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = per_filter_configs_.get(name);
@@ -914,6 +928,9 @@ public:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
+    bool filterDisabled(absl::string_view config_name) const override {
+      return parent_->filterDisabled(config_name);
+    }
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
@@ -999,6 +1016,13 @@ public:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
+    bool filterDisabled(absl::string_view config_name) const override {
+      absl::optional<bool> result = per_filter_configs_.disabled(config_name);
+      if (result.has_value()) {
+        return result.value();
+      }
+      return DynamicRouteEntry::filterDisabled(config_name);
+    }
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {
       auto* config = per_filter_configs_.get(name);
@@ -1536,6 +1560,9 @@ public:
 
   const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const {
     return per_filter_configs_.get(name);
+  }
+  bool filterDisabled(absl::string_view config_name) const {
+    return per_filter_configs_.disabled(config_name).value_or(false);
   }
 
   // Router::CommonConfig

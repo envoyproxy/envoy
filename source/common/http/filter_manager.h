@@ -907,6 +907,18 @@ private:
     const Http::FilterContext& context_;
   };
 
+  class FilterChainOptionsImpl : public FilterChainOptions {
+  public:
+    FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
+
+    bool filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr && route_->filterDisabled(config_name);
+    }
+
+  private:
+    const Router::RouteConstSharedPtr route_;
+  };
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 

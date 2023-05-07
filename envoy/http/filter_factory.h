@@ -36,6 +36,25 @@ struct FilterContext {
 };
 
 /**
+ * Additional options for creating a filter chain.
+ */
+class FilterChainOptions {
+public:
+  virtual ~FilterChainOptions() = default;
+
+  /**
+   * @param config_name the name of the filter configuration.
+   * @return whether the a specific filter is disabled based on the config name.
+   */
+  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+};
+
+class EmptyFilterChainOptions : public FilterChainOptions {
+public:
+  bool filterDisabled(absl::string_view) const override { return false; }
+};
+
+/**
  * The filter chain manager is provided by the connection manager to the filter chain factory.
  * The filter chain factory will post the filter factory context and filter factory to the
  * filter chain manager to create filter and construct HTTP stream filter chain.
@@ -69,10 +88,12 @@ public:
    *                FilterChainManager.
    * @param only_create_if_configured if true, only creates filter chain if there is a non-default
    *                                  configured filter chain. Default false.
+   * @param options additional options for creating a filter chain.
    * @return whather a filter chain has been created.
    */
-  virtual bool createFilterChain(FilterChainManager& manager,
-                                 bool only_create_if_configured = false) const PURE;
+  virtual bool
+  createFilterChain(FilterChainManager& manager, bool only_create_if_configured = false,
+                    const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 
   /**
    * Called when a new upgrade stream is created on the connection.
