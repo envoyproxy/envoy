@@ -111,7 +111,7 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
 
   builder_.enablePlatformCertificatesValidation(true);

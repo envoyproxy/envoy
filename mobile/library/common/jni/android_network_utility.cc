@@ -67,7 +67,7 @@ static void ExtractCertVerifyResult(JNIEnv* env, jobject result, envoy_cert_veri
 
 // `auth_type` and `host` are expected to be UTF-8 encoded.
 jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::string>& cert_chain,
-                                        std::string auth_type, std::string host) {
+                                        std::string auth_type, absl::string_view hostname) {
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
   jclass jcls_AndroidNetworkLibrary =
       find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
@@ -77,7 +77,7 @@ jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::stri
   Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:GetStaticMethodID");
   jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
   jbyteArray auth_string = ToJavaByteArray(env, auth_type);
-  jbyteArray host_string = ToJavaByteArray(env, host);
+  jbyteArray host_string = ToJavaByteArray(env, reinterpret_cast<const uint8_t *>(hostname.data()), hostname.length());
   jobject result =
       env->CallStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
                                   chain_byte_array, auth_string, host_string);
@@ -91,12 +91,12 @@ jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::stri
 
 // `auth_type` and `host` are expected to be UTF-8 encoded.
 static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chain,
-                                       std::string auth_type, std::string host,
+                                       std::string auth_type, absl::string_view hostname,
                                        envoy_cert_verify_status_t* status,
                                        bool* is_issued_by_known_root,
                                        std::vector<std::string>* verified_chain) {
   JNIEnv* env = get_env();
-  jobject result = call_jvm_verify_x509_cert_chain(env, cert_chain, auth_type, host);
+  jobject result = call_jvm_verify_x509_cert_chain(env, cert_chain, auth_type, hostname);
   if (Envoy::JNI::Exception::checkAndClear()) {
     *status = CERT_VERIFY_STATUS_NOT_YET_VALID;
   } else {
@@ -108,22 +108,20 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
   env->DeleteLocalRef(result);
 }
 
-envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* certs, uint8_t size,
-                                                    const char* host_name) {
+envoy_cert_validation_result verify_x509_cert_chain(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
   jni_log("[Envoy]", "verify_x509_cert_chain");
 
   envoy_cert_verify_status_t result;
   bool is_issued_by_known_root;
   std::vector<std::string> verified_chain;
   std::vector<std::string> cert_chain;
-  for (uint8_t i = 0; i < size; ++i) {
-    cert_chain.push_back(Envoy::Data::Utility::copyToString(certs[i]));
-    release_envoy_data(certs[i]);
+  for (absl::string_view cert : certs) {
+    cert_chain.push_back(std::string(cert));
   }
 
   // Android ignores the authType parameter to X509TrustManager.checkServerTrusted, so pass in "RSA"
   // as dummy value. See https://crbug.com/627154.
-  jvm_verify_x509_cert_chain(cert_chain, "RSA", host_name, &result, &is_issued_by_known_root,
+  jvm_verify_x509_cert_chain(cert_chain, "RSA", hostname, &result, &is_issued_by_known_root,
                              &verified_chain);
   switch (result) {
   case CERT_VERIFY_STATUS_OK:

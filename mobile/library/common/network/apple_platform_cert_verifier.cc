@@ -34,7 +34,7 @@ CFMutableArrayRef CreateTrustPolicies() {
 // Returns a new CFMutableArrayRef containing the specified certificates
 // in the form expected by Security.framework and Keychain Services, or
 // NULL on failure.
-CFMutableArrayRef CreateSecCertificateArray(const envoy_data* certs, uint8_t num_certs) {
+CFMutableArrayRef CreateSecCertificateArray(absl::Span<const absl::string_view> certs) {
   CFMutableArrayRef cert_array =
       CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
 
@@ -42,8 +42,8 @@ CFMutableArrayRef CreateSecCertificateArray(const envoy_data* certs, uint8_t num
     return NULL;
   }
 
-  for (uint8_t i = 0; i < num_certs; ++i) {
-    CFDataRef cert_data = CFDataCreate(kCFAllocatorDefault, certs[i].bytes, certs[i].length);
+  for (absl::string_view cert : certs) {
+    CFDataRef cert_data = CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const uint8_t*>(cert.data()), cert.length());
     if (!cert_data) {
       CFRelease(cert_array);
       return NULL;
@@ -69,15 +69,14 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
   return result;
 }
 
-envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
-                                         const char* /*hostname*/) {
+envoy_cert_validation_result verify_cert(absl::Span<const absl::string_view> certs, absl::string_view /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");
   }
 
-  CFMutableArrayRef cert_array = CreateSecCertificateArray(certs, num_certs);
+  CFMutableArrayRef cert_array = CreateSecCertificateArray(certs);
   if (!cert_array) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");

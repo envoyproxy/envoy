@@ -5,10 +5,8 @@ namespace Envoy {
 
 bool DefaultSystemHelper::isCleartextPermitted(absl::string_view /*hostname*/) { return true; }
 
-envoy_cert_validation_result DefaultSystemHelper::validateCertificateChain(const envoy_data* certs,
-                                                                           uint8_t size,
-                                                                           const char* hostname) {
-  return verify_cert(certs, size, hostname);
+envoy_cert_validation_result DefaultSystemHelper::validateCertificateChain(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
+  return verify_cert(certs, hostname);
 }
 
 void DefaultSystemHelper::cleanupAfterCertificateValidation() {}

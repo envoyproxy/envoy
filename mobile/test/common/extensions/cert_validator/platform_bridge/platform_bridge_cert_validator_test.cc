@@ -55,7 +55,7 @@ public:
 class MockValidator {
 public:
   MOCK_METHOD(void, cleanup, ());
-  MOCK_METHOD(envoy_cert_validation_result, validate, (const envoy_data*, uint8_t, const char*));
+  MOCK_METHOD(envoy_cert_validation_result, validate, (absl::Span<const absl::string_view> certs, absl::string_view hostname));
 };
 
 class PlatformBridgeCertValidatorTest
@@ -68,8 +68,8 @@ protected:
         mock_validator_(std::make_unique<MockValidator>()),
         main_thread_id_(std::this_thread::get_id()),
         helper_handle_(test::SystemHelperPeer::replaceSystemHelper()) {
-    ON_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _))
-        .WillByDefault(WithArgs<0, 1, 2>(Invoke(this, &PlatformBridgeCertValidatorTest::validate)));
+    ON_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _))
+        .WillByDefault(WithArgs<0, 1>(Invoke(this, &PlatformBridgeCertValidatorTest::validate)));
     ON_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
         .WillByDefault(Invoke(this, &PlatformBridgeCertValidatorTest::cleanup));
 
@@ -100,16 +100,15 @@ protected:
     return GetParam() == CertificateValidationContext::ACCEPT_UNTRUSTED;
   }
 
-  envoy_cert_validation_result validate(const envoy_data* certs, uint8_t size,
-                                        const char* hostname) {
+  envoy_cert_validation_result validate(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
     // Validate must be called on the worker thread, not the main thread.
     EXPECT_NE(main_thread_id_, std::this_thread::get_id());
 
     // Make sure the cert was converted correctly.
-    const Buffer::InstancePtr buffer = Data::Utility::toInternalData(*certs);
+    const Buffer::InstancePtr buffer(new Buffer::OwnedImpl(certs[0]));
     const auto digest = Common::Crypto::UtilitySingleton::get().getSha256Digest(*buffer);
     EXPECT_EQ(TEST_SAN_DNS2_CERT_256_HASH, Hex::encode(digest));
-    return mock_validator_->validate(certs, size, hostname);
+    return mock_validator_->validate(certs, hostname);
   }
 
   void cleanup() {
@@ -199,7 +198,7 @@ TEST_P(PlatformBridgeCertValidatorTest, EmptyCertChain) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
@@ -208,7 +207,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
@@ -229,7 +228,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
@@ -238,7 +237,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
@@ -264,7 +263,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
@@ -273,7 +272,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
@@ -299,7 +298,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
@@ -308,7 +307,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
@@ -329,7 +328,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
@@ -340,7 +339,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, StrEq(subject_alt_names[0].c_str())))
+  EXPECT_CALL(*mock_validator_, validate(_, StrEq(subject_alt_names[0].c_str())))
       .WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
@@ -362,7 +361,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
 
 TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
 
   initializeConfig();
   auto validator = std::make_unique<PlatformBridgeCertValidator>(&config_, stats_);
@@ -371,7 +370,7 @@ TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
-  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));

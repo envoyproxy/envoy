@@ -102,8 +102,12 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   envoy_data leaf_cert_der = cert_chain[0];
   bssl::UniquePtr<X509> leaf_cert(d2i_X509(
       nullptr, const_cast<const unsigned char**>(&leaf_cert_der.bytes), leaf_cert_der.length));
+  std::vector<absl::string_view> certs;
+  for (const envoy_data data : cert_chain) {
+    certs.push_back(absl::string_view(reinterpret_cast<const char*>(data.bytes), data.length));
+  }
   envoy_cert_validation_result result = SystemHelper::getInstance().validateCertificateChain(
-      cert_chain.data(), cert_chain.size(), hostname.c_str());
+      certs, hostname);
   bool success = result.result == ENVOY_SUCCESS;
   if (!success) {
     ENVOY_LOG(debug, result.error_details);

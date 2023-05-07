@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
 
 namespace Envoy {
@@ -31,7 +32,7 @@ public:
    * Invokes platform APIs to validate certificates.
    */
   virtual envoy_cert_validation_result
-  validateCertificateChain(const envoy_data* certs, uint8_t size, const char* host_name) PURE;
+  validateCertificateChain(absl::Span<const absl::string_view> certs, absl::string_view hostname) PURE;
   /**
    * Invokes platform APIs to clean up after validation is complete.
    */

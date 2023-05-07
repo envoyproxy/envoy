@@ -12,7 +12,7 @@ MockSystemHelper::MockSystemHelper() {
   success.result = ENVOY_SUCCESS;
   success.tls_alert = 0;
   success.error_details = "";
-  ON_CALL(*this, validateCertificateChain(_, _, _)).WillByDefault(Return(success));
+  ON_CALL(*this, validateCertificateChain(_, _)).WillByDefault(Return(success));
 }
 
 } // namespace test
