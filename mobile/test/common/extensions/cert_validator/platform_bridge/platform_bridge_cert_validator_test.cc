@@ -55,7 +55,8 @@ public:
 class MockValidator {
 public:
   MOCK_METHOD(void, cleanup, ());
-  MOCK_METHOD(envoy_cert_validation_result, validate, (absl::Span<const absl::string_view> certs, absl::string_view hostname));
+  MOCK_METHOD(envoy_cert_validation_result, validate,
+              (absl::Span<const absl::string_view> certs, absl::string_view hostname));
 };
 
 class PlatformBridgeCertValidatorTest
@@ -100,7 +101,8 @@ protected:
     return GetParam() == CertificateValidationContext::ACCEPT_UNTRUSTED;
   }
 
-  envoy_cert_validation_result validate(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
+  envoy_cert_validation_result validate(absl::Span<const absl::string_view> certs,
+                                        absl::string_view hostname) {
     // Validate must be called on the worker thread, not the main thread.
     EXPECT_NE(main_thread_id_, std::this_thread::get_id());
 

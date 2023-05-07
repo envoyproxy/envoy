@@ -106,8 +106,8 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   for (const envoy_data data : cert_chain) {
     certs.push_back(absl::string_view(reinterpret_cast<const char*>(data.bytes), data.length));
   }
-  envoy_cert_validation_result result = SystemHelper::getInstance().validateCertificateChain(
-      certs, hostname);
+  envoy_cert_validation_result result =
+      SystemHelper::getInstance().validateCertificateChain(certs, hostname);
   bool success = result.result == ENVOY_SUCCESS;
   if (!success) {
     ENVOY_LOG(debug, result.error_details);

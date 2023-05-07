@@ -32,7 +32,8 @@ public:
    * Invokes platform APIs to validate certificates.
    */
   virtual envoy_cert_validation_result
-  validateCertificateChain(absl::Span<const absl::string_view> certs, absl::string_view hostname) PURE;
+  validateCertificateChain(absl::Span<const absl::string_view> certs,
+                           absl::string_view hostname) PURE;
   /**
    * Invokes platform APIs to clean up after validation is complete.
    */

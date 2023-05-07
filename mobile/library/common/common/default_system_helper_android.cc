@@ -8,8 +8,9 @@ bool DefaultSystemHelper::isCleartextPermitted(absl::string_view hostname) {
   return is_cleartext_permitted(hostname);
 }
 
-
-envoy_cert_validation_result DefaultSystemHelper::validateCertificateChain(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
+envoy_cert_validation_result
+DefaultSystemHelper::validateCertificateChain(absl::Span<const absl::string_view> certs,
+                                              absl::string_view hostname) {
   return verify_x509_cert_chain(certs, hostname);
 }
 

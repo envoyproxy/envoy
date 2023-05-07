@@ -43,7 +43,8 @@ CFMutableArrayRef CreateSecCertificateArray(absl::Span<const absl::string_view> 
   }
 
   for (absl::string_view cert : certs) {
-    CFDataRef cert_data = CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const uint8_t*>(cert.data()), cert.length());
+    CFDataRef cert_data = CFDataCreate(
+        kCFAllocatorDefault, reinterpret_cast<const uint8_t*>(cert.data()), cert.length());
     if (!cert_data) {
       CFRelease(cert_array);
       return NULL;
@@ -69,7 +70,8 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
   return result;
 }
 
-envoy_cert_validation_result verify_cert(absl::Span<const absl::string_view> certs, absl::string_view /*hostname*/) {
+envoy_cert_validation_result verify_cert(absl::Span<const absl::string_view> certs,
+                                         absl::string_view /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,

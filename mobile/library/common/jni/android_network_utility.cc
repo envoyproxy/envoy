@@ -77,7 +77,8 @@ jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::stri
   Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:GetStaticMethodID");
   jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
   jbyteArray auth_string = ToJavaByteArray(env, auth_type);
-  jbyteArray host_string = ToJavaByteArray(env, reinterpret_cast<const uint8_t *>(hostname.data()), hostname.length());
+  jbyteArray host_string =
+      ToJavaByteArray(env, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
   jobject result =
       env->CallStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
                                   chain_byte_array, auth_string, host_string);
@@ -108,7 +109,8 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
   env->DeleteLocalRef(result);
 }
 
-envoy_cert_validation_result verify_x509_cert_chain(absl::Span<const absl::string_view> certs, absl::string_view hostname) {
+envoy_cert_validation_result verify_x509_cert_chain(absl::Span<const absl::string_view> certs,
+                                                    absl::string_view hostname) {
   jni_log("[Envoy]", "verify_x509_cert_chain");
 
   envoy_cert_verify_status_t result;
