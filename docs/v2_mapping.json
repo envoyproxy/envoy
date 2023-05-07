@@ -118,7 +118,6 @@
   "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto": "envoy/config/retry/omit_host_metadata/v2/omit_host_metadata_config.proto",
   "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.proto": "envoy/config/retry/previous_hosts/v2/previous_hosts.proto",
   "envoy/config/trace/v3/datadog.proto": "envoy/config/trace/v2/datadog.proto",
-  "envoy/config/trace/v3/dynamic_ot.proto": "envoy/config/trace/v2/dynamic_ot.proto",
   "envoy/config/trace/v3/http_tracer.proto": "envoy/config/trace/v2/http_tracer.proto",
   "envoy/config/trace/v3/lightstep.proto": "envoy/config/trace/v2/lightstep.proto",
   "envoy/config/trace/v3/opencensus.proto": "envoy/config/trace/v2/opencensus.proto",

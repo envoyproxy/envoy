@@ -11,7 +11,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
-    "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
     # Extensions that require CEL.
@@ -336,7 +335,6 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_googleurl()
     _io_hyperscan()
     _io_vectorscan()
-    _io_opentracing_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -750,18 +748,6 @@ def _io_vectorscan():
         type = "tar.gz",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
-    )
-
-def _io_opentracing_cpp():
-    external_http_archive(
-        name = "io_opentracing_cpp",
-        patch_args = ["-p1"],
-        # Workaround for LSAN false positive in https://github.com/envoyproxy/envoy/issues/7647
-        patches = ["@envoy//bazel:io_opentracing_cpp.patch"],
-    )
-    native.bind(
-        name = "opentracing",
-        actual = "@io_opentracing_cpp//:opentracing",
     )
 
 def _com_github_datadog_dd_trace_cpp():
