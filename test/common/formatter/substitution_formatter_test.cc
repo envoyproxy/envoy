@@ -2740,7 +2740,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   }
   // Test "not gRPC request" with response_trailer
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2748,11 +2748,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
   // Test "not gRPC request" with response_header
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2760,7 +2760,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
 }
 
@@ -2840,7 +2840,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   }
   // Test "not gRPC request" with response_trailer
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2848,11 +2848,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
   // Test "not gRPC request" with response_header
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2860,7 +2860,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
 }
 
@@ -2925,7 +2925,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   }
   // Test "not gRPC request" with response_trailer
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2933,11 +2933,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
   // Test "not gRPC request" with response_header
   {
-    request_headers_ = {{":method", "GET"}, {":path", "/health"}};
+    request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
     EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
                                               stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -2945,7 +2945,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
-    request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+    request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
 }
 
