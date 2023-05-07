@@ -28,82 +28,94 @@ class MatchDelegateInegrationTest : public testing::TestWithParam<Network::Addre
 public:
   MatchDelegateInegrationTest() : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
   void initialize() override {
-    config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& cm) {
-      auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
-      auto* route = vh->mutable_routes()->Mutable(0);
-      route->mutable_match()->set_path("/");
-      Any cfg_any;
-      const auto per_route_matcher = TestUtility::parseYaml<
-          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(per_route_config_);
-
-      ASSERT_TRUE(cfg_any.PackFrom(per_route_matcher));
-      route->mutable_typed_per_filter_config()->insert(
-          MapPair<std::string, Any>("envoy.filters.http.match_delegate", cfg_any));
-    });
-
     config_helper_.prependFilter(default_config_);
     HttpIntegrationTest::initialize();
   }
 
   IntegrationStreamDecoderPtr response_;
   FakeStreamPtr request_{};
-  envoy::extensions::common::matching::v3::ExtensionWithMatcher matcher_;
+  // envoy::extensions::common::matching::v3::ExtensionWithMatcher matcher_;
   const std::string default_config_ = R"EOF(
-    name: ext_proc
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-      extension_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-          code: 403
+      name: ext_proc
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: set-response-code
+          typed_config:
+            "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+            code: 403
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: skip
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+    )EOF";
+  const std::string per_route_config_ = R"EOF(
       xds_matcher:
         matcher_tree:
           input:
             name: request-headers
             typed_config:
-              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
-              header_name: default-matcher-header
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: match-header
           exact_match_map:
             map:
-              match:
+              route:
                 action:
                   name: skip
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-  )EOF";
-  const std::string per_route_config_ = R"EOF(
-    xds_matcher:
-      matcher_tree:
-        input:
-          name: request-headers
-          typed_config:
-            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-            header_name: match-header
-        exact_match_map:
-          map:
-            match:
-              action:
-                name: set-response-code
-                typed_config:
-                  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-                  code: 200
-  )EOF";
+    )EOF";
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(MatchDelegateInegrationTest, Basicflow) {
+TEST_P(MatchDelegateInegrationTest, BasicFlow) {
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  response_ = codec_client_->makeHeaderOnlyRequest(Envoy::Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "test"}, {":scheme", "http"}, {":authority", "host"}});
-  EXPECT_THAT(response_->headers(), Envoy::Http::HttpStatusIs("403"));
-  response_ = codec_client_->makeHeaderOnlyRequest(Envoy::Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
-  EXPECT_THAT(response_->headers(), Envoy::Http::HttpStatusIs("200"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Envoy::Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
+                                            {"match-header", "route"},
+                                            {":authority", "host"}});
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_THAT(response1->headers(), Envoy::Http::HttpStatusIs("403"));
+}
+
+TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
+  config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& cm) {
+    auto* config = cm.mutable_route_config()
+                       ->mutable_virtual_hosts()
+                       ->Mutable(0)
+                       ->mutable_typed_per_filter_config();
+    const auto per_route_matcher = TestUtility::parseYaml<
+        envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(per_route_config_);
+    (*config)["envoy.filters.http.match_delegate"].PackFrom(per_route_matcher);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                        {":path", "/"},
+                                                        {":scheme", "http"},
+                                                        {"match-header", "route"},
+                                                        {":authority", "host"}};
+  Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  auto response2 = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_THAT(response2->headers(), Envoy::Http::HttpStatusIs("200"));
 }
 } // namespace
 } // namespace MatchDelegate
