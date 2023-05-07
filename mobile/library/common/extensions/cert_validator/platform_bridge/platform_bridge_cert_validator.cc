@@ -53,7 +53,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
             Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
   }
 
-  std::vector<envoy_data> certs;
+  std::vector<std::string> certs;
   for (uint64_t i = 0; i < sk_X509_num(&cert_chain); i++) {
     X509* cert = sk_X509_value(&cert_chain, i);
     unsigned char* cert_in_der = nullptr;
@@ -62,7 +62,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 
     absl::string_view cert_str(reinterpret_cast<char*>(cert_in_der),
                                static_cast<size_t>(der_length));
-    certs.push_back(Data::Utility::copyToBridgeData(cert_str));
+    certs.push_back(std::string(cert_str));
     OPENSSL_free(cert_in_der);
   }
 
@@ -94,20 +94,17 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 }
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(
-    Event::Dispatcher* dispatcher, std::vector<envoy_data> cert_chain, std::string hostname,
+    Event::Dispatcher* dispatcher, std::vector<std::string> cert_chain, std::string hostname,
     std::vector<std::string> subject_alt_names, PlatformBridgeCertValidator* parent) {
   ASSERT(!cert_chain.empty());
   ENVOY_LOG(trace, "Start verifyCertChainByPlatform for host {}", hostname);
   // This is running in a stand alone thread other than the engine thread.
-  envoy_data leaf_cert_der = cert_chain[0];
+  const std::string& leaf_cert_der = cert_chain[0];
+  const unsigned char* leaf_cert_data = reinterpret_cast<const unsigned char*>(leaf_cert_der.data());
   bssl::UniquePtr<X509> leaf_cert(d2i_X509(
-      nullptr, const_cast<const unsigned char**>(&leaf_cert_der.bytes), leaf_cert_der.length));
-  std::vector<absl::string_view> certs;
-  for (const envoy_data data : cert_chain) {
-    certs.push_back(absl::string_view(reinterpret_cast<const char*>(data.bytes), data.length));
-  }
+      nullptr, &leaf_cert_data, leaf_cert_der.length()));
   envoy_cert_validation_result result =
-      SystemHelper::getInstance().validateCertificateChain(certs, hostname);
+      SystemHelper::getInstance().validateCertificateChain(cert_chain, hostname);
   bool success = result.result == ENVOY_SUCCESS;
   if (!success) {
     ENVOY_LOG(debug, result.error_details);

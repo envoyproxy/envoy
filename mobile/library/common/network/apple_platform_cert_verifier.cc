@@ -34,7 +34,7 @@ CFMutableArrayRef CreateTrustPolicies() {
 // Returns a new CFMutableArrayRef containing the specified certificates
 // in the form expected by Security.framework and Keychain Services, or
 // NULL on failure.
-CFMutableArrayRef CreateSecCertificateArray(absl::Span<const absl::string_view> certs) {
+CFMutableArrayRef CreateSecCertificateArray(const std::vector<std::string>& certs) {
   CFMutableArrayRef cert_array =
       CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
 
@@ -70,7 +70,7 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
   return result;
 }
 
-envoy_cert_validation_result verify_cert(absl::Span<const absl::string_view> certs,
+envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
                                          absl::string_view /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {

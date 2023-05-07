@@ -12,7 +12,7 @@ public:
   // SystemHelper:
   MOCK_METHOD(bool, isCleartextPermitted, (absl::string_view hostname));
   MOCK_METHOD(envoy_cert_validation_result, validateCertificateChain,
-              (absl::Span<const absl::string_view> certs, absl::string_view hostname));
+              (const std::vector<std::string>& certs, absl::string_view hostname));
   MOCK_METHOD(void, cleanupAfterCertificateValidation, ());
 };
 

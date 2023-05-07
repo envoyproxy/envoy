@@ -74,7 +74,7 @@ private:
   // thread to trigger callback and update verify stats.
   // Must be called on the validation thread.
   static void verifyCertChainByPlatform(Event::Dispatcher* dispatcher,
-                                        std::vector<envoy_data> cert_chain, std::string hostname,
+                                        std::vector<std::string> cert_chain, std::string hostname,
                                         std::vector<std::string> subject_alt_names,
                                         PlatformBridgeCertValidator* parent);
 

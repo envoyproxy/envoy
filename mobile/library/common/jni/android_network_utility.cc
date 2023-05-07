@@ -109,7 +109,7 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
   env->DeleteLocalRef(result);
 }
 
-envoy_cert_validation_result verify_x509_cert_chain(absl::Span<const absl::string_view> certs,
+envoy_cert_validation_result verify_x509_cert_chain(const std::vector<std::string>& certs,
                                                     absl::string_view hostname) {
   jni_log("[Envoy]", "verify_x509_cert_chain");
 
