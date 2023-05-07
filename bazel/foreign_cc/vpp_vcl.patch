@@ -1,4 +1,5 @@
-# Not a git repo so embed version
+diff --git src/CMakeLists.txt src/CMakeLists.txt
+index 4be247333..230c667ff 100644
 --- src/CMakeLists.txt
 +++ src/CMakeLists.txt
 @@ -40,12 +40,8 @@ include(cmake/ccache.cmake)
@@ -16,16 +17,18 @@
  string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
  list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
  
-@@ -188,7 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+@@ -188,8 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
    find_package(OpenSSL)
    set(SUBDIRS
      vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
 -    plugins tools/vppapigen tools/g2 tools/perftool cmake pkg
-+    tools/vppapigen tools/g2 tools/perftool cmake pkg
-     tools/appimage
+-    tools/appimage
++    tools/vppapigen cmake pkg
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-
+   set(SUBDIRS vppinfra)
+diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
+index 058a0f3d8..30dcb0c15 100644
 --- src/cmake/ccache.cmake
 +++ src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
@@ -37,7 +40,8 @@
  if(VPP_USE_CCACHE)
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
-
+diff --git src/cmake/library.cmake src/cmake/library.cmake
+index ad4adfcab..0051bca10 100644
 --- src/cmake/library.cmake
 +++ src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
@@ -49,3 +53,34 @@
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
+diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
+index 8415c28fb..a017d9fc6 100755
+--- src/tools/vppapigen/vppapigen.py
++++ src/tools/vppapigen/vppapigen.py
+@@ -7,6 +7,13 @@ import logging
+ import binascii
+ import os
+ from subprocess import Popen, PIPE
++
++# Put ply on the path ...
++plypath = os.path.join(
++    os.environ["EXT_BUILD_ROOT"],
++    os.path.dirname(os.environ["PLYPATHS"].split()[0]))
++sys.path += [plypath]
++
+ import ply.lex as lex
+ import ply.yacc as yacc
+
+diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
+index e6d8f98ff..600ef4d5f 100644
+--- src/vcl/CMakeLists.txt
++++ src/vcl/CMakeLists.txt
+@@ -30,6 +30,8 @@ add_vpp_library(vppcom
+   api_headers
+ )
+
++file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
++
+ add_vpp_library(vcl_ldpreload
+   SOURCES
+   ldp_socket_wrapper.c

@@ -35,7 +35,9 @@ namespace ExternalProcessing {
   COUNTER(message_timeouts)                                                                        \
   COUNTER(rejected_header_mutations)                                                               \
   COUNTER(override_message_timeout_received)                                                       \
-  COUNTER(override_message_timeout_ignored)
+  COUNTER(override_message_timeout_ignored)                                                        \
+  COUNTER(clear_route_cache_ignored)                                                               \
+  COUNTER(clear_route_cache_disabled)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -73,8 +75,9 @@ public:
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
-        max_message_timeout_ms_(max_message_timeout_ms),
+      : failure_mode_allow_(config.failure_mode_allow()),
+        disable_clear_route_cache_(config.disable_clear_route_cache()),
+        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
 
@@ -94,6 +97,8 @@ public:
     return mutation_checker_;
   }
 
+  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -102,6 +107,7 @@ private:
   }
 
   const bool failure_mode_allow_;
+  const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -185,7 +191,7 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
-  void onNewTimeout(const uint32_t message_timeout_ms);
+  void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
                         bool end_stream) {

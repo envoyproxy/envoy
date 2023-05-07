@@ -38,14 +38,33 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: ext_proc
+  change: |
+    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check
+    for header mutations beforce clearing the route cache. Failures due to this check will be counted under the
+    clear_route_cache_ignored stat.
 - area: aws
   change: |
     Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched
     from environment variables. This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
+- area: http cookies
+  change: |
+    Changed internal format of http cookie to protobuf and added expiry timestamp. Processing expired cookie
+    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
+    the cookie is still accepted, but is planned to be obsoleted in the future.
+    This behavior change can be reverted by setting
+    ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: oauth2
+  change: |
+    The Max-Age attribute of Set-Cookie HTTP response header was being assigned a value representing Seconds Since
+    the Epoch, causing cookies to expire in ~53 years. This was fixed an now it is being assinged a value representing
+    the number of seconds until the cookie expires.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth_use_standard_max_age_value`` to false.
 - area: tls
   change: |
     Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
@@ -54,6 +73,16 @@ bug_fixes:
     GRPC_STATUS_NUMBER will not be showed in access_log, for non-grpc request.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
+- area: ext_authz
+  change: |
+    Fix a bug where the ext_authz filter will ignore the request body when the
+    :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` is set to true and
+    HTTP authorization service is configured.
+- area: router
+  change: |
+    Fixed the bug that updating :ref:`scope_key_builder
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
+    of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -96,6 +125,11 @@ new_features:
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http1_server_abort_dispatch`` that rejects HTTP1 server processing of requests.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.http2_server_go_away_on_dispatch`` that sends
+    ``GOAWAY`` for HTTP2 server processing of requests.  When a ``GOAWAY`` frame is submitted by
+    this the counter ``http2.goaway_sent`` will be incremented.
 - area: matchers
   change: |
     Added :ref:`RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>` input
@@ -114,6 +148,16 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: access_log
+  change: |
+    added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
+    to filter access log records based on the type of the record.
+- area: ext_proc
+  change: |
+    added new configuration field
+    :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
+    clear_route_cache_disabled stat.
 - area: redis_proxy
   change: |
     added new field :ref:`connection_rate_limit
