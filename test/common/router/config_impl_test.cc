@@ -10292,7 +10292,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "The filter test.default.filter virtual host or route specific configurations");
+      "The filter test.default.filter doesn't support virtual host or route specific "
+      "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
