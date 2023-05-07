@@ -100,9 +100,9 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   ENVOY_LOG(trace, "Start verifyCertChainByPlatform for host {}", hostname);
   // This is running in a stand alone thread other than the engine thread.
   const std::string& leaf_cert_der = cert_chain[0];
-  const unsigned char* leaf_cert_data = reinterpret_cast<const unsigned char*>(leaf_cert_der.data());
-  bssl::UniquePtr<X509> leaf_cert(d2i_X509(
-      nullptr, &leaf_cert_data, leaf_cert_der.length()));
+  const unsigned char* leaf_cert_data =
+      reinterpret_cast<const unsigned char*>(leaf_cert_der.data());
+  bssl::UniquePtr<X509> leaf_cert(d2i_X509(nullptr, &leaf_cert_data, leaf_cert_der.length()));
   envoy_cert_validation_result result =
       SystemHelper::getInstance().validateCertificateChain(cert_chain, hostname);
   bool success = result.result == ENVOY_SUCCESS;
