@@ -75,7 +75,9 @@ envoy_cc_library(
     srcs = ["cluster_store.cc"],
     hdrs = ["cluster_store.h"],
     deps = [
+        "//envoy/server:factory_context_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/server:factory_context_base_impl_lib",
         "@com_google_absl//absl/container:flat_hash_set",
     ],
 )

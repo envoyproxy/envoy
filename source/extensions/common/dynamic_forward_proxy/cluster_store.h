@@ -1,6 +1,9 @@
 #pragma once
 
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/upstream.h"
+
+#include "source/server/factory_context_base_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -38,16 +41,16 @@ public:
 using DfpClusterSharedPtr = std::shared_ptr<DfpCluster>;
 using DfpClusterWeakPtr = std::weak_ptr<DfpCluster>;
 
-class DFPClusterStore {
+class DFPClusterStore : public Singleton::Instance {
 public:
   // Load the dynamic forward proxy cluster from this store.
-  static DfpClusterSharedPtr load(std::string cluster_name);
+  DfpClusterSharedPtr load(std::string cluster_name);
 
   // Save the dynamic forward proxy cluster into this store.
-  static void save(const std::string cluster_name, DfpClusterSharedPtr cluster);
+  void save(const std::string cluster_name, DfpClusterSharedPtr cluster);
 
   // Remove the dynamic forward proxy cluster from this store.
-  static void remove(std::string cluster_name);
+  void remove(std::string cluster_name);
 
 private:
   using ClusterMapType = absl::flat_hash_map<std::string, DfpClusterWeakPtr>;
@@ -56,7 +59,18 @@ private:
     absl::Mutex mutex_;
   };
 
-  static ClusterStoreType& getClusterStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ClusterStoreType); }
+  ClusterStoreType& getClusterStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ClusterStoreType); }
+};
+
+using DFPClusterStoreSharedPtr = std::shared_ptr<DFPClusterStore>;
+
+class DFPClusterStoreFactory {
+public:
+  DFPClusterStoreFactory(Server::Configuration::FactoryContextBase& context) : context_(context) {}
+  DFPClusterStoreSharedPtr get();
+
+private:
+  Server::FactoryContextBaseImpl context_;
 };
 
 } // namespace DynamicForwardProxy

@@ -1265,7 +1265,6 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterWeakPtr = std::weak_ptr<Cluster>;
 using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream

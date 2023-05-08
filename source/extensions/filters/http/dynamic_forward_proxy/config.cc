@@ -16,8 +16,9 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
-  ProxyFilterConfigSharedPtr filter_config(
-      std::make_shared<ProxyFilterConfig>(proto_config, cache_manager_factory, context));
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(context);
+  ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
+      proto_config, cache_manager_factory, cluster_store_factory, context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(filter_config));
   };

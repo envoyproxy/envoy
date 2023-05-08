@@ -50,14 +50,19 @@ public:
         std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDfpCluster>>();
     auto cluster = std::dynamic_pointer_cast<Extensions::Common::DynamicForwardProxy::DfpCluster>(
         dfp_cluster_);
-    Common::DynamicForwardProxy::DFPClusterStore::save("fake_cluster", cluster);
+    Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        factory_context_);
+    cluster_store_factory.get()->save("fake_cluster", cluster);
   }
 
   virtual void setupFilter() {
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
+    Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        factory_context_);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, factory_context_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
+                                                         factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -458,7 +463,9 @@ TEST_F(ProxyFilterTest, SubClusterOverflow) {
 
 // DFP cluster is removed early.
 TEST_F(ProxyFilterTest, DFPClusterIsGone) {
-  Common::DynamicForwardProxy::DFPClusterStore::remove("fake_cluster");
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+      factory_context_);
+  cluster_store_factory.get()->remove("fake_cluster");
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -512,7 +519,10 @@ public:
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     proto_config.set_save_upstream_address(true);
 
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, factory_context_);
+    Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        factory_context_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
+                                                         factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);

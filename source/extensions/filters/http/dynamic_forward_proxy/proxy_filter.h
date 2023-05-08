@@ -40,8 +40,12 @@ public:
   ProxyFilterConfig(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+      Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
       Server::Configuration::FactoryContext& context);
 
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreSharedPtr cluster_store() {
+    return cluster_store_;
+  }
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   bool saveUpstreamAddress() const { return save_upstream_address_; };
@@ -82,6 +86,7 @@ private:
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   };
 
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreSharedPtr cluster_store_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   Upstream::ClusterManager& cluster_manager_;

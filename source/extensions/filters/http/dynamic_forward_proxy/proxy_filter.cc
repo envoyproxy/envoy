@@ -53,8 +53,9 @@ using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCa
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+    Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
     Server::Configuration::FactoryContext& context)
-    : dns_cache_manager_(cache_manager_factory.get()),
+    : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
@@ -216,7 +217,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr dfp_cluster =
-      Common::DynamicForwardProxy::DFPClusterStore::load(cluster_info_->name());
+      config_->cluster_store()->load(cluster_info_->name());
   if (!dfp_cluster) {
     // This could happen in a very small race when users remove the DFP cluster and a route still
     // using it, which is not a good usage, will end with ServiceUnavailable.
