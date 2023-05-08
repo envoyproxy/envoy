@@ -769,18 +769,24 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     factory = &config_.router_context_.genericConnPoolFactory();
   }
 
-  bool should_tcp_proxy = false;
-
+  using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
+  UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
-
+    if (method == Http::Headers::get().MethodValues.Connect) {
+      upstream_protocol = UpstreamProtocol::TCP;
+    }
+    if (downstream_headers_->getUpgradeValue() == Http::Headers::get().UpgradeValues.ConnectUdp) {
+      upstream_protocol = UpstreamProtocol::UDP;
+    }
     // Allow POST for proxying raw TCP if it is configured.
-    if (!should_tcp_proxy && route_entry_->connectConfig()->allow_post()) {
-      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    if (upstream_protocol == UpstreamProtocol::HTTP &&
+        route_entry_->connectConfig()->allow_post() &&
+        method == Http::Headers::get().MethodValues.Post) {
+      upstream_protocol = UpstreamProtocol::TCP;
     }
   }
-  return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
+  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
 

@@ -278,7 +278,8 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     encodeHeadersBase(*modified_headers, end_stream);
-  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+  } else if (headers.Method() && headers.Method()->value() == "CONNECT" &&
+             (!headers.Protocol() || headers.Protocol()->value() != "connect-udp")) {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
     modified_headers->removeScheme();
     modified_headers->removePath();

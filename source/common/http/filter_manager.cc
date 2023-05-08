@@ -1473,7 +1473,11 @@ bool FilterManager::createFilterChain() {
 
     // Treat CONNECT requests as a special upgrade case.
     if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
+      ENVOY_LOG(trace, "Treat CONNECT requests as a special upgrade case.");
+      upgrade = HeaderUtility::isConnectUdp(*filter_manager_callbacks_.requestHeaders())
+                    ? filter_manager_callbacks_.requestHeaders()->Protocol()
+                    : filter_manager_callbacks_.requestHeaders()->Method();
+      ENVOY_LOG(trace, upgrade->value().getStringView());
     }
   }
 

@@ -246,6 +246,7 @@ public:
   struct {
     const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
+    const std::string ConnectUdp{"connect-udp"};
   } UpgradeValues;
 
   struct {

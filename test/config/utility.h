@@ -405,6 +405,10 @@ public:
                                bool http3 = false,
                                absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
                                    proxy_protocol_version = absl::nullopt);
+  // Given an HCM with the default config, set the matcher to be a connect matcher and enable
+  // CONNECT-UDP requests.
+  static void setConnectUdpConfig(HttpConnectionManager& hcm, bool terminate_connect,
+                                  bool http3 = false);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&

@@ -58,7 +58,7 @@ public:
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());                                                 \
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));                                        \
   MOCK_METHOD(uint64_t, id, (), (const));                                                          \
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));                                    \
   MOCK_METHOD(bool, initializeReadFilters, ());                                                    \

@@ -172,6 +172,11 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
+   */
+  static bool isConnectUdp(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,

@@ -149,7 +149,7 @@ public:
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& dispatcher() const PURE;
 
   /**
    * @return uint64_t the unique local ID of this connection.
