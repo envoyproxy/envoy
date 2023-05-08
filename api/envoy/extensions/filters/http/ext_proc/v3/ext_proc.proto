@@ -201,7 +201,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
