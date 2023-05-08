@@ -170,7 +170,10 @@ public:
   /**
    * A set of data input types supported by InputMatcher.
    * String is default supported data input type because almost all the derived objects support
-   * string only. Override this function to provide matcher specific supported data input types.
+   * string only. The name of core types (e.g., std::string, int) is defined string constrant to
+   * produce human-readable name (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific supported data input types.
    */
   virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
     return absl::flat_hash_set<std::string>{DefaultMatchingDataType};
