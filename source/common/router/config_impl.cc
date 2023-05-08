@@ -2130,13 +2130,14 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (is_optional) {
-      ENVOY_LOG(debug,
-                "The filter {} doesn't support virtual host-specific configurations, and it is "
-                "optional, so ignore it.",
-                name);
+      ENVOY_LOG(
+          debug,
+          "The filter {} doesn't support virtual host or route specific configurations, and it is "
+          "optional, so ignore it.",
+          name);
     } else {
-      throw EnvoyException(
-          fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
+      throw EnvoyException(fmt::format(
+          "The filter {} doesn't support virtual host or route specific configurations", name));
     }
   }
   return object;
