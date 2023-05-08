@@ -688,22 +688,22 @@ modify different aspects of the server:
                 "percentiles": [
                   { "interval": null, "cumulative": 1 },
                   { "interval": null, "cumulative": 1.0351851851851852 },
-                  { "interval": null "cumulative": 1.0703703703703704, },
+                  { "interval": null "cumulative": 1.0703703703703704 },
                   { "interval": null, "cumulative": 2.0136363636363637 },
-                  { "interval": null "cumulative": 2.0654545454545454, },
-                  { "interval": null "cumulative": 2.0827272727272725, },
-                  { "interval": null "cumulative": 2.0965454545454545, },
+                  { "interval": null "cumulative": 2.0654545454545454 },
+                  { "interval": null "cumulative": 2.0827272727272725 },
+                  { "interval": null "cumulative": 2.0965454545454545 },
                   { "interval": null, "cumulative": 2.098272727272727 },
                   { "interval": null, "cumulative": 2.0996545454545457 },
-                  { "interval": null "cumulative": 2.1, }
+                  { "interval": null "cumulative": 2.1 }
                 ],
                 "totals": [
                   { "value": 1, "count": 25 },
-                  { "value": 2 "count": 9, }
+                  { "value": 2 "count": 9 }
                 ],
                 "intervals": [
                   { "value": 1, "count": 2 },
-                  { "value": 2 "count": 3, }
+                  { "value": 2 "count": 3 }
                 ],
               },
             ]
