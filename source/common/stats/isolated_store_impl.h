@@ -235,11 +235,11 @@ public:
   }
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to function not in use");
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
   }
 
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to function not in use");
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
   }
 
 protected:

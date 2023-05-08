@@ -786,14 +786,10 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
   store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   StatNamePool pool(symbol_table_);
-  StatName name = pool.add("c1");
-  StatName tag_key = pool.add("a");
-  StatName tag_val = pool.add("b");
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
 
-  StatNameTagVector tags{{tag_key, tag_val}};
-  store_->extractAndAppendTags(name, pool, tags);
-
-  EXPECT_EQ(2, tags.size());
+  ASSERT_EQ(2, tags.size());
   EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
   EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
@@ -811,14 +807,10 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {
   store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   StatNamePool pool(symbol_table_);
-  StatName name = pool.add("c1");
-  StatName tag_key = pool.add("a");
-  StatName tag_val = pool.add("b");
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
 
-  StatNameTagVector tags{{tag_key, tag_val}};
-  store_->extractAndAppendTags(name, pool, tags);
-
-  EXPECT_EQ(1, tags.size());
+  ASSERT_EQ(1, tags.size());
   EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
 }
@@ -834,14 +826,10 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
   store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   StatNamePool pool(symbol_table_);
-  StatName name = pool.add("foo.bar");
-  StatName tag_key = pool.add("a");
-  StatName tag_val = pool.add("b");
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("foo.bar"), pool, tags);
 
-  StatNameTagVector tags{{tag_key, tag_val}};
-  store_->extractAndAppendTags(name, pool, tags);
-
-  EXPECT_EQ(2, tags.size());
+  ASSERT_EQ(2, tags.size());
   EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
   EXPECT_EQ("foo_tag", symbol_table_.toString(tags[1].first));
@@ -855,14 +843,10 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexBuiltinExpression) {
   store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   StatNamePool pool(symbol_table_);
-  StatName name = pool.add("cluster.foo.bar");
-  StatName tag_key = pool.add("a");
-  StatName tag_val = pool.add("b");
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("cluster.foo.bar"), pool, tags);
 
-  StatNameTagVector tags{{tag_key, tag_val}};
-  store_->extractAndAppendTags(name, pool, tags);
-
-  EXPECT_EQ(2, tags.size());
+  ASSERT_EQ(2, tags.size());
   EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
   EXPECT_EQ("envoy.cluster_name", symbol_table_.toString(tags[1].first));

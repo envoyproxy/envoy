@@ -358,11 +358,11 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to function not in use");
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
   };
 
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to function not in use");
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
   };
 
   // Stats::StoreRoot
