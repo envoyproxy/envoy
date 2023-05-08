@@ -170,8 +170,8 @@ public:
   /**
    * A set of data input types supported by InputMatcher.
    * String is default supported data input type because almost all the derived objects support
-   * string only. The name of core types (e.g., std::string, int) is defined string constrant to
-   * produce human-readable name (e.g., "string", "int").
+   * string only. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
    *
    * Override this function to provide matcher specific supported data input types.
    */
@@ -254,7 +254,10 @@ public:
   /**
    * Input type of DataInput.
    * String is default data input type since nearly all the DataInput's derived objects' input type
-   * is string. Override this function to provide matcher specific data input type.
+   * is string. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific data input type.
    */
   virtual std::string dataInputType() const { return DefaultMatchingDataType; }
 };
