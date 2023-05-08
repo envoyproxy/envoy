@@ -3,6 +3,8 @@
 
 #include "envoy/matcher/matcher.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Matcher {
 
@@ -147,11 +149,8 @@ public:
       : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {
     auto supported_input_types = input_matcher_->supportedDataInputTypes();
     if (supported_input_types.find(data_input_->dataInputType()) == supported_input_types.end()) {
-      std::string supported_types;
-      for (const auto& str : supported_input_types) {
-        absl::StrAppend(&supported_types, str, ", ");
-      }
-      supported_types.erase(supported_types.length() - 2);
+      std::string supported_types =
+          absl::StrJoin(supported_input_types.begin(), supported_input_types.end(), ", ");
       throw EnvoyException(
           absl::StrCat("Unsupported data input type: ", data_input_->dataInputType(),
                        ". The matcher supports input type: ", supported_types));
