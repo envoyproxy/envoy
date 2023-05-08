@@ -1253,17 +1253,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-
   create(defaultConfig());
-
-  // Set up for an initialize callback.
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
-  ClusterUpdateCallbacksHandlePtr cb =
-      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
   envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
@@ -1277,17 +1267,7 @@ TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
 }
 
 TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-
   create(defaultConfig());
-
-  // Set up for an initialize callback.
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
-  ClusterUpdateCallbacksHandlePtr cb =
-      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
   envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
