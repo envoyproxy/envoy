@@ -57,6 +57,9 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":ads_integration_lib",
         ":http_integration_lib",
