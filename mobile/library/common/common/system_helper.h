@@ -33,6 +33,7 @@ public:
    */
   virtual envoy_cert_validation_result
   validateCertificateChain(const std::vector<std::string>& certs, absl::string_view hostname) PURE;
+
   /**
    * Invokes platform APIs to clean up after validation is complete.
    */

@@ -10,7 +10,7 @@ DefaultSystemHelper::validateCertificateChain(const std::vector<std::string>& /*
   envoy_cert_validation_result result;
   result.result = ENVOY_FAILURE;
   result.tls_alert = 80; // internal error
-  result.error_details = "Certifcate verification not implemented ";
+  result.error_details = "Certificate verification not implemented.";
   return result;
 }
 
