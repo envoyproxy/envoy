@@ -26,7 +26,8 @@ class ServerFactoryContext;
 namespace Matcher {
 
 using MatchingDataType = absl::variant<absl::monostate, std::string>;
-const char DefaultMatchingDataType[] = "string";
+inline constexpr absl::string_view DefaultMatchingDataType = "string";
+
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
 // The matching might stop early if either the data is not available at all yet, or if more data
@@ -176,7 +177,7 @@ public:
    * Override this function to provide matcher specific supported data input types.
    */
   virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
-    return absl::flat_hash_set<std::string>{DefaultMatchingDataType};
+    return absl::flat_hash_set<std::string>{std::string(DefaultMatchingDataType)};
   }
 };
 
@@ -259,7 +260,7 @@ public:
    *
    * Override this function to provide matcher specific data input type.
    */
-  virtual std::string dataInputType() const { return DefaultMatchingDataType; }
+  virtual std::string dataInputType() const { return std::string(DefaultMatchingDataType); }
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
