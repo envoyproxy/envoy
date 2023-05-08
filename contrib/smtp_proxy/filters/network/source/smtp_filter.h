@@ -1,5 +1,8 @@
 #pragma once
+
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -9,7 +12,7 @@
 #include "source/common/common/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha/smtp_proxy.pb.h"
-#include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
+#include "contrib/smtp_proxy/filters/network/source/smtp_decoder_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,14 +48,18 @@ class SmtpFilterConfig {
 public:
   struct SmtpFilterConfigOptions {
     std::string stats_prefix_;
+    bool tracing_;
     envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::UpstreamTLSMode
         upstream_tls_;
+    std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   };
   SmtpFilterConfig(const SmtpFilterConfigOptions& config_options, Stats::Scope& scope);
   const SmtpProxyStats& stats() { return stats_; }
-
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const { return access_logs_; }
   Stats::Scope& scope_;
   SmtpProxyStats stats_;
+  bool tracing_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::UpstreamTLSMode
       upstream_tls_{envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
 
@@ -67,7 +74,15 @@ using SmtpFilterConfigSharedPtr = std::shared_ptr<SmtpFilterConfig>;
 class SmtpFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
   // Network::ReadFilter
-  SmtpFilter(SmtpFilterConfigSharedPtr config);
+  SmtpFilter(SmtpFilterConfigSharedPtr config, TimeSource& time_source,
+             Random::RandomGenerator& random_generator);
+  ~SmtpFilter() {
+    // delete session_;
+    // session_ = nullptr;
+    if (config_->accessLogs().size() > 0) {
+      emitLogEntry(getStreamInfo());
+    }
+  }
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
@@ -80,11 +95,12 @@ public:
     write_callbacks_ = &callbacks;
   }
   Network::FilterStatus doDecode(Buffer::Instance& buffer, bool upstream);
-  DecoderPtr createDecoder(DecoderCallbacks* callbacks);
-  SmtpSession& getSession() { return decoder_->getSession(); }
+  DecoderPtr createDecoder(DecoderCallbacks* callbacks, TimeSource& time_source,
+                           Random::RandomGenerator&);
+
   const SmtpProxyStats& getStats() const { return config_->stats_; }
 
-  Network::Connection& connection() const { return read_callbacks_->connection(); }
+  Network::Connection& connection() const override { return read_callbacks_->connection(); }
   const SmtpFilterConfigSharedPtr& getConfig() const { return config_; }
 
   void incSmtpSessionRequests() override;
@@ -105,19 +121,29 @@ public:
   bool downstreamStartTls(absl::string_view response) override;
   bool sendReplyDownstream(absl::string_view response) override;
   bool upstreamTlsRequired() const override;
+  bool tracingEnabled() override;
+  bool sendUpstream(Buffer::Instance& buffer) override;
 
   bool upstreamStartTls() override;
   void closeDownstreamConnection() override;
+  SmtpSession* getSession() { return decoder_->getSession(); }
+  Buffer::OwnedImpl& getReadBuffer() override { return read_buffer_; }
+  Buffer::OwnedImpl& getWriteBuffer() override { return write_buffer_; }
+  void emitLogEntry(StreamInfo::StreamInfo& stream_info) override;
+  StreamInfo::StreamInfo& getStreamInfo() override {
+    return read_callbacks_->connection().streamInfo();
+  }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
 
   SmtpFilterConfigSharedPtr config_;
-
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   std::unique_ptr<Decoder> decoder_;
+  TimeSource& time_source_;
+  Random::RandomGenerator& random_generator_;
 };
 
 } // namespace SmtpProxy

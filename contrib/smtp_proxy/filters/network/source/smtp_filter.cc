@@ -16,20 +16,29 @@ namespace SmtpProxy {
 SmtpFilterConfig::SmtpFilterConfig(const SmtpFilterConfigOptions& config_options,
                                    Stats::Scope& scope)
     : scope_{scope}, stats_(generateStats(config_options.stats_prefix_, scope)),
-      upstream_tls_(config_options.upstream_tls_) {}
-SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
-  if (!decoder_) {
-    decoder_ = createDecoder(this);
+      tracing_(config_options.tracing_), upstream_tls_(config_options.upstream_tls_) {
+  access_logs_ = config_options.access_logs_;
+}
+
+SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config, TimeSource& time_source,
+                       Random::RandomGenerator& random_generator)
+    : config_{config}, time_source_(time_source), random_generator_(random_generator) {}
+
+void SmtpFilter::emitLogEntry(StreamInfo::StreamInfo& stream_info) {
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
 
 Network::FilterStatus SmtpFilter::onNewConnection() {
   incSmtpSessionRequests();
+  if (!decoder_) {
+    decoder_ = createDecoder(this, time_source_, random_generator_);
+  }
   return Network::FilterStatus::Continue;
 }
 
 bool SmtpFilter::downstreamStartTls(absl::string_view response) {
-
   Buffer::OwnedImpl buffer;
   buffer.add(response);
 
@@ -39,9 +48,9 @@ bool SmtpFilter::downstreamStartTls(absl::string_view response) {
       if (!read_callbacks_->connection().startSecureTransport()) {
         ENVOY_CONN_LOG(trace, "smtp_proxy filter: cannot switch to tls",
                        read_callbacks_->connection(), bytes);
+        return true;
       } else {
         // Switch to TLS has been completed.
-        incTlsTerminatedSessions();
         ENVOY_CONN_LOG(trace, "smtp_proxy filter: switched to tls", read_callbacks_->connection(),
                        bytes);
         return false;
@@ -52,6 +61,11 @@ bool SmtpFilter::downstreamStartTls(absl::string_view response) {
 
   read_callbacks_->connection().write(buffer, false);
   return false;
+}
+
+bool SmtpFilter::sendUpstream(Buffer::Instance& data) {
+  read_callbacks_->injectReadDataToFilterChain(data, false);
+  return true;
 }
 
 bool SmtpFilter::sendReplyDownstream(absl::string_view response) {
@@ -77,6 +91,8 @@ bool SmtpFilter::upstreamTlsRequired() const {
   return (config_->upstream_tls_ ==
           envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
 }
+
+bool SmtpFilter::tracingEnabled() { return config_->tracing_; }
 
 bool SmtpFilter::upstreamStartTls() {
   // Try to switch upstream connection to use a secure channel.
@@ -155,16 +171,19 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool end_strea
 Network::FilterStatus SmtpFilter::doDecode(Buffer::Instance& data, bool upstream) {
 
   switch (decoder_->onData(data, upstream)) {
-  case Decoder::Result::ReadyForNext:
+  case SmtpUtils::Result::ReadyForNext:
     return Network::FilterStatus::Continue;
-  case Decoder::Result::Stopped:
+  case SmtpUtils::Result::Stopped:
     return Network::FilterStatus::StopIteration;
+  default:
+    break;
   }
   return Network::FilterStatus::Continue;
 }
 
-DecoderPtr SmtpFilter::createDecoder(DecoderCallbacks* callbacks) {
-  return std::make_unique<DecoderImpl>(callbacks);
+DecoderPtr SmtpFilter::createDecoder(DecoderCallbacks* callbacks, TimeSource& time_source,
+                                     Random::RandomGenerator& random_generator) {
+  return std::make_unique<DecoderImpl>(callbacks, time_source, random_generator);
 }
 
 } // namespace SmtpProxy

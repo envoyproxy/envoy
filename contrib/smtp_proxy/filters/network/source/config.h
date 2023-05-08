@@ -25,6 +25,8 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
+
+  // std::vector<AccessLog::InstanceSharedPtr> access_logs_;
 };
 
 } // namespace SmtpProxy
