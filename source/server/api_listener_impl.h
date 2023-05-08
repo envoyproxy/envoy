@@ -58,7 +58,10 @@ protected:
   class SyntheticReadCallbacks : public Network::ReadFilterCallbacks {
   public:
     SyntheticReadCallbacks(ApiListenerImplBase& parent)
-        : parent_(parent), connection_(SyntheticConnection(*this)) {}
+        : SyntheticReadCallbacks(parent, parent.factory_context_.mainThreadDispatcher()) {}
+
+    SyntheticReadCallbacks(ApiListenerImplBase& parent, Event::Dispatcher& dispatcher)
+        : parent_(parent), connection_(SyntheticConnection(*this, dispatcher)) {}
 
     // Network::ReadFilterCallbacks
     void continueReading() override { IS_ENVOY_BUG("Unexpected call to continueReading"); }
@@ -80,8 +83,8 @@ protected:
     // Network::ReadFilterCallbacks.
     class SyntheticConnection : public Network::Connection {
     public:
-      SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent),
+      SyntheticConnection(SyntheticReadCallbacks& parent, Event::Dispatcher& dispatcher)
+          : parent_(parent), dispatcher_(dispatcher),
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
             stream_info_(parent_.parent_.factory_context_.timeSource(), connection_info_provider_),
@@ -121,9 +124,7 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
-      Event::Dispatcher& dispatcher() override {
-        return parent_.parent_.factory_context_.mainThreadDispatcher();
-      }
+      Event::Dispatcher& dispatcher() override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
@@ -174,6 +175,7 @@ protected:
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 
       SyntheticReadCallbacks& parent_;
+      Event::Dispatcher& dispatcher_;
       Network::ConnectionInfoSetterSharedPtr connection_info_provider_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
@@ -190,7 +192,6 @@ protected:
   Stats::ScopeSharedPtr global_scope_;
   Stats::ScopeSharedPtr listener_scope_;
   FactoryContextImpl factory_context_;
-  SyntheticReadCallbacks read_callbacks_;
 };
 
 /**
@@ -207,14 +208,12 @@ public:
   Http::ApiListenerOptRef http() override;
   void shutdown() override;
 
-  Network::ReadFilterCallbacks& readCallbacksForTest() { return read_callbacks_; }
+  Network::ReadFilterCallbacks& readCallbacksForTest();
 
 private:
-  // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
-  // route config manager, scoped route config manager.
-  std::function<Http::ApiListenerPtr()> http_connection_manager_factory_;
-  // Http::ServerConnectionCallbacks is the API surface that this class provides via its handle().
-  Http::ApiListenerPtr http_connection_manager_;
+  class HttpConnectionManagerState;
+
+  Envoy::ThreadLocal::TypedSlotPtr<HttpConnectionManagerState> tls_;
 };
 
 } // namespace Server
