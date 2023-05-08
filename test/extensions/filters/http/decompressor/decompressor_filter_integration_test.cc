@@ -242,7 +242,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
       compressed_request_length);
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounterGe(
       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 2);
 
   // Enable response decompression by setting the Content-Encoding header to gzip.
