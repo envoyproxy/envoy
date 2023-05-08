@@ -8,6 +8,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -338,6 +339,12 @@ public:
    * this function. This will return nullptr when scoped routing is not enabled.
    */
   virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
+
+  /**
+   * @return OptRef<Router::ScopeKeyBuilder> the scope key builder to calculate the scope key.
+   * This will return nullptr when scoped routing is not enabled.
+   */
+  virtual OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.

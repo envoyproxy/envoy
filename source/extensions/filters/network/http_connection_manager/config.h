@@ -18,6 +18,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/scopes.h"
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
@@ -186,6 +187,9 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return scope_key_builder_ ? *scope_key_builder_ : OptRef<const Router::ScopeKeyBuilder>{};
+  }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
@@ -315,6 +319,9 @@ private:
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
+  // used to get scope key, then scoped_routes_config_provider_ should be used to get the scoped
+  // routes
+  Router::ScopeKeyBuilderPtr scope_key_builder_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
