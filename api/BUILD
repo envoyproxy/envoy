@@ -258,6 +258,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/random/v3:pkg",
         "//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg",
         "//envoy/extensions/load_balancing_policies/round_robin/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/subset/v3:pkg",
         "//envoy/extensions/load_balancing_policies/wrr_locality/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/common_inputs/network/v3:pkg",
