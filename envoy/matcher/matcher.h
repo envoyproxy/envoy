@@ -260,7 +260,7 @@ public:
    *
    * Override this function to provide matcher specific data input type.
    */
-  virtual std::string dataInputType() const { return std::string(DefaultMatchingDataType); }
+  virtual absl::string_view dataInputType() const { return DefaultMatchingDataType; }
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
