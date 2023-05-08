@@ -1054,12 +1054,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "32d62793deb3e7d3c77df57615ecd0ab4ab42859",
-        sha256 = "2aabe1824f7821cbf3ac6e05e23a571836ca141a243d6a2ab41e6f0037d6f370",
+        version = "3a06b4d609a514aff792d6c3cf033a3dedb42edb",
+        sha256 = "23dd8b079cf9d21f3fb5a82a44a9241c52973e457a0c89eb46bf521cd41199bd",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-04-27",
+        release_date = "2023-05-03",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1150,7 +1150,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
-        # Note: the llvm/clang version should match the version specifed in:
+        # Note: the llvm/clang version should match the version specified in:
         #  - .github/workflows/codeql-daily.yml
         #  - .github/workflows/codeql-push.yml
         #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
