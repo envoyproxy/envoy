@@ -19,6 +19,7 @@ TEST(AwsRequestSigningFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 service_name: s3
 region: us-west-2
+host_rewrite: new-host
 match_excluded_headers:
   - prefix: x-envoy
   - exact: foo
@@ -31,6 +32,7 @@ match_excluded_headers:
   AwsRequestSigningProtoConfig expected_config;
   expected_config.set_service_name("s3");
   expected_config.set_region("us-west-2");
+  expected_config.set_host_rewrite("new-host");
   expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
   expected_config.add_match_excluded_headers()->set_exact("foo");
   expected_config.add_match_excluded_headers()->set_exact("bar");
@@ -54,6 +56,7 @@ TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfig) {
 aws_request_signing:
   service_name: s3
   region: us-west-2
+  host_rewrite: new-host
   match_excluded_headers:
     - prefix: x-envoy
     - exact: foo
