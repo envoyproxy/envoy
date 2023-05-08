@@ -432,9 +432,9 @@ public:
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 
   /**
-￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
-    * for upstream filters.
-    */
+   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
+   * for upstream filters.
+   */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 };
 
