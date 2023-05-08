@@ -217,7 +217,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr dfp_cluster =
-      config_->cluster_store()->load(cluster_info_->name());
+      config_->clusterStore()->load(cluster_info_->name());
   if (!dfp_cluster) {
     // This could happen in a very small race when users remove the DFP cluster and a route still
     // using it, which is not a good usage, will end with ServiceUnavailable.
