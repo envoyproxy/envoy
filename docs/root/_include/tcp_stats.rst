@@ -30,7 +30,7 @@
    cx_tx_percent_retransmitted_segments, Histogram, Percent of segments on a connection which were retransmistted
    cx_rtt_us, Histogram, Smoothed round trip time estimate in microseconds
    cx_rtt_variance_us, Histogram, Estimated variance in microseconds of the round trip time. Higher values indicated more variability.
-   cx_rcv_rtt_us, Histogram, Receiver side round trip time estimate in microseconds
+   cx_rcv_rtt, Histogram, Receiver side round trip time estimate in microseconds
    cx_tx_window_scale, Histogram, Shift value to scale send window
    cx_rx_window_scale, Histogram, Shift value to scale receive window
    cx_congestion_window, Histogram, urrent congestion window in bytes for sending data
