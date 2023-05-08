@@ -43,6 +43,12 @@ envoy_cc_library(
     }),
 )
 
+# Ideally, Bazel select() would choose the appropriate implementation to use.
+# It would use the Android implementation on Android, or when the config
+# android_system_helper is set. Otherwise, it would use the Apple implementation
+# on Apple platforms, or the default otherwise. However, Bazel select() doesn't
+# have a good way to express this. Instead, system_helper.cc uses "#if defined"
+# and "#include" to select the correct implementation.
 envoy_cc_library(
     name = "default_system_helper_lib",
     srcs = [],
