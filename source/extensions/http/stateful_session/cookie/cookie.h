@@ -46,9 +46,7 @@ public:
       return nullptr;
     }
 
-    const auto address = parseAddress(headers);
-    auto sessionState = std::make_unique<SessionStateImpl>(address, *this, time_source_);
-    return sessionState;
+    return std::make_unique<SessionStateImpl>(parseAddress(headers), *this, time_source_);
   }
 
   bool requestPathMatch(absl::string_view request_path) const {
