@@ -475,7 +475,7 @@ modify different aspects of the server:
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
 
-  .. http:get:: /stats?histogram_buckets=detail
+  .. http:get:: /stats?histogram_buckets=detailed
 
   Shows histograms as both percentile summary data, and raw bucket
   data, up to 64 buckets. If the raw bucket data has more than 64
@@ -667,7 +667,7 @@ modify different aspects of the server:
       ]
     }
 
-  .. http:get:: /stats?format=json&histogram_buckets=detail
+  .. http:get:: /stats?format=json&histogram_buckets=detailed
 
   Shows histograms as both percentile summary data, and raw bucket
   data, up to 64 buckets. If the raw bucket data has more than 64
