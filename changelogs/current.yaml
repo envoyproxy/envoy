@@ -127,7 +127,7 @@ new_features:
     to limit reconnection rate to redis server to avoid reconnection storm.
 - area: admin
   change: |
-    Adds a new admin stats html bucket-mode ``disabled`` to generate all recorded buckets and summary percentiles.
+    Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
 
 deprecated:
 - area: access_log
