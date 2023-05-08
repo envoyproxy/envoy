@@ -98,14 +98,17 @@ def envoy_cmake(
         name,
         cache_entries = {},
         debug_cache_entries = {},
+        default_cache_entries = {"CMAKE_BUILD_TYPE": "Bazel"},
         lib_source = "",
         postfix_script = "",
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         generate_crosstool_file = False,
+        generate_args = ["-GNinja"],
+        targets = ["", "install"],
         **kwargs):
-    cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
+    cache_entries.update(default_cache_entries)
     cache_entries_debug = dict(cache_entries)
     cache_entries_debug.update(debug_cache_entries)
 
@@ -133,8 +136,8 @@ def envoy_cmake(
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         }),
-        generate_args = ["-GNinja"],
-        targets = ["", "install"],
+        generate_args = generate_args,
+        targets = targets,
         # TODO: Remove install target and make this work
         install = False,
         # TODO(lizan): Make this always true

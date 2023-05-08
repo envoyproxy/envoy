@@ -1,4 +1,5 @@
-# Not a git repo so embed version
+diff --git src/CMakeLists.txt src/CMakeLists.txt
+index 4be247333..230c667ff 100644
 --- src/CMakeLists.txt
 +++ src/CMakeLists.txt
 @@ -40,12 +40,8 @@ include(cmake/ccache.cmake)
@@ -15,17 +16,19 @@
 +set(VPP_VERSION 22.02-rc0~385-g7c3275e84)
  string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
  list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
- 
-@@ -188,7 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+
+@@ -188,8 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
    find_package(OpenSSL)
    set(SUBDIRS
      vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
 -    plugins tools/vppapigen tools/g2 tools/perftool cmake pkg
-+    tools/vppapigen tools/g2 tools/perftool cmake pkg
-     tools/appimage
+-    tools/appimage
++    tools/vppapigen cmake pkg
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-
+   set(SUBDIRS vppinfra)
+diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
+index 058a0f3d8..30dcb0c15 100644
 --- src/cmake/ccache.cmake
 +++ src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
@@ -37,15 +40,158 @@
  if(VPP_USE_CCACHE)
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
-
+diff --git src/cmake/library.cmake src/cmake/library.cmake
+index ad4adfcab..0051bca10 100644
 --- src/cmake/library.cmake
 +++ src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
    set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
    target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
- 
+
 -  add_library(${lib} SHARED)
 +  add_library(${lib} STATIC)
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
- 
+
    if(VPP_LIB_VERSION)
+diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
+index 8415c28fb..a017d9fc6 100755
+--- src/tools/vppapigen/vppapigen.py
++++ src/tools/vppapigen/vppapigen.py
+@@ -7,5 +7,12 @@ import logging
+ import binascii
+ import os
+ from subprocess import Popen, PIPE
++
++# Put ply on the path ...
++plypath = os.path.dirname(os.path.join(
++    os.environ["EXT_BUILD_ROOT"],
++    os.path.dirname(os.environ["PLYPATHS"].split()[0])))
++sys.path += [plypath]
++
+ import ply.lex as lex
+ import ply.yacc as yacc
+
+diff --git src/vat/CMakeLists.txt src/vat/CMakeLists.txt
+index e5945b20d..3d76f3d88 100644
+--- src/vat/CMakeLists.txt
++++ src/vat/CMakeLists.txt
+@@ -19,39 +19,6 @@ add_vpp_library(vatplugin
+   LINK_LIBRARIES vppinfra
+ )
+
+-##############################################################################
+-# vpp_api_test
+-##############################################################################
+-add_vpp_executable(vpp_api_test ENABLE_EXPORTS
+-  SOURCES
+-  api_format.c
+-  main.c
+-  plugin.c
+-  json_format.c
+-  types.c
+-  ip_types_api.c
+-  ip_types.c
+-  protocols.def
+-
+-  DEPENDS api_headers
+-
+-  LINK_LIBRARIES
+-  vlibmemoryclient
+-  svm
+-  vatplugin
+-  vppinfra
+-  Threads::Threads
+-  dl
+-)
+-
+-##############################################################################
+-#  vpp_json_test
+-##############################################################################
+-add_vpp_executable(vpp_json_test ENABLE_EXPORTS NO_INSTALL
+-  SOURCES json_format.c json_test.c
+-  LINK_LIBRARIES vppinfra m
+-)
+-
+ ##############################################################################
+ # vat headers
+ ##############################################################################
+diff --git src/vat2/CMakeLists.txt src/vat2/CMakeLists.txt
+index 108e184b5..a90107617 100644
+--- src/vat2/CMakeLists.txt
++++ src/vat2/CMakeLists.txt
+@@ -14,21 +14,6 @@
+ ##############################################################################
+ # vat2
+ ##############################################################################
+-add_vpp_executable(vat2 ENABLE_EXPORTS
+-  SOURCES
+-  main.c
+-  plugin.c
+-
+-  DEPENDS api_headers
+-
+-  LINK_LIBRARIES
+-  vlibmemoryclient
+-  svm
+-  vppinfra
+-  vppapiclient
+-  Threads::Threads
+-  dl
+-)
+
+ #
+ # Unit test code. Call generator directly to avoid it being installed
+@@ -37,20 +22,6 @@ add_vpp_executable(vat2 ENABLE_EXPORTS
+ #)
+
+ vpp_generate_api_c_header (test/vat2_test.api)
+-add_vpp_executable(test_vat2 ENABLE_EXPORTS NO_INSTALL
+-  SOURCES
+-  test/vat2_test.c
+-
+-  DEPENDS api_headers
+-
+-  LINK_LIBRARIES
+-  vlibmemoryclient
+-  svm
+-  vppinfra
+-  vppapiclient
+-  Threads::Threads
+-  dl
+-)
+ #target_link_options(test_vat2 PUBLIC "LINKER:-fsanitize=address")
+ if(VPP_BUILD_TESTS_WITH_COVERAGE)
+   set(TARGET_NAME test_vat2)
+diff --git src/vpp-api/CMakeLists.txt src/vpp-api/CMakeLists.txt
+index 72cc1b29c..0f2510d51 100644
+--- src/vpp-api/CMakeLists.txt
++++ src/vpp-api/CMakeLists.txt
+@@ -29,10 +29,5 @@ add_vpp_headers(vpp-api
+   client/stat_client.h
+ )
+
+-add_vpp_executable(test_vppapiclient NO_INSTALL
+-  SOURCES client/test.c
+-  LINK_LIBRARIES vppinfra pthread vppapiclient
+-)
+-
+ add_subdirectory(vapi)
+ add_subdirectory(python)
+diff --git src/vpp/CMakeLists.txt src/vpp/CMakeLists.txt
+index 1b43b1299..361b981d9 100644
+--- src/vpp/CMakeLists.txt
++++ src/vpp/CMakeLists.txt
+@@ -83,13 +83,6 @@ if(VPP_API_TEST_BUILTIN)
+   add_definitions(-DVPP_API_TEST_BUILTIN=1)
+ endif()
+
+-add_vpp_executable(vpp
+-  ENABLE_EXPORTS
+-  SOURCES ${VPP_SOURCES}
+-  LINK_LIBRARIES svm vlib vppinfra vlibmemory vnet Threads::Threads ${CMAKE_DL_LIBS}
+-  DEPENDS vpp_version_h api_headers
+-)
+-
+ add_vpp_headers(vpp
+   stats/stat_segment.h
+   stats/stat_segment_shared.h
