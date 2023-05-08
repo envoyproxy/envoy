@@ -39,7 +39,6 @@ envoy_cmake(
         "CMAKE_ENABLE_TESTING": "OFF",
         "CMAKE_ENABLE_EXPORTS": "OFF",
     },
-    # build_args = ["--", "-C", ".", "vppcom"],
     copts = ["-Wno-unused-variable"],
     default_cache_entries = {},
     env = {
@@ -62,7 +61,6 @@ envoy_cmake(
         "cpu:16",
         "skip_on_windows",
     ],
-    # tags = ["no-remote", "skip_on_windows"],
     targets = [
         "",
         "install",
