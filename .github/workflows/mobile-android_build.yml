@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      image: envoyproxy/envoy-build-ubuntu:mobile-321658b6b50abda6869f89fac275f59bf3b1e757
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -53,7 +53,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -86,7 +86,14 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 301" -m 1
+      run: |
+        timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
+            echo "Failed checking for headers in adb logcat" >&2
+            timeout 30 adb logcat || {
+                echo "Failed dumping adb logcat" >&2
+            }
+            exit 1
+        }
   kotlinhelloworld:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_helloworld
@@ -100,7 +107,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -133,7 +140,15 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 200" -m 1
+      run: |
+        timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
+            echo "Failed checking for headers in adb logcat" >&2
+            timeout 30 adb logcat || {
+                echo "Failed dumping adb logcat" >&2
+            }
+            exit 1
+        }
+
   kotlinbaselineapp:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_baseline_app
@@ -147,7 +162,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -180,7 +195,14 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 301" -m 1
+      run: |
+        timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
+            echo "Failed checking for headers in adb logcat" >&2
+            timeout 30 adb logcat || {
+                echo "Failed dumping adb logcat" >&2
+            }
+            exit 1
+        }
   kotlinexperimentalapp:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_experimental_app
@@ -194,7 +216,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -229,4 +251,11 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 200" -m 1
+      run: |
+        timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
+            echo "Failed checking for headers in adb logcat" >&2
+            timeout 30 adb logcat || {
+                echo "Failed dumping adb logcat" >&2
+            }
+            exit 1
+        }

@@ -163,46 +163,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
                                                    "\r?.*")));
 }
 
-TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    for (int i = 0; i < static_resources->clusters_size(); ++i) {
-      auto* cluster = static_resources->mutable_clusters(i);
-      auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
-      thresholds->mutable_max_connections()->set_value(1027);
-      thresholds->mutable_max_pending_requests()->set_value(1027);
-    }
-  });
-  initialize();
-// The large number of connection is meant to regression test
-// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
-// TODO(alyssawilk) debug.
-#if defined(__APPLE__)
-  const int num_connections = 50;
-#else
-  const int num_connections = 1026;
-#endif
-  std::vector<IntegrationTcpClientPtr> clients(num_connections);
-
-  for (int i = 0; i < num_connections; ++i) {
-    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-  }
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
-  for (int i = 0; i < num_connections; ++i) {
-    IntegrationTcpClientPtr& tcp_client = clients[i];
-    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
-    // This particular request will result in the upstream sending a response,
-    // and flush-closing due to the 'close_after_response' header.
-    ASSERT_TRUE(tcp_client->write(
-        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
-        false));
-    tcp_client->waitForHalfClose();
-    tcp_client->close();
-    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
-  }
-}
-
 TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
   autonomous_upstream_ = true;
   initialize();
@@ -563,19 +523,16 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
 
-    tcp_proxy_config.set_flush_access_log_on_connected(true);
+    tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+        "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);
   });
-
-  const std::string ip_regex =
-      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -584,8 +541,63 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT={}", ip_regex)));
+  EXPECT_EQ(absl::StrCat("ACCESS_LOG_TYPE=",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)),
+            log_result);
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+  test_server_.reset();
+  log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(
+      absl::StrCat(
+          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
+          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)),
+      log_result);
+}
+
+TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_nanos(
+        100000000); // 0.1 seconds
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(
+      absl::StrCat("ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic)),
+      log_result);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));
@@ -639,11 +651,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  const auto indicies = std::vector<uint64_t>({0, 1, 2});
+  const auto indices = std::vector<uint64_t>({0, 1, 2});
 
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
+    waitForNextRawUpstreamConnection(indices, fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello")); // send initial client data

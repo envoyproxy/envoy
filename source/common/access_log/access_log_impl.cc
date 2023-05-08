@@ -96,14 +96,14 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
                                       const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                      const Http::ResponseTrailerMap&) const {
+                                      const Http::ResponseTrailerMap&, AccessLogType) const {
   const Tracing::Decision decision = Tracing::TracerUtility::shouldTraceRequest(info);
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                const Http::ResponseHeaderMap&,
-                                const Http::ResponseTrailerMap&) const {
+                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                                AccessLogType) const {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -112,15 +112,15 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 }
 
 bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                              const Http::ResponseHeaderMap&,
-                              const Http::ResponseTrailerMap&) const {
-  absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
-  if (!final.has_value()) {
+                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                              AccessLogType) const {
+  absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
+  if (!duration.has_value()) {
     return false;
   }
 
   return compareAgainstValue(
-      std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());
+      std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config,
@@ -131,7 +131,7 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
 
 bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                             const Http::ResponseTrailerMap&) const {
+                             const Http::ResponseTrailerMap&, AccessLogType) const {
   // This code is verbose to avoid preallocating a random number that is not needed.
   uint64_t random_value;
   if (use_independent_randomness_) {
@@ -179,10 +179,12 @@ AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
 bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers) const {
+                        const Http::ResponseTrailerMap& response_trailers,
+                        AccessLogType access_log_type) const {
   bool result = false;
   for (auto& filter : filters_) {
-    result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
+    result |= filter->evaluate(info, request_headers, response_headers, response_trailers,
+                               access_log_type);
 
     if (result) {
       break;
@@ -195,10 +197,12 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
 bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
                          const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
-                         const Http::ResponseTrailerMap& response_trailers) const {
+                         const Http::ResponseTrailerMap& response_trailers,
+                         AccessLogType access_log_type) const {
   bool result = true;
   for (auto& filter : filters_) {
-    result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
+    result &= filter->evaluate(info, request_headers, response_headers, response_trailers,
+                               access_log_type);
 
     if (!result) {
       break;
@@ -210,7 +214,7 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
 
 bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info,
                                     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                    const Http::ResponseTrailerMap&) const {
+                                    const Http::ResponseTrailerMap&, AccessLogType) const {
   return !info.healthCheck();
 }
 
@@ -219,7 +223,8 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&,
                             const Http::RequestHeaderMap& request_headers,
-                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const {
+                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                            AccessLogType) const {
   return Http::HeaderUtility::matchHeaders(request_headers, *header_data_);
 }
 
@@ -235,8 +240,8 @@ ResponseFlagFilter::ResponseFlagFilter(
 }
 
 bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                  const Http::ResponseHeaderMap&,
-                                  const Http::ResponseTrailerMap&) const {
+                                  const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                                  AccessLogType) const {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -253,7 +258,8 @@ GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatu
 
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                                 const Http::ResponseHeaderMap& response_headers,
-                                const Http::ResponseTrailerMap& response_trailers) const {
+                                const Http::ResponseTrailerMap& response_trailers,
+                                AccessLogType) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
   const auto& optional_status =
@@ -294,8 +300,8 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
 }
 
 bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                              const Http::ResponseHeaderMap&,
-                              const Http::ResponseTrailerMap&) const {
+                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                              AccessLogType) const {
   const auto& value =
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the

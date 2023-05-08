@@ -35,6 +35,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",

@@ -40,21 +40,6 @@ class UpstreamCodecFilter;
 
 /* The Upstream request is the base class for forwarding HTTP upstream.
  *
- * This supports both classic forwarding, and upstream filter mode, dictated by
- * allow_upstream_filters_ which is set via envoy.reloadable_features.allow_upstream_filters.
- *
- * In 'classic' mode, the UpstreamRequest requests a new stream, internally
- * buffers data and trailers in |buffered_request_body_| and |downstream_metadata_map_vector_|
- * and forwards the router's headers, buffered body, buffered metadata, and
- * router's trailers to the |upstream_| once the stream is established.
- *
- * In 'classic' mode, when the stream is established, the UpstreamRequest
- * handles upstream data by directly implementing UpstreamToDownstream. As
- * upstream headers/body/metadata/trailers are received, they are forwarded
- * directly to the router via the RouterFilterInterface |parent_|
- *
- * For upstream filter mode, things are more involved.
- *
  * On the new request path, payload (headers/body/metadata/data) still arrives via
  * the accept[X]fromRouter functions. Said data is immediately passed off to the
  * UpstreamFilterManager, which passes each item through the filter chain until
@@ -95,11 +80,6 @@ public:
   void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
-
-  void acceptHeadersFromRouterOld(bool end_stream);
-  void acceptDataFromRouterOld(Buffer::Instance& data, bool end_stream);
-  void acceptTrailersFromRouterOld(Http::RequestTrailerMap& trailers);
-  void acceptMetadataFromRouterOld(Http::MetadataMapPtr&& metadata_map_ptr);
 
   void resetStream();
   void setupPerTryTimeout();
@@ -193,12 +173,10 @@ private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
-  bool shouldSendEndStream() {
-    // Only encode end stream if the full request has been received, the body
-    // has been sent, and any trailers or metadata have also been sent.
-    return router_sent_end_stream_ && !buffered_request_body_ && !encode_trailers_ &&
-           downstream_metadata_map_vector_.empty();
-  }
+  // Records the latency from when the upstream request was first created to
+  // when the pool callback fires. This latency can be useful to track excessive
+  // queuing.
+  void recordConnectionPoolCallbackLatency();
 
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
@@ -206,6 +184,8 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
+  void upstreamLog(AccessLog::AccessLogType access_log_type);
+  void resetUpstreamLogFlushTimer();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -230,12 +210,12 @@ private:
 
   Event::TimerPtr max_stream_duration_timer_;
 
+  // Per-stream access log flush duration. This timer is enabled once when the stream is created
+  // and will log to all access logs once per trigger.
+  Event::TimerPtr upstream_log_flush_timer_;
+
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
-
-  // TODO(alyssawilk) remove these with allow_upstream_filters_
-  Buffer::InstancePtr buffered_request_body_;
-  Http::MetadataMapVector downstream_metadata_map_vector_;
 
   // The number of outstanding readDisable to be called with parameter value true.
   // When downstream send buffers get above high watermark before response headers arrive, we
@@ -272,7 +252,6 @@ private:
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
   bool had_upstream_ : 1;
-  bool allow_upstream_filters_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1;
   bool upstream_wait_for_response_headers_before_disabling_read_ : 1;

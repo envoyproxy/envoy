@@ -34,7 +34,6 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
@@ -72,31 +71,25 @@ public:
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV3Yaml(yaml)); }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, cm_, stats_store_, validation_visitor_);
-    cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config, runtime_,
-                                                    factory_context, std::move(scope), false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, factory_context);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
-  NiceMock<MockClusterManager> cm_;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Ssl::MockContextManager ssl_context_manager_;
+
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* cleanup_timer_;
-  NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Server::MockOptions options_;
   Common::CallbackHandlePtr priority_update_cb_;
 };
 
@@ -239,12 +232,16 @@ TEST_F(OriginalDstClusterTest, AddressCollision) {
 
   // Simulate concurrent request for the same address from two workers.
   Event::PostCb post_cb1;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb1.chooseHost(&lb_context);
   ASSERT_NE(host1, nullptr);
   EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host1->address());
   Event::PostCb post_cb2;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb2));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb2](Event::PostCb cb) {
+    post_cb2 = std::move(cb);
+  });
   HostConstSharedPtr host2 = lb2.chooseHost(&lb_context);
   ASSERT_NE(host2, nullptr);
   EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host2->address());
@@ -277,7 +274,9 @@ TEST_F(OriginalDstClusterTest, AddressCollision) {
 
   // New host gets created once again.
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host4 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb1();
@@ -307,7 +306,9 @@ TEST_F(OriginalDstClusterTest, HostInUse) {
   // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
   auto lb = OriginalDstCluster::LoadBalancer(cluster_);
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   EXPECT_CALL(membership_updated_, ready());
   post_cb();
@@ -355,10 +356,14 @@ TEST_F(OriginalDstClusterTest, CollisionHostInUse) {
   // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
   auto lb = OriginalDstCluster::LoadBalancer(cluster_);
   Event::PostCb post_cb1;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
   HostConstSharedPtr host1 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   Event::PostCb post_cb2;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb2));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb2](Event::PostCb cb) {
+    post_cb2 = std::move(cb);
+  });
   HostConstSharedPtr host2 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
 
   EXPECT_CALL(membership_updated_, ready());
@@ -417,7 +422,9 @@ TEST_F(OriginalDstClusterTest, Membership) {
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
   HostConstSharedPtr host = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
@@ -464,7 +471,9 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // New host gets created
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
@@ -511,14 +520,18 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   OriginalDstCluster::LoadBalancer lb(cluster_);
   EXPECT_CALL(membership_updated_, ready());
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
   EXPECT_EQ(*connection1.connectionInfoProvider().localAddress(), *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
@@ -590,7 +603,9 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
@@ -641,7 +656,9 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
@@ -684,7 +701,9 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -698,7 +717,9 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "127.0.0.1:5556");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
@@ -752,7 +773,9 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
                                            "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -805,7 +828,9 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -864,7 +889,9 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -894,7 +921,9 @@ TEST_F(OriginalDstClusterTest, UsePortOverride) {
 
   TestLoadBalancerContext lb_context1(&connection);
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -930,7 +959,9 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);

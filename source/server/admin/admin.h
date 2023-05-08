@@ -123,12 +123,14 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return null_access_log_flush_interval_;
   }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -176,7 +178,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::HttpTracerSharedPtr tracer() override { return nullptr; }
+  Tracing::TracerSharedPtr tracer() override { return nullptr; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
@@ -216,7 +218,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
@@ -329,6 +331,7 @@ private:
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<OverloadState>();
     }
+    LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 
@@ -458,6 +461,7 @@ private:
   Server::Instance& server_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;

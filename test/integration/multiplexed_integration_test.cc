@@ -33,6 +33,46 @@ using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
 namespace Envoy {
+namespace {
+std::vector<int> stoiAccessLogString(const std::string& access_log_entry_of_ints) {
+  std::vector<int> ret;
+  const std::vector<std::string> split_string = TestUtility::split(access_log_entry_of_ints, ' ');
+  ret.reserve(split_string.size());
+
+  for (auto& str : split_string) {
+    ret.push_back(std::stoi(str));
+  }
+
+  return ret;
+}
+
+// Helper class that tabulates the bytes of a given stream by consuming the raw HTTP2 frames.
+struct StreamByteAccumulator {
+  uint32_t stream_wire_bytes_recieved_ = 0;
+  uint32_t stream_data_frames_recieved_ = 0;
+  uint32_t stream_body_payload_recieved_ = 0;
+  uint32_t stream_wire_header_bytes_recieved_ = 0;
+
+  void countFrame(const Http2Frame& frame) {
+    stream_wire_bytes_recieved_ += frame.size();
+    if (frame.type() == Http2Frame::Type::Data) {
+      ++stream_data_frames_recieved_;
+      stream_body_payload_recieved_ += frame.payloadSize();
+    } else if (frame.type() == Http2Frame::Type::Headers) {
+      stream_wire_header_bytes_recieved_ += frame.size();
+    }
+  }
+
+  int bodyWireBytesReceivedDiscountingHeaders() const {
+    return stream_wire_bytes_recieved_ - stream_wire_header_bytes_recieved_;
+  }
+
+  int bodyWireBytesReceivedGivenPayloadAndFrames() const {
+    return stream_body_payload_recieved_ + stream_data_frames_recieved_ * Http2Frame::HeaderSize;
+  }
+};
+
+} // end namespace
 
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
@@ -607,8 +647,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
 
 // Verifies small metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
-  // Make sure we have metadata coverage of the new style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -638,8 +676,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
 
 // Verifies large metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
-  // Make sure we have metadata coverage of the old style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -982,7 +1018,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
   codec_client_->rawConnection().write(bogus_data, false);
 
   // Verifies error is received.
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
@@ -1937,6 +1973,91 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   tcp_client_->close();
 }
 
+TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanWindowSize) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // We need to increase the idle timeout to avoid connection close.
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(10);
+      });
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_SENT%");
+  beginSession();
+
+  // Sending a settings frame to change window to be less than the response
+  // size.
+  // Wait for Envoy to ack the renegotiated settings.
+  const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, 70000}});
+  sendFrame(settings_frame2);
+
+  auto renegotiated_setting = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Settings, renegotiated_setting.type());
+
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makeRequest(1, "host", "/response/larger/than/window"));
+  waitForNextUpstreamRequest();
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(60000, false);
+  upstream_request_->encodeData(50000, true);
+
+  // Wire bytes received *ONLY* relates to wire bytes for this stream e.g. connection
+  // level frames are irrelevant.
+  StreamByteAccumulator accumulator;
+
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  accumulator.countFrame(response);
+
+  response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, response.type());
+  accumulator.countFrame(response);
+
+  response = readFrame();
+  accumulator.countFrame(response);
+  EXPECT_EQ(Http2Frame::Type::Data, response.type());
+
+  // Check access log if the agnostic stream lifetime is not extended.
+  // It should have access logged since it has received the entire response.
+  int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
+  if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
+    hcm_logged_wire_bytes_sent = access_log_values[0];
+    hcm_logged_wire_header_bytes_sent = access_log_values[1];
+  }
+
+  // Grant the sender (Envoy) additional window so it can finish sending the
+  // stream.
+  const Http2Frame stream_update_frame = Http2Frame::makeWindowUpdateFrame(1, 60000);
+  const Http2Frame conn_update_frame = Http2Frame::makeWindowUpdateFrame(0, 60000);
+  sendFrame(conn_update_frame);
+  sendFrame(stream_update_frame);
+
+  while (!response.endStream() && accumulator.stream_wire_bytes_recieved_ < 60000 + 50000) {
+    response = readFrame();
+    accumulator.countFrame(response);
+    EXPECT_EQ(Http2Frame::Type::Data, response.type());
+  }
+
+  EXPECT_EQ(accumulator.bodyWireBytesReceivedDiscountingHeaders(),
+            accumulator.bodyWireBytesReceivedGivenPayloadAndFrames());
+
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    // Access logs are only available now due to the expanded agnostic stream
+    // lifetime.
+    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
+    hcm_logged_wire_bytes_sent = access_log_values[0];
+    hcm_logged_wire_header_bytes_sent = access_log_values[1];
+  }
+  EXPECT_EQ(accumulator.stream_wire_header_bytes_recieved_, hcm_logged_wire_header_bytes_sent);
+  EXPECT_EQ(accumulator.stream_wire_bytes_recieved_, hcm_logged_wire_bytes_sent)
+      << "Received " << accumulator.stream_wire_bytes_recieved_
+      << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(Http2FrameIntegrationTest::testParams()),
                          frameIntegrationTestParamToString);
@@ -2253,6 +2374,33 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   if (!response1->complete()) {
     ASSERT_TRUE(response1->waitForEndStream());
   }
+}
+
+TEST_P(MultiplexedIntegrationTest, ConnectionPoolPerDownstream) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  // Preserve the upstream connection while making sure
+  // sendRequestAndWaitForResponse will wait for a new connection.
+  FakeHttpConnectionPtr upstream_connection_ptr = std::move(fake_upstream_connection_);
+  std::unique_ptr<IntegrationCodecClient> client = std::move(codec_client_);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  AssertionResult result = upstream_connection_ptr->close();
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_connection_ptr->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  upstream_connection_ptr.reset();
+  client->close();
 }
 
 // Ordering of inheritance is important here, SocketInterfaceSwap must be

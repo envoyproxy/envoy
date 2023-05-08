@@ -43,6 +43,9 @@ genrule(
     cmd = """
         ./$(location :vcl_build_launcher) vpp_vcl_build.sh $(location external/libvppcom.a)
     """,
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     tools = [
         ":vcl_build_launcher",
     ],

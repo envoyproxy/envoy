@@ -16,6 +16,10 @@ public:
   size_t capacity(const PackedStruct<T, max_size, ElementName>& packed_struct) const {
     return packed_struct.capacity();
   }
+  template <class T, uint8_t max_size, class ElementName, ElementName element_name>
+  const T& testConstAccess(const PackedStruct<T, max_size, ElementName>& packed_struct) const {
+    return packed_struct.template get<element_name>().ref();
+  }
 };
 
 namespace {
@@ -40,6 +44,10 @@ TEST_F(PackedStructTest, StringStruct) {
   // Add a third element.
   redirect_strings.set<RedirectStringElement::HostRedirect>("abcd");
   EXPECT_EQ(redirect_strings.get<RedirectStringElement::HostRedirect>().ref(), "abcd");
+  auto& const_val =
+      testConstAccess<std::string, 3, RedirectStringElement, RedirectStringElement::HostRedirect>(
+          redirect_strings);
+  EXPECT_EQ(const_val, "abcd");
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 3 * sizeof(std::string) + 16);
   EXPECT_EQ(redirect_strings.size(), 3);
   EXPECT_EQ(capacity(redirect_strings), 3);

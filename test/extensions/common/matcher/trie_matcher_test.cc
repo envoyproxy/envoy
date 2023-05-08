@@ -182,7 +182,7 @@ on_no_match:
   {
     // Input is nullopt.
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateMatch("bar");
   }
 }
@@ -473,26 +473,26 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     validateUnableToMatch();
   }
 }
@@ -536,7 +536,8 @@ matcher_tree:
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  Network::Matching::MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

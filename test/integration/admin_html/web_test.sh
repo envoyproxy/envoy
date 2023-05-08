@@ -12,41 +12,30 @@
 #
 # These steps can also be performed manually rather than via the script.
 
+ENVOY_BIN="bazel-bin/test/integration/admin_html/test_server"
+source test/integration/test_utility.sh
+
 tmp="/tmp/admin_web_test.$$"
 rm -rf "$tmp"
 mkdir "$tmp"
 
 echo "Saving temp files to $tmp"
 
-ENVOY_BINARY="bazel-bin/test/integration/admin_html/test_server"
-if [ -e "$ENVOY_BINARY" ]; then
+if [ -e "$ENVOY_BIN" ]; then
   echo "*** Re-using binary..."
 else
   echo "*** Building: log file $tmp/build.log..."
   bazel build test/integration:admin_test_server >& "$tmp/build.log"
 fi
-ls -l "$ENVOY_BINARY"
+ls -l "$ENVOY_BIN"
 
 
 echo "*** Invoking Envoy: log file $tmp/envoy.log ..."
-$ENVOY_BINARY \
-      -c test/integration/admin_html/web_test.yaml \
-      --admin-address-path "$tmp/admin.port" >& "$tmp/envoy.log" &
+$ENVOY_BIN -c test/integration/admin_html/web_test.yaml \
+  --admin-address-path "$tmp/admin.port" >& "$tmp/envoy.log" &
 
-echo "*** Waiting for the Envoy server to write the admin port to $tmp/admin.port ..."
-while [ ! -s "$tmp/admin.port" ]; do
-  sleep 1
-done
-
-echo ""
-echo "*** Waiting for Envoy /ready to respond with \"LIVE\""
-
-ready=""
-while [ "$ready" != "LIVE" ]; do
-  admin_port=$(cat $tmp/admin.port)
-  ready=$(curl "$admin_port/ready")
-  sleep 1
-done
+echo "*** Waiting for the Envoy server to write admin port to $tmp/admin.port ..."
+admin_port=$(wait_for_admin_returning_admin_address "$tmp/admin.port")
 
 echo ""
 echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
@@ -56,7 +45,7 @@ echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
 echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
 test_url="$admin_port/test?file=web_test.html"
-active_stats_url="$admin_port/stats?format=active"
+active_stats_url="$admin_port/stats?format=active-html"
 echo $browser "$test_url" "$active_stats_url" ">&" "$tmp/browser.log"
 $browser "$test_url" "$active_stats_url" >& "$tmp/browser.log"
 

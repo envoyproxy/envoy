@@ -32,10 +32,13 @@ const std::string secondary_name("secondary");
 class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AggregateClusterTest()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(Upstream::ClusterInfoImpl::generateStats(*stats_store_.rootScope(), stat_names_)) {
+      : stat_names_(server_context_.store_.symbolTable()),
+        stats_(Upstream::ClusterInfoImpl::generateStats(*server_context_.store_.rootScope(),
+                                                        stat_names_)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
+
+    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   Upstream::HostVector setupHostSet(Upstream::ClusterInfoConstSharedPtr cluster, int healthy_hosts,
@@ -96,14 +99,12 @@ public:
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-    Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
-    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
-        stats_store_, validation_visitor_);
 
-    cluster_ = std::make_shared<Cluster>(
-        server_context_, cluster_config, config, server_context_.cluster_manager_, runtime_,
-        api_->randomGenerator(), factory_context, std::move(scope), false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+
+    cluster_ = std::make_shared<Cluster>(cluster_config, config, factory_context);
 
     server_context_.cluster_manager_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
@@ -126,14 +127,11 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
+
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_{Api::createApiForTest(stats_store_, random_)};
-  Server::MockOptions options_;
+  Api::ApiPtr api_{Api::createApiForTest(server_context_.store_, random_)};
+
   std::shared_ptr<Cluster> cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;

@@ -33,7 +33,7 @@ public:
                Envoy::Server::Configuration::ServerFactoryContext& context,
                Stats::StatName stats_prefix);
 
-  PolicySharedPtr getPolicy(::Envoy::Http::ResponseHeaderMap& headers,
+  PolicySharedPtr getPolicy(const ::Envoy::Http::ResponseHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info) const;
 
   ~FilterConfig() override = default;

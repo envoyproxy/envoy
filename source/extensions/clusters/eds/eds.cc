@@ -13,21 +13,13 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
-                             std::move(stats_scope), added_via_api,
-                             factory_context.mainThreadDispatcher().timeSource()),
+EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                               ClusterFactoryContext& cluster_context)
+    : BaseDynamicClusterImpl(cluster, cluster_context),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          factory_context.messageValidationVisitor(), "cluster_name"),
-      factory_context_(factory_context), local_info_(factory_context.localInfo()),
-      cluster_name_(cluster.eds_cluster_config().service_name().empty()
-                        ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
-  Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
+          cluster_context.messageValidationVisitor(), "cluster_name"),
+      local_info_(cluster_context.serverFactoryContext().localInfo()) {
+  Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   if (Config::SubscriptionFactory::isPathBasedConfigSource(
@@ -38,12 +30,12 @@ EdsClusterImpl::EdsClusterImpl(
   }
   const auto resource_name = getResourceName();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_, {});
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
+void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
@@ -153,8 +145,8 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
           resources[0].get().resource());
-  if (cluster_load_assignment.cluster_name() != cluster_name_) {
-    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
+  if (cluster_load_assignment.cluster_name() != edsServiceName()) {
+    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
                                      cluster_load_assignment.cluster_name()));
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
@@ -165,7 +157,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
       throw EnvoyException(fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
-          cluster_name_, locality.leds_cluster_locality_config().leds_collection_name()));
+          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name()));
     }
   }
 
@@ -184,9 +176,9 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (factory_context_.clusterManager().adsMux()) {
+  if (transport_factory_context_->clusterManager().adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = factory_context_.clusterManager().adsMux()->pause(type_url);
+    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
   }
 
   // Compare the current set of LEDS localities (localities using LEDS) to the one received in the
@@ -211,22 +203,23 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   // (optimize for no-copy).
   envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (cla_leds_configs.empty()) {
-    cluster_load_assignment_ = absl::nullopt;
+    cluster_load_assignment_ = nullptr;
     used_load_assignment = &cluster_load_assignment;
   } else {
-    cluster_load_assignment_ = std::move(cluster_load_assignment);
-    used_load_assignment = &cluster_load_assignment_.value();
+    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        std::move(cluster_load_assignment));
+    used_load_assignment = cluster_load_assignment_.get();
   }
 
   // Add all the LEDS localities that are new.
   for (const auto& leds_config : cla_leds_configs) {
     if (leds_localities_.find(leds_config) == leds_localities_.end()) {
       ENVOY_LOG(trace, "Found new LEDS config in EDS onConfigUpdate() for cluster {}: {}",
-                cluster_name_, leds_config.DebugString());
+                edsServiceName(), leds_config.DebugString());
 
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
-          leds_config, cluster_name_, factory_context_, info_->statsScope(),
+          leds_config, edsServiceName(), *transport_factory_context_, info_->statsScope(),
           [&, used_load_assignment]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
@@ -259,7 +252,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", edsServiceName());
     info_->configUpdateStats().update_empty_.inc();
     onPreInitComplete();
     return false;
@@ -278,7 +271,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // stale.
   // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
-  resource.set_cluster_name(cluster_name_);
+  resource.set_cluster_name(edsServiceName());
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
   auto decoded_resource =
@@ -377,19 +370,13 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-EdsClusterFactory::createClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                                     ClusterFactoryContext& context) {
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(std::make_unique<EdsClusterImpl>(
-                            server_context, cluster, context.runtime(), socket_factory_context,
-                            std::move(stats_scope), context.addedViaApi()),
-                        nullptr);
+  return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {

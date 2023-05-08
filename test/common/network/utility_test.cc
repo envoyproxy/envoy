@@ -562,6 +562,13 @@ TEST(NetworkUtility, ParseProtobufAddress) {
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
   }
+  {
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_envoy_internal_address()->set_server_listener_name("internal_listener");
+    proto_address.mutable_envoy_internal_address()->set_endpoint_id("12345");
+    EXPECT_EQ("envoy://internal_listener/12345",
+              Utility::protobufAddressToAddress(proto_address)->asString());
+  }
 #if defined(__linux__)
   {
     envoy::config::core::v3::Address proto_address;
