@@ -31,13 +31,15 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                         config.sub_clusters_config(), max_sub_clusters, 1024)),
+      tls_(context.serverFactoryContext().threadLocal()), cm_(context.clusterManager()),
+      max_sub_clusters_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
+  tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
   if (enable_sub_cluster_) {
     if (sub_cluster_lb_policy_ ==
         envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
@@ -52,6 +54,9 @@ Cluster::~Cluster() {
   if (enable_sub_cluster_) {
     idle_timer_->disableTimer();
     idle_timer_.reset();
+  }
+  if (tls_.isShutdown()) {
+    return;
   }
   // Should remove all sub clusters, otherwise, might be memory leaking.
   // This lock is useless, just make compiler happy.
