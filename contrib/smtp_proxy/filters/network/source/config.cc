@@ -16,7 +16,6 @@ Network::FilterFactoryCb
 NetworkFilters::SmtpProxy::SmtpConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  ASSERT(!proto_config.stat_prefix().empty());
 
   SmtpFilterConfig::SmtpFilterConfigOptions config_options;
   config_options.stats_prefix_ = fmt::format("smtp.{}", proto_config.stat_prefix());
