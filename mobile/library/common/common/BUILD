@@ -9,6 +9,7 @@ envoy_cc_library(
     srcs = [
         "system_helper.cc",
     ] + select({
+        "@envoy//bazel:android_system_helper": ["default_system_helper_android.cc"],
         "@envoy//bazel:android": ["default_system_helper_android.cc"],
         "@envoy//bazel:apple": ["default_system_helper_apple.cc"],
         "//conditions:default": ["default_system_helper.cc"],
@@ -21,6 +22,10 @@ envoy_cc_library(
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
     ] + select({
+        "@envoy//bazel:android_system_helper": [
+            "//library/common/jni:android_jni_utility_lib",
+            "//library/common/jni:android_network_utility_lib",
+        ],
         "@envoy//bazel:android": [
             "//library/common/jni:android_jni_utility_lib",
             "//library/common/jni:android_network_utility_lib",
