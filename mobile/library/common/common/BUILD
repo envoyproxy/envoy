@@ -34,6 +34,7 @@ envoy_cc_library(
             "//library/common/jni:android_jni_utility_lib",
             "//library/common/jni:android_network_utility_lib",
         ],
+        "//conditions:default": [],
     }) + select({
         "@envoy//bazel:apple": [
             "//library/common/network:apple_platform_cert_verifier",
