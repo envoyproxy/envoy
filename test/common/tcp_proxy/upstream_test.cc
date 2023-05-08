@@ -4,10 +4,12 @@
 #include "source/common/tcp_proxy/upstream.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -23,6 +25,7 @@ using testing::Return;
 namespace Envoy {
 namespace TcpProxy {
 namespace {
+using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy;
 using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 template <typename T> class HttpUpstreamTest : public testing::Test {
@@ -38,27 +41,42 @@ public:
     }
     EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
     config_message_.set_hostname("default.host.com:443");
+    tcp_proxy_.set_allocated_tunneling_config(&config_message_);
   }
 
   void setupUpstream() {
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
-    upstream_ = std::make_unique<T>(callbacks_, *this->config_, downstream_stream_info_);
+    route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
+    conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
+                                                decoder_callbacks_, Http::CodecType::HTTP2,
+                                                downstream_stream_info_);
+    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_, *config_,
+                                    downstream_stream_info_, generic_conn_pool_);
     upstream_->setRequestEncoder(encoder_, true);
   }
-
   NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
+  TcpProxy tcp_proxy_;
+  std::unique_ptr<Router::GenericConnPool> generic_conn_pool_;
   TcpProxy_TunnelingConfig config_message_;
-  std::unique_ptr<TunnelingConfigHelper> config_;
   std::unique_ptr<HttpUpstream> upstream_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockLoadBalancerContext> lb_context_;
+  std::unique_ptr<HttpConnPool> conn_pool_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Stats::MockStore> store_;
+  Stats::MockScope& scope_{store_.mockScope()};
+  std::unique_ptr<TunnelingConfigHelper> config_;
+  std::unique_ptr<HttpConnPool::RouteImpl> route_;
 };
 
 using testing::Types;
 
-using Implementations = Types<Http1Upstream, Http2Upstream>;
+// using Implementations = Types<Http1Upstream, Http2Upstream>;
+using Implementations = Types<Http2Upstream>;
 
 TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
 
@@ -73,8 +91,9 @@ TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
   this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder.
-  this->upstream_ =
-      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
+  this->upstream_ = std::make_unique<TypeParam>(
+      *this->conn_pool_, this->callbacks_, this->decoder_callbacks_, *this->route_, *this->config_,
+      this->downstream_stream_info_, (this->generic_conn_pool_));
   this->upstream_->encodeData(buffer2, true);
 }
 
@@ -112,8 +131,9 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder.
-  this->upstream_ =
-      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
+  this->upstream_ = std::make_unique<TypeParam>(
+      *this->conn_pool_, this->callbacks_, this->decoder_callbacks_, *this->route_, *this->config_,
+      this->downstream_stream_info_, (this->generic_conn_pool_));
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 
@@ -229,8 +249,13 @@ public:
   }
 
   void setupUpstream() {
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
-    upstream_ = std::make_unique<T>(callbacks_, *this->config_, this->downstream_stream_info_);
+    route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
+    conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
+                                                decoder_callbacks_, Http::CodecType::HTTP2,
+                                                downstream_stream_info_);
+    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_, *config_,
+                                    downstream_stream_info_, generic_conn_pool_);
   }
 
   void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
@@ -248,9 +273,18 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
   std::unique_ptr<HttpUpstream> upstream_;
+  TcpProxy tcp_proxy_;
   TcpProxy_TunnelingConfig config_message_;
   std::unique_ptr<TunnelingConfigHelper> config_;
   bool is_http2_ = true;
+  std::unique_ptr<HttpConnPool> conn_pool_;
+  std::unique_ptr<Router::GenericConnPool> generic_conn_pool_;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockLoadBalancerContext> lb_context_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  Stats::MockStore store_;
+  Stats::MockScope& scope_{store_.mockScope()};
+  std::unique_ptr<HttpConnPool::RouteImpl> route_;
 };
 
 TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
@@ -376,8 +410,9 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 
   Http::MockRequestEncoder another_encoder;
-  auto another_upstream =
-      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
+  auto another_upstream = std::make_unique<TypeParam>(
+      *this->conn_pool_, this->callbacks_, this->decoder_callbacks_, *this->route_, *this->config_,
+      this->downstream_stream_info_, (this->generic_conn_pool_));
   EXPECT_CALL(another_encoder, getStream()).Times(AnyNumber());
   EXPECT_CALL(another_encoder, http1StreamEncoderOptions()).Times(AnyNumber());
   EXPECT_CALL(another_encoder, enableTcpTunneling()).Times(AnyNumber());

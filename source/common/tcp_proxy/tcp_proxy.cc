@@ -84,7 +84,7 @@ Config::SharedConfig::SharedConfig(
   }
   if (config.has_tunneling_config()) {
     tunneling_config_helper_ =
-        std::make_unique<TunnelingConfigHelperImpl>(stats_scope_, config, context);
+        std::make_unique<TunnelingConfigHelperImpl>(*stats_scope_.get(), config, context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -616,7 +616,7 @@ const std::string& TunnelResponseTrailers::key() {
 }
 
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
-    const Stats::ScopeSharedPtr stats_scope,
+    Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.tunneling_config().use_post()),
@@ -626,8 +626,8 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
       prefix_(config_message.stat_prefix(), context.scope().symbolTable()),
-      router_config_(prefix_.statName(), context.localInfo(), *stats_scope.get(),
-                     context.clusterManager(), context.runtime(), context.api().randomGenerator(),
+      router_config_(prefix_.statName(), context.localInfo(), stats_scope, context.clusterManager(),
+                     context.runtime(), context.api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), true,
                      false, false, false, false, false, {}, context.api().timeSource(),
                      context.httpContext(), context.routerContext()),
