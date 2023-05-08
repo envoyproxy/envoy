@@ -645,6 +645,11 @@ config_setting(
 )
 
 config_setting(
+    name = "android_system_helper",
+    values = {"define": "system-helper=android"},
+)
+
+config_setting(
     name = "libfuzzer_coverage",
     define_values = {
         "FUZZING_ENGINE": "libfuzzer",

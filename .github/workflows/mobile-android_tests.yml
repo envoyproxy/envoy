@@ -82,6 +82,7 @@ jobs:
             --define envoy_mobile_listener=enabled \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --define=signal_trace=disabled \
+            --define=system-helper=android \
             //test/java/...
   kotlintestslinux:
     if: github.repository == 'envoyproxy/envoy'

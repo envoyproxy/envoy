@@ -11,6 +11,9 @@ public:
 
   // SystemHelper:
   MOCK_METHOD(bool, isCleartextPermitted, (absl::string_view hostname));
+  MOCK_METHOD(envoy_cert_validation_result, validateCertificateChain,
+              (const std::vector<std::string>& certs, absl::string_view hostname));
+  MOCK_METHOD(void, cleanupAfterCertificateValidation, ());
 };
 
 // SystemHelperPeer allows the replacement of the SystemHelper singleton
