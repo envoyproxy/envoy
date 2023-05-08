@@ -14,8 +14,6 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-#define MYLOGLEV error
-
 const std::string ValidatedInputGenerator::kAny = "google.protobuf.Any";
 
 ValidatedInputGenerator::ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map,
@@ -45,7 +43,7 @@ template <typename T, typename R> static bool handleNumericRules(T& number, cons
     number = number_rules.gte();
   }
   if (number_rules.in_size() > 0 || number_rules.not_in_size() > 0) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::U32IntRules::in|not_in rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::U32IntRules::in|not_in rule found, not handling yet");
   }
   return true;
 }
@@ -83,7 +81,7 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
     str = str.substr(0, string_rules.max_bytes());
   }
   if (string_rules.has_pattern()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::pattern '{}' found, not handling yet",
+    ENVOY_LOG_MISC(info, "pgv::StringRules::pattern '{}' found, not handling yet",
                    string_rules.pattern());
   }
   if (string_rules.has_prefix() &&
@@ -109,10 +107,10 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
     str += string_rules.contains();
   }
   if (string_rules.in_size() != 0 || string_rules.not_in_size() != 0) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::in|not_in rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::in|not_in rule found, not handling yet");
   }
   if (string_rules.has_email()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::email rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::email rule found, not handling yet");
   }
   if (string_rules.has_hostname() && !pgv::IsHostname(str)) {
     str = "localhost.localdomain";
@@ -125,13 +123,13 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
     str = "::1";
   }
   if (string_rules.has_uri()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::uri rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::uri rule found, not handling yet");
   }
   if (string_rules.has_uri_ref()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::uri_ref rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::uri_ref rule found, not handling yet");
   }
   if (string_rules.has_len()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::len rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::len rule found, not handling yet");
   }
   if (string_rules.has_len_bytes() && str.length() != string_rules.len_bytes()) {
 
@@ -143,10 +141,10 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
   }
 
   if (string_rules.has_address()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::address rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::address rule found, not handling yet");
   }
   if (string_rules.has_uuid()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::uuid rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::uuid rule found, not handling yet");
   }
   {
     std::string::size_type found_at;
@@ -156,7 +154,7 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
     }
   }
   if (string_rules.has_well_known_regex()) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::StringRules::well_known_regex rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::StringRules::well_known_regex rule found, not handling yet");
   }
 }
 
@@ -201,7 +199,7 @@ void ValidatedInputGenerator::handleAnyRules(
     }
   }
   if (any_rules.in_size() > 0 || any_rules.not_in_size() > 0) {
-    ENVOY_LOG_MISC(MYLOGLEV, "pgv::AnyRules::in|not_in rule found, not handling yet");
+    ENVOY_LOG_MISC(info, "pgv::AnyRules::in|not_in rule found, not handling yet");
   }
 }
 
