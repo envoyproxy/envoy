@@ -460,6 +460,7 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
   access_token_ = access_token;
   id_token_ = id_token;
   refresh_token_ = refresh_token;
+  expires_in_ = std::to_string(expires_in.count());
 
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
@@ -510,10 +511,17 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
+  std::string max_age;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.oauth_use_standard_max_age_value")) {
+    max_age = expires_in_;
+  } else {
+    max_age = new_expires_;
+  }
+
   // We use HTTP Only cookies for the HMAC and Expiry.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, new_expires_);
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
+  const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
+  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
 
   const CookieNames& cookie_names = config_->cookieNames();
 
