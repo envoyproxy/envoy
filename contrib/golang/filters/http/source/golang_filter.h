@@ -154,8 +154,7 @@ public:
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info,
-           Envoy::AccessLog::AccessLogType access_log_type =
-               Envoy::AccessLog::AccessLogType::NotSet) override;
+           Envoy::AccessLog::AccessLogType access_log_type) override;
 
   void onStreamComplete() override {}
 
@@ -181,6 +180,10 @@ public:
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
 
 private:
+  bool hasDestroyed() {
+    Thread::LockGuard lock(mutex_);
+    return has_destroyed_;
+  };
   ProcessorState& getProcessorState();
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);

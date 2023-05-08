@@ -89,7 +89,7 @@ protected:
    */
   class HostHeaderValidationResult {
   public:
-    using RejectAction = ::Envoy::Http::HeaderValidatorBase::RejectAction;
+    using RejectAction = ::Envoy::Http::HeaderValidator::RejectAction;
     HostHeaderValidationResult(RejectAction action, absl::string_view details,
                                absl::string_view address, absl::string_view port)
         : result_(action, details, address, port) {

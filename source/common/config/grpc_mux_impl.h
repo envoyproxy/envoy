@@ -40,9 +40,8 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-              CustomConfigValidatorsPtr&& config_validators,
+              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+              bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
               JitteredExponentialBackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
@@ -185,6 +184,8 @@ private:
     // The identifier for the server that sent the most recent response, or
     // empty if there is none.
     std::string control_plane_identifier_{};
+    // If true, xDS resources were previously fetched from an xDS source or an xDS delegate.
+    bool previously_fetched_data_{false};
   };
 
   bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
@@ -214,7 +215,6 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
-  bool previously_fetched_data_{false};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);

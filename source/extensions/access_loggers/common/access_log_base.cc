@@ -22,8 +22,8 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
   if (!response_trailers) {
     response_trailers = Http::StaticEmptyHeaders::get().response_trailers.get();
   }
-  if (filter_ &&
-      !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
+  if (filter_ && !filter_->evaluate(stream_info, *request_headers, *response_headers,
+                                    *response_trailers, access_log_type)) {
     return;
   }
   return emitLog(*request_headers, *response_headers, *response_trailers, stream_info,

@@ -77,8 +77,12 @@ envoy_cc_test(
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
@@ -424,46 +428,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ring_hash_lb_test",
-    srcs = ["ring_hash_lb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//envoy/router:router_interface",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:ring_hash_lb_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "maglev_lb_test",
-    srcs = ["maglev_lb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/upstream:maglev_lb_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
     deps = [
@@ -484,9 +448,9 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/memory:stats_lib",
-        "//source/common/upstream:maglev_lb_lib",
-        "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",

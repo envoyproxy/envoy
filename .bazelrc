@@ -44,6 +44,8 @@ build --test_summary=terse
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
+test --test_verbose_timeout_warnings
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
@@ -195,6 +197,7 @@ build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
 build:test-coverage --test_arg="-l trace"
+build:test-coverage --test_arg="--log-path /dev/null"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
@@ -259,6 +262,7 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --google_default_credentials=true
 build:remote --remote_download_toplevel
+build:remote --nobuild_runfile_links
 
 # Windows bazel does not allow sandboxed as a spawn strategy
 build:remote-windows --spawn_strategy=remote,local
@@ -333,6 +337,10 @@ build:docker-tsan --config=rbe-toolchain-tsan
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+build:remote-ci --config=ci
+# Note this config is used by mobile CI also.
+build:ci --noshow_progress
+build:ci --noshow_loading_progress
 
 # Build Event Service
 build:google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
