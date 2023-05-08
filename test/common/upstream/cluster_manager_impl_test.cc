@@ -1252,6 +1252,52 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(3U, cluster.info().use_count());
 }
 
+TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  create(defaultConfig());
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.3);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_EQ(common_config_ptr_a->healthy_panic_threshold().value(), common_config_ptr_b->healthy_panic_threshold().value());
+}
+
+TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  create(defaultConfig());
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.5);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_NE(common_config_ptr_a->healthy_panic_threshold().value(), common_config_ptr_b->healthy_panic_threshold().value());
+}
+
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 

@@ -84,24 +84,10 @@ public:
               (const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
-  /*
-   * Mimic the behavior of a shared common_lb_config by storing it in a shared pointer
-   */
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
-    // Check if value equivalent to common_lb_config_a_
-    if (common_lb_config_a_ == nullptr) {
-      common_lb_config_a_ =
-          std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
-              common_lb_config);
-      return common_lb_config_a_;
-    } else if (Protobuf::util::MessageDifferencer::Equivalent(common_lb_config,
-                                                              *common_lb_config_a_)) {
-      return common_lb_config_a_;
-    } else {
-      return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
+    return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
           common_lb_config);
-    }
   }
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
@@ -124,7 +110,6 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> common_lb_config_a_;
 };
 } // namespace Upstream
 } // namespace Envoy
