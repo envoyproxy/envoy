@@ -670,9 +670,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
-  } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
-    Router::ScopeKeyPtr scope_key =
-        parent_.snapped_scoped_routes_config_->computeScopeKey(*parent_.request_headers_);
+  } else if (scope_key_builder_.has_value()) {
+    Router::ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(*parent_.request_headers_);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -757,10 +756,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
-               connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
+               connection_manager.config_.scopedRouteConfigProvider() != nullptr &&
+               connection_manager.config_.scopeKeyBuilder().has_value()) ||
               (connection_manager.config_.routeConfigProvider() != nullptr &&
-               connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
-         "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
+               connection_manager.config_.scopedRouteConfigProvider() == nullptr &&
+               !connection_manager.config_.scopeKeyBuilder().has_value())),
+         "Either routeConfigProvider or (scopedRouteConfigProvider and scopeKeyBuilder) should be "
+         "set in "
          "ConnectionManagerImpl.");
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     filter_manager_.addAccessLogHandler(access_log);
@@ -775,10 +777,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
             connection_manager.config_.routeConfigProvider(), *this);
   } else if (connection_manager_.config_.isRoutable() &&
-             connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+             connection_manager.config_.scopedRouteConfigProvider() != nullptr &&
+             connection_manager.config_.scopeKeyBuilder().has_value()) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.scopedRouteConfigProvider(), *this);
+            connection_manager.config_.scopedRouteConfigProvider(),
+            connection_manager.config_.scopeKeyBuilder(), *this);
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1094,7 +1098,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
       snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
-    } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+    } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr &&
+               connection_manager_.config_.scopeKeyBuilder().has_value()) {
       snapped_scoped_routes_config_ =
           connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
       snapScopedRouteConfig();
@@ -1406,7 +1411,9 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+  auto scope_key =
+      connection_manager_.config_.scopeKeyBuilder()->computeScopeKey(*request_headers_);
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(scope_key);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
@@ -1515,7 +1522,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
-        connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+        connection_manager_.config_.scopedRouteConfigProvider() != nullptr &&
+        connection_manager_.config_.scopeKeyBuilder().has_value()) {
       // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
       snapScopedRouteConfig();
     }
