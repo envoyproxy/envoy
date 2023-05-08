@@ -11,11 +11,21 @@
 #include "xds/core/v3/resource_locator.pb.h"
 
 namespace Envoy {
+
+namespace Server {
+class Instance;
+} // namespace Server
+
 namespace Config {
+class XdsResourcesDelegate;
+class XdsConfigTracker;
 
 class SubscriptionFactory {
 public:
   virtual ~SubscriptionFactory() = default;
+
+  static constexpr uint32_t RetryInitialDelayMs = 500;
+  static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
 
   /**
    * @return true if a config source comes from the local filesystem.
@@ -68,17 +78,30 @@ public:
 };
 
 // A factory class that individual config subscriptions can subclass to be factory-created.
-// TODO(alyssawilk) rename once https://github.com/envoyproxy/envoy/pull/26468 lands
-class ConfigSubscriptionFactory : public Config::TypedFactory {
+class ConfigSubscriptionFactory : public Config::UntypedFactory {
 public:
+  struct SubscriptionData {
+    const LocalInfo::LocalInfo& local_info_;
+    Event::Dispatcher& dispatcher_;
+    Upstream::ClusterManager& cm_;
+    ProtobufMessage::ValidationVisitor& validation_visitor_;
+    Api::Api& api_;
+    const Server::Instance& server_;
+    OptRef<XdsResourcesDelegate> xds_resources_delegate_;
+    OptRef<XdsConfigTracker> xds_config_tracker_;
+
+    const envoy::config::core::v3::ConfigSource& config_;
+    absl::string_view type_url_;
+    Stats::Scope& scope_;
+    SubscriptionCallbacks& callbacks_;
+    OpaqueResourceDecoderSharedPtr resource_decoder_;
+    const SubscriptionOptions& options_;
+    OptRef<const xds::core::v3::ResourceLocator> collection_locator_;
+    SubscriptionStats stats_;
+  };
+
   std::string category() const override { return "envoy.config_subscription"; }
-  virtual SubscriptionPtr create(const LocalInfo::LocalInfo& local_info,
-                                 Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                 Api::Api& api, const envoy::config::core::v3::ConfigSource& config,
-                                 absl::string_view type_url, SubscriptionCallbacks& callbacks,
-                                 OpaqueResourceDecoderSharedPtr resource_decoder,
-                                 SubscriptionStats stats,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual SubscriptionPtr create(SubscriptionData& data) PURE;
 };
 
 } // namespace Config

@@ -50,6 +50,7 @@ envoy_cc_library(
     hdrs = ["datasource.h"],
     deps = [
         ":remote_data_fetcher_lib",
+        ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -161,19 +162,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_subscription_lib",
-    srcs = ["grpc_subscription_impl.cc"],
-    hdrs = ["grpc_subscription_impl.h"],
-    deps = [
-        ":grpc_mux_lib",
-        ":xds_resource_lib",
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/grpc:async_client_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "new_grpc_mux_lib",
     srcs = ["new_grpc_mux_impl.cc"],
     hdrs = ["new_grpc_mux_impl.h"],
@@ -279,7 +267,6 @@ envoy_cc_library(
     hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":custom_config_validators_lib",
-        ":grpc_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",

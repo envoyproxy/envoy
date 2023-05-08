@@ -61,7 +61,6 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
 #endif
@@ -103,10 +102,7 @@ public:
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
 #endif
   EngineBuilder& addPlatformFilter(std::string name);
-  // TODO(alyssawilk) remove the legacy APIs and update docs once Lyft is moved over.
-  EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 
-  EngineBuilder& addVirtualCluster(std::string name, std::vector<MatcherData> matchers);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // Add a direct response. For testing purposes only.
@@ -183,7 +179,6 @@ private:
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
   bool admin_interface_enabled_ = false;
-  bool enable_happy_eyeballs_ = true;
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
@@ -195,8 +190,6 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
-  std::vector<std::string> virtual_clusters_;
-  std::vector<std::pair<std::string, std::vector<MatcherData>>> virtual_cluster_data_;
   std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;

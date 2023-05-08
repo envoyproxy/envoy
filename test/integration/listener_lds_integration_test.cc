@@ -918,16 +918,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
@@ -1010,16 +1012,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
@@ -1715,7 +1719,7 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   initialize();
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
 
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {

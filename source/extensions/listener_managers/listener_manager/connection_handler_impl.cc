@@ -21,6 +21,12 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
     : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
+ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
+                                             absl::optional<uint32_t> worker_index,
+                                             OverloadManager& overload_manager)
+    : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
+      per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
+
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
 
 void ConnectionHandlerImpl::decNumConnections() {
@@ -68,7 +74,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     ASSERT(config.listenSocketFactories().size() == 1);
     details->addActiveListener(config, config.listenSocketFactories()[0]->localAddress(),
                                listener_reject_fraction_, disable_listeners_,
-                               std::move(internal_listener));
+                               std::move(internal_listener), overload_manager_);
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
@@ -78,7 +84,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
-              address, config.connectionBalancer(*address)));
+              address, config.connectionBalancer(*address)),
+          overload_manager_);
     }
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
@@ -89,7 +96,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           config, address, listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
-              dispatcher_, config));
+              dispatcher_, config),
+          overload_manager_);
     }
   }
 

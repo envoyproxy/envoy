@@ -1,0 +1,148 @@
+
+parameters:
+- name: bucketGCP
+  type: string
+  default: ""
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
+- name: concurrencyChecks
+  displayName: "Checks concurrency"
+  type: number
+  default: 10
+
+# Auth
+- name: authGithub
+  type: string
+  default: ""
+- name: authGCP
+  type: string
+  default: ""
+
+- name: runChecks
+  displayName: "Run checks"
+  type: string
+  default: true
+
+
+jobs:
+- job: bazel
+  displayName: "Linux x64"
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runChecks }}, 'true'))
+  variables:
+    REPO_FETCH_DEPTH: 1
+    REPO_FETCH_TAGS: false
+    PUBLISH_TEST_RESULTS: true
+    PUBLISH_ENVOY: true
+  strategy:
+    maxParallel: ${{ parameters.concurrencyChecks }}
+    matrix:
+      # These are ordered by most time-consuming first.
+      compile_time_options:
+        CI_TARGET: "bazel.compile_time_options"
+        ENVOY_FILTER_EXAMPLE: true
+      tsan:
+        CI_TARGET: "bazel.tsan"
+      asan:
+        CI_TARGET: "bazel.asan"
+        ENVOY_FILTER_EXAMPLE: true
+      # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
+      # api_compat:
+      #  CI_TARGET: "bazel.api_compat"
+      gcc:
+        CI_TARGET: "bazel.gcc"
+      msan:
+        CI_TARGET: "bazel.msan"
+        ENVOY_FILTER_EXAMPLE: true
+      clang_tidy:
+        CI_TARGET: "bazel.clang_tidy"
+        REPO_FETCH_DEPTH: 0
+        REPO_FETCH_TAGS: true
+        PUBLISH_TEST_RESULTS: false
+        PUBLISH_ENVOY: false
+      api:
+        CI_TARGET: "bazel.api"
+  timeoutInMinutes: 180
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: $(CI_TARGET)
+      envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      repoFetchDepth: $(REPO_FETCH_DEPTH)
+      repoFetchTags: $(REPO_FETCH_TAGS)
+      publishTestResults: $(PUBLISH_TEST_RESULTS)
+      publishEnvoy: $(PUBLISH_ENVOY)
+      stepsPost:
+
+      # TODO(phlax): consolidate "fix" paths/jobs
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
+          artifactName: "$(CI_TARGET).fixes"
+        timeoutInMinutes: 10
+        condition: and(failed(), eq(variables['CI_TARGET'], 'bazel.clang_tidy'))
+
+- job: coverage
+  displayName: "Linux x64"
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runChecks }}, 'true'))
+  timeoutInMinutes: 240
+  pool: "envoy-x64-large"
+  strategy:
+    maxParallel: 2
+    matrix:
+      coverage:
+        CI_TARGET: "coverage"
+      fuzz_coverage:
+        CI_TARGET: "fuzz_coverage"
+  steps:
+  - template: ../bazel.yml
+    parameters:
+      managedAgent: false
+      ciTarget: bazel.$(CI_TARGET)
+      rbe: false
+      # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
+    displayName: "Upload $(CI_TARGET) Report to GCS"
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
+    condition: always()
+
+- job: complete
+  displayName: "Checks complete"
+  dependsOn: ["bazel", "coverage"]
+  pool:
+    vmImage: "ubuntu-20.04"
+  # This condition ensures that this (required) check passes if all of
+  # the preceding checks either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: |
+    and(
+      eq(variables['Build.Reason'], 'PullRequest'),
+      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "checks complete"

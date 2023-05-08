@@ -19,7 +19,7 @@ public:
     matchers.reserve(values.size());
     for (const auto& v : values) {
       matchers.emplace_back(std::make_unique<SingleFieldMatcher<TestData>>(
-          std::make_unique<TestInput>(DataInputGetResult{v.second, absl::nullopt}),
+          std::make_unique<TestInput>(DataInputGetResult{v.second, absl::monostate()}),
           std::make_unique<BoolMatcher>(v.first)));
     }
 
@@ -58,9 +58,7 @@ TEST_F(FieldMatcherTest, SingleFieldMatcher) {
       createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()).result());
   EXPECT_FALSE(
       createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()).result());
-  EXPECT_TRUE(createSingleMatcher(absl::nullopt, [](auto v) { return v == absl::nullopt; })
-                  ->match(TestData())
-                  .result());
+
   EXPECT_FALSE(createSingleMatcher(absl::nullopt, [](auto v) { return v == "foo"; })
                    ->match(TestData())
                    .result());

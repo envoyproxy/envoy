@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerificatio
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
-import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -57,7 +56,6 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
-  private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -71,8 +69,6 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClustersLegacy = mutableListOf<String>()
-  private var virtualClusters = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -240,19 +236,6 @@ open class EngineBuilder(
   fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
     this.dnsCacheSaveIntervalSeconds = saveInterval
-    return this
-  }
-
-  /**
-   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-   * true.
-   *
-   * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
-   *
-   * @return This builder.
-   */
-  fun enableHappyEyeballs(enableHappyEyeballs: Boolean): EngineBuilder {
-    this.enableHappyEyeballs = enableHappyEyeballs
     return this
   }
 
@@ -553,30 +536,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Add virtual cluster configuration.
-   *
-   * @param cluster the JSON configuration string for a virtual cluster.
-   *
-   * @return this builder.
-   */
-  fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClustersLegacy.add(cluster)
-    return this
-  }
-
-  /**
-   * Add virtual cluster configurations.
-   *
-   * @param configs structured configurations of virtual clusters.
-   *
-   * @return this builder.
-   */
-  fun addVirtualClusters(configs: List<VirtualClusterConfig>): EngineBuilder {
-    this.virtualClusters + configs;
-    return this
-  }
-
-  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -711,7 +670,6 @@ open class EngineBuilder(
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -722,8 +680,6 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
-      virtualClustersLegacy,
-      virtualClusters,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,

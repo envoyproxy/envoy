@@ -213,6 +213,7 @@ envoy_cc_library(
         "//envoy/common:resource_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/init:manager_interface",
+        "//envoy/server/overload:load_shed_point_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:interval_value",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

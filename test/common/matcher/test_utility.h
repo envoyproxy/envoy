@@ -19,7 +19,7 @@ struct TestData {
 // A CommonProtocolInput that returns the configured value every time.
 struct CommonProtocolTestInput : public CommonProtocolInput {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
-  absl::optional<std::string> get() override { return data_; }
+  MatchingDataType get() override { return data_; }
 
   const std::string data_;
 };
@@ -101,7 +101,7 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  bool match(absl::optional<absl::string_view>) override { return value_; }
+  bool match(const MatchingDataType&) override { return value_; }
 
   const bool value_;
 };
@@ -111,7 +111,12 @@ struct TestMatcher : public InputMatcher {
   explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
 
-  bool match(absl::optional<absl::string_view> input) override { return predicate_(input); }
+  bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<absl::monostate>(input)) {
+      return false;
+    }
+    return predicate_(absl::get<std::string>(input));
+  }
 
   std::function<bool(absl::optional<absl::string_view>)> predicate_;
 };
@@ -143,7 +148,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  bool match(absl::optional<absl::string_view>) override { return false; }
+  bool match(const MatchingDataType&) override { return false; }
 };
 
 /**
@@ -172,7 +177,13 @@ public:
 class CustomStringMatcher : public InputMatcher {
 public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
-  bool match(absl::optional<absl::string_view> str) override { return str_value_ == str; }
+  bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<absl::monostate>(input)) {
+      return false;
+    }
+
+    return str_value_ == absl::get<std::string>(input);
+  }
 
 private:
   std::string str_value_;
@@ -212,9 +223,11 @@ createSingleMatcher(absl::optional<absl::string_view> input,
                     std::function<bool(absl::optional<absl::string_view>)> predicate,
                     DataInputGetResult::DataAvailability availability =
                         DataInputGetResult::DataAvailability::AllDataAvailable) {
+  MatchingDataType data =
+      input.has_value() ? MatchingDataType(std::string(*input)) : absl::monostate();
+
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{
-          availability, input ? absl::make_optional(std::string(*input)) : absl::nullopt}),
+      std::make_unique<TestInput>(DataInputGetResult{availability, std::move(data)}),
       std::make_unique<TestMatcher>(predicate));
 }
 
