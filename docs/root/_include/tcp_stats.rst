@@ -33,6 +33,6 @@
    cx_rcv_rtt, Histogram, Receiver side round trip time estimate in microseconds
    cx_tx_window_scale, Histogram, Shift value to scale send window
    cx_rx_window_scale, Histogram, Shift value to scale receive window
-   cx_congestion_window, Histogram, urrent congestion window in bytes for sending data
+   cx_congestion_window, Histogram, Congestion window in bytes for sending data
    cx_pacing_rate, Histogram, Pacing rate in MB per second
    cx_delivery_rate, Histogram, Observed maximum delivery rate in MB per second
