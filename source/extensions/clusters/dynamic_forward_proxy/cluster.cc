@@ -173,7 +173,7 @@ Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
   // try again to get the sub cluster.
   auto cluster = cm_.getThreadLocalCluster(cluster_name);
   if (cluster == nullptr) {
-    ENVOY_LOG(error, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
+    ENVOY_LOG(warn, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
     return nullptr;
   }
 
