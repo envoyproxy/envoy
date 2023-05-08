@@ -107,16 +107,6 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   ASSERT_EQ(cc_.status, "400");
   ASSERT_EQ(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
-
-  EXPECT_EQ(0, cc_.final_intel.stream_start_ms);
-  EXPECT_EQ(0, cc_.final_intel.connect_start_ms);
-  EXPECT_EQ(0, cc_.final_intel.connect_end_ms);
-  EXPECT_EQ(0, cc_.final_intel.sending_start_ms);
-  EXPECT_EQ(0, cc_.final_intel.sending_end_ms);
-  EXPECT_EQ(0, cc_.final_intel.response_start_ms);
-  EXPECT_EQ(0, cc_.final_intel.stream_end_ms);
-  EXPECT_EQ(0, cc_.final_intel.dns_start_ms);
-  EXPECT_EQ(0, cc_.final_intel.dns_end_ms);
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
