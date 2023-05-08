@@ -7,7 +7,10 @@ envoy_package()
 
 selects.config_setting_group(
     name = "use_android_system_helper",
-    match_any = ["@envoy//bazel:android_system_helper", "@envoy//bazel:android"],
+    match_any = [
+        "@envoy//bazel:android_system_helper",
+        "@envoy//bazel:android",
+    ],
 )
 
 envoy_cc_library(
@@ -24,13 +27,13 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     deps = [
-        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         ":default_system_helper_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
     ] + select({
         ":use_android_system_helper": [
             "//library/common/jni:android_jni_utility_lib",
             "//library/common/jni:android_network_utility_lib",
-        ]
+        ],
     }) + select({
         "@envoy//bazel:apple": [
             "//library/common/network:apple_platform_cert_verifier",
@@ -41,14 +44,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "default_system_helper_lib",
+    srcs = [],
     hdrs = [
+        "default_system_helper.cc",
         "default_system_helper.h",
         "default_system_helper_android.cc",
         "default_system_helper_apple.cc",
-        "default_system_helper.cc",
     ],
     repository = "@envoy",
-    srcs = [],
     deps = [],
 )
 
