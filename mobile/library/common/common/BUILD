@@ -1,40 +1,55 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+selects.config_setting_group(
+    name = "use_android_system_helper",
+    match_any = ["@envoy//bazel:android_system_helper", "@envoy//bazel:android"],
+)
+
 envoy_cc_library(
     name = "system_helper_lib",
     srcs = [
         "system_helper.cc",
-    ] + select({
-        "@envoy//bazel:android_system_helper": ["default_system_helper_android.cc"],
-        "@envoy//bazel:android": ["default_system_helper_android.cc"],
-        "@envoy//bazel:apple": ["default_system_helper_apple.cc"],
-        "//conditions:default": ["default_system_helper.cc"],
-    }),
+    ],
     hdrs = [
-        "default_system_helper.h",
         "system_helper.h",
     ],
+    copts = select({
+        ":use_android_system_helper": ["-DUSE_ANDROID_SYSTEM_HELPER"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        ":default_system_helper_lib",
     ] + select({
-        "@envoy//bazel:android_system_helper": [
+        ":use_android_system_helper": [
             "//library/common/jni:android_jni_utility_lib",
             "//library/common/jni:android_network_utility_lib",
-        ],
-        "@envoy//bazel:android": [
-            "//library/common/jni:android_jni_utility_lib",
-            "//library/common/jni:android_network_utility_lib",
-        ],
+        ]
+    }) + select({
         "@envoy//bazel:apple": [
             "//library/common/network:apple_platform_cert_verifier",
         ],
         "//conditions:default": [],
     }),
+)
+
+envoy_cc_library(
+    name = "default_system_helper_lib",
+    hdrs = [
+        "default_system_helper.h",
+        "default_system_helper_android.cc",
+        "default_system_helper_apple.cc",
+        "default_system_helper.cc",
+    ],
+    repository = "@envoy",
+    srcs = [],
+    deps = [],
 )
 
 envoy_cc_library(
