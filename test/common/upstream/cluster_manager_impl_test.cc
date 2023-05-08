@@ -1272,7 +1272,8 @@ TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
   config_b.mutable_healthy_panic_threshold()->set_value(0.3);
   auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
   auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
-  EXPECT_EQ(common_config_ptr_a->healthy_panic_threshold().value(), common_config_ptr_b->healthy_panic_threshold().value());
+  EXPECT_EQ(common_config_ptr_a->healthy_panic_threshold().value(),
+            common_config_ptr_b->healthy_panic_threshold().value());
 }
 
 TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
@@ -1295,7 +1296,8 @@ TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
   config_b.mutable_healthy_panic_threshold()->set_value(0.5);
   auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
   auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
-  EXPECT_NE(common_config_ptr_a->healthy_panic_threshold().value(), common_config_ptr_b->healthy_panic_threshold().value());
+  EXPECT_NE(common_config_ptr_a->healthy_panic_threshold().value(),
+            common_config_ptr_b->healthy_panic_threshold().value());
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {

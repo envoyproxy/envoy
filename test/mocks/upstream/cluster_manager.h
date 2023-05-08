@@ -87,7 +87,7 @@ public:
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
     return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
-          common_lb_config);
+        common_lb_config);
   }
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
