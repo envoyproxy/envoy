@@ -175,7 +175,6 @@ message ExternalProcessor {
   // field is set in an external processor response.
   bool disable_clear_route_cache = 11;
 
-  // [#not-implemented-hide:]
   // The Metadata field can be used to provide additional information about the external processing filter.
   // It can be used for configuration, stats, and logging. The metadata will be copied into the filter state
   // object "ext-proc-logging-info" that contains stats about gRPC messages sent by this ext_proc
