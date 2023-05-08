@@ -848,6 +848,27 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
   EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
 }
 
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexBuiltinExpression) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  StatNamePool pool(symbol_table_);
+  StatName name = pool.add("cluster.foo.bar");
+  StatName tag_key = pool.add("a");
+  StatName tag_val = pool.add("b");
+
+  StatNameTagVector tags{{tag_key, tag_val}};
+  store_->extractAndAppendTags(name, pool, tags);
+
+  EXPECT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("envoy.cluster_name", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("foo", symbol_table_.toString(tags[1].second));
+}
+
 class LookupWithStatNameTest : public ThreadLocalStoreNoMocksMixin, public testing::Test {};
 
 TEST_F(LookupWithStatNameTest, All) {
