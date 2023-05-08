@@ -135,10 +135,14 @@ jobs:
 
       # Publish docs
       - script: |
-          ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+          ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
         displayName: "Upload Docs to GCS"
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_RBE: "1"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
