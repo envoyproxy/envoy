@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
@@ -47,6 +48,9 @@ inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-in
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
+  explicit ExtProcLoggingInfo(const envoy::config::core::v3::Metadata& metadata):
+    metadata_(metadata) {}
+
   struct GrpcCall {
     GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
              const ProcessorState::CallbackState callback_state)
@@ -62,11 +66,13 @@ public:
                       envoy::config::core::v3::TrafficDirection traffic_direction);
 
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
 
-private:
+ private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
+  const envoy::config::core::v3::Metadata metadata_;
 };
 
 class FilterConfig {
@@ -79,7 +85,8 @@ public:
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
+        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
+        metadata_(config.metadata()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -99,7 +106,9 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-private:
+  const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
+
+ private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
@@ -114,6 +123,7 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
+  const envoy::config::core::v3::Metadata metadata_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

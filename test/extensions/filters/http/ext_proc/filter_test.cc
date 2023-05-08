@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
@@ -282,6 +283,18 @@ protected:
     EXPECT_EQ(calls_count, expected_calls_count);
   }
 
+  // The metadata configured as part of ext_proc filter should be in the filter state.
+  void expectMetadataInFilterState(const envoy::config::core::v3::Metadata expected_metadata) {
+    const envoy::config::core::v3::Metadata& loggedMetadata =
+        stream_info_.filterState()
+            ->getDataReadOnly<Envoy::Extensions::HttpFilters::
+                                  ExternalProcessing::ExtProcLoggingInfo>(
+                Envoy::Extensions::HttpFilters::ExternalProcessing::
+                    ExtProcLoggingInfoName)
+            ->metadata();
+    EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
+  }
+
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
@@ -310,6 +323,10 @@ TEST_F(HttpFilterTest, SimplestPost) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   failure_mode_allow: true
+  metadata:
+    filter_metadata:
+      com.foo.bar:
+        scooby: "doo"
   )EOF");
 
   EXPECT_TRUE(config_->failureModeAllow());
@@ -365,6 +382,11 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
+
+  envoy::config::core::v3::Metadata metadata;
+  auto &filter_metadata = *metadata.mutable_filter_metadata();
+  (*filter_metadata["com.foo.bar"].mutable_fields())["scooby"].set_string_value("doo");
+  expectMetadataInFilterState(metadata);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -510,6 +532,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
+  expectMetadataInFilterState(envoy::config::core::v3::Metadata());
 }
 
 // Using the default configuration, test the filter with a processor that
