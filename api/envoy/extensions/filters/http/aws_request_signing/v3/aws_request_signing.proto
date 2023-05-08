@@ -67,6 +67,7 @@ message AwsRequestSigning {
 
 message AwsRequestSigningPerRoute {
   // Override the global configuration of the filter with this new config.
+  // This overrides the entire message of AwsRequestSigning and not at field level.
   AwsRequestSigning aws_request_signing = 1;
 
   // The human readable prefix to use when emitting stats.

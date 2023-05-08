@@ -47,6 +47,13 @@ Example filter configuration:
     - prefix: x-forwarded
     - exact: x-amzn-trace-id
 
+.. literalinclude:: _include/aws-request-signing-filter.yaml
+    :language: yaml
+    :lines: 25-35
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
+
 
 .. include:: _include/aws_credentials.rst
 
@@ -54,28 +61,14 @@ Note that this filter also supports per route configuration:
 
 .. code-block:: yaml
 
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { prefix: "/some-route-match" }
-        route: { cluster: service }
-        typed_per_filter_config:
-          envoy.filters.http.aws_request_signing:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
-            aws_request_signing:
-              service_name: s3
-              region: us-west-2
-              use_unsigned_payload: true
-              match_excluded_headers:
-              - prefix: x-envoy
-              - prefix: x-forwarded
-              - exact: x-amzn-trace-id
-            stat_prefix: some-prefix
+.. literalinclude:: _include/aws-request-signing-filter-route-level-override.yaml
+    :language: yaml
+    :lines: 20-37
+    :lineno-start: 20
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-This can be used to either override the global configuration
+Above shows an example of route-level config overriding the config on the virutal-host level.
 
 Statistics
 ----------
