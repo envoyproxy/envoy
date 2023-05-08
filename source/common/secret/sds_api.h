@@ -137,13 +137,13 @@ public:
          const std::string& sds_config_name, std::function<void()> destructor_cb) {
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
-    Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
+    auto& server_context = secret_provider_context.serverFactoryContext();
+    Config::Utility::checkLocalInfo("TlsCertificateSdsApi", server_context.localInfo());
     return std::make_shared<TlsCertificateSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.mainThreadDispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.mainThreadDispatcher(),
-        secret_provider_context.api());
+        server_context.mainThreadDispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
+        destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
   }
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -223,14 +223,14 @@ public:
          const std::string& sds_config_name, std::function<void()> destructor_cb) {
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
+    auto& server_context = secret_provider_context.serverFactoryContext();
     Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
-                                    secret_provider_context.localInfo());
+                                    server_context.localInfo());
     return std::make_shared<CertificateValidationContextSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.mainThreadDispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.mainThreadDispatcher(),
-        secret_provider_context.api());
+        server_context.mainThreadDispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
+        destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
@@ -318,14 +318,13 @@ public:
          const std::string& sds_config_name, std::function<void()> destructor_cb) {
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
-    Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi",
-                                    secret_provider_context.localInfo());
+    auto& server_context = secret_provider_context.serverFactoryContext();
+    Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi", server_context.localInfo());
     return std::make_shared<TlsSessionTicketKeysSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.mainThreadDispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.mainThreadDispatcher(),
-        secret_provider_context.api());
+        server_context.mainThreadDispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
+        destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
   }
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -392,13 +391,13 @@ public:
          const std::string& sds_config_name, std::function<void()> destructor_cb) {
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
-    Config::Utility::checkLocalInfo("GenericSecretSdsApi", secret_provider_context.localInfo());
+    auto& server_context = secret_provider_context.serverFactoryContext();
+    Config::Utility::checkLocalInfo("GenericSecretSdsApi", server_context.localInfo());
     return std::make_shared<GenericSecretSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.mainThreadDispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.mainThreadDispatcher(),
-        secret_provider_context.api());
+        server_context.mainThreadDispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
+        destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
   }
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
