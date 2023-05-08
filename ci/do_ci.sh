@@ -476,6 +476,17 @@ case $CI_TARGET in
         BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
+    coverage-upload|fuzz_coverage-upload)
+        setup_clang_toolchain
+
+        if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
+            TARGET=fuzz_coverage
+        else
+            TARGET=coverage
+        fi
+
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "/source/generated/${TARGET}" "$TARGET"
+        ;;
     clang_tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
@@ -528,6 +539,10 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         "${ENVOY_SRCDIR}"/docs/build.sh
+        ;;
+    docs-upload)
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
     deps)
         setup_clang_toolchain
@@ -593,7 +608,7 @@ case $CI_TARGET in
                 cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
                 cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
 
-                "${ENVOY_SRCDIR}ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
+                "${ENVOY_SRCDIR}/ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
 
                 exit 0
             fi
