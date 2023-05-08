@@ -185,7 +185,10 @@ message ProcessingResponse {
   // :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>`
   // Such message can be sent at most once in a particular Envoy ext_proc filter processing state.
   // To enable this API, one has to set ``max_message_timeout`` to a number >= 1ms.
-  google.protobuf.Duration override_message_timeout = 10;
+  google.protobuf.Duration override_message_timeout = 10 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {nanos: 1000000}
+  }];
 }
 
 // The following are messages that are sent to the server.
