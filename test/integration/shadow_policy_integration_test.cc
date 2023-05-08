@@ -69,7 +69,7 @@ public:
         });
   }
 
-  void sendRequestAndValidateResponse() {
+  void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response =
@@ -80,7 +80,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterEq("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
+                                   times_called);
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -108,6 +109,39 @@ INSTANTIATE_TEST_SUITE_P(
                                                                                        : "IPv6",
                           "_", std::get<1>(params.param) ? "streaming_shadow" : "buffered_shadow");
     });
+
+TEST_P(ShadowPolicyIntegrationTest, Basic) {
+  initialConfigSetup("cluster_1", "");
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(1)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  // https://github.com/envoyproxy/envoy/issues/26820
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+}
 
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
   if (!streaming_shadow_) {
@@ -459,6 +493,8 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowOnlyTimeout) {
   // Clean up.
   ASSERT_TRUE(fake_upstream_connection_main->close());
   ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
   cleanupUpstreamAndDownstream();
 
@@ -726,14 +762,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
 
   cleanupUpstreamAndDownstream();
 
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
-                ->value(),
-            1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", 1);
   // Main cluster saw no reset; shadow cluster saw remote reset.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_completed", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
 }
 
 // Test request mirroring / shadowing with the cluster name in policy.

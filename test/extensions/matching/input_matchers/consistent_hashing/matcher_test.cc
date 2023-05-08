@@ -15,8 +15,8 @@ TEST(MatcherTest, BasicUsage) {
     Matcher matcher1(10, 100, 0);
     Matcher matcher2(10, 100, 0);
 
-    EXPECT_FALSE(matcher1.match(absl::nullopt));
-    EXPECT_FALSE(matcher2.match(absl::nullopt));
+    EXPECT_FALSE(matcher1.match(absl::monostate()));
+    EXPECT_FALSE(matcher2.match(absl::monostate()));
   }
   {
     Matcher matcher1(58, 100, 0);

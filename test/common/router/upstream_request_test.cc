@@ -108,7 +108,6 @@ TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
 // Test sending headers from the router to upstream.
 TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_upstream_filters", "true"}});
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());
 

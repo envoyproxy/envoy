@@ -261,12 +261,12 @@ SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb)
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
-void DispatcherImpl::post(std::function<void()> callback) {
+void DispatcherImpl::post(PostCb callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
     do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(callback);
+    post_callbacks_.push_back(std::move(callback));
   }
 
   if (do_post) {
@@ -359,7 +359,7 @@ void DispatcherImpl::runPostCallbacks() {
   // objects that is being deferred deleted.
   clearDeferredDeleteList();
 
-  std::list<std::function<void()>> callbacks;
+  std::list<PostCb> callbacks;
   {
     // Take ownership of the callbacks under the post_lock_. The lock must be released before
     // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute

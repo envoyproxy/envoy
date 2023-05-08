@@ -647,8 +647,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
 
 // Verifies small metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
-  // Make sure we have metadata coverage of the new style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -678,8 +676,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
 
 // Verifies large metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
-  // Make sure we have metadata coverage of the old style code.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1022,7 +1018,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
   codec_client_->rawConnection().write(bogus_data, false);
 
   // Verifies error is received.
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
@@ -2378,6 +2374,33 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   if (!response1->complete()) {
     ASSERT_TRUE(response1->waitForEndStream());
   }
+}
+
+TEST_P(MultiplexedIntegrationTest, ConnectionPoolPerDownstream) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  // Preserve the upstream connection while making sure
+  // sendRequestAndWaitForResponse will wait for a new connection.
+  FakeHttpConnectionPtr upstream_connection_ptr = std::move(fake_upstream_connection_);
+  std::unique_ptr<IntegrationCodecClient> client = std::move(codec_client_);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  AssertionResult result = upstream_connection_ptr->close();
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_connection_ptr->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  upstream_connection_ptr.reset();
+  client->close();
 }
 
 // Ordering of inheritance is important here, SocketInterfaceSwap must be

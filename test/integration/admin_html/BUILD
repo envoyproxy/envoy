@@ -16,7 +16,6 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
-    stamped = True,
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",

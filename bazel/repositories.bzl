@@ -244,7 +244,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
-    _com_github_datadog_dd_opentracing_cpp()
     _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
@@ -347,7 +346,6 @@ def _boringssl():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:boringssl_static.patch",
-            "@envoy//bazel:boringssl_CVE-2023-0286.patch",
         ],
     )
 
@@ -355,7 +353,6 @@ def _boringssl_fips():
     external_http_archive(
         name = "boringssl_fips",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
-        patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -649,17 +646,6 @@ def _io_opentracing_cpp():
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
-    )
-
-def _com_github_datadog_dd_opentracing_cpp():
-    external_http_archive("com_github_datadog_dd_opentracing_cpp")
-    external_http_archive(
-        name = "com_github_msgpack_msgpack_c",
-        build_file = "@com_github_datadog_dd_opentracing_cpp//:bazel/external/msgpack.BUILD",
-    )
-    native.bind(
-        name = "dd_opentracing_cpp",
-        actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
     )
 
 def _com_github_datadog_dd_trace_cpp():
@@ -1131,7 +1117,13 @@ def _proxy_wasm_cpp_sdk():
     external_http_archive(name = "proxy_wasm_cpp_sdk")
 
 def _proxy_wasm_cpp_host():
-    external_http_archive(name = "proxy_wasm_cpp_host")
+    external_http_archive(
+        name = "proxy_wasm_cpp_host",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:proxy_wasm_cpp_host.patch",
+        ],
+    )
 
 def _emsdk():
     external_http_archive(

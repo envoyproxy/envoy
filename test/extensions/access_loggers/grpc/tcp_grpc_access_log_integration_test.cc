@@ -107,7 +107,9 @@ public:
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
 
-      tcp_proxy_config.mutable_access_log_flush_interval()->set_seconds(1); // 1s
+      tcp_proxy_config.mutable_access_log_options()
+          ->mutable_access_log_flush_interval()
+          ->set_seconds(1); // 1s
 
       tcp_proxy->PackFrom(tcp_proxy_config);
     });
@@ -316,6 +318,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -375,6 +378,7 @@ tcp_logs:
       downstream_wire_bytes_received: 3
       upstream_wire_bytes_sent: 3
       upstream_wire_bytes_received: 5
+      access_log_type: TcpPeriodic
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -469,6 +473,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -535,6 +540,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -598,6 +604,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -644,6 +651,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -697,6 +705,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -750,6 +759,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}

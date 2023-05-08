@@ -61,13 +61,15 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // sending them.
   const Http::ResponseHeaderMap* header_map = &headers;
   std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
     modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
     header_map = modified_headers.get();
   }
-
+#endif
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
@@ -224,6 +226,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+  saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
@@ -232,19 +235,23 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     onStreamError(close_connection_upon_invalid_header_, rst);
     return;
   }
-  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
-      Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+
+  if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
   }
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isH3UpgradeRequest(*headers)) {
     // Transform Request from H3 to H1
     Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
   }
+#endif
 
   request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
   ConsumeHeaderList();
@@ -311,11 +318,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
+  quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (read_side_closed()) {
     return;
   }
-  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
-  quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
     maybeDecodeTrailers();
@@ -471,6 +478,22 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
       header_name, headers_with_underscores_action_, stats_);
   if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     details_ = Http3ResponseCodeDetailValues::invalid_underscore;
+    return result;
+  }
+  ASSERT(!header_name.empty());
+  if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+    return result;
+  }
+  static const absl::flat_hash_set<std::string> known_pseudo_headers{":authority", ":protocol",
+                                                                     ":path", ":method", ":scheme"};
+  if (header_name == ":path") {
+    if (saw_path_) {
+      // According to RFC9114, :path header should only have one value.
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
+    saw_path_ = true;
+  } else if (!known_pseudo_headers.contains(header_name)) {
+    return Http::HeaderUtility::HeaderValidationResult::REJECT;
   }
   return result;
 }

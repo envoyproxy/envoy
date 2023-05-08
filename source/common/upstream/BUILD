@@ -85,8 +85,6 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":od_cds_api_lib",
-        ":ring_hash_lb_lib",
-        ":subset_lb_lib",
         ":host_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -385,55 +383,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "maglev_lb_lib",
-    srcs = ["maglev_lb.cc"],
-    hdrs = ["maglev_lb.h"],
-    deps = [
-        ":thread_aware_lb_lib",
-        ":upstream_lib",
-        "//source/common/common:bit_array_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "ring_hash_lb_lib",
-    srcs = ["ring_hash_lb.cc"],
-    hdrs = ["ring_hash_lb.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
-    deps = [
-        ":thread_aware_lb_lib",
-        "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "subset_lb_lib",
-    srcs = ["subset_lb.cc"],
-    hdrs = ["subset_lb.h"],
-    deps = [
-        ":load_balancer_lib",
-        ":maglev_lb_lib",
-        ":ring_hash_lb_lib",
-        ":upstream_lib",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/upstream:load_balancer_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     deps = [
@@ -505,6 +454,7 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:health_checker_interface",
         "//envoy/upstream:load_balancer_interface",

@@ -137,6 +137,9 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
+  // For https://github.com/envoyproxy/envoy/issues/26264
+  // Set to trace since unable to reproduce issue locally.
+  LogLevelSetter save_levels(spdlog::level::trace);
   initialize();
   updateResource(file_updater_1_, 0.7);
 
@@ -159,7 +162,7 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
   upstream_request_->encodeData(10, true);
 
-  response2->waitForHeaders();
+  EXPECT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(codec_client_->waitForDisconnect());
 
   codec_client_->close();
