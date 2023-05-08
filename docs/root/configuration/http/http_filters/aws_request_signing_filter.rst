@@ -34,32 +34,14 @@ Example configuration
 
 Example filter configuration:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.aws_request_signing
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
-    service_name: s3
-    region: us-west-2
-    use_unsigned_payload: true
-    match_excluded_headers:
-    - prefix: x-envoy
-    - prefix: x-forwarded
-    - exact: x-amzn-trace-id
-
 .. literalinclude:: _include/aws-request-signing-filter.yaml
     :language: yaml
     :lines: 25-35
     :lineno-start: 25
     :linenos:
-    :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
-
-
-.. include:: _include/aws_credentials.rst
+    :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`\
 
 Note that this filter also supports per route configuration:
-
-.. code-block:: yaml
 
 .. literalinclude:: _include/aws-request-signing-filter-route-level-override.yaml
     :language: yaml
@@ -69,6 +51,8 @@ Note that this filter also supports per route configuration:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
 Above shows an example of route-level config overriding the config on the virutal-host level.
+
+.. include:: _include/aws_credentials.rst
 
 Statistics
 ----------
