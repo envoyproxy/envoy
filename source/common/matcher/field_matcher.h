@@ -149,11 +149,9 @@ public:
     if (supported_input_types.find(data_input_->dataInputType()) == supported_input_types.end()) {
       std::string supported_types;
       for (const auto& str : supported_input_types) {
-        if (!supported_types.empty()) {
-          absl::StrAppend(&supported_types, ", ");
-        }
-        absl::StrAppend(&supported_types, str);
+        absl::StrAppend(&supported_types, str, ", ");
       }
+      supported_types.erase(supported_types.length() - 2);
       throw EnvoyException(
           absl::StrCat("Unsupported data input type: ", data_input_->dataInputType(),
                        ". The matcher supports input type: ", supported_types));
