@@ -39,7 +39,7 @@ Example filter configuration:
     :lines: 25-35
     :lineno-start: 25
     :linenos:
-    :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`\
+    :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
 
 Note that this filter also supports per route configuration:
 
