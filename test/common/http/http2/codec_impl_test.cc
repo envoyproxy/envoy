@@ -605,9 +605,11 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -2924,8 +2926,11 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(client_callbacks_, onGoAway(_));
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 }
@@ -4237,6 +4242,65 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
     server_->getStream(1)->readDisable(false);
     EXPECT_TRUE(process_buffered_data_callback->enabled());
   }
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway) {
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
+
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  } else {
+    // nghttp2 does not raise the headers to the decoder.
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  }
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDispatch) {
+  initialize();
+
+  int times_shed_load_invoked = 0;
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
+      .WillRepeatedly(Invoke([&times_shed_load_invoked]() {
+        ++times_shed_load_invoked;
+        return false;
+      }));
+
+  // Drive new streams to be created within a single server dispatch.
+  const int num_streams_to_create = 20;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+
+  std::vector<RequestEncoder*> request_encoders;
+  std::vector<ResponseEncoder*> response_encoders;
+  request_encoders.reserve(num_streams_to_create);
+  response_encoders.reserve(num_streams_to_create);
+  for (int i = 0; i < num_streams_to_create; ++i) {
+    request_encoders.push_back(&client_->newStream(response_decoder_));
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoders.push_back(&encoder);
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          return request_decoder_;
+        }));
+
+    EXPECT_TRUE(request_encoders[i]->encodeHeaders(request_headers, true).ok());
+  }
+
+  // All the newly created streams are queued in the connection buffer.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);
+  driveToCompletion();
+  EXPECT_EQ(1, times_shed_load_invoked);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
 TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {

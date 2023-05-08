@@ -15,11 +15,13 @@ namespace Http2 {
  */
 #define ALL_HTTP2_CODEC_STATS(COUNTER, GAUGE)                                                      \
   COUNTER(dropped_headers_with_underscores)                                                        \
+  COUNTER(goaway_sent)                                                                             \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
+  COUNTER(keepalive_timeout)                                                                       \
   COUNTER(metadata_empty_frames)                                                                   \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
@@ -30,7 +32,6 @@ namespace Http2 {
   COUNTER(trailers)                                                                                \
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \
-  COUNTER(keepalive_timeout)                                                                       \
   GAUGE(streams_active, Accumulate)                                                                \
   GAUGE(pending_send_bytes, Accumulate)                                                            \
   GAUGE(deferred_stream_close, Accumulate)

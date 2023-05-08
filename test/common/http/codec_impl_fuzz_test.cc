@@ -603,7 +603,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     server = std::make_unique<Http2::ServerConnectionImpl>(
         server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, server_http2_options, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, overload_manager_);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
