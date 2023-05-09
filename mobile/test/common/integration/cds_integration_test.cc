@@ -58,7 +58,7 @@ protected:
     ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
   }
 
-  bool use_xdstp_;
+  bool use_xdstp_{false};
   std::string cds_namespace_;
 };
 
