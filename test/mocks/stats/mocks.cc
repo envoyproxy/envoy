@@ -18,6 +18,7 @@ namespace Stats {
 
 MockCounter::MockCounter() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, internal()).WillByDefault(ReturnPointee(&internal_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
 }
@@ -25,6 +26,7 @@ MockCounter::~MockCounter() = default;
 
 MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, internal()).WillByDefault(ReturnPointee(&internal_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
@@ -32,6 +34,7 @@ MockGauge::~MockGauge() = default;
 
 MockTextReadout::MockTextReadout() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, internal()).WillByDefault(ReturnPointee(&internal_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
 }
 MockTextReadout::~MockTextReadout() = default;
@@ -48,6 +51,7 @@ MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, internal()).WillByDefault(ReturnPointee(&internal_));
   ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {

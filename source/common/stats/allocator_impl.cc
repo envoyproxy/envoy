@@ -85,6 +85,7 @@ public:
   // Metric
   SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
+  bool internal() const override { return flags_ & Metric::Flags::Internal; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
@@ -168,7 +169,8 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode,
+            bool internalFlag = false)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
@@ -184,6 +186,7 @@ public:
       // https://github.com/envoyproxy/envoy/issues/7227.
       break;
     }
+    if(internalFlag) { flags_ |= Flags::Internal; }
   }
 
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
@@ -361,7 +364,8 @@ void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const 
     f_size(counters_.size());
   }
   for (auto& counter : counters_) {
-    f_stat(*counter);
+    if(!counter->internal())
+      f_stat(*counter);
   }
 }
 
@@ -371,7 +375,8 @@ void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
     f_size(gauges_.size());
   }
   for (auto& gauge : gauges_) {
-    f_stat(*gauge);
+    if(!gauge->internal())
+      f_stat(*gauge);
   }
 }
 
@@ -381,7 +386,8 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
     f_size(text_readouts_.size());
   }
   for (auto& text_readout : text_readouts_) {
-    f_stat(*text_readout);
+    if(!text_readout->internal())
+      f_stat(*text_readout);
   }
 }
 
@@ -390,7 +396,8 @@ void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_counters_.size());
     for (auto counter : sinked_counters_) {
-      f_stat(*counter);
+      if(!counter->internal())
+        f_stat(*counter);
     }
   } else {
     forEachCounter(f_size, f_stat);
@@ -402,7 +409,8 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
     for (auto gauge : sinked_gauges_) {
-      f_stat(*gauge);
+      if(!gauge->internal())
+        f_stat(*gauge);
     }
   } else {
     forEachGauge(f_size, f_stat);
@@ -414,7 +422,8 @@ void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_text_readouts_.size());
     for (auto text_readout : sinked_text_readouts_) {
-      f_stat(*text_readout);
+      if(!text_readout->internal())
+        f_stat(*text_readout);
     }
   } else {
     forEachTextReadout(f_size, f_stat);
