@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 38]
+// [#next-free-field: 39]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -99,6 +99,15 @@ message Bootstrap {
     // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
     core.v3.ApiConfigSource ads_config = 3;
+  }
+
+  message ApplicationLogFormat {
+    oneof log_format {
+      // Flush application logs in JSON format. If set, it will override Envoy's --log-format
+      // CLI option. The configured JSON struct can support all the format tags specified in
+      // the --log-format section, in :ref:`operations CLI <operations_cli>`.
+      google.protobuf.Struct json_format = 1;
+    }
   }
 
   reserved 10, 11;
@@ -360,6 +369,8 @@ message Bootstrap {
   // Envoy only supports ListenerManager for this field and Envoy Mobile
   // supports ApiListenerManager.
   core.v3.TypedExtensionConfig listener_manager = 37;
+
+  ApplicationLogFormat application_log_format = 38;
 }
 
 // Administration interface :ref:`operations documentation
