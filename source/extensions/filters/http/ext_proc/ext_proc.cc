@@ -559,7 +559,16 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Check whether the server is asking to extend the timer.
   if (response->has_override_message_timeout()) {
-    onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
+    // The override_message_timeout in response may be too big for duration, which leads
+    // to exception been thrown during durationToMilliseconds() check.
+    // Needs to properly handle this case.
+    try {
+      onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
+    } catch (const DurationUtil::OutOfRangeException& e) {
+      ENVOY_LOG(warn, "override_message_timeout value out-of-range: {}. Ignoring the message.",
+                e.what());
+      stats_.override_message_timeout_ignored_.inc();
+    }
     return;
   }
 
