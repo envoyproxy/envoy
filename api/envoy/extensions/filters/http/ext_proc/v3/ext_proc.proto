@@ -95,8 +95,16 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`
 // messages, and the server must reply with
 // :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
-
-// [#next-free-field: 13]
+//
+// Stats about each gRPC call will be recorded in a :ref:`dynamic filter state
+// <arch_overview_advanced_filter_state_sharing>` object whose name is specified
+// by :ref:`filter_state_name
+// <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.filter_state_name>`.
+// This data can then be logged as part of Access Logs using the :ref:`command
+// operator <config_access_log_command_operators>`
+// %FILTER_STATE(<filter_state_name>)%.
+//
+// [#next-free-field: 14]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -175,11 +183,14 @@ message ExternalProcessor {
   // field is set in an external processor response.
   bool disable_clear_route_cache = 11;
 
-  // The Metadata field can be used to provide additional information about the external processing filter.
-  // It can be used for configuration, stats, and logging. The metadata will be copied into the filter state
-  // object "ext-proc-logging-info" that contains stats about gRPC messages sent by this ext_proc
-  // filter during request processing.
-  config.core.v3.Metadata metadata = 12;
+  // The name of the :ref:`dynamic filter state
+  // <arch_overview_advanced_filter_state_sharing>` object under which stats
+  // about individual gRPC calls such as latency, bytes sent/received, status
+  // codes, etc., will be recorded. Defaults to "ext-proc-logging-info".
+  string filter_state_name = 12;
+
+  // Additional metadata to be added to the dynamic filter state for logging purposes.
+  config.core.v3.Metadata metadata = 13;
 }
 
 // Extra settings that may be added to per-route configuration for a

@@ -103,13 +103,13 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
-    filter_state->setData(ExtProcLoggingInfoName,
+  if (!filter_state->hasData<ExtProcLoggingInfo>(config_->filterStateName())) {
+    filter_state->setData(config_->filterStateName(),
                           std::make_shared<ExtProcLoggingInfo>(config_->metadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(config_->filterStateName());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

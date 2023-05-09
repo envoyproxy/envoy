@@ -44,12 +44,10 @@ struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-info";
-
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtProcLoggingInfo(const envoy::config::core::v3::Metadata& metadata):
-    metadata_(metadata) {}
+  explicit ExtProcLoggingInfo(const envoy::config::core::v3::Metadata& metadata)
+      : metadata_(metadata) {}
 
   struct GrpcCall {
     GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
@@ -68,7 +66,7 @@ public:
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
 
- private:
+private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
@@ -86,6 +84,8 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
+        filter_state_name_(
+            PROTOBUF_GET_STRING_OR_DEFAULT(config, filter_state_name, "ext-proc-logging-info")),
         metadata_(config.metadata()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -106,9 +106,11 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
+  const std::string& filterStateName() const { return filter_state_name_; }
+
   const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
 
- private:
+private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
@@ -123,6 +125,7 @@ public:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
+  const std::string filter_state_name_;
   const envoy::config::core::v3::Metadata metadata_;
 };
 

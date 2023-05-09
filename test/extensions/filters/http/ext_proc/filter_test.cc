@@ -270,12 +270,13 @@ protected:
 
   // The number of processor grpc calls made in the encoding and decoding path.
   void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
-                       const Grpc::Status::GrpcStatus status, const int expected_calls_count) {
+                       const Grpc::Status::GrpcStatus status, const int expected_calls_count,
+                       const std::string& filter_state_name) {
     const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfoName)
+                filter_state_name)
             ->grpcCalls(traffic_direction);
     int calls_count = std::count_if(
         grpc_calls.begin(), grpc_calls.end(),
@@ -284,13 +285,13 @@ protected:
   }
 
   // The metadata configured as part of ext_proc filter should be in the filter state.
-  void expectMetadataInFilterState(const envoy::config::core::v3::Metadata expected_metadata) {
+  void expectMetadataInFilterState(const envoy::config::core::v3::Metadata expected_metadata,
+                                   const std::string& filter_state_name) {
     const envoy::config::core::v3::Metadata& loggedMetadata =
         stream_info_.filterState()
-            ->getDataReadOnly<Envoy::Extensions::HttpFilters::
-                                  ExternalProcessing::ExtProcLoggingInfo>(
-                Envoy::Extensions::HttpFilters::ExternalProcessing::
-                    ExtProcLoggingInfoName)
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+                filter_state_name)
             ->metadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
@@ -380,13 +381,16 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
+  const std::string expected_filter_state_name = "ext-proc-logging-info";
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1,
+                  expected_filter_state_name);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1,
+                  expected_filter_state_name);
 
   envoy::config::core::v3::Metadata metadata;
-  auto &filter_metadata = *metadata.mutable_filter_metadata();
+  auto& filter_metadata = *metadata.mutable_filter_metadata();
   (*filter_metadata["com.foo.bar"].mutable_fields())["scooby"].set_string_value("doo");
-  expectMetadataInFilterState(metadata);
+  expectMetadataInFilterState(metadata, expected_filter_state_name);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -480,6 +484,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
+  filter_state_name: "foobar"
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -530,9 +535,12 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
-  expectMetadataInFilterState(envoy::config::core::v3::Metadata());
+  const std::string expected_filter_state_name = "foobar";
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1,
+                  expected_filter_state_name);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0,
+                  expected_filter_state_name);
+  expectMetadataInFilterState(envoy::config::core::v3::Metadata(), expected_filter_state_name);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1252,8 +1260,11 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2);
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7);
+  const std::string expected_filter_state_name = "ext-proc-logging-info";
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2,
+                  expected_filter_state_name);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7,
+                  expected_filter_state_name);
 }
 
 // Using a configuration with streaming set for the request and
@@ -1645,7 +1656,9 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1);
+  const std::string expected_filter_state_name = "ext-proc-logging-info";
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1,
+                  expected_filter_state_name);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1700,8 +1713,11 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
-  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1);
+  const std::string expected_filter_state_name = "ext-proc-logging-info";
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1,
+                  expected_filter_state_name);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1,
+                  expected_filter_state_name);
 }
 
 // Using the default configuration, test the filter with a processor that
