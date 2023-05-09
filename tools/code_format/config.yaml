@@ -199,6 +199,7 @@ paths:
     - source/server/admin/stats_request.cc
     - source/server/admin/utils.h
     - source/server/admin/utils.cc
+    - source/common/runtime/runtime_impl.cc
     - tools/clang_tools/api_booster/main.cc
     - tools/clang_tools/api_booster/proto_cxx_utils.cc
 
