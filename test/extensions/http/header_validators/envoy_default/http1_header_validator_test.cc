@@ -595,8 +595,9 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   auto uhv = createH1(redirect_encoded_slash_config);
   EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_EQ(result.action(),
-            ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
+  EXPECT_EQ(
+      result.action(),
+      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }

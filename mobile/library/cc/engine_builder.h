@@ -61,7 +61,6 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
 #endif
@@ -90,7 +89,6 @@ public:
 #endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
-  EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -180,7 +178,6 @@ private:
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
   bool admin_interface_enabled_ = false;
-  bool enable_happy_eyeballs_ = true;
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
@@ -196,7 +193,6 @@ private:
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

@@ -1018,7 +1018,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
 void ConnectionImpl::goAway() {
   adapter_->SubmitGoAway(adapter_->GetHighestReceivedStreamId(),
                          http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
-
+  stats_.goaway_sent_.inc();
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -2047,10 +2047,13 @@ ServerConnectionImpl::ServerConnectionImpl(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count),
-      callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
+      callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
+          "envoy.load_shed_points.http2_server_go_away_on_dispatch")) {
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
@@ -2133,6 +2136,11 @@ Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
+      should_send_go_away_on_dispatch_->shouldShedLoad()) {
+    ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
+  }
   return ConnectionImpl::dispatch(data);
 }
 
