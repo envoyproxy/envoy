@@ -32,7 +32,7 @@ private:
                                     Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& perRouteConfig,
+  createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& per_route_config,
                                        Server::Configuration::ServerFactoryContext& context,
                                        ProtobufMessage::ValidationVisitor&) override;
 };
