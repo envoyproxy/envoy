@@ -37,7 +37,6 @@ envoy_cmake(
         "CMAKE_BUILD_TYPE": "Release",
         "VPP_API_TEST_BUILTIN": "OFF",
         "BUILD_SHARED_LIBS": "OFF",
-        "CMAKE_ENABLE_TESTING": "OFF",
         "CMAKE_ENABLE_EXPORTS": "OFF",
     },
     copts = ["-Wno-unused-variable"],

@@ -53,7 +53,26 @@ index ad4adfcab..0051bca10 100644
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
+diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
+index 8415c28fb..a017d9fc6 100755
+--- src/tools/vppapigen/vppapigen.py
++++ src/tools/vppapigen/vppapigen.py
+@@ -7,6 +7,13 @@ import logging
+ import binascii
+ import os
+ from subprocess import Popen, PIPE
++
++# Put ply on the path ...
++plypath = os.path.join(
++    os.environ["EXT_BUILD_ROOT"],
++    os.path.dirname(os.environ["PLYPATHS"].split()[0]))
++sys.path += [plypath]
++
+ import ply.lex as lex
+ import ply.yacc as yacc
 
+diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
+index e6d8f98ff..600ef4d5f 100644
 --- src/vcl/CMakeLists.txt
 +++ src/vcl/CMakeLists.txt
 @@ -30,6 +30,8 @@ add_vpp_library(vppcom
