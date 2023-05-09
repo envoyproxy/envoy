@@ -1069,7 +1069,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_WIRE_BYTES_SENT",
