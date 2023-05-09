@@ -39,6 +39,7 @@ envoy_extension_cc_test(
     deps = [
         ":header_validator_test_lib",
         "//envoy/http:header_validator_errors",
+        "//source/extensions/http/header_validators/envoy_default:character_tables",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//test/test_common:test_runtime_lib",

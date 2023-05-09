@@ -23,7 +23,7 @@ protected:
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
-    return std::make_unique<PathNormalizer>(typed_config);
+    return std::make_unique<PathNormalizer>(typed_config, translate_backslash_to_slash_);
   }
 
   static constexpr absl::string_view empty_config = "{}";
@@ -58,6 +58,7 @@ protected:
     )EOF";
   TestScopedRuntime scoped_runtime_;
   bool preserve_percent_encoded_case_{false};
+  bool translate_backslash_to_slash_{false};
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
@@ -461,20 +462,20 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
 }
 
 TEST_F(PathNormalizerTest, BackslashTranslatedToSlash) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
+  translate_backslash_to_slash_ = true;
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/path\\with/back\\/slash%5c?key=val\\ue"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+  // In query backslash is untouched
+  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C?key=val\\ue");
 }
 
 TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
+  translate_backslash_to_slash_ = false;
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
 
   auto normalizer = create(empty_config);

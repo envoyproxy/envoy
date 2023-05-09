@@ -31,7 +31,7 @@ DEFINE_PROTO_FUZZER(
   *config.mutable_uri_path_normalization_options() = input.options();
   ::testing::NiceMock<Http::MockHeaderValidatorStats> stats_fake;
   Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator validator(
-      config, Http::Protocol::Http11, stats_fake);
+      config, Http::Protocol::Http11, stats_fake, {false});
   // The character set of the :path and :method headers is validated before normalization.
   // Here we will just not run the test with invalid values
   if (!validator.validateMethodHeader(method) ||
@@ -42,7 +42,7 @@ DEFINE_PROTO_FUZZER(
   header_map->setMethod(method.getStringView());
   header_map->setPath(path.getStringView());
 
-  Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer normalizer(config);
+  Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer normalizer(config, false);
   auto result = normalizer.normalizePathUri(*header_map);
   if (result.ok() || result.action() ==
                          Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer::

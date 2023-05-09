@@ -13,7 +13,8 @@ class PathNormalizer {
 public:
   PathNormalizer(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
-          config);
+          config,
+      bool translate_backslash_to_slash);
 
   using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RejectOrRedirectResult;
 
@@ -88,6 +89,8 @@ private:
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
+
+  const bool translate_backslash_to_slash_{false};
 };
 
 using PathNormalizerPtr = std::unique_ptr<PathNormalizer>;

@@ -28,7 +28,10 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
+        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
+    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        config_overrides);
   }
 
   ClientHttp1HeaderValidatorPtr createH1Client(absl::string_view config_yaml) {
@@ -36,7 +39,10 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
+        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
+    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        config_overrides);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -751,30 +757,63 @@ TEST_F(Http1HeaderValidatorTest, InvalidResponseHeaderBeforeSendingDownstream) {
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
 }
 
-TEST_F(Http1HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5C"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
+TEST_F(Http1HeaderValidatorTest, ControlAsciiInPathRejected) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
   auto uhv = createH1(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+  for (char control_ascii = 0; control_ascii <= 0x20; ++control_ascii) {
+#ifndef NDEBUG
+    // In debug builds this test triggers ASSERT for NUL, CR and LF characters
+    // in header value
+    if (control_ascii == 0 || control_ascii == '\r' || control_ascii == '\n') {
+      continue;
+    }
+#endif
+    std::string path_with_control_ascii("/path/with/extended/ascii");
+    path_with_control_ascii[12] = control_ascii;
+    HeaderString invalid_value{};
+    setHeaderStringUnvalidated(invalid_value, path_with_control_ascii);
+    ::Envoy::Http::TestRequestHeaderMapImpl headers{
+        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+    headers.addViaMove(HeaderString(absl::string_view(":path")), std::move(invalid_value));
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+  }
 }
 
-TEST_F(Http1HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5c"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
+TEST_F(Http1HeaderValidatorTest, ControlAsciiInQueryRejected) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
   auto uhv = createH1(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+  for (uint32_t control_ascii = 0; control_ascii <= 0x20; ++control_ascii) {
+#ifndef NDEBUG
+    // In debug builds this test triggers ASSERT for NUL, CR and LF characters
+    // in header value
+    if (control_ascii == 0 || control_ascii == '\r' || control_ascii == '\n') {
+      continue;
+    }
+#endif
+    std::string query_with_control_ascii("/query?with=extended&ascii");
+    query_with_control_ascii[13] = static_cast<char>(control_ascii);
+    HeaderString invalid_value{};
+    setHeaderStringUnvalidated(invalid_value, query_with_control_ascii);
+    ::Envoy::Http::TestRequestHeaderMapImpl headers{
+        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+    headers.addViaMove(HeaderString(absl::string_view(":path")), std::move(invalid_value));
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+  }
+}
+
+TEST_F(Http1HeaderValidatorTest, ExtendedAsciiInPathRejected) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+  auto uhv = createH1(empty_config);
+
+  for (uint32_t extended_ascii = 0x80; extended_ascii < 0x100; ++extended_ascii) {
+    std::string path_with_extended_ascii("/path/with/extended/ascii");
+    path_with_extended_ascii[12] = static_cast<char>(extended_ascii);
+    headers.setPath(path_with_extended_ascii);
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+  }
 }
 
 } // namespace

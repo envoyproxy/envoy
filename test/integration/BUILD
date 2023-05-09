@@ -2229,12 +2229,15 @@ envoy_cc_test(
     srcs = [
         "default_header_validator_integration_test.cc",
     ],
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
+        "//source/common/http:character_set_validation_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/http/header_validators/envoy_default:character_tables",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

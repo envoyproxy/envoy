@@ -29,7 +29,9 @@ struct PathNormalizerResponseCodeDetailValues {
 
 using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCodeDetailValues>;
 
-PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
+PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
+                               bool translate_backslash_to_slash)
+    : config_(config), translate_backslash_to_slash_(translate_backslash_to_slash) {}
 
 PathNormalizer::DecodedOctet
 PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
@@ -242,8 +244,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+  if (translate_backslash_to_slash_) {
     translateBackToForwardSlashes(path);
   }
 

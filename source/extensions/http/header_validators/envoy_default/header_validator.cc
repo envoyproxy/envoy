@@ -22,26 +22,6 @@ template <typename IntType>
 std::from_chars_result fromChars(const absl::string_view string_value, IntType& value) {
   return std::from_chars(string_value.data(), string_value.data() + string_value.size(), value);
 }
-
-// Same table as the kPathHeaderCharTable but with the backslash character allowed
-// This table is used when the "envoy.reloadable_features.uhv_translate_backslash_to_slash"
-// runtime keys is set to "true".
-constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01001111111111111111111111110100,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111101001,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b01111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
-
 } // namespace
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
@@ -51,9 +31,11 @@ using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 ::Envoy::Http::HeaderValidatorStats& stats)
-    : config_(config), protocol_(protocol), header_values_(::Envoy::Http::Headers::get()),
-      stats_(stats), path_normalizer_(config) {}
+                                 ::Envoy::Http::HeaderValidatorStats& stats,
+                                 const HeaderValidatorConfigOverrides& config_overrides)
+    : config_(config), protocol_(protocol), config_overrides_(config_overrides),
+      header_values_(::Envoy::Http::Headers::get()), stats_(stats),
+      path_normalizer_(config, config_overrides.allow_non_compliant_characters_in_path_) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -406,58 +388,109 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
+  return validatePathHeaderCharacterSet(value, kPathHeaderCharTable,
+                                        ::Envoy::Http::kUriQueryAndFragmentCharTable);
+}
+
+HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeaderCharacterSet(
+    const HeaderString& value, const std::array<uint32_t, 8>& allowed_path_chracters,
+    const std::array<uint32_t, 8>& allowed_query_fragment_characters) {
+  static const HeaderValueValidationResult bad_path_result{
+      HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   const auto& path = value.getStringView();
-  bool is_valid = !path.empty();
+  if (path.empty()) {
+    return bad_path_result;
+  }
 
   auto iter = path.begin();
   auto end = path.end();
-  // When the envoy.reloadable_features.uhv_translate_backslash_to_slash == true
-  // the validation method needs to allow backslashes in path, so they can be translated
-  // to slashes during path normalization.
-  const bool allow_backslash =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_translate_backslash_to_slash");
-
-  const std::array<uint32_t, 8>& allowed_path_chracters =
-      allow_backslash ? kPathHeaderCharTableWithBackSlashAllowed : kPathHeaderCharTable;
 
   // Validate the path component of the URI
-  for (; iter != end && is_valid; ++iter) {
-    const char ch = *iter;
-    if (ch == '?' || ch == '#') {
+  for (; iter != end; ++iter) {
+    if (*iter == '?' || *iter == '#') {
       // This is the start of the query or fragment portion of the path which uses a different
       // character table.
       break;
     }
 
-    is_valid &= testCharInTable(allowed_path_chracters, ch);
+    if (!testCharInTable(allowed_path_chracters, *iter)) {
+      return bad_path_result;
+    }
   }
 
-  if (is_valid && iter != end && *iter == '?') {
+  if (iter != end) {
     // Validate the query component of the URI
+    bool observed_fragment_start = *iter == '#';
     ++iter;
-    for (; iter != end && is_valid; ++iter) {
-      const char ch = *iter;
-      if (ch == '#') {
-        break;
+    for (; iter != end; ++iter) {
+      if (*iter == '#' && !observed_fragment_start) {
+        // There can only be at most one '#' character in URI to separate query and fragment.
+        observed_fragment_start = true;
+        continue;
       }
 
-      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, ch);
+      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
+        return bad_path_result;
+      }
     }
-  }
-
-  if (is_valid && iter != end && *iter == '#') {
-    // Validate the fragment component of the URI
-    ++iter;
-    for (; iter != end && is_valid; ++iter) {
-      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, *iter);
-    }
-  }
-
-  if (!is_valid) {
-    return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   return HeaderValueValidationResult::success();
+}
+
+void HeaderValidator::encodeAdditionalCharactersInPath(
+    ::Envoy::Http::RequestHeaderMap& header_map) {
+  // " < > ^ ` { } | TAB space extended-ASCII
+  static constexpr std::array<uint32_t, 8> kCharactersToEncode = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b10100000000000000000000000001010,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b00000000000000000000000000000010,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b10000000000000000000000000011100,
+      // extended ascii
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+  };
+
+  absl::string_view path = header_map.path();
+  // Check if URI the path contains any characters >= 0x80
+  auto char_to_encode = path.begin();
+  for (; char_to_encode != path.end() && !testCharInTable(kCharactersToEncode, *char_to_encode);
+       ++char_to_encode) {
+    // Return early if we got to query or fragment without finding any characters that has to be
+    // encoded.
+    if (*char_to_encode == '?' || *char_to_encode == '#') {
+      return;
+    }
+  }
+  if (char_to_encode == path.end()) {
+    return;
+  }
+  std::string encoded_path(path.begin(), char_to_encode);
+  encoded_path.reserve(path.size());
+
+  for (; char_to_encode != path.end(); ++char_to_encode) {
+    if (*char_to_encode == '?' || *char_to_encode == '#') {
+      break;
+    }
+    if (testCharInTable(kCharactersToEncode, *char_to_encode)) {
+      absl::StrAppend(&encoded_path,
+                      fmt::format("%{:02X}", static_cast<const unsigned char&>(*char_to_encode)));
+    } else {
+      encoded_path.push_back(*char_to_encode);
+    }
+  }
+  // Append query and fragment if present
+  encoded_path.append(char_to_encode, path.end());
+  // Encoding would change the length of the path
+  if (encoded_path.size() > path.size()) {
+    header_map.setPath(encoded_path);
+  }
 }
 
 bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {

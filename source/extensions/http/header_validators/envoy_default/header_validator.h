@@ -16,6 +16,37 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+struct HeaderValidatorConfigOverrides {
+  // This flag enables validation of the :path header compatibile with legacy Envoy codecs.
+  // When this flag is false header validator checks the URL path in accordance with
+  // the https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
+  //
+  // This option currently is `true` by default and can be overridden using the
+  // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value. Note that the default value
+  // will be changed to `false` in the future to make Envoy behavior standard compliant and
+  // consistent across all HTTP protocol versions.
+  //
+  // In the relaxed mode header validator allows the folloiwng additional characters:
+  // HTTP/1 protocol: " < > [ ] ^ ` { } \ |
+  // HTTP/2 and HTTP/3 protocols: all characters allowed for HTTP/1, space, TAB, all extended ASCII
+  // (>= 0x80)
+  //
+  // In addition when this flag is true AND path normaliztion is enabled, Envoy will do the
+  // following:
+  // 1. all additionally allowed characters with the exception of the [] and \ characters are URL
+  // encoded in path
+  //    segment or URL only. These characters in query or fragment will remain unecoded.
+  // 2. \ character is translated to / in path segment.
+  //
+  // This option provides backward compatibility with the existing (pre header validator) Envoy
+  // behavior. Envoy's lageacy codecs were not compliant with the
+  // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
+  //
+  // With the `envoy.uhv.allow_non_compliant_characters_in_path` set to false the header validator
+  // rejects requests with characters not allowed by the RFC in the :path header.
+  const bool allow_non_compliant_characters_in_path_{true};
+};
+
 /*
  * Base class for all HTTP codec header validations. This class has several methods to validate
  * headers that are shared across multiple codec versions where the RFC guidance did not change.
@@ -25,7 +56,8 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const HeaderValidatorConfigOverrides& config_overrides);
   virtual ~HeaderValidator() = default;
 
   using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
@@ -163,9 +195,28 @@ protected:
    */
   void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
+  /*
+   * Validate the :path pseudo header using specific allowed character set.
+   */
+  HeaderValueValidationResult
+  validatePathHeaderCharacterSet(const ::Envoy::Http::HeaderString& value,
+                                 const std::array<uint32_t, 8>& allowed_path_chracters,
+                                 const std::array<uint32_t, 8>& allowed_query_fragment_characters);
+
+  // URL-encode additional characters in URL path. This method is called iff
+  // `envoy.uhv.allow_non_compliant_characters_in_path` is true.
+  // Encoded characters:
+  //
+  // " < > ^ ` { } | TAB space extended-ASCII
+  // This method is provided for backward compatibility with Envoy's pre header validator
+  // behavior. See comments in the HeaderValidatorConfigOverrides declaration above for more
+  // information.
+  void encodeAdditionalCharactersInPath(::Envoy::Http::RequestHeaderMap& header_map);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
+  const HeaderValidatorConfigOverrides config_overrides_;
   const ::Envoy::Http::HeaderValues& header_values_;
   ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;
