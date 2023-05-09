@@ -34,8 +34,9 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
-    return envoyEngine.startStream(callbacks, explicitFlowControl);
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
+                                     long minChunkSize) {
+    return envoyEngine.startStream(callbacks, explicitFlowControl, minChunkSize);
   }
 
   @Override

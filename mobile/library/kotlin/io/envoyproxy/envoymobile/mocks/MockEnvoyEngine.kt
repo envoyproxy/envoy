@@ -23,9 +23,10 @@ internal class MockEnvoyEngine : EnvoyEngine {
 
   override fun startStream(
     callbacks: EnvoyHTTPCallbacks?,
-    explicitFlowControl: Boolean
+    explicitFlowControl: Boolean,
+    minChunkSize: Long
   ): EnvoyHTTPStream {
-    return MockEnvoyHTTPStream(callbacks!!, explicitFlowControl)
+    return MockEnvoyHTTPStream(callbacks!!, explicitFlowControl, minChunkSize)
   }
 
   override fun terminate() = Unit

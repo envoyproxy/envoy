@@ -182,7 +182,7 @@ TEST(MainInterfaceTest, BasicStream) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   send_headers(engine_handle, stream, c_headers, false);
   send_data(engine_handle, stream, c_data, false);
@@ -226,7 +226,7 @@ TEST(MainInterfaceTest, SendMetadata) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   EXPECT_EQ(ENVOY_FAILURE, send_metadata(engine_handle, stream, {}));
 
@@ -274,7 +274,7 @@ TEST(MainInterfaceTest, ResetStream) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   reset_stream(engine_handle, stream);
 

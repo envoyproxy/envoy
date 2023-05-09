@@ -12,13 +12,15 @@ public class EnvoyHTTPStream {
   private final long engineHandle;
   private final long streamHandle;
   private final boolean explicitFlowControl;
+  private final long minChunkSize;
   private final JvmCallbackContext callbacksContext;
 
   /**
    * Start the stream via the JNI library.
    */
   void start() {
-    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl);
+    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl,
+                           minChunkSize);
   }
 
   /**
@@ -27,12 +29,15 @@ public class EnvoyHTTPStream {
    * @param streamHandle Underlying handle of the HTTP stream owned by an Envoy engine.
    * @param callbacks The callbacks for the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
+   * @param minChunkSize If nonzero, indicates the smallest data chunk that should be sent up sans
+   *     end stream.
    */
   public EnvoyHTTPStream(long engineHandle, long streamHandle, EnvoyHTTPCallbacks callbacks,
-                         boolean explicitFlowControl) {
+                         boolean explicitFlowControl, long minChunkSize) {
     this.engineHandle = engineHandle;
     this.streamHandle = streamHandle;
     this.explicitFlowControl = explicitFlowControl;
+    this.minChunkSize = minChunkSize;
     callbacksContext = new JvmCallbackContext(callbacks);
   }
 

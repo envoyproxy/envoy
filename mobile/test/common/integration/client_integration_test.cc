@@ -131,12 +131,25 @@ void ClientIntegrationTest::trickleTest() {
   terminal_callback_.waitReady();
 }
 
-TEST_P(ClientIntegrationTest, Trickle) {
+TEST_P(ClientIntegrationTest, TrickleNoMinChunk) {
+  min_chunk_size_ = 0;
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
+TEST_P(ClientIntegrationTest, TrickleNoNoMinChunkExplicitFlowControl) {
+  min_chunk_size_ = 0;
+  explicit_flow_control_ = true;
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
+}
+
+TEST_P(ClientIntegrationTest, TrickleMinChunk) {
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
+}
+
+TEST_P(ClientIntegrationTest, TrickleNoMinChunkExplicitFlowControl) {
   explicit_flow_control_ = true;
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);

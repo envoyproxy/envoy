@@ -541,7 +541,8 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
                                  mCurrentUrl, mRequestContext.getBuilder().quicEnabled());
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
-                                                             /* explicitFlowCrontrol= */ true));
+                                                             /* explicitFlowCrontrol= */ true,
+                                                             /* minChunkSize */ 0));
     mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
       mUploadDataStream.initializeWithRequest();
