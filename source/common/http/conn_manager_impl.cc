@@ -1929,19 +1929,21 @@ void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr r
     return;
   }
 
-  filter_manager_.streamInfo().route_ = route;
-  setCachedRoute({std::move(route)});
-  if (nullptr == filter_manager_.streamInfo().route() ||
-      nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
+  // Update the cached route.
+  setCachedRoute({route});
+  // Update the cached cluster info based on the new route.
+  if (nullptr == route || nullptr == route->routeEntry()) {
     cached_cluster_info_ = nullptr;
   } else {
-    Upstream::ThreadLocalCluster* local_cluster =
-        connection_manager_.cluster_manager_.getThreadLocalCluster(
-            filter_manager_.streamInfo().route()->routeEntry()->clusterName());
-    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
+    auto* cluster = connection_manager_.cluster_manager_.getThreadLocalCluster(
+        route->routeEntry()->clusterName());
+    cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
   }
 
+  // Update route and cluster info in the filter manager's stream info.
+  filter_manager_.streamInfo().route_ = std::move(route); // Now can move route here safely.
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+
   refreshCachedTracingCustomTags();
   refreshDurationTimeout();
   refreshIdleTimeout();
