@@ -213,12 +213,47 @@ if [[ "$CI_TARGET" =~ bazel.* ]]; then
     CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
 fi
 
+# Setup toolchains
+
+TOOLCHAIN_SETUP=setup_clang_toolchain
+
+case $CI_TARGET in
+    api|clang_tidy|compile_time_options|msan)
+        ENVOY_STDLIB="libstdc++"
+        ;;
+    api_compat|publish|verify_distro|verify_examples)
+        TOOLCHAIN_SETUP=
+        ;;
+    gcc)
+        BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
+        setup_gcc_toolchain
+        ;;
+    release)
+        # When testing memory consumption, we want to test against exact byte-counts
+        # where possible. As these differ between platforms and compile options, we
+        # define the 'release' builds as canonical and test them only in CI, so the
+        # toolchain is kept consistent. This ifdef is checked in
+        # test/common/stats/stat_test_utility.cc when computing
+        # Stats::TestUtil::MemoryTest::mode().
+        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+        fi
+        ;;
+    *)
+        ;;
+esac
+
+if [[ -n "$TOOLCHAIN_SETUP" ]]; then
+    $TOOLCHAIN_SETUP
+fi
+
+
+# Run CI
+
 case $CI_TARGET in
     api)
         # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
         # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
-        ENVOY_STDLIB="libstdc++"
-        setup_clang_toolchain
         export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
         echo "Run protoxform test"
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -254,7 +289,6 @@ case $CI_TARGET in
         ;;
 
     asan)
-        setup_clang_toolchain
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
             "--config=clang-asan"
@@ -285,21 +319,17 @@ case $CI_TARGET in
         ;;
 
     check_and_fix_proto_format)
-        setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
         ;;
 
     check_proto_format)
-        setup_clang_toolchain
         echo "Check proto format ..."
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
     clang_tidy)
         # clang-tidy will warn on standard library issues with libc++
-        ENVOY_STDLIB="libstdc++"
-        setup_clang_toolchain
         export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
@@ -336,8 +366,6 @@ case $CI_TARGET in
             "--@envoy//source/extensions/filters/http/kill_request:enabled"
             "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
             "--remote_download_minimal")
-        ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
-        setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
@@ -402,7 +430,6 @@ case $CI_TARGET in
         ;;
 
     coverage|fuzz_coverage)
-        setup_clang_toolchain
         echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
@@ -415,7 +442,6 @@ case $CI_TARGET in
         ;;
 
     coverage-upload|fuzz_coverage-upload)
-        setup_clang_toolchain
         if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
             TARGET=fuzz_coverage
         else
@@ -425,7 +451,6 @@ case $CI_TARGET in
         ;;
 
     debug)
-        setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
         # Make sure that there are no regressions to building Envoy with autolink disabled.
         EXTRA_OPTIONS=(
@@ -439,13 +464,11 @@ case $CI_TARGET in
         ;;
 
     debug.server_only)
-        setup_clang_toolchain
         echo "bazel debug build..."
         bazel_envoy_binary_build debug
         ;;
 
     deps)
-        setup_clang_toolchain
         echo "dependency validate_test..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_test
@@ -471,7 +494,6 @@ case $CI_TARGET in
         ;;
 
     dev)
-        setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel fastbuild build with tests..."
         echo "Building..."
@@ -482,7 +504,6 @@ case $CI_TARGET in
         ;;
 
     dev.contrib)
-        setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel fastbuild build with contrib extensions and tests..."
         echo "Building..."
@@ -495,7 +516,6 @@ case $CI_TARGET in
 
     distribution)
         echo "Building distro packages..."
-        setup_clang_toolchain
         # Extract the Envoy binary from the tarball
         mkdir -p distribution/custom
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -522,30 +542,24 @@ case $CI_TARGET in
         ;;
 
     docs)
-        setup_clang_toolchain
         echo "generating docs..."
         # Build docs.
         "${ENVOY_SRCDIR}/docs/build.sh"
         ;;
 
     docs-upload)
-        setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
 
     fix_proto_format)
-        # proto_format.sh needs to build protobuf.
-        setup_clang_toolchain
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
         ;;
 
     format)
-        setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/format_pre.sh"
         ;;
 
     fuzz)
-        setup_clang_toolchain
         FUZZ_TEST_TARGETS=("$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
         echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
         echo "Building envoy fuzzers and executing 100 fuzz iterations..."
@@ -557,8 +571,6 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
-        setup_gcc_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -570,8 +582,6 @@ case $CI_TARGET in
         ;;
 
     msan)
-        ENVOY_STDLIB=libc++
-        setup_clang_toolchain
         # rbe-toolchain-msan must comes as first to win library link order.
         BAZEL_BUILD_OPTIONS=(
             "--config=rbe-toolchain-msan"
@@ -616,16 +626,6 @@ case $CI_TARGET in
         ;;
 
     release)
-        # When testing memory consumption, we want to test against exact byte-counts
-        # where possible. As these differ between platforms and compile options, we
-        # define the 'release' builds as canonical and test them only in CI, so the
-        # toolchain is kept consistent. This ifdef is checked in
-        # test/common/stats/stat_test_utility.cc when computing
-        # Stats::TestUtil::MemoryTest::mode().
-        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
-        fi
-        setup_clang_toolchain
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
         mkdir -p "$ENVOY_BINARY_DIR"
         # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
@@ -663,13 +663,11 @@ case $CI_TARGET in
         ;;
 
     release.server_only)
-        setup_clang_toolchain
         echo "bazel release build..."
         bazel_envoy_binary_build release
         ;;
 
     sizeopt)
-        setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -680,13 +678,11 @@ case $CI_TARGET in
         ;;
 
     sizeopt.server_only)
-        setup_clang_toolchain
         echo "bazel size optimized build..."
         bazel_envoy_binary_build sizeopt
         ;;
 
     tsan)
-        setup_clang_toolchain
         echo "bazel TSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
