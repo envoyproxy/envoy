@@ -36,12 +36,11 @@ public:
    */
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
-    Admin::RequestPtr request;
     if (params.format_ == Envoy::Server::StatsFormat::Prometheus) {
-      request = StatsHandler::makePrometheusRequest(store_, params, custom_namespaces_);
-    } else {
-      request = StatsHandler::makeRequest(store_, params);
+      Envoy::Server::StatsHandler::prometheusRender(store_, custom_namespaces_, params, data);
+      return data.length();
     }
+    Admin::RequestPtr request = StatsHandler::makeRequest(store_, params);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     uint64_t count = 0;

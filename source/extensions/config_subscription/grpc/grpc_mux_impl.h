@@ -183,6 +183,8 @@ private:
     // The identifier for the server that sent the most recent response, or
     // empty if there is none.
     std::string control_plane_identifier_{};
+    // If true, xDS resources were previously fetched from an xDS source or an xDS delegate.
+    bool previously_fetched_data_{false};
   };
 
   bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
@@ -212,7 +214,6 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
-  bool previously_fetched_data_{false};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);

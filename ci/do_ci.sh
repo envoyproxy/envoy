@@ -32,7 +32,7 @@ fi
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
-  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
+  mv -f "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
   ((build_profile_count++))
 }
 
@@ -225,21 +225,30 @@ case $CI_TARGET in
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
         mkdir -p "$ENVOY_BINARY_DIR"
 
+        # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
+        # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
+        # `--stripopt=--strip-all -c opt`
+        BAZEL_RELEASE_OPTIONS=(
+            --stripopt=--strip-all
+            -c opt)
+
         # Run release tests
-        echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal -c opt "${TEST_TARGETS[@]}"
+        echo "Testing with:"
+        echo "  targets: ${TEST_TARGETS[*]}"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
+        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal "${BAZEL_RELEASE_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
         # Build release binaries
-        # As the binary build package enforces `-c opt`, adding here to ensure the distribution build reuses
-        # any already compiled artefacts, the bundle itself will always be compiled `-c opt`
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution/binary:release
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" //distribution/binary:release
 
         # Copy release binaries to binary export directory
         cp -a "bazel-bin/distribution/binary/release.tar.zst" "${ENVOY_BINARY_DIR}/release.tar.zst"
 
         # Grab the schema_validator_tool
         # TODO(phlax): bundle this with the release when #26390 is resolved
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel --stripopt=--strip-all -c opt //test/tools/schema_validator:schema_validator_tool.stripped
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel "${BAZEL_RELEASE_OPTIONS[@]}" //test/tools/schema_validator:schema_validator_tool.stripped
 
         # Copy schema_validator_tool to binary export directory
         cp -a bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped "${ENVOY_BINARY_DIR}/schema_validator_tool"
@@ -258,18 +267,6 @@ case $CI_TARGET in
             ENVOY_RELEASE_TARBALL="/build/bazel.release/arm64/bin/release.tar.zst"
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
-
-        # By default the packages will be signed by the first available key.
-        # If there is no key available, a throwaway key is created
-        # and the packages signed with it, for the purpose of testing only.
-        if ! gpg --list-secret-keys "*"; then
-            export PACKAGES_MAINTAINER_NAME="Envoy CI"
-            export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
-            BAZEL_BUILD_OPTIONS+=(
-                "--action_env=PACKAGES_GEN_KEY=1"
-                "--action_env=PACKAGES_MAINTAINER_NAME"
-                "--action_env=PACKAGES_MAINTAINER_EMAIL")
-        fi
 
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
@@ -420,13 +417,13 @@ case $CI_TARGET in
 
         # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -436,7 +433,7 @@ case $CI_TARGET in
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
         echo "Building binary with wasm=wavm... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c fastbuild @envoy//source/exe:envoy-static --build_tag_filters=-nofips
         collect_build_profile build
         ;;
     api)
@@ -479,6 +476,17 @@ case $CI_TARGET in
         BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
+    coverage-upload|fuzz_coverage-upload)
+        setup_clang_toolchain
+
+        if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
+            TARGET=fuzz_coverage
+        else
+            TARGET=coverage
+        fi
+
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "/source/generated/${TARGET}" "$TARGET"
+        ;;
     clang_tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
@@ -502,7 +510,7 @@ case $CI_TARGET in
         ;;
     fuzz)
         setup_clang_toolchain
-        FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
+        FUZZ_TEST_TARGETS=("$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
         echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
         echo "Building envoy fuzzers and executing 100 fuzz iterations..."
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
@@ -531,6 +539,10 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         "${ENVOY_SRCDIR}"/docs/build.sh
+        ;;
+    docs-upload)
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
     deps)
         setup_clang_toolchain
@@ -582,6 +594,22 @@ case $CI_TARGET in
                 # from the current commit (as this only happens on non-PRs we are safe from merges)
                 BUILD_SHA="$(git rev-parse HEAD)"
                 bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+
+                # TODO(phlax): move this to pytooling
+                mkdir -p linux/amd64 linux/arm64 publish
+
+                # linux/amd64
+                tar xf /build/bazel.release/release.tar.zst -C ./linux/amd64
+                cp -a linux/amd64/envoy "publish/envoy-${version}-linux-x86_64"
+                cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${version}-linux-x86_64"
+
+                # linux/arm64
+                tar xf /build/bazel.release.arm64/release.tar.zst -C ./linux/arm64
+                cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
+                cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
+
+                "${ENVOY_SRCDIR}/ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
+
                 exit 0
             fi
         fi

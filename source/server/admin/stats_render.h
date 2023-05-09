@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
@@ -12,29 +10,14 @@
 namespace Envoy {
 namespace Server {
 
-// Abstract base class for rendering stats, which captures logic
-// that is shared across all formats (e.g. finalizing rendering of stats).
-// The APIs for generating stats output vary between formats (e.g.
-// JSON vs. Prometheus) and are defined in derived classes: having a base
-// render class avoids code duplication while affording the flexibility to
-// capture any differences in how we generate stats output.
-class StatsRenderBase {
+// Abstract class for rendering stats. Every method is called "generate"
+// differing only by the data type, to facilitate templatized call-sites.
+//
+// There are currently Json and Text implementations of this interface, and in
+// #19546 an HTML version will be added to provide a hierarchical view.
+class StatsRender {
 public:
-  virtual ~StatsRenderBase() = default;
-
-  // Completes rendering any buffered data.
-  virtual void finalize(Buffer::Instance& response) PURE;
-
-  // Indicates that no stats for a particular type have been found.
-  virtual void noStats(Buffer::Instance&, absl::string_view) {}
-};
-
-// Abstract class for rendering ungrouped stats.
-// Every method is called "generate" differing only by the data type, to
-// facilitate templatized call-sites.
-class StatsRender : public StatsRenderBase {
-public:
-  ~StatsRender() override = default;
+  virtual ~StatsRender() = default;
 
   // Writes a fragment for a numeric value, for counters and gauges.
   virtual void generate(Buffer::Instance& response, const std::string& name, uint64_t value) PURE;
@@ -46,6 +29,12 @@ public:
   // Writes a histogram value.
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const Stats::ParentHistogram& histogram) PURE;
+
+  // Completes rendering any buffered data.
+  virtual void finalize(Buffer::Instance& response) PURE;
+
+  // Indicates that no stats for a particular type have been found.
+  virtual void noStats(Buffer::Instance&, absl::string_view) {}
 };
 
 // Implements the Render interface for simple textual representation of stats.
@@ -104,91 +93,6 @@ private:
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
-};
-
-// Implements the Render base interface for textual representation of Prometheus stats
-// (see: https://prometheus.io/docs/concepts/data_model).
-// The APIs for rendering Prometheus stats take as input a string (the stat's name)
-// and a vector of counters, gauges etc. (each entry in the vector holds a set of labels
-// and the stat's value for that set of labels). The Prometheus stat is rendered
-// as per the text-based format described at
-// https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format.
-class PrometheusStatsRender : public StatsRenderBase {
-public:
-  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const std::vector<Stats::HistogramSharedPtr>& histogram);
-
-  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const std::vector<Stats::GaugeSharedPtr>& gauge);
-
-  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const std::vector<Stats::CounterSharedPtr>& counter);
-
-  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const std::vector<Stats::TextReadoutSharedPtr>& text_readout);
-
-  void finalize(Buffer::Instance&) override;
-
-  /**
-   * Format the given tags, returning a string as a comma-separated list
-   * of <tag_name>="<tag_value>" pairs.
-   */
-  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
-
-  /**
-   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
-   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
-   * has a valid prometheus namespace, the trimmed name is returned.
-   * Otherwise, return nullopt.
-   */
-  static absl::optional<std::string>
-  metricName(const std::string& extracted_name,
-             const Stats::CustomStatNamespaces& custom_namespace_factory);
-
-private:
-  /**
-   * Take a string and sanitize it according to Prometheus conventions.
-   */
-  static std::string sanitizeName(const absl::string_view name);
-
-  /**
-   * Take tag values and sanitize it for text serialization, according to
-   * Prometheus conventions.
-   */
-  static std::string sanitizeValue(const absl::string_view value);
-
-  template <class StatType>
-  void outputStatType(
-      Envoy::Buffer::Instance& response, const std::vector<StatType>& metrics,
-      const std::string& prefixed_tag_extracted_name,
-      const std::function<std::string(
-          const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
-      absl::string_view type);
-
-  /*
-   * Return the prometheus output for a numeric Stat (Counter or Gauge).
-   */
-  template <class StatType>
-  static std::string generateNumericOutput(const StatType& metric,
-                                           const std::string& prefixed_tag_extracted_name);
-
-  /*
-   * Returns the prometheus output for a TextReadout in gauge format.
-   * It is a workaround of a limitation of prometheus which stores only numeric metrics.
-   * The output is a gauge named the same as a given text-readout. The value of returned gauge is
-   * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
-   * tag {"text_value":"textReadout.value"}.
-   */
-  static std::string generateTextReadoutOutput(const Stats::TextReadoutSharedPtr& metric,
-                                               const std::string& prefixed_tag_extracted_name);
-
-  /*
-   * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
-   * newlines) that contains all the individual bucket counts and sum/count for a single histogram
-   * (metric_name plus all tags).
-   */
-  static std::string generateHistogramOutput(const Stats::HistogramSharedPtr& histogram,
-                                             const std::string& prefixed_tag_extracted_name);
 };
 
 } // namespace Server

@@ -28,8 +28,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
-import org.chromium.net.impl.CronetUrlRequestContext;
-import org.chromium.net.impl.NativeCronetEngineBuilderImpl;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
+import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
@@ -229,8 +229,8 @@ public class CronetUrlRequestContextTest {
 
     // Create new request context, but its initialization on the main thread
     // will be stuck behind blockingTask.
-    final CronetUrlRequestContext cronetEngine =
-        (CronetUrlRequestContext) new CronetEngine.Builder(getContext()).build();
+    final CronvoyUrlRequestContext cronetEngine =
+        (CronvoyUrlRequestContext) new CronetEngine.Builder(getContext()).build();
     // Unblock the main thread, so context gets initialized and shutdown on
     // it.
     block.open();
@@ -252,8 +252,8 @@ public class CronetUrlRequestContextTest {
       @Override
       public void run() {
         // Create new request context, loading the library.
-        final CronetUrlRequestContext cronetEngine =
-            (CronetUrlRequestContext) new CronetEngine.Builder(getContext()).build();
+        final CronvoyUrlRequestContext cronetEngine =
+            (CronvoyUrlRequestContext) new CronetEngine.Builder(getContext()).build();
         // Shutdown right after init.
         cronetEngine.shutdown();
         // Verify that context is shutdown.
@@ -1281,7 +1281,7 @@ public class CronetUrlRequestContextTest {
   @Ignore("Library Loader not needed")
   public void testSetLibraryLoaderIsIgnoredInNativeCronetEngineBuilderImpl() throws Exception {
     CronetEngine.Builder builder =
-        new CronetEngine.Builder(new NativeCronetEngineBuilderImpl(getContext()));
+        new CronetEngine.Builder(new NativeCronvoyEngineBuilderImpl(getContext()));
     TestBadLibraryLoader loader = new TestBadLibraryLoader();
     builder.setLibraryLoader(loader);
     CronetEngine engine = builder.build();
@@ -1294,7 +1294,7 @@ public class CronetUrlRequestContextTest {
   @Feature({"Cronet"})
   public void testNativeCronetEngineBuilderImplSetsCorrectVersionString() throws Exception {
     CronetEngine.Builder builder =
-        new CronetEngine.Builder(new NativeCronetEngineBuilderImpl(getContext()));
+        new CronetEngine.Builder(new NativeCronvoyEngineBuilderImpl(getContext()));
     CronetEngine engine = builder.build();
     assertTrue(engine.getVersionString().startsWith("Cronet/"));
   }
