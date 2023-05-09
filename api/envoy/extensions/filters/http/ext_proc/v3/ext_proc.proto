@@ -96,11 +96,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // messages, and the server must reply with
 // :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
 //
-// Stats about each gRPC call will be recorded in a :ref:`dynamic filter state
+// Stats about each gRPC call are recorded in a :ref:`dynamic filter state
 // <arch_overview_advanced_filter_state_sharing>` object whose name is specified
 // by :ref:`filter_state_name
 // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.filter_state_name>`.
-// This data can then be logged as part of Access Logs using the :ref:`command
+// This data can be logged as part of Access Logs using the :ref:`command
 // operator <config_access_log_command_operators>`
 // %FILTER_STATE(<filter_state_name>)%.
 //
