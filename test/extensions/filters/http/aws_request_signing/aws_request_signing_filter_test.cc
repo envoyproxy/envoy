@@ -205,10 +205,10 @@ TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
 
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
-  EXPECT_CALL(*(signer),
-              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+  EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
-  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(), "overridden-host", false);
+  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
+                                    "overridden-host", false);
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&per_route_config));
 
