@@ -1,4 +1,8 @@
-load("//bazel:envoy_build_system.bzl", "envoy_contrib_package")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_contrib_package",
+    "envoy_select_boringssl",
+)
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load(
     "//contrib:all_contrib_extensions.bzl",
@@ -32,6 +36,9 @@ configure_make(
     ],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
-    deps = ["@boringssl//:ssl"],
+    deps = envoy_select_boringssl(
+        ["@boringssl_fips//:ssl"],
+        ["@boringssl//:ssl"],
+    ),
     alwayslink = True,
 )

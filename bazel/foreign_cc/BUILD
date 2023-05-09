@@ -1,4 +1,9 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cmake",
+    "envoy_package",
+    "envoy_select_boringssl",
+)
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
@@ -198,7 +203,10 @@ envoy_cmake(
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
-    deps = ["@boringssl//:ssl"],
+    deps = envoy_select_boringssl(
+        ["@boringssl_fips//:ssl"],
+        ["@boringssl//:ssl"],
+    ),
 )
 
 envoy_cmake(
