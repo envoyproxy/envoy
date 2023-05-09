@@ -90,11 +90,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "b0452fc4dfb1b02357bd4ce2d55a1056b53e2ffd",
-        sha256 = "fbc095421b95427e2dc4ba02aa4459796e020fbc1a3b577168e781dd3d420119",
+        version = "2c557f5c899527b3331c316b2d5ca137fcb046b9",
+        sha256 = "f7e256ee9ee4d02536fb2124c6b79694633e187fe9b33017273af92e88bbdd6c",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2023-02-22",
+        release_date = "2023-05-06",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/envoy-build-tools/blob/{version}/LICENSE",
@@ -1054,12 +1054,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "32d62793deb3e7d3c77df57615ecd0ab4ab42859",
-        sha256 = "2aabe1824f7821cbf3ac6e05e23a571836ca141a243d6a2ab41e6f0037d6f370",
+        version = "3a06b4d609a514aff792d6c3cf033a3dedb42edb",
+        sha256 = "23dd8b079cf9d21f3fb5a82a44a9241c52973e457a0c89eb46bf521cd41199bd",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-04-27",
+        release_date = "2023-05-03",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1150,7 +1150,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
-        # Note: the llvm/clang version should match the version specifed in:
+        # Note: the llvm/clang version should match the version specified in:
         #  - .github/workflows/codeql-daily.yml
         #  - .github/workflows/codeql-push.yml
         #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
