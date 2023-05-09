@@ -49,7 +49,13 @@ private:
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}
   DataInputGetResult get(const TestData&) const override { return result_; }
+  DataInputGetResult result_;
+};
 
+struct TestFloatInput : public DataInput<TestData> {
+  explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
+  DataInputGetResult get(const TestData&) const override { return result_; }
+  absl::string_view dataInputType() const override { return "float"; }
   DataInputGetResult result_;
 };
 
@@ -84,6 +90,7 @@ public:
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    // Note, here is using `TestInput` same as `TestDataInputStringFactory`.
     return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
@@ -97,12 +104,34 @@ private:
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
+class TestDataInputFloatFactory : public DataInputFactory<TestData> {
+public:
+  TestDataInputFloatFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
+  TestDataInputFloatFactory(float)
+      : TestDataInputFloatFactory(
+            {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}
+  DataInputFactoryCb<TestData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return [&]() { return std::make_unique<TestFloatInput>(result_); };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::FloatValue>();
+  }
+  std::string name() const override { return "float"; }
+
+private:
+  const DataInputGetResult result_;
+  Registry::InjectFactory<DataInputFactory<TestData>> injection_;
+};
+
 // A matcher that evaluates to the configured value.
+// Note, `BoolMatcher` supports string type data input only as `TestDataInputBoolFactory` is using
+// `TestInput` same as `TestDataInputStringFactory`.
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
   bool match(const MatchingDataType&) override { return value_; }
-
   const bool value_;
 };
 
