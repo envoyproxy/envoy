@@ -1,13 +1,10 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
-
-// #include "envoy/extensions/common/matching/v3/extension_matcher.h"
-
-#include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 
 #include "source/common/http/match_delegate/config.h"
 
+#include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
@@ -20,6 +17,7 @@ namespace Http {
 namespace MatchDelegate {
 namespace {
 
+using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
@@ -30,11 +28,16 @@ public:
   void initialize() override {
     config_helper_.prependFilter(default_config_);
     HttpIntegrationTest::initialize();
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   }
 
-  IntegrationStreamDecoderPtr response_;
-  FakeStreamPtr request_{};
-  // envoy::extensions::common::matching::v3::ExtensionWithMatcher matcher_;
+  const Envoy::Http::TestRequestHeaderMapImpl default_request_headers_ = {{":method", "GET"},
+                                                                          {":path", "/"},
+                                                                          {":scheme", "http"},
+                                                                          {"match-header", "route"},
+                                                                          {":authority", "host"}};
+
   const std::string default_config_ = R"EOF(
       name: ext_proc
       typed_config:
@@ -83,15 +86,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
 
 TEST_P(MatchDelegateInegrationTest, BasicFlow) {
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response1 = codec_client_->makeHeaderOnlyRequest(
-      Envoy::Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                            {":path", "/"},
-                                            {":scheme", "http"},
-                                            {"match-header", "route"},
-                                            {":authority", "host"}});
-  ASSERT_TRUE(response1->waitForEndStream());
-  EXPECT_THAT(response1->headers(), Envoy::Http::HttpStatusIs("403"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("403"));
 }
 
 TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
@@ -100,22 +97,15 @@ TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
                        ->mutable_virtual_hosts()
                        ->Mutable(0)
                        ->mutable_typed_per_filter_config();
-    const auto per_route_matcher = TestUtility::parseYaml<
-        envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(per_route_config_);
-    (*config)["envoy.filters.http.match_delegate"].PackFrom(per_route_matcher);
+    const auto matcher = TestUtility::parseYaml<ExtensionWithMatcherPerRoute>(per_route_config_);
+    (*config)["envoy.filters.http.match_delegate"].PackFrom(matcher);
   });
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  Envoy::Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                        {":path", "/"},
-                                                        {":scheme", "http"},
-                                                        {"match-header", "route"},
-                                                        {":authority", "host"}};
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  auto response2 = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
-  ASSERT_TRUE(response2->waitForEndStream());
-  EXPECT_TRUE(response2->complete());
-  EXPECT_THAT(response2->headers(), Envoy::Http::HttpStatusIs("200"));
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
 }
 } // namespace
 } // namespace MatchDelegate
