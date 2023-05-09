@@ -1,5 +1,3 @@
-#include "source/common/common/assert.h"
-
 #include "library/common/common/default_system_helper.h"
 #include "library/common/jni/android_jni_utility.h"
 #include "library/common/jni/android_network_utility.h"

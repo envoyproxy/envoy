@@ -13,6 +13,7 @@
 #include "library/common/main_interface.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnRef;
 
