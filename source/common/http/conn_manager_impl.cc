@@ -119,6 +119,8 @@ const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  dispatcher_ = &callbacks.connection().dispatcher();
+
   stats_.named_.downstream_cx_total_.inc();
   stats_.named_.downstream_cx_active_.inc();
   if (read_callbacks_->connection().ssl()) {
@@ -143,15 +145,15 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   }
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createScaledTimer(
-        Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
-        [this]() -> void { onIdleTimeout(); });
+    connection_idle_timer_ =
+        dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
+                                       [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
   if (config_.maxConnectionDuration()) {
-    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onConnectionDurationTimeout(); });
+    connection_duration_timer_ =
+        dispatcher_->createTimer([this]() -> void { onConnectionDurationTimeout(); });
     connection_duration_timer_->enableTimer(config_.maxConnectionDuration().value());
   }
 
@@ -327,7 +329,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.filter_manager_.destroyFilters();
 
-  read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
+  dispatcher_->deferredDelete(stream.removeFromList(streams_));
 
   // The response_encoder should never be dangling (unless we're destroying a
   // stream we are recreating) as the codec level stream will either outlive the
@@ -356,7 +358,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   if (downstream_stream_account == nullptr) {
     // Create account, wiring the stream to use it for tracking bytes.
     // If tracking is disabled, the wiring becomes a NOP.
-    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    auto& buffer_factory = dispatcher_->getWatermarkFactory();
     downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
     response_encoder.getStream().setAccount(downstream_stream_account);
   }
@@ -663,8 +665,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
-  Event::Dispatcher& thread_local_dispatcher =
-      parent_.connection_manager_.read_callbacks_->connection().dispatcher();
+  Event::Dispatcher& thread_local_dispatcher = *parent_.connection_manager_.dispatcher_;
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     ASSERT(!parent_.request_headers_->Host()->value().empty());
     const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
@@ -740,7 +741,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                                              : makeOptRef<const TracingConnectionManagerConfig>(
                                                    *connection_manager_.config_.tracingConfig())),
       stream_id_(connection_manager.random_generator_.random()),
-      filter_manager_(*this, connection_manager_.read_callbacks_->connection().dispatcher(),
+      filter_manager_(*this, *connection_manager_.dispatcher_,
                       connection_manager_.read_callbacks_->connection(), stream_id_,
                       std::move(account), connection_manager_.config_.proxy100Continue(),
                       buffer_limit, connection_manager_.config_.filterFactory(),
@@ -799,17 +800,16 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    stream_idle_timer_ =
-        connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
-            Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
-            [this]() -> void { onIdleTimeout(); });
+    stream_idle_timer_ = connection_manager_.dispatcher_->createScaledTimer(
+        Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+        [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
 
   if (connection_manager_.config_.requestTimeout().count()) {
     std::chrono::milliseconds request_timeout = connection_manager_.config_.requestTimeout();
-    request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onRequestTimeout(); });
+    request_timer_ =
+        connection_manager.dispatcher_->createTimer([this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout, this);
   }
 
@@ -817,30 +817,27 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     std::chrono::milliseconds request_headers_timeout =
         connection_manager_.config_.requestHeadersTimeout();
     request_header_timer_ =
-        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
-            [this]() -> void { onRequestHeaderTimeout(); });
+        connection_manager.dispatcher_->createTimer([this]() -> void { onRequestHeaderTimeout(); });
     request_header_timer_->enableTimer(request_headers_timeout, this);
   }
 
   const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
   if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
-    max_stream_duration_timer_ =
-        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
-            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_ = connection_manager.dispatcher_->createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
   }
 
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
-    access_log_flush_timer_ =
-        connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          // If the request is complete, we've already done the stream-end access-log, and shouldn't
-          // do the periodic log.
-          if (!streamInfo().requestComplete().has_value()) {
-            filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
-            refreshAccessLogFlushTimer();
-          }
-        });
+    access_log_flush_timer_ = connection_manager.dispatcher_->createTimer([this]() -> void {
+      // If the request is complete, we've already done the stream-end access-log, and shouldn't
+      // do the periodic log.
+      if (!streamInfo().requestComplete().has_value()) {
+        filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
+        refreshAccessLogFlushTimer();
+      }
+    });
     refreshAccessLogFlushTimer();
   }
 }
@@ -1053,7 +1050,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !filter_manager_.remoteDecodeComplete()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
-        connection_manager_.read_callbacks_->connection().dispatcher().timeSource());
+        connection_manager_.dispatcher_->timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }
@@ -1403,8 +1400,7 @@ void ConnectionManagerImpl::startDrainSequence() {
   ASSERT(drain_state_ == DrainState::NotDraining);
   drain_state_ = DrainState::Draining;
   codec_->shutdownNotice();
-  drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-      [this]() -> void { onDrainTimeout(); });
+  drain_timer_ = dispatcher_->createTimer([this]() -> void { onDrainTimeout(); });
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 
@@ -1505,9 +1501,8 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 
   // Finally create (if necessary) and enable the timer.
   if (!max_stream_duration_timer_) {
-    max_stream_duration_timer_ =
-        connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_ = connection_manager_.dispatcher_->createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
   }
   max_stream_duration_timer_->enableTimer(timeout);
 }
@@ -1961,10 +1956,9 @@ void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
-          stream_idle_timer_ =
-              connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
-                  Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
-                  [this]() -> void { onIdleTimeout(); });
+          stream_idle_timer_ = connection_manager_.dispatcher_->createScaledTimer(
+              Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+              [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {
         // If we had a global stream idle timeout but the route-level idle timeout is set to zero
