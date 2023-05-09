@@ -1,5 +1,7 @@
 #include "source/extensions/formatter/cel/cel.h"
 
+#include <sys/stat.h>
+
 #include <string>
 
 #include "source/common/config/metadata.h"
@@ -8,6 +10,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+static const std::string DefaultUnspecifiedValueString = "-";
+
 #if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
 #endif
@@ -15,6 +19,18 @@
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
+
+namespace {
+
+  std::string truncate(std::string str, absl::optional<size_t> max_length) {
+    if (!max_length){
+      return str;
+    }
+
+    return str.substr(0, max_length.value());
+  }
+
+}
 
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
@@ -28,12 +44,13 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
                                                  const Http::ResponseHeaderMap& response_headers,
                                                  const Http::ResponseTrailerMap& response_trailers,
                                                  const StreamInfo::StreamInfo& stream_info,
-                                                 absl::string_view) const {
+                                                 absl::string_view,
+                                                 AccessLog::AccessLogType) const {
   Protobuf::Arena arena;
   auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
                                     &response_headers, &response_trailers);
   if (!eval_status.has_value() || eval_status.value().IsError()) {
-    return "";
+    return DefaultUnspecifiedValueString;
   }
   auto result = eval_status.value();
   return Expr::print(result);
@@ -43,24 +60,18 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
                                              const Http::ResponseHeaderMap& response_headers,
                                              const Http::ResponseTrailerMap& response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view) const {
-  Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
-                                    &response_headers, &response_trailers);
-  if (!eval_status.has_value() || eval_status.value().IsError()) {
-    return ValueUtil::nullValue();
-  }
-
-  auto result = eval_status.value();
-  auto str = Expr::print(result);
-  return ValueUtil::stringValue(str);
+                                             absl::string_view, AccessLog::AccessLogType) const {
+  auto result = format(request_headers, response_headers, response_trailers, stream_info, "",
+                    AccessLog::AccessLogType::NotSet);
+  return ValueUtil::stringValue(result.value());
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
 CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
-                                 absl::optional<size_t>&) const {
+                                 absl::optional<size_t>& max_length) const {
   if (command == "CEL") {
-    auto parse_status = google::api::expr::parser::Parse(subcommand);
+    auto cel_expr = truncate(subcommand, max_length);
+    auto parse_status = google::api::expr::parser::Parse(cel_expr);
     if (!parse_status.ok()) {
       throw EnvoyException("Not able to parse filter expression: " +
                            parse_status.status().ToString());

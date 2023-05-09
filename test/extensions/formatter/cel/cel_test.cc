@@ -29,21 +29,37 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-TEST_F(CELFormatterTest, TestStripQueryString) {
+TEST_F(CELFormatterTest, TestRequestHeader) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(request.headers[':method'])%"
   formatters:
     - name: envoy.formatter.cel
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.cel
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("GET", formatter->format(request_headers_, response_headers_, response_trailers_,
-                                     stream_info_, body_));
+                                     stream_info_, body_, AccessLog::AccessLogType::NotSet));
+}
+
+TEST_F(CELFormatterTest, TestInvalidExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(+++++)%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "Not able to parse filter expression: .*");
 }
 
 } // namespace Formatter
