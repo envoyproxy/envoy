@@ -22,15 +22,15 @@ namespace Formatter {
 
 namespace {
 
-  std::string truncate(std::string str, absl::optional<size_t> max_length) {
-    if (!max_length){
-      return str;
-    }
-
-    return str.substr(0, max_length.value());
+std::string truncate(std::string str, absl::optional<size_t> max_length) {
+  if (!max_length) {
+    return str;
   }
 
+  return str.substr(0, max_length.value());
 }
+
+} // namespace
 
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
@@ -62,7 +62,7 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
                                              const StreamInfo::StreamInfo& stream_info,
                                              absl::string_view, AccessLog::AccessLogType) const {
   auto result = format(request_headers, response_headers, response_trailers, stream_info, "",
-                    AccessLog::AccessLogType::NotSet);
+                       AccessLog::AccessLogType::NotSet);
   return ValueUtil::stringValue(result.value());
 }
 
