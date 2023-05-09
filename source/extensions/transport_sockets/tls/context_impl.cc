@@ -303,20 +303,30 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
+#if BORINGSSL_API_VERSION >= 21
+  // Register stat names based on lists reported by BoringSSL.
+  std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
+  SSL_get_all_cipher_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_curve_names(nullptr, 0));
+  SSL_get_all_curve_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_signature_algorithm_names(nullptr, 0));
+  SSL_get_all_signature_algorithm_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+
+  list.resize(SSL_get_all_version_names(nullptr, 0));
+  SSL_get_all_version_names(list.data(), list.size());
+  stat_name_set_->rememberBuiltins(list);
+#else
   // Use the SSL library to iterate over the configured ciphers.
   //
   // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
   for (TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
-    }
-  }
-
-  // As late as possible, run the custom SSL_CTX configuration callback on each
-  // SSL_CTX, if set.
-  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
-    for (TlsContext& ctx : tls_contexts_) {
-      sslctx_cb(ctx.ssl_ctx_.get());
     }
   }
 
@@ -358,6 +368,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   //
   // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
+#endif
+
+  // As late as possible, run the custom SSL_CTX configuration callback on each
+  // SSL_CTX, if set.
+  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
+    for (TlsContext& ctx : tls_contexts_) {
+      sslctx_cb(ctx.ssl_ctx_.get());
+    }
+  }
 
   if (!config.tlsKeyLogPath().empty()) {
     ENVOY_LOG(debug, "Enable tls key log");
