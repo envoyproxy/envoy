@@ -353,7 +353,6 @@ def _boringssl_fips():
     external_http_archive(
         name = "boringssl_fips",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
-        patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -1318,7 +1317,7 @@ filegroup(
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
 

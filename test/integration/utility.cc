@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/api/api_impl.h"
@@ -33,7 +34,7 @@
 #include "test/integration/ssl_utility.h"
 #endif
 #include "test/mocks/common.h"
-#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -134,8 +135,8 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
-  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
-  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
+  ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
+  ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
@@ -327,10 +328,13 @@ IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view 
 
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
+  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
+  ON_CALL(server_context, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
+
   TestUtility::loadFromYaml(std::string(config), typed_config);
 
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  return factory->createFromProto(typed_config.typed_config(), validation_visitor);
+  return factory->createFromProto(typed_config.typed_config(), server_context);
 #else
   return nullptr;
 #endif

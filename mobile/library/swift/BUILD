@@ -103,7 +103,7 @@ swift_library(
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
     ] + select({
         "//bazel:envoy_mobile_swift_cxx_interop": [
-            "//library/swift/EnvoyCxxSwiftInterop:EnvoyCxxSwiftInterop",
+            "//library/swift/EnvoyCxxSwiftInterop",
         ],
         "//conditions:default": [],
     }),

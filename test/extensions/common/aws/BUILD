@@ -58,8 +58,10 @@ envoy_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

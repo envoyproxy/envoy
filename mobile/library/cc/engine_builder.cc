@@ -181,11 +181,6 @@ EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
 }
 #endif
 
-EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
-  enable_happy_eyeballs_ = happy_eyeballs_on;
-  return *this;
-}
-
 #ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
@@ -195,11 +190,6 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
-  skip_dns_lookups_for_proxied_requests_ = value;
   return *this;
 }
 
@@ -575,11 +565,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
   auto* dns_cache_config = dfp_config.mutable_dns_cache_config();
   dns_cache_config->set_name("base_dns_cache");
-  if (enable_happy_eyeballs_) {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
-  } else {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_PREFERRED);
-  }
+  dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   dns_cache_config->mutable_host_ttl()->set_seconds(86400);
   dns_cache_config->mutable_dns_min_refresh_rate()->set_seconds(dns_min_refresh_seconds_);
   dns_cache_config->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
@@ -913,8 +899,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
   }
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
-      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();

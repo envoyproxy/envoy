@@ -14,10 +14,11 @@ CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
   compiled_expr_ = Expr::createExpression(builder, parsed_expr_);
 }
 
-bool CELAccessLogExtensionFilter::evaluate(
-    const StreamInfo::StreamInfo& stream_info, const Http::RequestHeaderMap& request_headers,
-    const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers) const {
+bool CELAccessLogExtensionFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
+                                           const Http::RequestHeaderMap& request_headers,
+                                           const Http::ResponseHeaderMap& response_headers,
+                                           const Http::ResponseTrailerMap& response_trailers,
+                                           AccessLog::AccessLogType) const {
   Protobuf::Arena arena;
   auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
                                     &response_headers, &response_trailers);

@@ -11,12 +11,12 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/benchmark/main.h"
@@ -57,8 +57,7 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, local_info_, true, std::move(config_validators_),
-          std::move(backoff_strategy),
+          scope_, {}, local_info_, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
@@ -66,7 +65,7 @@ public:
           server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
+          scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""));
