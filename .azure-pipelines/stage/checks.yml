@@ -126,7 +126,7 @@ jobs:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
-    condition: always()
+    condition: not(canceled())
 
 - job: complete
   displayName: "Checks complete"
