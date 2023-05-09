@@ -99,7 +99,7 @@ protected:
   std::unique_ptr<IoHandle> shadow_io_handle_;
   bool enable_server_socket_{true};
   bool enable_client_socket_{false};
-  bool enable_accept_socket_{true};
+  bool enable_accept_socket_{false};
 
   Api::IoCallUint64Result copyOut(uint64_t max_length, Buffer::RawSlice* slices,
                                   uint64_t num_slice);
