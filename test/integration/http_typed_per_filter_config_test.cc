@@ -30,9 +30,8 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {
         auto size = hcm.http_filters_size();
         hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
       });
-  EXPECT_DEATH(
-      initialize(),
-      "The filter set-response-code-filter doesn't support virtual host-specific configurations");
+  EXPECT_DEATH(initialize(), "The filter set-response-code-filter doesn't support virtual host or "
+                             "route specific configurations");
 }
 
 TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConfig) {
