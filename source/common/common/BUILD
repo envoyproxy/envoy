@@ -221,6 +221,9 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
+    external_deps = [
+        "spdlog",
+    ],
 )
 
 envoy_cc_library(
