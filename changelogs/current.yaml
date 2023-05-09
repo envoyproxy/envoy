@@ -104,6 +104,13 @@ bug_fixes:
 - area: boringssl
   change: |
     Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+- area: oauth2
+  change: |
+    The httpOnly attribute for Set-Cookie for tokens in HTTP response header was missing,
+    causing tokens to be accessible from the JavaScript making the apps vulnerable.
+    This was fixed now by marking the cookie as httpOnly.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
