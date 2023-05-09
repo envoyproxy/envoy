@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/cel/v3;celv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Formatter extension for printing various types of CEL]
+// [#protodoc-title: Formatter extension for printing CEL expressions]
 // [#extension: envoy.formatter.cel]
 
 // CEL formatter extension implements CEL command operator that evaluates configured
@@ -18,15 +18,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // See :ref:`here <config_access_log>` for more information on access log configuration.
 
-// %METADATA(EXPRESSION)%
+// %CEL(EXPRESSION)%
 // Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
-// Expression errors are considered false).
+// Expression errors are considered `-`).
 //
 // Examples:
-// - ``response.code``
-// - ``connection.mtls``
-// - ``request.headers['x-log-mtls']) ||
-// - ``request.url_path.contains('v1beta3')``
+// - ``CEL(response.code)``
+// - ``CEL(connection.mtls)``
+// - ``CEL(request.headers['x-log-mtls'] || request.url_path.contains('v1beta3'))
 
 message Cel {
 }
