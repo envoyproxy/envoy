@@ -43,7 +43,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 void ClientIntegrationTest::basicTest() {
-  initialize();
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -52,8 +51,6 @@ void ClientIntegrationTest::basicTest() {
   stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
     if (end_stream) {
       EXPECT_EQ(Data::Utility::copyToString(c_data), "");
-    } else {
-      EXPECT_EQ(c_data.length, 10);
     }
     cc_.on_data_calls++;
     release_envoy_data(c_data);
@@ -76,10 +73,21 @@ void ClientIntegrationTest::basicTest() {
   ASSERT_EQ(cc_.on_data_calls, 2);
   ASSERT_EQ(cc_.on_complete_calls, 1);
   ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+}
+
+TEST_P(ClientIntegrationTest, Basic) {
+  initialize();
+  basicTest();
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
 }
 
-TEST_P(ClientIntegrationTest, Basic) { basicTest(); }
+TEST_P(ClientIntegrationTest, LargeResponse) {
+  initialize();
+  std::string data(1024 * 32, 'a');
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->setResponseBody(data);
+  basicTest();
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 32828);
+}
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(false));
