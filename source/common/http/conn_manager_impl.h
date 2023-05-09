@@ -568,6 +568,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Event::Dispatcher* dispatcher_{};
   ConnectionManagerListenerStats& listener_stats_;
   Server::OverloadManager& overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
