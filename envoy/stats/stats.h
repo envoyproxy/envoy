@@ -94,8 +94,8 @@ public:
 
   /**
    * Indicates whether this metric is used or check in the ForEach loops
-  */
- virtual bool internal() const PURE;
+   */
+  virtual bool internal() const PURE;
 
   /**
    * Flags:
