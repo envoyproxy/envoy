@@ -760,7 +760,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
             envoy::type::v3::FractionalPercent::TEN_THOUSAND);
   EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
 
-  // Make sure the hacky fractional percent function works with nullion
+  // Make sure the hacky fractional percent function works with million
   fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
               .createEntry(fractional_value);
@@ -769,7 +769,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
             envoy::type::v3::FractionalPercent::MILLION);
   EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
 
-  // test atoi failure for the hacky fractional precent value function.
+  // test atoi failure for the hacky fractional percent value function.
   fractional_value.set_string_value(" numerator:  1.1 ");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
               .createEntry(fractional_value);
