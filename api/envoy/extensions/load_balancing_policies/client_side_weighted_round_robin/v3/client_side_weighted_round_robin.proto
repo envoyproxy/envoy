@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3";
 option java_outer_classname = "ClientSideWeightedRoundRobinProto";
@@ -58,10 +59,12 @@ message ClientSideWeightedRoundRobin {
   // blackout_period applies. Defaults to 3 minutes.
   google.protobuf.Duration weight_expiration_period = 4;
 
-  // How often endpoint weights are recalculated. Default is 1 second.
+  // How often endpoint weights are recalculated. Values less than 100ms are
+  // capped at 100ms. Default is 1 second.
   google.protobuf.Duration weight_update_period = 5;
 
   // The multiplier used to adjust endpoint weights with the error rate
-  // calculated as eps/qps. Default is 1.0.
-  google.protobuf.FloatValue error_utilization_penalty = 6;
+  // calculated as eps/qps. Configuration is rejected if this value is negative.
+  // Default is 1.0.
+  google.protobuf.FloatValue error_utilization_penalty = 6 [(validate.rules).float = {gte: 0.0}];
 }
