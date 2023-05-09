@@ -520,6 +520,8 @@ void GrpcMuxImpl::drainRequests() {
   grpc_stream_.maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
+// A factory class for creating GrpcMuxImpl so it does not have to be
+// hard-compiled into cluster_manager_impl.cc
 class GrpcMuxFactory : public MuxFactory {
 public:
   std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }

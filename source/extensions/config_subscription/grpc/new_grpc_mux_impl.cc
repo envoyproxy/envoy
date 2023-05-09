@@ -328,6 +328,8 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   return absl::nullopt;
 }
 
+// A factory class for creating NewGrpcMuxImpl so it does not have to be
+// hard-compiled into cluster_manager_impl.cc
 class NewGrpcMuxFactory : public MuxFactory {
 public:
   std::string name() const override { return "envoy.config_mux.new_grpc_mux_factory"; }

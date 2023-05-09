@@ -5,6 +5,7 @@
 namespace Envoy {
 namespace Config {
 
+// A placeholder class returned if no ADS is configured.
 class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:

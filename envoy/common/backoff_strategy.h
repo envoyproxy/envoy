@@ -32,7 +32,7 @@ public:
   /**
    * @return if the time interval exceeds any configured cap on next backoff value.
    */
-  virtual bool isOverTimeLimit(uint64_t /*interval_ms*/) const { return false; }
+  virtual bool isOverTimeLimit(uint64_t /*interval_ms*/) const PURE;
 };
 
 using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;
