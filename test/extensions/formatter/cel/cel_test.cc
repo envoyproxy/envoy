@@ -42,8 +42,8 @@ TEST_F(CELFormatterTest, TestStripQueryString) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("GET", formatter->format(request_headers_, response_headers_,
-                                               response_trailers_, stream_info_, body_));
+  EXPECT_EQ("GET", formatter->format(request_headers_, response_headers_, response_trailers_,
+                                     stream_info_, body_));
 }
 
 } // namespace Formatter
