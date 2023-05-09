@@ -487,6 +487,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
+    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:

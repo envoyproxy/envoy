@@ -144,6 +144,13 @@ public:
    * to secure mode. Implemented only by start_tls transport socket.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   * Called when upstream starttls socket is converted to tls and upstream ssl info
+   * needs to be set in the connection's stream_info.
+   * @return the const SSL connection data of upstream.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
