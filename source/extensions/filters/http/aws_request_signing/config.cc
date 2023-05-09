@@ -15,8 +15,8 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
 Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
