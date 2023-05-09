@@ -38,7 +38,6 @@ open class EngineBuilder(
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   private var runtimeGuards = mutableMapOf<String, Boolean>()
-  private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
@@ -303,22 +302,6 @@ open class EngineBuilder(
    */
   fun enableProxying(enableProxying: Boolean): EngineBuilder {
     this.enableProxying = enableProxying
-    return this
-  }
-
-  /**
-   * Allows Envoy to avoid having to wait on DNS response in the dynamic forward proxy filter
-   * for requests that are proxied i.e., a proxied request that goes to example.com will
-   * not have to wait for the DNS resolution for example.com domain if skipping of the DNS lookup
-   * is enabled. Defaults to false.
-   *
-   * @param enableSkipDNSLookup whether to ship waiting for DNS responses in the
-   *                            dynamic forward proxy filter for proxied requests.
-   *
-   * @return This builder.
-   */
-  fun enableSkipDNSLookupForProxiedRequests(enableSkipDNSLookup: Boolean): EngineBuilder {
-    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookup
     return this
   }
 
@@ -686,7 +669,6 @@ open class EngineBuilder(
       keyValueStores,
       statsSinks,
       runtimeGuards,
-      enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,
