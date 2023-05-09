@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
@@ -62,8 +63,7 @@ envoy_cmake(
         "skip_on_windows",
     ],
     targets = [
-        "",
-        "install",
+        "vppcom",
     ],
     working_directory = "src",
 )
