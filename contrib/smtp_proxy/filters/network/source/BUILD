@@ -19,13 +19,10 @@ envoy_cc_library(
     srcs = [
         "smtp_decoder.cc",
         "smtp_filter.cc",
-        "smtp_message.cc",
     ],
     hdrs = [
         "smtp_decoder.h",
         "smtp_filter.h",
-        "smtp_message.h",
-        "smtp_session.h",
     ],
     repository = "@envoy",
     deps = [
