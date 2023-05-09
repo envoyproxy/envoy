@@ -15,7 +15,7 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
 Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
+    const AwsRequestSigningProtoConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   auto credentials_provider =
@@ -37,8 +37,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute&
-        per_route_config,
+    const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
