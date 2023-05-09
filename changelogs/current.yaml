@@ -87,6 +87,12 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: match_delegate
+  change: |
+    added :ref:`per route configuration
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcherPerRoute>` to the 
+    :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter. Which allows the associated matcher to be defined on a per route basis.
 
 deprecated:
 - area: access_log
