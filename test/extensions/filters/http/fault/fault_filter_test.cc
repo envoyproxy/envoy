@@ -83,10 +83,6 @@ public:
       numerator: 100
       denominator: HUNDRED
     http_status: 429
-  metadata:
-    filter_metadata:
-      com.scooby.doo:
-        hello: "world"
   )EOF";
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
@@ -107,6 +103,10 @@ public:
   )EOF";
 
   const std::string header_abort_only_yaml = R"EOF(
+  metadata:
+    filter_metadata:
+      com.scooby.doo:
+        hello: "world"
   abort:
     header_abort: {}
     percentage:
@@ -244,9 +244,57 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   setUpTest(abort_only_yaml);
 
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
+}
+
+TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
+  setUpTest(header_abort_only_yaml);
+
+  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
+
   envoy::config::core::v3::Metadata dynamic_metadata;
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
-      .WillOnce(ReturnRef(dynamic_metadata));
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+          .WillByDefault(ReturnRef(dynamic_metadata));
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
@@ -281,53 +329,6 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
   EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
-  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  filter_->onDestroy();
-
-  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
-  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
-}
-
-TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
-  setUpTest(header_abort_only_yaml);
-
-  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
-
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
-      .Times(0);
-
-  // Abort related calls
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("fault.http.abort.abort_percent",
-                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(true));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
-      .WillOnce(Return(429));
-
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
-  EXPECT_CALL(decoder_filter_callbacks_,
-              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
-  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
-
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
