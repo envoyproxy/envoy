@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -111,6 +112,9 @@ public:
       cc->on_trailers_calls++;
       return nullptr;
     };
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
 
   envoy_headers defaultRequestHeaders() {
@@ -155,6 +159,9 @@ public:
   bool explicit_flow_control_{GetParam()};
   Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
   envoy_stream_t stream_ = 1;
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
