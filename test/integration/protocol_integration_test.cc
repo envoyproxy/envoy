@@ -463,14 +463,7 @@ TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
   EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
             waitForAccessLog(access_log_name_, 1, true));
 }
-/*
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        ConfigHelper::setConnectConfig(hcm, false, false,
-                                       downstreamProtocol() == Http::CodecType::HTTP3);
-      });
-*/
+
 TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;

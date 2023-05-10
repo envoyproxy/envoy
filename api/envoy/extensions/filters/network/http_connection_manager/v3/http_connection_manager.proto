@@ -356,7 +356,6 @@ message HttpConnectionManager {
     }
   }
 
-  // [#next-free-field: 4]
   message HcmAccessLogOptions {
     // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
     // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
