@@ -110,6 +110,11 @@ minor_behavior_changes:
     Ext_authz will add ``x-envoy-auth-failure-mode-allowed`` header when ``failure_mode_allow`` is enable.
     This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
+- area: resource_monitors
+  change: |
+    Removed legacy behavior that was previously allowed uses to set
+    ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true and
+    not count pages allocated by TCMalloc as free memory.
 
 bug_fixes:
 - area: http

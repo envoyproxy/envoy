@@ -4,7 +4,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/memory/stats.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,19 +26,12 @@ FixedHeapMonitor::FixedHeapMonitor(
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
 
   auto computeUsedMemory = [this]() -> size_t {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.do_not_count_mapped_pages_as_free")) {
-      const size_t physical = stats_->reservedHeapBytes();
-      const size_t unmapped = stats_->unmappedHeapBytes();
-      const size_t free_mapped = stats_->freeMappedHeapBytes();
-      ASSERT(physical >= (unmapped + free_mapped));
-      return physical - unmapped - free_mapped;
-    } else {
-      const size_t physical = stats_->reservedHeapBytes();
-      const size_t unmapped = stats_->unmappedHeapBytes();
-      ASSERT(physical >= unmapped);
-      return physical - unmapped;
-    }
+    const size_t physical = stats_->reservedHeapBytes();
+    const size_t unmapped = stats_->unmappedHeapBytes();
+    const size_t free_mapped = stats_->freeMappedHeapBytes();
+    ASSERT(physical >= (unmapped + free_mapped));
+    return physical - unmapped - free_mapped;
+
   };
 
   const size_t used = computeUsedMemory();
