@@ -48,6 +48,13 @@ minor_behavior_changes:
     Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched
     from environment variables. This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
+- area: http cookies
+  change: |
+    Changed internal format of http cookie to protobuf and added expiry timestamp. Processing expired cookie
+    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
+    the cookie is still accepted, but is planned to be obsoleted in the future.
+    This behavior change can be reverted by setting
+    ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
