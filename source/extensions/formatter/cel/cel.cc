@@ -71,6 +71,7 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
 CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
                                  absl::optional<size_t>& max_length) const {
   if (command == "CEL") {
+#if defined(USE_CEL_PARSER)
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
       throw EnvoyException("Not able to parse filter expression: " +
@@ -82,6 +83,9 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
   }
 
   return nullptr;
+#else
+    throw EnvoyException("CEL is not available for use in this environment.");
+#endif
 }
 
 } // namespace Formatter
