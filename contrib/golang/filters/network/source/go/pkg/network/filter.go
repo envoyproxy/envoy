@@ -20,7 +20,7 @@ package network
 import (
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type connectionCallback struct {

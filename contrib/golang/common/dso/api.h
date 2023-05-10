@@ -1,1 +1,1 @@
-../../filters/go/pkg/api/api.h
+../go/api/api.h

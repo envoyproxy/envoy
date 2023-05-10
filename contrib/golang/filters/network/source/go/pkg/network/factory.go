@@ -22,7 +22,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type ConfigFactory interface {

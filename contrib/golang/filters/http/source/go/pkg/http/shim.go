@@ -38,7 +38,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var ErrDupRequestKey = errors.New("dup request key")

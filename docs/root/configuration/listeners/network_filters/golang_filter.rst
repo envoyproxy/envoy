@@ -22,7 +22,7 @@ for more details on the filter's implementation.
 Developing a Go plugin
 ----------------------
 
-Envoy's Go plugins must implement the :repo:`DownstreamFilter/UpstreamFilter API <contrib/golang/filters/go/pkg/api/filter.go>`.
+Envoy's Go plugins must implement the :repo:`DownstreamFilter/UpstreamFilter API <contrib/golang/common/go/pkg/api/filter.go>`.
 
 Building a Go plugin
 ~~~~~~~~~~~~~~~~~~~~

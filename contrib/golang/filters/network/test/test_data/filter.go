@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/network"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network"
 )
 
 func init() {

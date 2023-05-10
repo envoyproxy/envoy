@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/http"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 )
 
 const Name = "basic"

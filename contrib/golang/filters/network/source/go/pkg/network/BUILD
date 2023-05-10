@@ -27,11 +27,11 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/network",
+    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/golang/common/go/api",
         "//contrib/golang/common/go/utils",
-        "//contrib/golang/filters/go/pkg/api",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/anypb",
     ],

@@ -203,12 +203,6 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/go"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/network/test/test_data"
   schedule:
     interval: daily

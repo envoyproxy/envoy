@@ -37,9 +37,10 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (

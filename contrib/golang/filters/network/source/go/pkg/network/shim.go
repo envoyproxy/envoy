@@ -41,8 +41,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
 )
 
 var (
@@ -66,9 +66,7 @@ func CreateUpstreamConn(addr string, filter api.UpstreamFilter) {
 
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(filter, func(f api.UpstreamFilter) {
-		runtime.SetFinalizer(filter, func(f api.UpstreamFilter) {
-			cgoAPI.UpstreamFinalize(unsafe.Pointer(uintptr(h)), api.NormalFinalize)
-		})
+		cgoAPI.UpstreamFinalize(unsafe.Pointer(uintptr(h)), api.NormalFinalize)
 	})
 
 	// TODO: handle error

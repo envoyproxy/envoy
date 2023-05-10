@@ -68,5 +68,5 @@ The output from the ``nc`` command below should include the "hello, " prefix add
       Further information about the Envoy Go HTTP filter.
    :ref:`Go extension API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`
       The Go extension filter API.
-   :repo:`Go plugin API <contrib/golang/filters/go/pkg/api/filter.go>`
+   :repo:`Go plugin API <contrib/golang/common/go/pkg/api/filter.go>`
       Overview of Envoy's Go plugin APIs.

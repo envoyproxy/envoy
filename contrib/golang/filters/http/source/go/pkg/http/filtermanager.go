@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var httpFilterConfigFactory = sync.Map{}

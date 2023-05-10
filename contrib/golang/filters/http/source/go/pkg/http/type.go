@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 // panic error messages when C API return not ok

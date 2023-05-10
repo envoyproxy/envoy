@@ -66,14 +66,15 @@ CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, v
 void envoyGoFilterHttpLog(uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
-// l4 downstream
+
+// downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
 CAPIStatus envoyGoFilterDownstreamWrite(void* wrapper, void* buffers, int buffersNum,
                                         int endStream);
 void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
-// l4 upstream
+// upstream
 void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr);
 CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream);
 CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);

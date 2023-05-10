@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type filter struct {

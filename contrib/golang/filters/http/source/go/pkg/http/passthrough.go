@@ -18,7 +18,7 @@
 package http
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type passThroughFilter struct {

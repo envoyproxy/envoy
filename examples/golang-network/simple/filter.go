@@ -5,9 +5,10 @@ import (
 	"net"
 
 	xds "github.com/cncf/xds/go/xds/type/v3"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/network"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network"
 )
 
 func init() {

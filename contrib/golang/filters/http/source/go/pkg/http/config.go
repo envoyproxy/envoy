@@ -36,11 +36,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 var (

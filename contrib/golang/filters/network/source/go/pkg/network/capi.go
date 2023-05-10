@@ -35,7 +35,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var cgoAPI api.NetworkCAPI = &cgoApiImpl{}
