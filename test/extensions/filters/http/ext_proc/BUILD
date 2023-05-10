@@ -117,6 +117,9 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
@@ -133,6 +136,9 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["streaming_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":test_processor_lib",
         ":utils_lib",
