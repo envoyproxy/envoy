@@ -203,7 +203,9 @@ Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers
                 transformation_result.new_headers ? *transformation_result.new_headers : headers);
         if (!validation_result.ok()) {
           ENVOY_CONN_LOG(debug, "Request header validation failed: {}\n{}", *parent_.connection_,
-                         validation_result.details(), transformation_result.new_headers ? *transformation_result.new_headers : headers);
+                         validation_result.details(),
+                         transformation_result.new_headers ? *transformation_result.new_headers
+                                                           : headers);
           failure = true;
           failure_details = std::string(validation_result.details());
         }
