@@ -70,8 +70,8 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
 ::Envoy::Formatter::FormatterProviderPtr
 CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
                                  absl::optional<size_t>& max_length) const {
-  if (command == "CEL") {
 #if defined(USE_CEL_PARSER)
+  if (command == "CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
       throw EnvoyException("Not able to parse filter expression: " +
