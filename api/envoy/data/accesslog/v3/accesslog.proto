@@ -31,6 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // *downstream* interaction between Envoy and a connected client.
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
+
 enum AccessLogType {
   NotSet = 0;
   TcpUpstreamConnected = 1;
