@@ -184,7 +184,7 @@ public:
       // https://github.com/envoyproxy/envoy/issues/7227.
       break;
     case ImportMode::Hidden:
-      flags |= Flags::Hidden;
+      flags_ |= Flags::Hidden;
       break;
     }
   }
@@ -247,6 +247,9 @@ public:
       parent_value_ = 0;
       flags_ &= ~Flags::Used;
       flags_ |= Flags::NeverImport;
+      break;
+    case ImportMode::Hidden:
+      flags_ |= Flags::Hidden;
       break;
     }
   }

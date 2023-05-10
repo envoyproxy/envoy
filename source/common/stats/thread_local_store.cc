@@ -906,8 +906,6 @@ bool ParentHistogramImpl::used() const {
   return merged_;
 }
 
-bool ParentHistogramImpl::internal() const { return false; }
-
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);
   if (merged_ || usedLockHeld()) {
