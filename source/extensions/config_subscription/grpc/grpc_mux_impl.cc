@@ -536,7 +536,7 @@ public:
     return std::make_shared<Config::GrpcMuxImpl>(
         local_info, std::move(async_client), dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         scope, Utility::parseRateLimitSettings(ads_config),
         ads_config.set_node_on_first_message_only(), std::move(config_validators),
         std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate,
