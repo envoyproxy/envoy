@@ -90,17 +90,10 @@ HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool,
                            Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                            Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
-                           StreamInfo::StreamInfo& downstream_info,
-                           std::unique_ptr<Router::GenericConnPool>& conn_pool)
+                           StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
       decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
-      upstream_callbacks_(callbacks) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    upstream_request_ = std::make_unique<UpstreamRequest>(
-        *this, std::move(conn_pool), /*can_send_early_data_=*/false, /*can_use_http3_=*/true);
-  }
-}
+      upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
@@ -112,35 +105,7 @@ bool HttpUpstream::readDisable(bool disable) {
   return true;
 }
 
-void HttpUpstream::newStream(GenericConnectionPoolCallbacks&) {
-  auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
-  const std::string& scheme =
-      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
-  downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.host(downstream_info_)},
-  });
-
-  if (config_.usePost()) {
-    downstream_headers_->addReference(Http::Headers::get().Path, "/");
-    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
-  }
-
-  config_.headerEvaluator().evaluateHeaders(*downstream_headers_,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
-                                            downstream_info_);
-  upstream_request_->acceptHeadersFromRouter(false);
-}
-
 void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    upstream_request_->acceptDataFromRouter(data, end_stream);
-    return;
-  }
   if (!request_encoder_) {
     return;
   }
@@ -331,6 +296,14 @@ HttpConnPool::~HttpConnPool() {
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+    upstream_ = std::make_unique<CombinedUpstream>(*this, upstream_callbacks_,
+                                                   *decoder_filter_callbacks_, *(route_.get()),
+                                                   config_, downstream_info_, generic_conn_pool_);
+    upstream_->newStream(callbacks);
+    return;
+  }
   if (type_ == Http::CodecType::HTTP1) {
     upstream_ = std::make_unique<Http1Upstream>(*this, upstream_callbacks_,
                                                 *decoder_filter_callbacks_, *(route_.get()),
@@ -340,11 +313,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
                                                 *decoder_filter_callbacks_, *(route_.get()),
                                                 config_, downstream_info_, generic_conn_pool_);
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    upstream_->newStream(callbacks);
-    return;
-  }
+
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this,
                                         {/*can_send_early_data_=*/false,
@@ -382,14 +351,59 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
 }
 
+CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
+                                   Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                                   Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                                   Router::Route& route, const TunnelingConfigHelper& config,
+                                   StreamInfo::StreamInfo& downstream_info,
+                                   std::unique_ptr<Router::GenericConnPool>& conn_pool)
+    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {
+  upstream_request_ = std::make_unique<UpstreamRequest>(
+      *this, std::move(conn_pool), /*can_send_early_data_=*/false, /*can_use_http3_=*/true);
+}
+
+void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
+  auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
+  const std::string& scheme =
+      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+  downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
+  });
+
+  if (config_.usePost()) {
+    downstream_headers_->addReference(Http::Headers::get().Path, "/");
+    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
+  }
+
+  config_.headerEvaluator().evaluateHeaders(*downstream_headers_,
+                                            downstream_info_.getRequestHeaders() == nullptr
+                                                ? *Http::StaticEmptyHeaders::get().request_headers
+                                                : *downstream_info_.getRequestHeaders(),
+                                            *Http::StaticEmptyHeaders::get().response_headers,
+                                            downstream_info_);
+  upstream_request_->acceptHeadersFromRouter(false);
+}
+
+void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
+  upstream_request_->acceptDataFromRouter(data, end_stream);
+}
+
+bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
+  if (Http::Utility::getResponseStatus(headers) != 200) {
+    return false;
+  }
+
+  return true;
+}
+
 Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
                              Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                              Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                              Router::Route& route, const TunnelingConfigHelper& config,
                              StreamInfo::StreamInfo& downstream_info,
-                             std::unique_ptr<Router::GenericConnPool>& conn_pool)
-    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info,
-                   conn_pool) {}
+                             std::unique_ptr<Router::GenericConnPool>&)
+    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (Http::Utility::getResponseStatus(headers) != 200) {
@@ -431,9 +445,8 @@ Http1Upstream::Http1Upstream(HttpConnPool& http_conn_pool,
                              Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                              Router::Route& route, const TunnelingConfigHelper& config,
                              StreamInfo::StreamInfo& downstream_info,
-                             std::unique_ptr<Router::GenericConnPool>& conn_pool)
-    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info,
-                   conn_pool) {}
+                             std::unique_ptr<Router::GenericConnPool>&)
+    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
 
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
   request_encoder_ = &request_encoder;

@@ -384,7 +384,7 @@ public:
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
   ~HttpUpstream() override;
-  void newStream(GenericConnectionPoolCallbacks& callbacks);
+  virtual void newStream(GenericConnectionPoolCallbacks& callbacks) PURE;
   virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
   void doneReading();
@@ -414,8 +414,7 @@ public:
 protected:
   HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
-               std::unique_ptr<Router::GenericConnPool>&);
+               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
@@ -535,6 +534,7 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
+  void newStream(GenericConnectionPoolCallbacks&) override {}
 };
 
 class Http2Upstream : public HttpUpstream {
@@ -546,6 +546,19 @@ public:
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
+  void newStream(GenericConnectionPoolCallbacks&) override {}
+};
+
+class CombinedUpstream : public HttpUpstream {
+public:
+  CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                   Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
+                   const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
+                   std::unique_ptr<Router::GenericConnPool>&);
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void setRequestEncoder(Http::RequestEncoder&, bool) override {}
+  bool isValidResponse(const Http::ResponseHeaderMap&) override;
 };
 
 } // namespace TcpProxy
