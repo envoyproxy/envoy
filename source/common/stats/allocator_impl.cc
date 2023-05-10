@@ -213,6 +213,7 @@ public:
   }
   uint64_t value() const override { return child_value_ + parent_value_; }
 
+  // TODO(diazalan): Rename importMode and mergeImportMode to generic name
   ImportMode importMode() const override {
     if (flags_ & Flags::NeverImport) {
       return ImportMode::NeverImport;
