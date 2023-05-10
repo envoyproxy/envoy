@@ -161,9 +161,9 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
-    name = "receive_data_chunk_limits_test",
+    name = "receive_data_delivery_limits_test",
     srcs = [
-        "ReceiveDataWithChunkLimitsTest.kt",
+        "ReceiveDataWithDeliveryLimitsTest.kt",
     ],
     exec_properties = {
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.

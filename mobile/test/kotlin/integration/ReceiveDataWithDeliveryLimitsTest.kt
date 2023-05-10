@@ -21,7 +21,7 @@ class ReceiveDataTest {
   }
 
   @Test
-  fun `data is received with min chunk size set`() {
+  fun `data is received with min delivery size set`() {
 
     val engine = EngineBuilder(Standard())
       .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
@@ -51,7 +51,7 @@ class ReceiveDataTest {
         dataExpectation.countDown()
       }
       .setOnError { _, _ -> fail("Unexpected error") }
-      .setMinChunkSize(10)
+      .setMinDeliverySize(10)
       .start()
       .sendHeaders(requestHeaders, true)
 

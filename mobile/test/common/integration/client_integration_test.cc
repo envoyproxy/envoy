@@ -131,28 +131,28 @@ void ClientIntegrationTest::trickleTest() {
   terminal_callback_.waitReady();
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoMinChunk) {
-  min_chunk_size_ = 0;
+TEST_P(ClientIntegrationTest, TrickleNoMinDelivery) {
+  min_delivery_size_ = 0;
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoNoMinChunkExplicitFlowControl) {
-  min_chunk_size_ = 0;
+TEST_P(ClientIntegrationTest, TrickleNoNoMinDeliveryExplicitFlowControl) {
+  min_delivery_size_ = 0;
   explicit_flow_control_ = true;
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleMinChunk) {
+TEST_P(ClientIntegrationTest, TrickleMinDelivery) {
   trickleTest();
-  ASSERT_LE(cc_.on_data_calls, 11);
+  ASSERT_EQ(cc_.on_data_calls, 2);
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoMinChunkExplicitFlowControl) {
+TEST_P(ClientIntegrationTest, TrickleNoMinDeliveryExplicitFlowControl) {
   explicit_flow_control_ = true;
   trickleTest();
-  ASSERT_LE(cc_.on_data_calls, 11);
+  ASSERT_EQ(cc_.on_data_calls, 2);
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {

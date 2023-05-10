@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
 open class StreamPrototype(private val engine: EnvoyEngine) {
   private val callbacks = StreamCallbacks()
   private var explicitFlowControl = false
-  private var minChunkSize: Long = 0
+  private var minDeliverySize: Long = 0
   private var useByteBufferPosition = false
 
   /**
@@ -29,19 +29,19 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
     val engineStream = engine.startStream(
       createCallbacks(executor),
       explicitFlowControl,
-      minChunkSize
+      minDeliverySize
     )
     return Stream(engineStream, useByteBufferPosition)
   }
 
   /**
-   * Sets chunk buffering on: data will be buffered in the C++ layer until the min chunk length or end stream is read.
+   * Sets min delivery: data will be buffered in the C++ layer until the min delivery length or end stream is read.
    *
-   * @param value set the minimum chunk size fo for this stream
+   * @param value set the minimum delivery size fo for this stream
    * @return This stream, for chaining syntax.
    */
-  fun setMinChunkSize(value: Long): StreamPrototype {
-    this.minChunkSize = value
+  fun setMinDeliverySize(value: Long): StreamPrototype {
+    this.minDeliverySize = value
     return this
   }
 

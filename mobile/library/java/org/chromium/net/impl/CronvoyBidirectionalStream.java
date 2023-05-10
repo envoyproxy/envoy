@@ -320,7 +320,7 @@ public final class CronvoyBidirectionalStream
           try {
             mStream.setStream(mRequestContext.getEnvoyEngine().startStream(
                 CronvoyBidirectionalStream.this, /* explicitFlowCrontrol= */ true,
-                /* minChunkSize */ 0));
+                /* minDeliverySize */ 0));
             if (!mDelayRequestHeadersUntilFirstFlush) {
               mStream.sendHeaders(mEnvoyRequestHeaders, mReadOnly);
             }

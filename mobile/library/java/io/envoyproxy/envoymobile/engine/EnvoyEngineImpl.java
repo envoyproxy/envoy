@@ -35,16 +35,16 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param callbacks The callbacks for the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
-   * @param minChunkSize If nonzero, indicates the smallest data chunk that should be sent up sans
-   *     end stream.
+   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
+   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
   @Override
   public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
-                                     long minChunkSize) {
+                                     long minDeliverySize) {
     long streamHandle = JniLibrary.initStream(engineHandle);
     EnvoyHTTPStream stream = new EnvoyHTTPStream(engineHandle, streamHandle, callbacks,
-                                                 explicitFlowControl, minChunkSize);
+                                                 explicitFlowControl, minDeliverySize);
     stream.start();
     return stream;
   }
