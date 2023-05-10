@@ -42,13 +42,15 @@ TEST(IoUringSocketHandleImpl, CreateClientSocket) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  Io::MockIoUringSocket socket;
+  Io::MockIoUringWorker worker;
   Io::MockIoUringFactory factory;
   Event::MockDispatcher dispatcher;
   IoUringSocketHandleTestImpl impl(factory, false);
   EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
-  // Removed when io uring client socket implemented.
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, false));
-  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _));
+  EXPECT_CALL(worker, addClientSocket(_, _)).WillOnce(testing::ReturnRef(socket));
+  EXPECT_CALL(factory, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
   impl.initializeFileEvent(
       dispatcher, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());

@@ -53,6 +53,7 @@ public:
   Api::SysCallIntResult listen(int backlog) override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
   Api::SysCallIntResult shutdown(int how) override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
@@ -85,7 +86,7 @@ protected:
   // io_uring implemented.
   std::unique_ptr<IoHandle> shadow_io_handle_{nullptr};
   bool enable_server_socket_{true};
-  bool enable_client_socket_{false};
+  bool enable_client_socket_{true};
   bool enable_accept_socket_{false};
 
   Api::IoCallUint64Result copyOut(uint64_t max_length, Buffer::RawSlice* slices,

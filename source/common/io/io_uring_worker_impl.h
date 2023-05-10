@@ -259,7 +259,7 @@ public:
 
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
-private:
+protected:
   const uint32_t write_timeout_ms_;
   // For read. io_uring socket will read sequentially in the order of buf_ and read_error_. Unless
   // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
@@ -298,6 +298,15 @@ private:
   void closeInternal();
   void submitReadRequest();
   void submitWriteOrShutdownRequest();
+};
+
+class IoUringClientSocket : public IoUringServerSocket {
+public:
+  IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
+                      uint32_t write_timeout_ms, bool enable_close_event);
+
+  void connect(const Network::Address::InstanceConstSharedPtr& address) override;
+  void onConnect(Request* req, int32_t result, bool injected) override;
 };
 
 } // namespace Io

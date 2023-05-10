@@ -122,6 +122,7 @@ IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, Event::FileReadyCb
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
   std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(
       fd, *this, std::move(cb), accept_size_, enable_close_event);
+  socket->enable();
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
@@ -131,6 +132,7 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
       fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+  socket->enable();
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
@@ -140,13 +142,18 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
       fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+  socket->enable();
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb, bool) {
+IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb cb,
+                                                  bool enable_close_event) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
-  PANIC("not implemented");
+  std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(
+      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+  LinkedList::moveIntoListBack(std::move(socket), sockets_);
+  return *sockets_.back();
 }
 
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() { return dispatcher_; }
@@ -351,9 +358,7 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t accept_size,
                                          bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event), accept_size_(accept_size),
-      requests_(std::vector<Request*>(accept_size_, nullptr)) {
-  enable();
-}
+      requests_(std::vector<Request*>(accept_size_, nullptr)) {}
 
 void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   IoUringSocketEntry::close(keep_fd_open, cb);
@@ -464,9 +469,7 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
                                          bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms) {
-  enable();
-}
+      write_timeout_ms_(write_timeout_ms) {}
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          IoUringWorkerImpl& parent, Event::FileReadyCb cb,
@@ -474,7 +477,6 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
       write_timeout_ms_(write_timeout_ms) {
   read_buf_.move(read_buf);
-  enable();
 }
 
 IoUringServerSocket::~IoUringServerSocket() {
@@ -797,13 +799,47 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
                 write_buf_.length(), slices.size(), fd_);
       write_or_shutdown_req_ = parent_.submitWriteRequest(*this, slices);
     } else if (shutdown_.has_value() && !shutdown_.value()) {
-      // Only SHUT_WR is supported now.
       write_or_shutdown_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
     } else if (status_ == Closed && read_req_ == nullptr && cancel_req_ == nullptr &&
                write_or_shutdown_cancel_req_ == nullptr) {
       closeInternal();
     }
   }
+}
+
+IoUringClientSocket::IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent,
+                                         Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         bool enable_close_event)
+    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, enable_close_event) {}
+
+void IoUringClientSocket::connect(const Network::Address::InstanceConstSharedPtr& address) {
+  // Reuse read request since there is no read on connecting and connect is cancellable.
+  ASSERT(read_req_ == nullptr);
+  read_req_ = parent_.submitConnectRequest(*this, address);
+}
+
+void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onConnect(req, result, injected);
+  ASSERT(!injected);
+  ENVOY_LOG(trace, "onConnect with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
+            injected, status_);
+
+  read_req_ = nullptr;
+  // Socket may be closed on connecting like binding error. In this situation we may not callback
+  // on connecting completion.
+  if (status_ == Closed) {
+    if (write_or_shutdown_req_ == nullptr) {
+      closeInternal();
+    }
+    return;
+  }
+
+  if (result == 0) {
+    enable();
+  }
+  // Calls parent injectCompletion() directly since we want to send connect result back to the IO
+  // handle.
+  parent_.injectCompletion(*this, RequestType::Write, result);
 }
 
 } // namespace Io

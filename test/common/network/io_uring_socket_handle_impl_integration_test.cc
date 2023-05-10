@@ -991,6 +991,80 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread)
   }
 }
 
+TEST_F(IoUringSocketHandleImplIntegrationTest, Connect) {
+  initialize();
+
+  // Peer handle starts listening.
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  peer_io_handle_->bind(local_addr);
+  peer_io_handle_->listen(5);
+
+  struct sockaddr addr;
+  socklen_t addrlen = sizeof(addr);
+  peer_io_handle_->accept(&addr, &addrlen);
+
+  int error = -1;
+  socklen_t error_size = sizeof(error);
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &error, &error_size](uint32_t events) {
+        if (events & Event::FileReadyType::Write) {
+          io_handle_->getOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from io_uring handle.
+  io_handle_->connect(peer_io_handle_->localAddress());
+
+  while (error == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(error, 0);
+
+  // Close safely.
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, ConnectError) {
+  initialize();
+
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 9999);
+
+  int original_error = -1;
+  socklen_t original_error_size = sizeof(original_error);
+  int error = -1;
+  socklen_t error_size = sizeof(error);
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &error, &error_size, &original_error, &original_error_size](uint32_t events) {
+        if (events & Event::FileReadyType::Write) {
+          getsockopt(io_handle_->fdDoNotUse(), SOL_SOCKET, SO_ERROR, &original_error,
+                     &original_error_size);
+          io_handle_->getOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from io_uring handle.
+  io_handle_->connect(local_addr);
+
+  while (error == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(original_error, 0);
+  EXPECT_EQ(error, ECONNREFUSED);
+
+  // Close safely.
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
