@@ -217,6 +217,9 @@ envoy_cc_test(
     srcs = [
         "upstream_access_log_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
