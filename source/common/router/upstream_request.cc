@@ -107,7 +107,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
 
-  // If pool factory will ensure the conn pool is valid.
+  // The pool factory will ensure the conn pool is valid before return it to the router filter.
   auto upstream_host = conn_pool_->host();
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstreamHeaders(), upstream_host);
