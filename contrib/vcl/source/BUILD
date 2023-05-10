@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
@@ -36,7 +37,6 @@ envoy_cmake(
         "CMAKE_BUILD_TYPE": "Release",
         "VPP_API_TEST_BUILTIN": "OFF",
         "BUILD_SHARED_LIBS": "OFF",
-        "CMAKE_ENABLE_TESTING": "OFF",
         "CMAKE_ENABLE_EXPORTS": "OFF",
     },
     copts = ["-Wno-unused-variable"],
@@ -62,8 +62,7 @@ envoy_cmake(
         "skip_on_windows",
     ],
     targets = [
-        "",
-        "install",
+        "vppcom",
     ],
     working_directory = "src",
 )
