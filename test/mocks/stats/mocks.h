@@ -142,10 +142,8 @@ public:
   MOCK_METHOD(uint64_t, latch, ());
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(bool, internal, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
 
-  bool internal_;
   bool used_;
   uint64_t value_;
   uint64_t latch_;
@@ -164,12 +162,10 @@ public:
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(bool, internal, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
   MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
 
-  bool internal_;
   bool used_;
   uint64_t value_;
   ImportMode import_mode_;
@@ -181,7 +177,6 @@ public:
   ~MockHistogram() override;
 
   MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(bool, internal, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
 
@@ -207,7 +202,6 @@ public:
   std::string bucketSummary() const override { return ""; };
 
   MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(bool, internal, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
   MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
@@ -219,7 +213,6 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   bool used_;
-  bool internal_;
   Unit unit_{Histogram::Unit::Unspecified};
   Store* store_{};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
@@ -236,11 +229,9 @@ public:
 
   MOCK_METHOD(void, set, (absl::string_view value), (override));
   MOCK_METHOD(bool, used, (), (const, override));
-  MOCK_METHOD(bool, internal, (), (const));
   MOCK_METHOD(std::string, value, (), (const, override));
 
   bool used_;
-  bool internal_;
   std::string value_;
 };
 

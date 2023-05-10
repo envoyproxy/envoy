@@ -60,7 +60,6 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
-  bool internal() const override { return false; }
 
 private:
   Histogram::Unit unit_;
@@ -110,7 +109,6 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
-  bool internal() const override;
 
   // RefcountInterface
   void incRefCount() override;

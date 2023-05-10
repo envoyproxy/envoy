@@ -93,11 +93,6 @@ public:
   virtual bool used() const PURE;
 
   /**
-   * Indicates whether this metric is used or check in the ForEach loops
-   */
-  virtual bool internal() const PURE;
-
-  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
@@ -106,7 +101,7 @@ public:
     static constexpr uint8_t Used = 0x01;
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
-    static constexpr uint8_t Internal = 0x08;
+    static constexpr uint8_t Hidden = 0x08;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -139,6 +134,7 @@ public:
     Uninitialized, // Gauge was discovered during hot-restart transfer.
     NeverImport,   // On hot-restart, each process starts with gauge at 0.
     Accumulate,    // Transfers gauge state on hot-restart.
+    Hidden,        // For deferred-stats gauges
   };
 
   ~Gauge() override = default;

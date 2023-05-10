@@ -85,7 +85,6 @@ public:
   // Metric
   SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
-  bool internal() const override { return flags_ & Metric::Flags::Internal; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
@@ -169,8 +168,7 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-            const StatNameTagVector& stat_name_tags, ImportMode import_mode,
-            bool internalFlag = false)
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
@@ -185,9 +183,9 @@ public:
       // an alternate scope. See
       // https://github.com/envoyproxy/envoy/issues/7227.
       break;
-    }
-    if (internalFlag) {
-      flags_ |= Flags::Internal;
+    case ImportMode::Hidden:
+      flags |= Flags::Hidden;
+      break;
     }
   }
 
@@ -220,6 +218,8 @@ public:
       return ImportMode::NeverImport;
     } else if (flags_ & Flags::LogicAccumulate) {
       return ImportMode::Accumulate;
+    } else if (flags_ & Flags::Hidden) {
+      return ImportMode::Hidden;
     }
     return ImportMode::Uninitialized;
   }
