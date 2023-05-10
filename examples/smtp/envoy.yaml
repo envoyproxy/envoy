@@ -11,8 +11,9 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.smtp_proxy.v3alpha.SmtpProxy
           stat_prefix: egress_smtp
-          proxy_protocol_config:
-            version: V2
+          downstream_ssl: ENABLE
+          upstream_ssl: DISABLE
+
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy

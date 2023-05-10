@@ -129,6 +129,78 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
   return Result::ReadyForNext;
 }
 
+void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+  std::string caps_out;
+  absl::string_view caps = caps_in;
+  int i = 0;
+
+  while (!caps.empty()) {
+    size_t crlf = caps.find(CRLF);
+    if (crlf == absl::string_view::npos) break;
+    absl::string_view line = caps.substr(0, crlf + CRLF.size());
+    caps = caps.substr(crlf+2);
+    if (i > 0) {
+      // trim off xyz-
+      absl::string_view line_cap = line.substr(4);
+      if (absl::StartsWithIgnoreCase(line_cap, cap)) return;
+    }
+    if (caps.empty()) {
+      std::string line_out(line);
+      line_out[3] = '-';
+      absl::StrAppend(&caps_out, line_out, line_out.substr(0,3), " ", cap, "\r\n");
+      break;
+    }
+
+    absl::StrAppend(&caps_out, line);
+    ++i;
+  }
+
+  caps_in = std::move(caps_out);
+}
+
+void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+  std::string caps_out;
+  absl::string_view caps = caps_in;
+  bool first = true;
+  size_t last = 0;
+  while (!caps.empty()) {
+    size_t crlf = caps.find(CRLF);
+    if (crlf == absl::string_view::npos) break;
+    absl::string_view line = caps.substr(0, crlf + CRLF.size());
+    caps = caps.substr(crlf + CRLF.size());
+    if (!first) {
+      // trim off xyz-
+      absl::string_view line_cap = line.substr(4);
+      if (absl::StartsWithIgnoreCase(line_cap, cap)) continue;
+    }
+    last = caps_out.size();
+    absl::StrAppend(&caps_out, line);
+    first = false;
+  }
+  caps_out[last+3] = ' ';
+  caps_in = std::move(caps_out);
+}
+
+bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view caps) {
+  bool first = true;
+  while (!caps.empty()) {
+    size_t crlf = caps.find("\r\n");
+    if (crlf == absl::string_view::npos) break;
+    absl::string_view line = caps.substr(0, crlf);
+    caps = caps.substr(crlf + CRLF.size());
+    if (first) {
+      first = false;
+      continue;
+    }
+
+    // trim off xyz-
+    line = line.substr(4);
+    if (absl::StartsWithIgnoreCase(line, cap)) return true;
+  }
+  return false;
+}
+
+
 } // namespace SmtpProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -50,6 +50,14 @@ public:
 
   virtual Result DecodeResponse(Buffer::Instance& data,
 				Response& result) = 0;
+  
+  // caps is a full wire response to EHLO that has previously been validated by DecodeResponse
+  // add cap to caps if not present
+  virtual void AddEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  // remove cap from caps if present
+  virtual void RemoveEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  // returns true if cap is present in caps
+  virtual bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) = 0;
  
 protected:
 
@@ -68,6 +76,10 @@ public:
 
   Result DecodeResponse(Buffer::Instance& data,
 			Response& result) override;
+
+  void AddEsmtpCapability(absl::string_view, std::string&) override;
+  void RemoveEsmtpCapability(absl::string_view, std::string&) override;
+  bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) override;
  
 protected:
   // Buffer used to temporarily store a downstream smtp packet

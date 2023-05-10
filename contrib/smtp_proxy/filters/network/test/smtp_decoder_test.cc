@@ -141,6 +141,111 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   data_.drain(response.wire_len);
 }
 
+TEST_F(SmtpProxyDecoderTest, HasCap) {
+  std::string caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-PIPELINING\r\n"
+    "200 STARTTLS\r\n";
+  EXPECT_TRUE(decoder_->HasEsmtpCapability("smtputf8", caps));
+  EXPECT_TRUE(decoder_->HasEsmtpCapability("PIPELINING", caps));
+  EXPECT_TRUE(decoder_->HasEsmtpCapability("StArTtLs", caps));
+  EXPECT_FALSE(decoder_->HasEsmtpCapability("SIZE", caps));
+}
+
+TEST_F(SmtpProxyDecoderTest, RemoveCap) {
+  std::string caps =
+    "200 example.com at your service\r\n";
+  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200 example.com at your service\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200 PIPELINING\r\n";
+  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200 PIPELINING\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-STARTTLS\r\n"
+    "200 PIPELINING\r\n";
+  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200 PIPELINING\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-PIPELINING\r\n"
+    "200 STARTTLS\r\n";
+  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200 PIPELINING\r\n",
+    caps);
+}
+
+TEST_F(SmtpProxyDecoderTest, AddCap) {
+  std::string caps =
+    "200 example.com at your service\r\n";
+  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200 STARTTLS\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200 PIPELINING\r\n";
+  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-PIPELINING\r\n"
+    "200 STARTTLS\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-STARTTLS\r\n"
+    "200 PIPELINING\r\n";
+  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-STARTTLS\r\n"
+    "200 PIPELINING\r\n",
+    caps);
+
+ caps =
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-PIPELINING\r\n"
+    "200 STARTTLS\r\n";
+  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  EXPECT_EQ(
+    "200-example.com at your service\r\n"
+    "200-SMTPUTF8\r\n"
+    "200-PIPELINING\r\n"
+    "200 STARTTLS\r\n",
+    caps);
+}
+
+
 } // namespace SmtpProxy
 } // namespace NetworkFilters
 } // namespace Extensions

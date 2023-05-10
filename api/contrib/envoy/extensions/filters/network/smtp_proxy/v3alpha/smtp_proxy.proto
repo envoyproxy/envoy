@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.smtp_proxy.v3alpha;
 
-import "google/protobuf/wrappers.proto";
-
-import "envoy/config/core/v3/proxy_protocol.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -26,18 +22,15 @@ message SmtpProxy {
   enum SSLMode {
     // Do not encrypt upstream connection to the server.
     DISABLE = 0;
-
+    ENABLE = 1;
     // Establish upstream SSL connection to the server. If the server does not
     // accept the request for SSL connection, the session is terminated.
-    REQUIRE = 1;
+    REQUIRE = 2;
   }
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_smtp_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Send (ha)proxy header to upstream
-  envoy.config.core.v3.ProxyProtocolConfig proxy_protocol_config = 2;
 
   // Controls whether to terminate SSL session initiated by a client.
   // If the value is false, the Smtp proxy filter will not try to
@@ -47,7 +40,7 @@ message SmtpProxy {
   // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
   // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
   // Refer to SMTP STARTTLS spec rfc3207 https://www.rfc-editor.org/rfc/rfc3207.html for details
-  bool terminate_ssl = 3;
+  SSLMode downstream_ssl = 3;
 
   // Controls whether to establish upstream SSL connection to the server.
   // Envoy will try to establish upstream SSL connection to the server only when

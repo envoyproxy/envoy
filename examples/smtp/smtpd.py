@@ -39,6 +39,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 from aiosmtpd.controller import Controller
 controller = Controller(InMemoryHandler(), hostname="localhost", port=9025,
-                        proxy_protocol_timeout=30)
+                        #proxy_protocol_timeout=30
+                        )
 controller.start()
 time.sleep(1000000)

@@ -5,12 +5,10 @@
 
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/network/well_known_names.h"
-#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
 
-using Envoy::Extensions::Common::ProxyProtocol::generateProxyProtoHeader;
-
+using ConfigProto = envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy;
 
 namespace Envoy {
 namespace Extensions {
@@ -19,8 +17,7 @@ namespace SmtpProxy {
 
 SmtpFilterConfig::SmtpFilterConfig(const SmtpFilterConfigOptions& config_options,
                                            Stats::Scope& scope)
-    : proxy_protocol_config_(config_options.proxy_protocol_config_),
-      terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
+    : downstream_ssl_(config_options.downstream_ssl_), upstream_ssl_(config_options.upstream_ssl_),
       scope_{scope}, stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
@@ -30,49 +27,19 @@ SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
 }
 
 Network::FilterStatus SmtpFilter::onNewConnection() {
+  ENVOY_CONN_LOG(trace, "smtp_proxy: onNewConnection()", read_callbacks_->connection());
+ 
   config_->stats_.sessions_.inc();
 
-  Buffer::OwnedImpl banner("220 envoy ESMTP\r\n");
-  write_callbacks_->injectWriteDataToFilterChain(banner, /*end_stream=*/false);
-  state_ = EHLO;
+  state_ = UPSTREAM_GREETING;
+ 
   return Network::FilterStatus::Continue;
-}
-
-Network::FilterStatus SmtpFilter::readUpstream(State new_state) {
-  state_ = new_state;
-  if (backend_buffer_.length() > 0) {
-    Buffer::OwnedImpl empty;
-    onWrite(empty, false);
-  }
-  return Network::FilterStatus::StopIteration; 
-}
-
-Network::FilterStatus SmtpFilter::readDownstream(State new_state) {
-  state_ = new_state;
-  if (frontend_buffer_.length() > 0) {
-    Buffer::OwnedImpl empty;
-    onData(empty, false);
-  }
-  return Network::FilterStatus::StopIteration; 
-}
-
-Network::FilterStatus SmtpFilter::maybeSendProxyHeader(State next) {
-  if (config_->proxy_protocol_config_) {
-    Buffer::OwnedImpl proxy_header;
-    // Note: this doesn't seem to populate tls info
-    generateProxyProtoHeader(*config_->proxy_protocol_config_,
-			     read_callbacks_->connection(),
-			     proxy_header);
-    read_callbacks_->injectReadDataToFilterChain(proxy_header, false);
-  }
-
-  return readUpstream(next);
 }
 
 // Network::ReadFilter
 Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_CONN_LOG(trace, "smtp_proxy: onData {} bytes, state {}", read_callbacks_->connection(),
-                 data.length(), state_);
+  ENVOY_CONN_LOG(trace, "smtp_proxy: onData {} bytes, state {}",
+		 read_callbacks_->connection(), data.length(), state_);
 
   if (state_ == PASSTHROUGH) {
     return Network::FilterStatus::Continue;
@@ -82,9 +49,8 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
   data.drain(data.length());
 
   Decoder::Command command;
-  if (state_ == EHLO ||
-      state_ == STARTTLS ||
-      state_ == EHLO2) {
+  if (state_ == DOWNSTREAM_EHLO ||
+      state_ == DOWNSTREAM_STARTTLS) {
     Decoder::Result res = decoder_->DecodeCommand(frontend_buffer_, command);
 
     if (res == Decoder::Result::Bad) {
@@ -115,8 +81,11 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
                    state_, command.verb);
   }
 
+  Buffer::OwnedImpl wire_command;
+  wire_command.move(frontend_buffer_, command.wire_len);
+
   switch (state_) {
-    case EHLO: {
+    case DOWNSTREAM_EHLO: {
       if (command.verb != Decoder::Command::HELO && command.verb != Decoder::Command::EHLO) {
 	config_->stats_.sessions_bad_ehlo_.inc();
 	Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
@@ -124,63 +93,50 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
 	read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 	return Network::FilterStatus::StopIteration; 
       }
+      read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
       if (command.verb == Decoder::Command::HELO) {
 	config_->stats_.sessions_non_esmtp_.inc();
-	return maybeSendProxyHeader(UPSTREAM_RESPONSE);
-      }
-      Buffer::OwnedImpl esmtp;
-      // XXX per config
-      esmtp.add("250-envoy smtp\r\n"
-		"250 STARTTLS\r\n");
-      frontend_buffer_.drain(command.wire_len);
-
-      write_callbacks_->injectWriteDataToFilterChain(esmtp, /*end_stream=*/false);
-      state_ = STARTTLS;
-      return Network::FilterStatus::StopIteration; 
-    }
-    case STARTTLS: {
-      if (command.verb != Decoder::Command::STARTTLS) {
-	config_->stats_.sessions_esmtp_unencrypted_.inc();
-	return maybeSendProxyHeader(UPSTREAM_BANNER);
-      }
-      frontend_buffer_.drain(command.wire_len);
-      onSSLRequest();
-      return Network::FilterStatus::StopIteration; 
-    }
-    case EHLO2: {
-      // If the next command from the client after the TLS negotiation isn't EHLO:
-      // leave the command in frontend_buffer_
-      // emit an ehlo to the upstream
-      // consume the ehlo response
-      // inject the buffered command from frontend_buffer_ to the upstream
-      if (command.verb != Decoder::Command::EHLO) {
-	config_->stats_.sessions_no_ehlo_after_starttls_.inc();
-	Buffer::OwnedImpl ehlo2("ehlo envoy\r\n");
-	read_callbacks_->injectReadDataToFilterChain(ehlo2, false);
-	state_ = UPSTREAM_RESPONSE;
+	state_ = PASSTHROUGH;
 	return Network::FilterStatus::StopIteration; 
       }
-      
-      read_callbacks_->injectReadDataToFilterChain(frontend_buffer_, /*end_stream=*/false);
-      //XXX ASSERT(frontend_buffer_.length() == command.wire_len);  // bad pipeline above
-      frontend_buffer_.drain(frontend_buffer_.length());
-
-      state_ = PASSTHROUGH;
+      state_ = UPSTREAM_EHLO_RESP;
       return Network::FilterStatus::StopIteration; 
+    }
+    case DOWNSTREAM_STARTTLS: {
+      if (command.verb != Decoder::Command::STARTTLS) {
+	if (config_->downstream_ssl_ == ConfigProto::REQUIRE) {
+	  Buffer::OwnedImpl err("500 TLS required\r\n");
+	  write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+	  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+	  return Network::FilterStatus::StopIteration; 
+	}
+
+	// If we wanted to send XCLIENT to the upstream indicating that
+	// the client is not TLS, we would start that here.
+	read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
+	config_->stats_.sessions_esmtp_unencrypted_.inc();
+	state_ = PASSTHROUGH;
+	return Network::FilterStatus::StopIteration; 
+      } else {
+	onDownstreamSSLRequest();
+	return Network::FilterStatus::StopIteration; 
+      }
     }
   default:
     // TODO this probably means that the client spoke at the wrong time
     break;
   }
 
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::Continue;
 }
 
 void SmtpFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  ENVOY_CONN_LOG(trace, "smtp_proxy: initializeReadFilterCallbacks()", callbacks.connection());
   read_callbacks_ = &callbacks;
 }
 
 void SmtpFilter::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) {
+  ENVOY_CONN_LOG(trace, "smtp_proxy: initializeWriteFilterCallbacks()", callbacks.connection());
   write_callbacks_ = &callbacks;
 }
 
@@ -195,11 +151,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   backend_buffer_.add(data);
   data.drain(data.length());
 
-  // upstream will generally send its greeting immediately upon
-  // connect so buffer it until we're ready for it.
-  // TODO but some states are invalid for the server to send e.g. while we're waiting for the client
-  if (state_ != UPSTREAM_BANNER &&
-      state_ != UPSTREAM_RESPONSE) {
+  if (state_ != UPSTREAM_GREETING &&
+      state_ != UPSTREAM_EHLO_RESP &&
+      state_ != UPSTREAM_STARTTLS_RESP) {
     return Network::FilterStatus::StopIteration;
   }
 
@@ -215,28 +169,87 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   if (res != Decoder::Result::ReadyForNext) {
     return Network::FilterStatus::Continue;
   }
-  backend_buffer_.drain(response.wire_len);
+  Buffer::OwnedImpl wire_resp;
+  wire_resp.move(backend_buffer_, response.wire_len);
 
-  if (state_ == UPSTREAM_BANNER) {
-    // we may have buffered the next command while we were waiting for this, resume processing that
-    return readDownstream(EHLO2);
-  } else {  // UPSTREAM_RESPONSE
-    // after filter-emitted 2nd EHLO: consumed EHLO response, send buffered command (MAIL, etc)
-    // after client HELO: consumed banner, send buffered HELO
-    read_callbacks_->injectReadDataToFilterChain(frontend_buffer_, false);
-    frontend_buffer_.drain(frontend_buffer_.length());
-    state_ = PASSTHROUGH;
+  switch (state_) {
+  case UPSTREAM_GREETING: {
+    write_callbacks_->injectWriteDataToFilterChain(wire_resp, /*end_stream=*/false);
+    state_ = DOWNSTREAM_EHLO;
+    return Network::FilterStatus::StopIteration;
+  }
+  case UPSTREAM_EHLO_RESP: {
+    if (config_->upstream_ssl_ == ConfigProto::REQUIRE &&
+	!decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
+      Buffer::OwnedImpl err("400 upstream STARTTLS not offered\r\n");
+      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return Network::FilterStatus::StopIteration;
+    }
+
+    {
+      std::string downstream_caps = wire_resp.toString();
+      if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
+	decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
+      } else {
+	decoder_->RemoveEsmtpCapability("STARTTLS", downstream_caps);
+      }
+      downstream_esmtp_capabilities_ = Buffer::OwnedImpl(downstream_caps);
+    }
+    
+    if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
+      state_ = UPSTREAM_STARTTLS_RESP;
+      Buffer::OwnedImpl starttls("STARTTLS\r\n");
+      read_callbacks_->injectReadDataToFilterChain(starttls, /*end_stream=*/false);
+    } else {
+      write_callbacks_->injectWriteDataToFilterChain(
+	downstream_esmtp_capabilities_, /*end_stream=*/false);
+      state_ = DOWNSTREAM_STARTTLS;
+    }
+    return Network::FilterStatus::StopIteration;
+  }
+  case UPSTREAM_STARTTLS_RESP: {
+    // this seems unlikely and is probably indicative of problems with
+    // the upstream, just fail for now
+    if ((response.code < 200) || (response.code > 299)) {
+      config_->stats_.sessions_upstream_ssl_command_err_.inc();
+      Buffer::OwnedImpl err("400 upstream STARTTLS error\r\n");
+      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    } else if (!read_callbacks_->startUpstreamSecureTransport()) {
+      config_->stats_.sessions_upstream_ssl_err_.inc();
+      ENVOY_CONN_LOG(info, "smtp_proxy: cannot enable upstream secure transport. "
+		     "Check configuration.",
+		     read_callbacks_->connection());
+      Buffer::OwnedImpl err("400 upstream TLS negotiation failure\r\n");
+      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    } else {
+      config_->stats_.sessions_upstream_terminated_ssl_.inc();
+
+      write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities_,
+						     /*end_stream=*/false);
+      if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
+	state_ = DOWNSTREAM_STARTTLS;
+      } else {
+	state_ = PASSTHROUGH;
+      }
+    }
+    return Network::FilterStatus::StopIteration;
+  }
+  default:
+    ASSERT(0);  // checked above
   }
 
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::Continue;
 }
 
 DecoderPtr SmtpFilter::createDecoder() {
   return std::make_unique<DecoderImpl>();
 }
 
-bool SmtpFilter::onSSLRequest() {
-  ENVOY_CONN_LOG(trace, "smtp_proxy: onSSLRequest()",
+bool SmtpFilter::onDownstreamSSLRequest() {
+  ENVOY_CONN_LOG(trace, "smtp_proxy: onDownstreamSSLRequest()",
 		 read_callbacks_->connection());
 
   Buffer::OwnedImpl buf("220 envoy ready for tls\r\n");
@@ -247,18 +260,21 @@ bool SmtpFilter::onSSLRequest() {
     // Wait until response has been transmitted.
     if (bytes >= len) {
       if (!read_callbacks_->connection().startSecureTransport()) {
+        config_->stats_.sessions_downstream_ssl_err_.inc();
+
         ENVOY_CONN_LOG(
             info, "smtp_proxy: cannot enable downstream secure transport. Check configuration.",
             read_callbacks_->connection());
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       } else {
         // Unsubscribe the callback.
-        config_->stats_.sessions_terminated_ssl_.inc();
+        config_->stats_.sessions_downstream_terminated_ssl_.inc();
         ENVOY_CONN_LOG(trace, "smtp_proxy: enabled SSL termination.",
                        read_callbacks_->connection());
 
-	// if proxy header enabled, injectReadDataToFilterChain()
-	maybeSendProxyHeader(UPSTREAM_BANNER);
+	// if we wanted to send XCLIENT to the upstream with the TLS
+	// info, we would start that here.
+	state_ = PASSTHROUGH;
 
         // Switch to TLS has been completed.
         // Signal to the decoder to stop processing the current message (SSLRequest).
