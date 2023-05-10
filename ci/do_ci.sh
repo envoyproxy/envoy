@@ -35,7 +35,7 @@ function collect_build_profile() {
   mv -f \
      "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" \
      "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
-      || true
+      || :
   ((build_profile_count++))
 }
 
