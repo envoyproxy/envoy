@@ -10,7 +10,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
-static const std::string DefaultUnspecifiedValueString = "-";
+constexpr absl::string_view DefaultUnspecifiedValueString = "-";
 
 #if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
@@ -35,8 +35,9 @@ std::string truncate(std::string str, absl::optional<size_t> max_length) {
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELFormatter::CELFormatter(Expr::Builder& builder,
-                           const google::api::expr::v1alpha1::Expr& input_expr)
-    : parsed_expr_(input_expr) {
+                           const google::api::expr::v1alpha1::Expr& input_expr,
+                           absl::optional<size_t> max_length)
+    : parsed_expr_(input_expr), max_length_(max_length) {
   compiled_expr_ = Expr::createExpression(builder, parsed_expr_);
 }
 
@@ -50,10 +51,10 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
   auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
                                     &response_headers, &response_trailers);
   if (!eval_status.has_value() || eval_status.value().IsError()) {
-    return DefaultUnspecifiedValueString;
+    return std::string(DefaultUnspecifiedValueString);
   }
   auto result = eval_status.value();
-  return Expr::print(result);
+  return truncate(Expr::print(result), max_length_);
 }
 
 ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
@@ -70,15 +71,14 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
 CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
                                  absl::optional<size_t>& max_length) const {
   if (command == "CEL") {
-    auto cel_expr = truncate(subcommand, max_length);
-    auto parse_status = google::api::expr::parser::Parse(cel_expr);
+    auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
       throw EnvoyException("Not able to parse filter expression: " +
                            parse_status.status().ToString());
     }
 
     auto expr_builder_ = Expr::createBuilder(nullptr);
-    return std::make_unique<CELFormatter>(*expr_builder_, parse_status.value().expr());
+    return std::make_unique<CELFormatter>(*expr_builder_, parse_status.value().expr(), max_length);
   }
 
   return nullptr;

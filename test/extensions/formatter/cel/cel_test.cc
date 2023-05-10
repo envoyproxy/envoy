@@ -46,6 +46,58 @@ TEST_F(CELFormatterTest, TestRequestHeader) {
                                      stream_info_, body_, AccessLog::AccessLogType::NotSet));
 }
 
+TEST_F(CELFormatterTest, TestMissingRequestHeader) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['missing-header'])%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("-", formatter->format(request_headers_, response_headers_, response_trailers_,
+                                   stream_info_, body_, AccessLog::AccessLogType::NotSet));
+}
+
+TEST_F(CELFormatterTest, TestWithoutMaxLength) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['x-envoy-original-path'])%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("/original/path?secret=parameter",
+            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_, AccessLog::AccessLogType::NotSet));
+}
+
+TEST_F(CELFormatterTest, TestMaxLength) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['x-envoy-original-path']):9%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("/original", formatter->format(request_headers_, response_headers_, response_trailers_,
+                                           stream_info_, body_, AccessLog::AccessLogType::NotSet));
+}
+
 TEST_F(CELFormatterTest, TestInvalidExpression) {
   const std::string yaml = R"EOF(
   text_format_source:
