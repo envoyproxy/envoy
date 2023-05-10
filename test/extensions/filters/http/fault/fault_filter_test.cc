@@ -62,6 +62,10 @@ public:
       numerator: 100
       denominator: HUNDRED
     fixed_delay: 5s
+  metadata:
+    filter_metadata:
+      com.scooby.doo:
+        hello: "world"
   )EOF";
 
   const std::string fixed_delay_only_disable_stats_yaml = R"EOF(
@@ -79,6 +83,10 @@ public:
       numerator: 100
       denominator: HUNDRED
     http_status: 429
+  metadata:
+    filter_metadata:
+      com.scooby.doo:
+        hello: "world"
   )EOF";
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
@@ -92,6 +100,10 @@ public:
       numerator: 100
       denominator: HUNDRED
     http_status: 503
+  metadata:
+    filter_metadata:
+      com.scooby.doo:
+        hello: "world"
   )EOF";
 
   const std::string header_abort_only_yaml = R"EOF(
@@ -230,12 +242,15 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
 }
 
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
-  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
-  fault.mutable_abort()->mutable_percentage()->set_numerator(100);
-  fault.mutable_abort()->mutable_percentage()->set_denominator(
-      envoy::type::v3::FractionalPercent::HUNDRED);
-  fault.mutable_abort()->set_http_status(429);
-  setUpTest(fault);
+  setUpTest(abort_only_yaml);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata));
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -264,6 +279,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -501,6 +517,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
   // Expect filter to continue execution when delay is 0ms
@@ -529,7 +546,7 @@ TEST_F(FaultFilterTest, Overflow) {
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
       .WillOnce(Return(0));
-
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
@@ -597,6 +614,11 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
 // Verifies that 2 consecutive delay faults be allowed with the max number of faults set to 1.
 TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   setUpTest(fixed_delay_only_yaml);
+  envoy::config::core::v3::Metadata dynamic_metadata;
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
 
   // Set the max number of faults to 1.
   EXPECT_CALL(runtime_.snapshot_,
@@ -622,6 +644,9 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
       .Times(2);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata))
+      .WillOnce(ReturnRef(dynamic_metadata));
 
   // Start request 1 with a fault delay.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -649,6 +674,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   // Should stop counting as active fault after delay elapsed.
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 
   // Prep up request 2, with setups and expectations same as request 1.
   setUpTest(fixed_delay_only_yaml);
@@ -667,6 +693,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
 
   // Have the fault delay of request 2 kick in, which should be delayed with success.
   timer_->invokeCallback();
+  EXPECT_THAT(dynamic_metadata, ProtoEq(config_->settings()->metadata()));
   filter_->onDestroy();
 
   EXPECT_EQ(2UL, config_->stats().delays_injected_.value());
@@ -775,6 +802,14 @@ TEST_F(FaultFilterTest, DelayForDownstreamClusterDisableTracing) {
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   setUpTest(fixed_delay_and_abort_yaml);
 
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(dynamic_metadata));
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
+
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
       .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
@@ -829,6 +864,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
   filter_->onDestroy();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
@@ -1358,8 +1394,14 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
 }
 
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
-  setupRateLimitTest(true);
+  // Set metadata in fault. Ensure that it does not get reflected in stream info.
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
+  auto& filter_metadata = *fault.mutable_metadata()->mutable_filter_metadata();
+  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
 
+  setupRateLimitTest(fault);
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).Times(0);
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);

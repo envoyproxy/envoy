@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -74,6 +75,7 @@ public:
     return response_rate_limit_percent_runtime_;
   }
   bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
+  const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
 
 private:
   class RuntimeKeyValues {
@@ -106,6 +108,8 @@ private:
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
   const bool disable_downstream_cluster_stats_;
+
+  const envoy::config::core::v3::Metadata metadata_;
 };
 
 /**
