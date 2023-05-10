@@ -449,21 +449,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rest_api_fetcher_lib",
-    srcs = ["rest_api_fetcher.cc"],
-    hdrs = ["rest_api_fetcher.h"],
-    deps = [
-        ":message_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:enum_to_int",
-        "//source/common/config:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "user_agent_lib",
     srcs = ["user_agent.cc"],
     hdrs = ["user_agent.h"],

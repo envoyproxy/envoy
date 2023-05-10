@@ -12,7 +12,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/http/rest_api_fetcher.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
