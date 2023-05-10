@@ -266,7 +266,7 @@ TEST_F(AllocatorImplTest, ForEachGaugeHidden) {
   alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                       [&num_iterations, &stat_names](Gauge& gauge) {
                         EXPECT_EQ(stat_names.count(gauge.statName()), 1);
-                        if(gauge.importMode()!=Gauge::ImportMode::Hidden)
+                        if (gauge.importMode() != Gauge::ImportMode::Hidden)
                           ++num_iterations;
                       });
   EXPECT_EQ(num_gauges, 12);

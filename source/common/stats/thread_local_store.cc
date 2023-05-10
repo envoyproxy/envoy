@@ -595,7 +595,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result;
-  if(import_mode != Gauge::ImportMode::Hidden) {
+  if (import_mode != Gauge::ImportMode::Hidden) {
     fast_reject_result = parent_.fastRejects(final_stat_name);
   } else {
     fast_reject_result = StatsMatcher::FastResult::Matches;
