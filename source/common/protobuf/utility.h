@@ -684,6 +684,15 @@ public:
   static uint64_t durationToMilliseconds(const ProtobufWkt::Duration& duration);
 
   /**
+   * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
+   * Instead, it returns error if duration is out-of-range.
+   * @param duration protobuf.
+   * @param error bool, set into true in case of duration out-of-range; otherwise false.
+   * @return duration in milliseconds.
+   */
+  static uint64_t durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration, bool& error);
+
+  /**
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
    * Specifically, we ensure that the duration is positive.
    * @param duration protobuf.

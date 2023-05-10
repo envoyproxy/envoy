@@ -1960,7 +1960,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcc
   newTimeoutWrongConfigTest(500);
 }
 
-// Send the new timeout to be an extremely large number, which will trigger exception being thrown.
+// Send the new timeout to be an extremely large number, which is out-of-range of duration.
 // Verify the code appropriately handled it.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutOutOfBounds) {
   // Config max_message_timeout proto to 100ms to enable the new timeout API.
