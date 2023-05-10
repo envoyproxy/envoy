@@ -435,35 +435,6 @@ TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
             waitForAccessLog(access_log_name_, 1, true));
 }
 
-TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    return;
-  }
-
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
-      });
-
-  useAccessLog("%RESPONSE_CODE% %ACCESS_LOG_TYPE%");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
-  waitForNextUpstreamRequest();
-  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamStart)),
-            waitForAccessLog(access_log_name_, 0, true));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
-            waitForAccessLog(access_log_name_, 1, true));
-}
-
 TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
