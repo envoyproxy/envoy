@@ -114,12 +114,18 @@ jobs:
       bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
       cacheTestResults: ${{ parameters.cacheTestResults }}
 
-  - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
     displayName: "Upload $(CI_TARGET) Report to GCS"
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
       GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
     condition: always()
 
 - job: complete

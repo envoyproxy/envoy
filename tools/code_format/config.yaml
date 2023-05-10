@@ -87,6 +87,9 @@ paths:
   exception:
     include:
     - source/common/config/utility.h
+    - source/common/matcher/map_matcher.h
+    - source/common/matcher/field_matcher.h
+    - source/extensions/common/matcher/trie_matcher.h
     # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
     exclude:
     - source/common/http/http2/codec_impl.h
@@ -318,3 +321,6 @@ visibility_excludes:
 - source/extensions/health_checkers/BUILD
 - source/extensions/config_subscription/rest/BUILD
 - source/extensions/config_subscription/filesystem/BUILD
+- source/extensions/config_subscription/grpc/BUILD
+- source/extensions/load_balancing_policies/subset/BUILD
+- source/extensions/load_balancing_policies/ring_hash/BUILD
