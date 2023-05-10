@@ -31,7 +31,6 @@ void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& call
     const size_t free_mapped = stats_->freeMappedHeapBytes();
     ASSERT(physical >= (unmapped + free_mapped));
     return physical - unmapped - free_mapped;
-
   };
 
   const size_t used = computeUsedMemory();

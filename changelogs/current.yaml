@@ -57,9 +57,9 @@ minor_behavior_changes:
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 - area: resource_monitors
   change: |
-    Removed legacy behavior that was previously allowed uses to set
+    Removed legacy behavior that was previously allowed users to set
     ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true and
-    not count pages allocated by TCMalloc as free memory.
+    not count pages allocated by TCMalloc as free memory in fixed heap monitor.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
