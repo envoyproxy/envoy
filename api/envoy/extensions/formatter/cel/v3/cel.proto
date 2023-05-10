@@ -20,12 +20,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // %CEL(EXPRESSION)%
 // Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
-// Expression errors are considered `-`).
+// Expression errors are considered `-`.
 //
 // Examples:
-// - ``CEL(response.code)``
-// - ``CEL(connection.mtls)``
-// - ``CEL(request.headers['x-log-mtls'] || request.url_path.contains('v1beta3'))
+// - ``%CEL(response.code)%``
+// - ``%CEL(connection.mtls)%``
+// - ``%CEL(request.headers['x-log-mtls'] || request.url_path.contains('v1beta3'))%``
 
 message Cel {
 }
