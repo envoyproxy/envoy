@@ -33,6 +33,7 @@ public:
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
+  void trickleTest();
 
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
@@ -87,6 +88,58 @@ TEST_P(ClientIntegrationTest, LargeResponse) {
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->setResponseBody(data);
   basicTest();
   ASSERT_EQ(cc_.on_complete_received_byte_count, 32828);
+}
+
+void ClientIntegrationTest::trickleTest() {
+  autonomous_upstream_ = false;
+
+  initialize();
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
+    if (explicit_flow_control_) {
+      // Allow reading up to 100 bytes
+      stream_->readData(100);
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  if (explicit_flow_control_) {
+    // Allow reading up to 100 bytes
+    stream_->readData(100);
+  }
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  FakeHttpConnectionPtr upstream_connection;
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection));
+  ASSERT_TRUE(
+      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
+
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  for (int i = 0; i < 10; ++i) {
+    upstream_request->encodeData(1, i == 9);
+  }
+
+  terminal_callback_.waitReady();
+}
+
+TEST_P(ClientIntegrationTest, Trickle) {
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
+}
+
+TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
+  explicit_flow_control_ = true;
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {

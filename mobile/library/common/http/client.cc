@@ -158,6 +158,10 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_data_callback_latency_, http_client_.timeSource());
 
+  // Make sure that when using explicit flow control this won't send more data until the next call
+  // to resumeData. Set before on-data to handle reentrant callbacks.
+  bytes_to_send_ = 0;
+
   bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), send_end_stream,
                             streamIntel(), bridge_callbacks_.context);
 
@@ -170,9 +174,6 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   if (send_end_stream) {
     onComplete();
   }
-  // Make sure that when using explicit flow control this won't send more data until the next call
-  // to resumeData.
-  bytes_to_send_ = 0;
 }
 
 void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& trailers) {
