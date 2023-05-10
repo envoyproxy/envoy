@@ -594,7 +594,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result;
+  if(import_mode != Gauge::ImportMode::Hidden) {
+    fast_reject_result = parent_.fastRejects(final_stat_name);
+  } else {
+    fast_reject_result = StatsMatcher::FastResult::Matches;
+  }
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_gauge_;
   }

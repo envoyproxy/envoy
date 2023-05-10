@@ -245,6 +245,34 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   EXPECT_EQ(num_iterations, 0);
 }
 
+TEST_F(AllocatorImplTest, ForEachGaugeHidden) {
+  StatNameHashSet stat_names;
+  std::vector<GaugeSharedPtr> gauges;
+
+  const size_t num_stats = 11;
+
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+    stat_names.insert(stat_name);
+    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+  }
+  // Add one last gauge to gauges with Hidden ImportMode
+  auto stat_name = makeStat(absl::StrCat("gauge", num_stats));
+  stat_names.insert(stat_name);
+  gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Hidden));
+
+  size_t num_gauges = 0;
+  size_t num_iterations = 0;
+  alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                      [&num_iterations, &stat_names](Gauge& gauge) {
+                        EXPECT_EQ(stat_names.count(gauge.statName()), 1);
+                        if(gauge.importMode()!=Gauge::ImportMode::Hidden)
+                          ++num_iterations;
+                      });
+  EXPECT_EQ(num_gauges, 12);
+  EXPECT_EQ(num_iterations, 11);
+}
+
 TEST_F(AllocatorImplTest, ForEachTextReadout) {
   StatNameHashSet stat_names;
   std::vector<TextReadoutSharedPtr> text_readouts;
