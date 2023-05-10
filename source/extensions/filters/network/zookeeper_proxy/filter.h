@@ -151,6 +151,7 @@ enum class ErrorBudgetResponseType { FAST, SLOW };
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride;
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride_Opcode;
 using LatencyThresholdOverrideList = Protobuf::RepeatedPtrField<LatencyThresholdOverride>;
+using LatencyThresholdOverrideMap = absl::flat_hash_map<int32_t, std::chrono::milliseconds>;
 using OpcodeMap = absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t>;
 
 /**
@@ -166,9 +167,13 @@ public:
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
 
-  // Captures the counter used to track total op-code usage, as well as the
-  // StatName under which to collect the latency for that op-code. The
-  // latency-name will be joined with the stat_prefix_, which varies per filter
+  // The OpCodeInfo is created as a public member of ZooKeeperFilterConfig.
+  // Therefore, its lifetime is tie to that of ZooKeeperFilterConfig.
+  // When the ZooKeeperFilterConfig object is destroyed, the OpCodeInfo will be destroyed as well.
+  // The the lifetime of scope is tie to the context passed to network filters to access server
+  // resources. The values of counter elements in OpCodeInfo are used to track total op-code usage,
+  // as well as the StatName under which to collect the latency, fast/slow responses for that
+  // op-code. The latency-name will be joined with the stat_prefix_, which varies per filter
   // instance.
   struct OpCodeInfo {
     Stats::Counter* resp_counter_;
@@ -231,12 +236,12 @@ private:
                                        {LatencyThresholdOverride::SetWatches2, 105}});
   }
 
-  absl::flat_hash_map<int32_t, std::chrono::milliseconds>
+  LatencyThresholdOverrideMap
   parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 
   const std::chrono::milliseconds default_latency_threshold_;
   // Key: opcode enum value defined in decoder.h, value: latency threshold override in millisecond.
-  const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_override_map_;
+  const LatencyThresholdOverrideMap latency_threshold_override_map_;
 };
 
 using ZooKeeperFilterConfigSharedPtr = std::shared_ptr<ZooKeeperFilterConfig>;

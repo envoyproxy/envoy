@@ -27,19 +27,19 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   const std::string stat_prefix = fmt::format("{}.zookeeper", proto_config.stat_prefix());
   const uint32_t max_packet_bytes =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
-  const std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(
+  const std::chrono::milliseconds default_latency_threshold(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, default_latency_threshold, 100));
   const LatencyThresholdOverrideList& latency_threshold_overrides =
       proto_config.latency_threshold_overrides();
 
   // Check duplicated opcodes in config.
-  std::set<LatencyThresholdOverride_Opcode> opcodes;
+  absl::flat_hash_set<LatencyThresholdOverride_Opcode> opcodes;
   for (const auto& threshold_override : latency_threshold_overrides) {
-    if (opcodes.find(threshold_override.opcode()) != opcodes.end()) {
+    auto insertion = opcodes.insert(threshold_override.opcode());
+    if (!insertion.second) {
       throw EnvoyException(fmt::format("Duplicated opcode find in config: {}",
                                        static_cast<uint32_t>(threshold_override.opcode())));
     }
-    opcodes.insert(threshold_override.opcode());
   }
 
   ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(

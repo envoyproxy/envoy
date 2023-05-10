@@ -130,10 +130,9 @@ int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode op
   throw EnvoyException(fmt::format("Unknown opcode from config: {}", static_cast<int32_t>(opcode)));
 }
 
-absl::flat_hash_map<int32_t, std::chrono::milliseconds>
-ZooKeeperFilterConfig::parseLatencyThresholdOverrides(
+LatencyThresholdOverrideMap ZooKeeperFilterConfig::parseLatencyThresholdOverrides(
     const LatencyThresholdOverrideList& latency_threshold_overrides) {
-  absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_override_map;
+  LatencyThresholdOverrideMap latency_threshold_override_map;
   for (const auto& threshold_override : latency_threshold_overrides) {
     latency_threshold_override_map[getOpCodeIndex(threshold_override.opcode())] =
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(threshold_override, threshold));
@@ -373,8 +372,6 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
   case ErrorBudgetResponseType::SLOW:
     config_->stats_.connect_resp_slow_.inc();
     break;
-  default:
-    break;
   }
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
@@ -405,8 +402,6 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
       break;
     case ErrorBudgetResponseType::SLOW:
       opcode_info.resp_slow_counter_->inc();
-      break;
-    default:
       break;
     }
   }
