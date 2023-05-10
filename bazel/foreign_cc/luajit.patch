@@ -149,7 +149,7 @@ index 00000000..1201542c
 +    shutil.copytree(src_dir, os.path.basename(src_dir))
 +    os.chdir(os.path.basename(src_dir))
 +
-+    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.8"
 +    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
 +    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"

@@ -956,10 +956,10 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that intermediate log entry by field %DURATION%.
+// Test that intermediate log entry by field %ACCESS_LOG_TYPE%.
 TEST_F(TcpProxyTest, IntermediateLogEntry) {
-  auto config = accessLogConfig("%DURATION%");
-  config.mutable_access_log_flush_interval()->set_seconds(1);
+  auto config = accessLogConfig("%ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
 
   auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
@@ -973,15 +973,18 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
-  EXPECT_EQ(access_log_data_.value(), fmt::format("-"));
+  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd));
 }
 
 TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
-  auto config = accessLogConfig("%UPSTREAM_HOST%");
-  config.set_flush_access_log_on_connected(true);
+  auto config = accessLogConfig("%UPSTREAM_HOST% %ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
@@ -989,10 +992,16 @@ TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
   // Default access log will only be flushed after the stream is closed.
   // Passing the following check makes sure that the access log was flushed
   // before the stream was closed.
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80");
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)));
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {

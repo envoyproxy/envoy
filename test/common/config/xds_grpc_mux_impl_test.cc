@@ -63,8 +63,10 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
-        std::move(config_validators_),
+        *stats_.rootScope(), rate_limit_settings_, local_info_, true, std::move(config_validators_),
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
         /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
@@ -73,8 +75,12 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, *stats_.rootScope(), custom_rate_limit_settings, local_info_, true,
-        std::move(config_validators_), /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+        *stats_.rootScope(), custom_rate_limit_settings, local_info_, true,
+        std::move(config_validators_),
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -896,8 +902,11 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
+          *stats_.rootScope(), rate_limit_settings_, local_info_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -911,8 +920,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          *stats_.rootScope(), rate_limit_settings_, local_info_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
           /*xds_config_tracker=*/XdsConfigTrackerOptRef()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -1024,8 +1033,10 @@ TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
       std::unique_ptr<Grpc::MockAsyncClient>(), dispatcher_,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-      random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
+      *stats_.rootScope(), rate_limit_settings_, local_info_, true,
       std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*xds_config_tracker=*/XdsConfigTrackerOptRef());
 
   Config::XdsMux::GrpcMuxSotw::shutdownAll();

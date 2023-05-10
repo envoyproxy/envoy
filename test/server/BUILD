@@ -56,6 +56,8 @@ envoy_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",

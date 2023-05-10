@@ -30,10 +30,8 @@ class EdsClusterImpl
     : public BaseDynamicClusterImpl,
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                 const envoy::config::cluster::v3::Cluster& cluster,
-                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                 bool added_via_api);
+  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                 ClusterFactoryContext& cluster_context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -56,11 +54,9 @@ private:
                               const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
-  std::string edsServiceName() const {
-    if (info_->edsServiceName().has_value() && !info_->edsServiceName()->empty()) {
-      return *info_->edsServiceName();
-    }
-    return info_->name();
+  const std::string& edsServiceName() const {
+    const std::string& name = info_->edsServiceName();
+    return !name.empty() ? name : info_->name();
   }
 
   // ClusterImplBase
@@ -118,8 +114,7 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                    const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
 

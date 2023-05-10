@@ -58,15 +58,15 @@ std::string convertToWildcard(const std::string& resource_name) {
 
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method,
-                         Random::RandomGenerator& random, Stats::Scope& scope,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
+                         JitteredExponentialBackOffStrategyPtr backoff_strategy,
                          XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
-    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings),
+    : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
+                   std::move(backoff_strategy), rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
       xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
@@ -332,7 +332,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       xds_config_tracker_->onConfigRejected(*message, error_detail->message());
     }
   }
-  previously_fetched_data_ = true;
+  api_state.previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
@@ -445,7 +445,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
-    if (!previously_fetched_data_) {
+    if (!api_state.second->previously_fetched_data_) {
       // On the initialization of the gRPC mux, if connection to the xDS server fails, load the
       // persisted config, if available. The locally persisted config will be used until
       // connectivity is established with the xDS server.
@@ -453,7 +453,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
           /*type_url=*/api_state.first,
           absl::flat_hash_set<std::string>{api_state.second->request_.resource_names().begin(),
                                            api_state.second->request_.resource_names().end()});
-      previously_fetched_data_ = true;
+      api_state.second->previously_fetched_data_ = true;
     }
   }
 }

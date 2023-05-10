@@ -21,7 +21,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
@@ -191,6 +191,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
   OptRef<Admin> admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
@@ -200,11 +201,11 @@ public:
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
+  ServerFactoryContext& serverFactoryContext() override { return *this; }
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
-  Stats::Store& stats() override { return server_.stats(); }
+  Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
-  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation

@@ -48,6 +48,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "character_set_validation_lib",
+    hdrs = ["character_set_validation.h"],
+)
+
+envoy_cc_library(
     name = "codec_client_lib",
     srcs = ["codec_client.cc"],
     hdrs = ["codec_client.h"],
@@ -247,6 +252,7 @@ envoy_cc_library(
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
+        "//envoy/router:scopes_interface",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
@@ -484,6 +490,7 @@ envoy_cc_library(
         "quiche_http2_protocol",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
@@ -516,6 +523,7 @@ envoy_cc_library(
         "quiche_http2_adapter",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",

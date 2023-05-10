@@ -28,7 +28,7 @@ class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::ServerFactoryContext& server_context);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
@@ -71,7 +71,7 @@ public:
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config,
-                                                       context.messageValidationVisitor());
+                                                       context.serverFactoryContext());
   }
   std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {

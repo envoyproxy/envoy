@@ -234,6 +234,14 @@ public:
     return constRootScope()->iterate(fn);
   }
 
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
+  }
+
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {
+    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
+  }
+
 protected:
   /**
    * Provides a hook for sub-classes to define how to create new scopes. When
