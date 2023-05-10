@@ -18,14 +18,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // See :ref:`here <config_access_log>` for more information on access log configuration.
 
-// %CEL(EXPRESSION)%
+// %CEL(EXPRESSION):Z%
 // Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
-// Expression errors are considered `-`.
+// Expression errors are considered `-`. Z is an optional parameter denoting string 
+// truncation up to Z characters long.
 //
 // Examples:
 // - ``%CEL(response.code)%``
 // - ``%CEL(connection.mtls)%``
+// - ``%CEL(request.headers['x-envoy-original-path']):10%``
 // - ``%CEL(request.headers['x-log-mtls'] || request.url_path.contains('v1beta3'))%``
 
+// Configuration for the CEL formatter.
 message Cel {
 }
