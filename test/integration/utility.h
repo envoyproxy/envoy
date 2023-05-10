@@ -85,7 +85,7 @@ public:
                       Event::Dispatcher& dispatcher,
                       Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
-  const Network::Connection& connection() { return *client_; }
+
   testing::AssertionResult
   run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block,
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
