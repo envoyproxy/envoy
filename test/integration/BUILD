@@ -216,6 +216,9 @@ envoy_cc_test(
     srcs = [
         "upstream_access_log_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -1974,6 +1977,9 @@ envoy_cc_test(
     name = "cx_limit_integration_test",
     size = "large",
     srcs = ["cx_limit_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/network:filter_interface",
@@ -1989,6 +1995,9 @@ envoy_cc_test(
     name = "direct_response_integration_test",
     size = "large",
     srcs = ["direct_response_integration_test.cc"],
+    tags = [
+        "cpu:2",
+    ],
     deps = [
         ":http_integration_lib",
     ],
