@@ -150,9 +150,10 @@ message HTTPFault {
   // Default value is false.
   bool disable_downstream_cluster_stats = 15;
 
-  // [#not-implemented-hide:]
-  // The Metadata field can be used to provide additional information
-  // about the fault. It can be used for configuration, stats, and logging.
-  // The metadata should go under the filter namespace that will need it.
+  // When an abort or delay fault is executed, the metadata provided here will be added to the
+  // request's dynamic metadata. The metadata must be set under the filter namespace that will use it.
+  // This data can be logged as part of Access Logs using the :ref:`command operator
+  // <config_access_log_command_operators>` %DYNAMIC_METADATA(NAMESPACE)%, where NAMESPACE is the filter
+  // namespace used when setting the metadata.
   config.core.v3.Metadata metadata = 16;
 }
