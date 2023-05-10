@@ -741,7 +741,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
       .createEntry(empty_value);
 
-  // make sure the hacky fractional percent function works.
+  // Make sure the hacky fractional percent function works.
   ProtobufWkt::Value fractional_value;
   fractional_value.set_string_value(" numerator:  11 ");
   auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
@@ -769,7 +769,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
             envoy::type::v3::FractionalPercent::MILLION);
   EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
 
-  // test atoi failure for the hacky fractional percent value function.
+  // Test atoi failure for the hacky fractional percent value function.
   fractional_value.set_string_value(" numerator:  1.1 ");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
               .createEntry(fractional_value);
