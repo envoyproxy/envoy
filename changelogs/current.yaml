@@ -90,9 +90,10 @@ new_features:
 - area: match_delegate
   change: |
     added :ref:`per route configuration
-    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcherPerRoute>` to the 
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcherPerRoute>` to the
     :ref:`ExtensionWithMatcher
-    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter. Which allows the associated matcher to be defined on a per route basis.
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+    Which allows the associated matcher to be defined on a per route basis.
 
 deprecated:
 - area: access_log
