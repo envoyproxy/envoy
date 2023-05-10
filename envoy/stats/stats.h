@@ -130,6 +130,7 @@ using CounterSharedPtr = RefcountPtr<Counter>;
  */
 class Gauge : public Metric {
 public:
+  // TODO(diazalan): Rename ImportMode to more generic name
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
     NeverImport,   // On hot-restart, each process starts with gauge at 0.
