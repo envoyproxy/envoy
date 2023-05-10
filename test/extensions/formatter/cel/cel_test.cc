@@ -2,6 +2,7 @@
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/extensions/formatter/cel/cel.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -28,6 +29,15 @@ public:
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
+
+TEST_F(CELFormatterTest, TestFormatValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_lenth = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_lenth);
+  EXPECT_THAT(formatter->formatValue(request_headers_, response_headers_, response_trailers_,
+                                     stream_info_, body_, AccessLog::AccessLogType::NotSet),
+              ProtoEq(ValueUtil::stringValue("GET")));
+}
 
 TEST_F(CELFormatterTest, TestRequestHeader) {
   const std::string yaml = R"EOF(
