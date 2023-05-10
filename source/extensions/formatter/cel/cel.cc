@@ -84,7 +84,7 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
 
   return nullptr;
 #else
-    throw EnvoyException("CEL is not available for use in this environment.");
+  throw EnvoyException("CEL is not available for use in this environment.");
 #endif
 }
 
