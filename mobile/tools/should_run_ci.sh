@@ -54,6 +54,8 @@ elif grep -q "^bazel/repository_locations\.bzl" <<< "$changed_files"; then
   success "bazel/repository_locations.bzl"
 elif grep -q "^\.bazelrc" <<< "$changed_files"; then
   success ".bazelrc"
+elif grep -q "^\.bazelversion" <<< "$changed_files"; then
+  success ".bazelversion"
 elif grep -q "^\.github/workflows/mobile-*" <<< "$changed_files"; then
   success "GitHub Workflows"
 else
