@@ -50,28 +50,17 @@ minor_behavior_changes:
     ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 - area: http cookies
   change: |
-<<<<<<< HEAD
-    prohibit route refresh after the response headers have been sent,  and clear the cached route table to more
-    aggressively free memory. This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`` to false.
-- area: ext_authz
-  change: |
-    Ext_authz will add ``x-envoy-auth-failure-mode-allowed`` header when ``failure_mode_allow`` is enable.
-    This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
+    Changed internal format of http cookie to protobuf and added expiry timestamp. Processing expired cookie
+    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
+    the cookie is still accepted, but is planned to be obsoleted in the future.
+    This behavior change can be reverted by setting
+    ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 - area: resource_monitors
   change: |
     Changed behavior of the fixed heap monitor to count pages allocated to
     TCMalloc as free memory if it's not used by Envoy. This change can be
     reverted temporarily by setting the runtime guard
     ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to false.
-=======
-    Changed internal format of http cookie to protobuf and added expiry timestamp. Processing expired cookie
-    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
-    the cookie is still accepted, but is planned to be obsoleted in the future.
-    This behavior change can be reverted by setting
-    ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
->>>>>>> upstream/main
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
