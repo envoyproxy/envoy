@@ -1,6 +1,7 @@
 #include "source/extensions/formatter/cel/cel.h"
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <string>
 
@@ -9,8 +10,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-
-constexpr absl::string_view DefaultUnspecifiedValueString = "-";
 
 #if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
@@ -32,7 +31,7 @@ std::string truncate(std::string str, absl::optional<size_t> max_length) {
 
 } // namespace
 
-namespace Expr = Envoy::Extensions::Filters::Common::Expr;
+namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(Expr::Builder& builder,
                            const google::api::expr::v1alpha1::Expr& input_expr,
@@ -51,10 +50,13 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
   auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
                                     &response_headers, &response_trailers);
   if (!eval_status.has_value() || eval_status.value().IsError()) {
-    return std::string(DefaultUnspecifiedValueString);
+    return absl::nullopt;
   }
-  auto result = eval_status.value();
-  return truncate(Expr::print(result), max_length_);
+  auto result = Expr::print(eval_status.value());
+  if (max_length_.has_value()) {
+    return truncate(result, max_length_);
+  }
+  return result;
 }
 
 ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
@@ -64,6 +66,9 @@ ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& reque
                                              absl::string_view, AccessLog::AccessLogType) const {
   auto result = format(request_headers, response_headers, response_trailers, stream_info, "",
                        AccessLog::AccessLogType::NotSet);
+  if (!result.has_value()) {
+    return ValueUtil::nullValue();
+  }
   return ValueUtil::stringValue(result.value());
 }
 
