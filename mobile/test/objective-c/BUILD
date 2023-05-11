@@ -28,3 +28,16 @@ envoy_mobile_objc_test(
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
 )
+
+
+envoy_mobile_objc_library(
+    name = "envoy_test_server_interface",
+    srcs = [
+        "EnvoyTestServerInterface.mm",
+    ],
+    headers = ["EnvoyTestServerInterface.h"]
+    visibility = ["//visibility:public"],
+    deps = [
+        "//test/common/integration:test_server_interface_lib"
+        ],
+)

@@ -1,6 +1,7 @@
 import Envoy
 import TestExtensions
 import XCTest
+import EnvoyTestServerInterface
 
 final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
   override static func setUp() {
