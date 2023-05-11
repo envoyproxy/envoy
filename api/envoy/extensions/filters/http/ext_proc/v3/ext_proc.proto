@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.ext_proc.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
-import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -175,8 +174,9 @@ message ExternalProcessor {
   // field is set in an external processor response.
   bool disable_clear_route_cache = 11;
 
-  // Disallow headers to be forwarded to the ext_proc server based on this regular expression.
-  type.matcher.v3.RegexMatcher disallow_header_to_forward = 12;
+  // [#not-implemented-hide:]
+  // Allow headers matching the ``forward_rules`` to be forwarded to the ext_proc server.
+  config.common.mutation_rules.v3.HeaderForwardingRules forward_rules = 12;
 }
 
 // Extra settings that may be added to per-route configuration for a
