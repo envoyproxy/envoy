@@ -73,14 +73,24 @@ public:
 
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
+    return {"runtime_config.yaml"};
+  }
+};
 
-    auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
+class JsonApplicationLogsValidationServerTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
 
-    // Strip directory part. options_ adds it for each test.
-    for (auto& file : files) {
-      file = file.substr(directory_.length() + 1);
-    }
-    return files;
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"json_application_logs.yaml"};
   }
 };
 
@@ -205,6 +215,42 @@ TEST(ValidationTest, Admin) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
     ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
+
+struct MockLogSink : Logger::SinkDelegate {
+  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~MockLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
+};
+
+TEST_P(JsonApplicationLogsValidationServerTest, ValidateJsonApplicationLogs) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_EQ(msg, "{\"MessageFromProto\":\"hello\"}\n");
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+  server.shutdown();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, JsonApplicationLogsValidationServerTest,
+    ::testing::ValuesIn(JsonApplicationLogsValidationServerTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server

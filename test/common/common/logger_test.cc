@@ -270,6 +270,74 @@ TEST(LoggerTest, LogWithLogDetails) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+TEST(LoggerTest, TestJsonFormatError) {
+  ProtobufWkt::Any log_struct;
+  log_struct.set_type_url("type.googleapis.com/bad.type.url");
+  log_struct.set_value("asdf");
+
+  // This scenario shouldn't happen in production, the test is added mainly for coverage.
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(LoggerTest, TestJsonFormatEmptyStruct) {
+  ProtobufWkt::Struct log_struct;
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(status.ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_EQ(msg, "{}\n");
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST(LoggerTest, TestJsonFormatNullField) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Message"].set_string_value("%v");
+  (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(status.ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
+    EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
+    EXPECT_THAT(msg, HasSubstr("\"NullField\":null"));
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST(LoggerTest, TestJsonFormat) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Level"].set_string_value("%l");
+  (*log_struct.mutable_fields())["Message"].set_string_value("%v");
+  (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(status.ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+    EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
+    EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
+    EXPECT_EQ(msg[0], '{');
+    EXPECT_EQ(msg[msg.size() - 2], '}');
+
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy
