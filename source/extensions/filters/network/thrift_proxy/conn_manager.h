@@ -324,6 +324,11 @@ private:
 
     bool passthroughSupported() const;
 
+    void recordResponseAccessLog(const MessageMetadataSharedPtr& metadata);
+    void recordResponseAccessLog(DirectResponse::ResponseType direct_response_type,
+                                 const MessageMetadataSharedPtr& metadata);
+    void recordResponseAccessLog(const std::string& message_type, const std::string& reply_type);
+
     // Apply filters to the decoder_event.
     // @param filter    the last filter which is already applied to the decoder_event.
     //                  nullptr indicates none is applied and the decoder_event is applied from the
@@ -372,7 +377,8 @@ private:
 
   void continueDecoding();
   void dispatch();
-  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
+  absl::optional<DirectResponse::ResponseType>
+  sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
   void emitLogEntry(const Http::RequestHeaderMap* request_headers,

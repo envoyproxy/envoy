@@ -61,17 +61,18 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   }
 }
 
@@ -289,11 +290,19 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
+      request_headers.removeEnvoyOriginalPath();
+    }
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
@@ -308,9 +317,6 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
-    request_headers.removeEnvoyOriginalPath();
-  }
 
   for (const LowerCaseString& header : internal_only_headers) {
     request_headers.remove(header);

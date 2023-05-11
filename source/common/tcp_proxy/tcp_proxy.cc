@@ -71,8 +71,7 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
+      stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -91,10 +90,32 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_flush_interval()) {
-    const uint64_t flush_interval =
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
-    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_connected() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_connected or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
+  } else {
+    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
+
+    if (config.has_access_log_flush_interval()) {
+      const uint64_t flush_interval =
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
   }
 
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
@@ -190,11 +211,10 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
-  getStreamInfo().setStreamState(StreamInfo::StreamState::Ended);
-
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpConnectionEnd);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -609,7 +629,7 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
   return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view());
+                               absl::string_view(), AccessLog::AccessLogType::NotSet);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -682,7 +702,14 @@ Network::FilterStatus Filter::onNewConnection() {
   return establishUpstreamConnection();
 }
 
-bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
+bool Filter::startUpstreamSecureTransport() {
+  bool switched_to_tls = upstream_->startUpstreamSecureTransport();
+  if (switched_to_tls) {
+    StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+    upstream_info.setUpstreamSslConnection(upstream_->getUpstreamConnectionSslInfo());
+  }
+  return switched_to_tls;
+}
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -792,15 +819,12 @@ void Filter::onUpstreamConnection() {
     }
   }
 
-  getStreamInfo().setStreamState(StreamInfo::StreamState::Started);
-
   if (config_->flushAccessLogOnConnected()) {
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                      AccessLog::AccessLogType::TcpUpstreamConnected);
     }
   }
-
-  getStreamInfo().setStreamState(StreamInfo::StreamState::InProgress);
 }
 
 void Filter::onIdleTimeout() {
@@ -822,17 +846,11 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  if (!getStreamInfo().streamState() ||
-      getStreamInfo().streamState() != StreamInfo::StreamState::Ended) {
-    resetAccessLogFlushTimer();
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpPeriodic);
   }
-
-  if (getStreamInfo().streamState() &&
-      getStreamInfo().streamState() == StreamInfo::StreamState::InProgress) {
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
-    }
-  }
+  resetAccessLogFlushTimer();
 }
 
 void Filter::resetAccessLogFlushTimer() {

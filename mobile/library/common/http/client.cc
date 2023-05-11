@@ -10,6 +10,7 @@
 
 #include "library/common/bridge/utility.h"
 #include "library/common/buffer/bridge_fragment.h"
+#include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
@@ -157,6 +158,10 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_data_callback_latency_, http_client_.timeSource());
 
+  // Make sure that when using explicit flow control this won't send more data until the next call
+  // to resumeData. Set before on-data to handle reentrant callbacks.
+  bytes_to_send_ = 0;
+
   bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), send_end_stream,
                             streamIntel(), bridge_callbacks_.context);
 
@@ -169,9 +174,6 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   if (send_end_stream) {
     onComplete();
   }
-  // Make sure that when using explicit flow control this won't send more data until the next call
-  // to resumeData.
-  bytes_to_send_ = 0;
 }
 
 void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& trailers) {
@@ -486,7 +488,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
     // This is largely a check for the android platform: is_cleartext_permitted
     // is a no-op for other platforms.
     if (internal_headers->getSchemeValue() != "https" &&
-        !is_cleartext_permitted(internal_headers->getHostValue())) {
+        !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
       direct_stream->request_decoder_->sendLocalReply(
           Http::Code::BadRequest, "Cleartext is not permitted", nullptr, absl::nullopt, "");
       return;

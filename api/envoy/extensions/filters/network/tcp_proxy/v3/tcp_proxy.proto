@@ -10,6 +10,7 @@ import "envoy/type/v3/hash_policy.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -134,6 +135,19 @@ message TcpProxy {
     google.protobuf.Duration timeout = 3;
   }
 
+  message TcpAccessLogOptions {
+    // The interval to flush access log. The TCP proxy will flush only one access log when the connection
+    // is closed by default. If this field is set, the TCP proxy will flush access log periodically with
+    // the specified interval.
+    // The interval must be at least 1ms.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true, access log will be flushed when the TCP proxy has successfully established a
+    // connection with the upstream. If the connection failed, the access log will not be flushed.
+    bool flush_access_log_on_connected = 2;
+  }
+
   reserved 6;
 
   reserved "deprecated_v1";
@@ -212,14 +226,29 @@ message TcpProxy {
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // The interval to flush access log. The TCP proxy will flush only one access log when the connection
-  // is closed by default. If this field is set, the TCP proxy will flush access log periodically with
-  // the specified interval.
-  // The interval must be at least 1ms.
-  google.protobuf.Duration access_log_flush_interval = 15
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+  // Note that if both this field and :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
+  // are specified, the former (deprecated field) is ignored.
+  google.protobuf.Duration access_log_flush_interval = 15 [
+    deprecated = true,
+    (validate.rules).duration = {gte {nanos: 1000000}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
-  // If set to true, access log will be flushed when the TCP proxy has successfully established a
-  // connection with the upstream. If the connection failed, the access log will not be flushed.
-  bool flush_access_log_on_connected = 16;
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`flush_access_log_on_connected
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
+  // Note that if both this field and :ref:`flush_access_log_on_connected
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
+  // are specified, the former (deprecated field) is ignored.
+  bool flush_access_log_on_connected = 16
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Additional access log options for TCP Proxy.
+  TcpAccessLogOptions access_log_options = 17;
 }

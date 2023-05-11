@@ -107,7 +107,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
-    StreamResetReason reason = StreamResetReason::ConnectionFailure;
+    StreamResetReason reason = event == Network::ConnectionEvent::RemoteClose
+                                   ? StreamResetReason::RemoteConnectionFailure
+                                   : StreamResetReason::LocalConnectionFailure;
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
@@ -182,11 +184,34 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
-void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
   if (header_validator_) {
-    ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =
-        header_validator_->validateResponseHeaderMap(*headers);
-    if (!result.ok()) {
+    auto result = header_validator_->transformRequestHeaders(headers);
+    if (!result.status.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("header validation failed: ", result.status.details()));
+    }
+    if (result.new_headers) {
+      return RequestEncoderWrapper::encodeHeaders(*result.new_headers, end_stream);
+    }
+  }
+#endif
+  return RequestEncoderWrapper::encodeHeaders(headers, end_stream);
+}
+
+void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
+  if (header_validator_) {
+    const ::Envoy::Http::HeaderValidator::ValidationResult validation_result =
+        header_validator_->validateResponseHeaders(*headers);
+    bool failure = !validation_result.ok();
+    if (!failure) {
+      const ::Envoy::Http::ClientHeaderValidator::TransformationResult transformation_result =
+          header_validator_->transformResponseHeaders(*headers);
+      failure = !transformation_result.ok();
+    }
+    if (failure) {
       ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", *parent_.connection_,
                      *headers);
       if ((parent_.codec_->protocol() == Protocol::Http2 &&
@@ -208,6 +233,7 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
       return;
     }
   }
+#endif
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
@@ -240,13 +266,12 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
         host->cluster().maxResponseHeadersCount(), proxied);
     break;
   }
-  case CodecType::HTTP2: {
+  case CodecType::HTTP2:
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
-  }
   case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);

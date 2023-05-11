@@ -39,6 +39,7 @@ public:
   waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose(bool ignore_spurious_events = false);
+  void waitForHalfClose(std::chrono::milliseconds timeout, bool ignore_spurious_events = false);
   void readDisable(bool disabled);
   ABSL_MUST_USE_RESULT AssertionResult
   write(const std::string& data, bool end_stream = false, bool verify = true,
