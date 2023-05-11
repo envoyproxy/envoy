@@ -103,9 +103,11 @@ message Bootstrap {
 
   message ApplicationLogFormat {
     oneof log_format {
-      // Flush application logs in JSON format. If set, it will override Envoy's --log-format
-      // CLI option. The configured JSON struct can support all the format tags specified in
-      // the --log-format section, in :ref:`operations CLI <operations_cli>`.
+      option (validate.required) = true;
+
+      // Flush application logs in JSON format. The configured JSON struct can
+      // support all the format tags specified in the --log-format section,
+      // in :ref:`operations CLI <operations_cli>`.
       google.protobuf.Struct json_format = 1;
     }
   }
@@ -370,6 +372,8 @@ message Bootstrap {
   // supports ApiListenerManager.
   core.v3.TypedExtensionConfig listener_manager = 37;
 
+  // Optional field to set the application logs format. If this field is set, it will override
+  // the default log format, or the format that is specified by the CLI option ``--log-foramt``.
   ApplicationLogFormat application_log_format = 38;
 }
 

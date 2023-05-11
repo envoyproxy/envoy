@@ -23,3 +23,26 @@ with the following :ref:`command line options <operations_cli>`:
 * The ``--log-level`` flag can be set to control the log severity logged to Stackdriver.
 
 `Reference documentation <https://cloud.google.com/run/docs/logging#container-logs>`_ for Stackdriver on GKE.
+
+Printing logs in JSON format
+----------------------------
+
+It is possible to use the bootstrap config :ref:`json_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogFormat.json_format>`
+to print the logs in custom JSON format. The json format struct can support all the format flags that are specified in :ref:`command line options <operations_cli>`. Example:
+
+.. code-block:: yaml
+
+  application_log_format:
+    json_format:
+      Timestamp: "%Y-%m-%dT%T.%F"
+      ThreadId: "%t"
+      SourceLine: "%s:%#"
+      Level: "%l"
+      Message: "%_"
+      FixedValue: "SomeFixedValue"
+
+.. note::
+   The JSON log format will be applied only after the bootstrap config initialization.
+   Therefore, some of the logs will be printed in the default log format, or the one that is specified by the CLI option ``--log-format``.
+   For full JSON application logs experience, it is possible to set ``--log-format`` with JSON format, so both logs before bootstrap initialization and after, are written in JSON format.
+   For example: ``--log-format '{"Timestamp":"%Y-%m-%dT%T.%F","ThreadId":"%t","SourceLine":"%s:%#","Level":"%l","Message":"%_"}'.
