@@ -293,9 +293,6 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   request_headers_.addCopy("x-envoy-fault-abort-request", "429");
 
   envoy::config::core::v3::Metadata dynamic_metadata;
-  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
-      .WillByDefault(ReturnRef(dynamic_metadata));
-
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
   (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
@@ -318,6 +315,8 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
       .WillOnce(Return(429));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -327,7 +326,6 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
-  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -342,6 +340,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 }
 
 TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
