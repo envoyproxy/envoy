@@ -162,7 +162,8 @@ steps:
       AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
     ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
       AZP_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
-    ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+    # Any PR or CI run in envoy-presubmit uses the fake SCM hash
+    ${{ if or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.DefinitionName'], 'envoy-presubmit')) }}:
       # sha1sum of `ENVOY_PULL_REQUEST`
       BAZEL_FAKE_SCM_REVISION: e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
     ${{ if parameters.rbe }}:
