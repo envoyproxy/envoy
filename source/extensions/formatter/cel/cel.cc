@@ -1,7 +1,6 @@
 #include "source/extensions/formatter/cel/cel.h"
 
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include <string>
 
