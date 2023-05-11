@@ -191,7 +191,7 @@ steps:
     # Cleanup offending files with unicode names
     rm -rf $(Build.StagingDirectory)/bazel_root/base/external/go_sdk/test/fixedbugs
   displayName: "Check disk space at end"
-  condition: always()
+  condition: not(canceled())
 
 - ${{ each step in parameters.stepsPost }}:
   - ${{ each pair in step }}:
