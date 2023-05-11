@@ -11,11 +11,28 @@ namespace SmtpProxy {
 
 static const absl::string_view CRLF = "\r\n";
 
-// https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.4
-const size_t kMaxCommandLine = 512;
-
+// While https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.4
+// prescribes a max command line of 512 bytes, individual SMTP
+// extensions may increase this. e.g. extensions that add an
+// additional keyword to the MAIL FROM: command typically increase the
+// max mail command by the length of that keyword. For BINARYMIME
+// (rfc3030) this is 16 bytes, for SMTPUTF8 (rfc6531), it is 8
+// bytes. To the letter of the rfc, you need to understand all of the
+// extensions advertised by the server to determine the exact
+// limit. This is not a full implementation of SMTP; the limit here is
+// meant as a circuit breaker against obvious garbage. The real
+// implementation on either side is free to enforce a more precise
+// limit.
+const size_t kMaxCommandLine = 1024;
+// Likewise, the rfc reply limit is 512 bytes
 // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.5
-const size_t kMaxReplyLine = 512;
+const size_t kMaxReplyLine = 1024;
+
+// The smtp proxy filter only expects to consume the first ~3
+// responses from the upstream (greeting, ehlo, starttls), which
+// should be much smaller than this but again, don't buffer an
+// unbounded amount.
+const size_t kMaxReplyBytes = 65536;
 
 Decoder::Result GetLine(Buffer::Instance& data,
 			size_t start,
@@ -78,8 +95,9 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
     break;
   }
   
-  // could be a little more persnickety about at least verb must be only printing chars, etc.
-
+  // We aren't too picky here since we're only going to look at the
+  // first ~2 commands (EHLO, STARTTLS) and the filter is going to
+  // hang up if the first isn't EHLO.
   return Result::ReadyForNext;
 }
 
@@ -94,6 +112,8 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
     Result res = GetLine(data, line_off, raw_line, line, kMaxReplyLine);
     if (res != Result::ReadyForNext) return res;
     line_off += line.size();
+    if (line_off > kMaxReplyBytes) return Result::Bad;
+
     // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.2
     //  Reply-line     = *( Reply-code "-" [ textstring ] CRLF )
     //                 Reply-code [ SP textstring ] CRLF
@@ -129,21 +149,29 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
   return Result::ReadyForNext;
 }
 
+// line is
+// 234-SIZE 1048576\r\n
+bool MatchCapability(absl::string_view line, absl::string_view cap) {
+  line = line.substr(4);  // 234-
+  line = line.substr(0, line.size() - CRLF.size());
+  if (!absl::StartsWithIgnoreCase(line, cap)) return false;
+  line = line.substr(cap.size());
+  if (line.empty() || line[0] == ' ') return true;
+  return false;
+}
+
 void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in) {
   std::string caps_out;
   absl::string_view caps = caps_in;
-  int i = 0;
+  bool first = true;
 
   while (!caps.empty()) {
     size_t crlf = caps.find(CRLF);
-    if (crlf == absl::string_view::npos) break;
+    if (crlf == absl::string_view::npos) break;  // invalid input
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
-    caps = caps.substr(crlf+2);
-    if (i > 0) {
-      // trim off xyz-
-      absl::string_view line_cap = line.substr(4);
-      if (absl::StartsWithIgnoreCase(line_cap, cap)) return;
-    }
+    caps = caps.substr(crlf + CRLF.size());
+    if (!first && MatchCapability(line, cap)) return;
+    first = false;
     if (caps.empty()) {
       std::string line_out(line);
       line_out[3] = '-';
@@ -152,7 +180,6 @@ void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in
     }
 
     absl::StrAppend(&caps_out, line);
-    ++i;
   }
 
   caps_in = std::move(caps_out);
@@ -165,19 +192,15 @@ void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps
   size_t last = 0;
   while (!caps.empty()) {
     size_t crlf = caps.find(CRLF);
-    if (crlf == absl::string_view::npos) break;
+    if (crlf == absl::string_view::npos) return;  // invalid input
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
-    if (!first) {
-      // trim off xyz-
-      absl::string_view line_cap = line.substr(4);
-      if (absl::StartsWithIgnoreCase(line_cap, cap)) continue;
-    }
+    if (!first && MatchCapability(line, cap)) continue;
+    first = false;
     last = caps_out.size();
     absl::StrAppend(&caps_out, line);
-    first = false;
   }
-  caps_out[last+3] = ' ';
+  caps_out[last + 3] = ' ';
   caps_in = std::move(caps_out);
 }
 
@@ -185,17 +208,15 @@ bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view ca
   bool first = true;
   while (!caps.empty()) {
     size_t crlf = caps.find("\r\n");
-    if (crlf == absl::string_view::npos) break;
-    absl::string_view line = caps.substr(0, crlf);
+    if (crlf == absl::string_view::npos) break;  // invalid input
+    absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
     if (first) {
       first = false;
       continue;
     }
 
-    // trim off xyz-
-    line = line.substr(4);
-    if (absl::StartsWithIgnoreCase(line, cap)) return true;
+    if (MatchCapability(line, cap)) return true;
   }
   return false;
 }

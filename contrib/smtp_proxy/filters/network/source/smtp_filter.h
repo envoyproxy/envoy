@@ -21,6 +21,8 @@ namespace SmtpProxy {
  */
 #define ALL_SMTP_PROXY_STATS(COUNTER)                                                          \
   COUNTER(sessions)                                                                            \
+  COUNTER(sessions_upstream_desync)                                                            \
+  COUNTER(sessions_downstream_desync)                                                          \
   COUNTER(sessions_bad_line)                                                                   \
   COUNTER(sessions_bad_pipeline)                                                               \
   COUNTER(sessions_bad_ehlo)                                                                   \

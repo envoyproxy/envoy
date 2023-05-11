@@ -45,22 +45,30 @@ public:
     size_t wire_len;
   };
 
+  // Attempts to decode an SMTP command from data. If the buffer contains a
+  // complete command, this is parsed out into result and ReadyForNext
+  // is returned. Otherwise:
+  // NeedMoreData: buffer contains an incomplete command
+  // Bad: buffer contains data that is not a prefix of a valid command
   virtual Result DecodeCommand(Buffer::Instance& data,
 			       Command& result) = 0;
-
+  // Attempts to decode an SMTP response from data.
   virtual Result DecodeResponse(Buffer::Instance& data,
 				Response& result) = 0;
   
-  // caps is a full wire response to EHLO that has previously been validated by DecodeResponse
-  // add cap to caps if not present
-  virtual void AddEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
-  // remove cap from caps if present
-  virtual void RemoveEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
-  // returns true if cap is present in caps
-  virtual bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) = 0;
- 
-protected:
+  // The following routines operate on the full wire bytes of a
+  // response to EHLO that has previously been validated by
+  // DecodeResponse() e.g.
+  // 220-example.com smtp server at your service\r\n
+  // 220-PIPELINING\r\n
+  // 220 STARTTLS\r\n
 
+  // Adds the ESMTP capability cap to caps if not present.
+  virtual void AddEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  // Adds the ESMTP capability cap to caps if present.
+  virtual void RemoveEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  // Returns true if the ESMTP capability cap is present in caps.
+  virtual bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) = 0;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -80,12 +88,6 @@ public:
   void AddEsmtpCapability(absl::string_view, std::string&) override;
   void RemoveEsmtpCapability(absl::string_view, std::string&) override;
   bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) override;
- 
-protected:
-  // Buffer used to temporarily store a downstream smtp packet
-  // while sending other packets. Currently used only when negotiating
-  // upstream SSL.
-  Buffer::OwnedImpl temp_storage_;
 };
 
 } // namespace SmtpProxy

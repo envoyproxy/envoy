@@ -28,11 +28,11 @@ SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
 
 Network::FilterStatus SmtpFilter::onNewConnection() {
   ENVOY_CONN_LOG(trace, "smtp_proxy: onNewConnection()", read_callbacks_->connection());
- 
+
   config_->stats_.sessions_.inc();
 
   state_ = UPSTREAM_GREETING;
- 
+
   return Network::FilterStatus::Continue;
 }
 
@@ -41,93 +41,103 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
   ENVOY_CONN_LOG(trace, "smtp_proxy: onData {} bytes, state {}",
 		 read_callbacks_->connection(), data.length(), state_);
 
-  if (state_ == PASSTHROUGH) {
+  switch (state_) {
+  case PASSTHROUGH:
     return Network::FilterStatus::Continue;
+  case DOWNSTREAM_EHLO:
+  case DOWNSTREAM_STARTTLS:
+    break;
+  default:
+    // client spoke out of turn -> hang up
+    config_->stats_.sessions_downstream_desync_.inc();
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return Network::FilterStatus::StopIteration;
   }
 
   frontend_buffer_.add(data);
   data.drain(data.length());
 
   Decoder::Command command;
-  if (state_ == DOWNSTREAM_EHLO ||
-      state_ == DOWNSTREAM_STARTTLS) {
-    Decoder::Result res = decoder_->DecodeCommand(frontend_buffer_, command);
 
-    if (res == Decoder::Result::Bad) {
-      config_->stats_.sessions_bad_line_.inc();
-      Buffer::OwnedImpl err("500 bad\r\n");
-      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      // TODO may not always want to hang up here though the decoder
-      // isn't very strict on this, only enforces max line length.
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return Network::FilterStatus::StopIteration; 
-    }
-    if (res != Decoder::Result::ReadyForNext) {
-      return Network::FilterStatus::Continue;
-    }
+  Decoder::Result res = decoder_->DecodeCommand(frontend_buffer_, command);
 
-    if (command.wire_len != frontend_buffer_.length()) {
-      config_->stats_.sessions_bad_pipeline_.inc();
-      ENVOY_CONN_LOG(trace, "smtp_proxy: bad pipeline {} {}", read_callbacks_->connection(),
-		     command.wire_len, frontend_buffer_.length());
-
-      Buffer::OwnedImpl err("503 bad pipeline\r\n");
-      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return Network::FilterStatus::StopIteration; 
-    }
-
-    ENVOY_CONN_LOG(trace, "smtp_proxy: state {} command {}", read_callbacks_->connection(),
-                   state_, command.verb);
+  switch (res) {
+  case Decoder::Result::Bad: {
+    config_->stats_.sessions_bad_line_.inc();
+    Buffer::OwnedImpl err("500 syntax error\r\n");
+    write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+    // TODO may not always want to hang up here though the decoder
+    // isn't very picky and only enforces an upper bound on max line
+    // length. This will break if the server advertises an extension
+    // that allows a huge command line and the command immediately
+    // after EHLO is that but that seems unlikely.
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return Network::FilterStatus::StopIteration;
   }
+  case Decoder::Result::NeedMoreData:
+    return Network::FilterStatus::Continue;
+  case Decoder::Result::ReadyForNext:
+    break;
+  }
+
+  if (command.wire_len != frontend_buffer_.length()) {
+    config_->stats_.sessions_bad_pipeline_.inc();
+    ENVOY_CONN_LOG(trace, "smtp_proxy: bad pipeline {} {}", read_callbacks_->connection(),
+		   command.wire_len, frontend_buffer_.length());
+
+    Buffer::OwnedImpl err("503 bad pipeline\r\n");
+    write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return Network::FilterStatus::StopIteration;
+  }
+
+  ENVOY_CONN_LOG(trace, "smtp_proxy: state {} command {}", read_callbacks_->connection(),
+		 state_, command.verb);
 
   Buffer::OwnedImpl wire_command;
   wire_command.move(frontend_buffer_, command.wire_len);
 
   switch (state_) {
-    case DOWNSTREAM_EHLO: {
-      if (command.verb != Decoder::Command::HELO && command.verb != Decoder::Command::EHLO) {
-	config_->stats_.sessions_bad_ehlo_.inc();
-	Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
+  case DOWNSTREAM_EHLO: {
+    if (command.verb != Decoder::Command::HELO && command.verb != Decoder::Command::EHLO) {
+      config_->stats_.sessions_bad_ehlo_.inc();
+      Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
+      write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return Network::FilterStatus::StopIteration;
+    }
+    read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
+    if (command.verb == Decoder::Command::HELO) {
+      config_->stats_.sessions_non_esmtp_.inc();
+      state_ = PASSTHROUGH;
+      return Network::FilterStatus::StopIteration;
+    }
+    state_ = UPSTREAM_EHLO_RESP;
+    return Network::FilterStatus::StopIteration;
+  }
+  case DOWNSTREAM_STARTTLS: {
+    if (command.verb != Decoder::Command::STARTTLS) {
+      if (config_->downstream_ssl_ == ConfigProto::REQUIRE) {
+	Buffer::OwnedImpl err("530 TLS required\r\n");  // rfc3207
 	write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
 	read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-	return Network::FilterStatus::StopIteration; 
+	return Network::FilterStatus::StopIteration;
       }
+
+      // If we wanted to send XCLIENT to the upstream indicating that
+      // the client is not TLS, we would start that here.
       read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
-      if (command.verb == Decoder::Command::HELO) {
-	config_->stats_.sessions_non_esmtp_.inc();
-	state_ = PASSTHROUGH;
-	return Network::FilterStatus::StopIteration; 
-      }
-      state_ = UPSTREAM_EHLO_RESP;
-      return Network::FilterStatus::StopIteration; 
+      config_->stats_.sessions_esmtp_unencrypted_.inc();
+      state_ = PASSTHROUGH;
+      return Network::FilterStatus::StopIteration;
     }
-    case DOWNSTREAM_STARTTLS: {
-      if (command.verb != Decoder::Command::STARTTLS) {
-	if (config_->downstream_ssl_ == ConfigProto::REQUIRE) {
-	  Buffer::OwnedImpl err("500 TLS required\r\n");
-	  write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-	  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-	  return Network::FilterStatus::StopIteration; 
-	}
-
-	// If we wanted to send XCLIENT to the upstream indicating that
-	// the client is not TLS, we would start that here.
-	read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
-	config_->stats_.sessions_esmtp_unencrypted_.inc();
-	state_ = PASSTHROUGH;
-	return Network::FilterStatus::StopIteration; 
-      } else {
-	onDownstreamSSLRequest();
-	return Network::FilterStatus::StopIteration; 
-      }
-    }
-  default:
-    // TODO this probably means that the client spoke at the wrong time
-    break;
+    onDownstreamSSLRequest();
+    return Network::FilterStatus::StopIteration;
   }
-
-  return Network::FilterStatus::Continue;
+  default:
+    ASSERT(0);  // ABSL_UNREACHABLE();
+  }
+  ASSERT(0);  // ABSL_UNREACHABLE();
 }
 
 void SmtpFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -145,30 +155,46 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   ENVOY_CONN_LOG(trace, "smtp_proxy: onWrite {} bytes, state {}", read_callbacks_->connection(),
                  data.length(), state_);
 
-  if (state_ == PASSTHROUGH) {
+  switch (state_) {
+  case PASSTHROUGH:
     return Network::FilterStatus::Continue;
-  }
-  backend_buffer_.add(data);
-  data.drain(data.length());
-
-  if (state_ != UPSTREAM_GREETING &&
-      state_ != UPSTREAM_EHLO_RESP &&
-      state_ != UPSTREAM_STARTTLS_RESP) {
+  case UPSTREAM_GREETING:
+  case UPSTREAM_EHLO_RESP:
+  case UPSTREAM_STARTTLS_RESP:
+    break;
+  default:
+    // upstream spoke out of turn -> hang up
+    config_->stats_.sessions_upstream_desync_.inc();
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
   }
+
+  backend_buffer_.add(data);
+  data.drain(data.length());
 
   // We need to decode the response to know that we consumed it all
   Decoder::Response response;
   Decoder::Result res = decoder_->DecodeResponse(backend_buffer_, response);
-  if (res == Decoder::Result::Bad) {
-    Buffer::OwnedImpl err("451 internal error\r\n");
+  switch (res) {
+  case Decoder::Result::Bad: {
+    Buffer::OwnedImpl err("451 upstream syntax error\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return Network::FilterStatus::StopIteration; 
+    return Network::FilterStatus::StopIteration;
   }
-  if (res != Decoder::Result::ReadyForNext) {
+  case Decoder::Result::NeedMoreData:
     return Network::FilterStatus::Continue;
+  case Decoder::Result::ReadyForNext:
+    break;
   }
+
+  if (response.wire_len != backend_buffer_.length()) {
+    Buffer::OwnedImpl err("451 upstream bad pipeline\r\n");
+    write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return Network::FilterStatus::StopIteration;
+  }
+
   Buffer::OwnedImpl wire_resp;
   wire_resp.move(backend_buffer_, response.wire_len);
 
@@ -196,7 +222,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       }
       downstream_esmtp_capabilities_ = Buffer::OwnedImpl(downstream_caps);
     }
-    
+
     if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
       state_ = UPSTREAM_STARTTLS_RESP;
       Buffer::OwnedImpl starttls("STARTTLS\r\n");
@@ -238,10 +264,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     return Network::FilterStatus::StopIteration;
   }
   default:
-    ASSERT(0);  // checked above
+    ASSERT(0);  // ABSL_UNREACHABLE();
   }
-
-  return Network::FilterStatus::Continue;
+  ASSERT(0);  // ABSL_UNREACHABLE();
 }
 
 DecoderPtr SmtpFilter::createDecoder() {

@@ -17,15 +17,14 @@ envoy_contrib_package()
 envoy_cc_library(
     name = "filter",
     srcs = [
-        "smtp_decoder.cc",
         "smtp_filter.cc",
     ],
     hdrs = [
-        "smtp_decoder.h",
         "smtp_filter.h",
     ],
     repository = "@envoy",
     deps = [
+        ":decoder",
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
@@ -35,6 +34,20 @@ envoy_cc_library(
 	"//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "decoder",
+    srcs = [
+        "smtp_decoder.cc",
+    ],
+    hdrs = [
+        "smtp_decoder.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "//source/common/buffer:buffer_lib",
     ],
 )
 
