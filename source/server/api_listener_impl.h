@@ -5,6 +5,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
@@ -57,9 +58,6 @@ protected:
   // need this and the SyntheticConnection stub anymore.
   class SyntheticReadCallbacks : public Network::ReadFilterCallbacks {
   public:
-    SyntheticReadCallbacks(ApiListenerImplBase& parent)
-        : SyntheticReadCallbacks(parent, parent.factory_context_.mainThreadDispatcher()) {}
-
     SyntheticReadCallbacks(ApiListenerImplBase& parent, Event::Dispatcher& dispatcher)
         : parent_(parent), connection_(SyntheticConnection(*this, dispatcher)) {}
 
@@ -205,15 +203,17 @@ public:
 
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
-  Http::ApiListenerOptRef http() override;
-  void shutdown() override;
+  Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) override;
 
-  Network::ReadFilterCallbacks& readCallbacksForTest();
+  Network::ReadFilterCallbacks& readCallbacksForTest(Http::ApiListener& http_api_listener);
 
 private:
-  class HttpConnectionManagerState;
+  class HttpConnectionManagerWrapper;
 
-  Envoy::ThreadLocal::TypedSlotPtr<HttpConnectionManagerState> tls_;
+  // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
+  // route config manager, scoped route config manager.
+  std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+      http_connection_manager_factory_;
 };
 
 } // namespace Server

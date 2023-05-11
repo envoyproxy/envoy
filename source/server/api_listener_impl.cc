@@ -1,6 +1,7 @@
 #include "source/server/api_listener_impl.h"
 
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/http/api_listener.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -30,53 +31,36 @@ void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConn
   }
 }
 
-class HttpApiListener::HttpConnectionManagerState : public ThreadLocal::ThreadLocalObject {
+// This class wraps a HttpConnectionManager used as an Http::ApiListener and the associated
+// SyntheticReadCallbacks to ensure that both objects have the same lifetime.
+class HttpApiListener::HttpConnectionManagerWrapper : public Http::ApiListener {
 public:
-  explicit HttpConnectionManagerState(
-      std::unique_ptr<SyntheticReadCallbacks> read_callbacks,
-      std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
-          http_connection_manager_factory)
-      : read_callbacks_(std::move(read_callbacks)),
-        http_connection_manager_factory_(http_connection_manager_factory) {}
+  HttpConnectionManagerWrapper(HttpApiListener& parent, Event::Dispatcher& dispatcher)
+      : read_callbacks_(parent, dispatcher),
+        http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
 
-  ~HttpConnectionManagerState() override {
-    // The Http::ConnectionManagerImpl is a callback target for the
-    // read_callback_.connection_. By raising connection closure,
-    // Http::ConnectionManagerImpl::onEvent is fired. In that case the
+  ~HttpConnectionManagerWrapper() override {
+    // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
+    // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
     // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
-    read_callbacks_->connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
+    read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
   }
 
-  Http::ApiListener& httpApiListener() {
-    if (http_api_listener_ == nullptr) {
-      // We need it initialize this lazily as this function depends on other
-      // thread-local state already being set up.
-      http_api_listener_ = http_connection_manager_factory_(*read_callbacks_);
-    }
-    return *http_api_listener_;
+  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
+                                  bool is_internally_created = false) override {
+    return http_connection_manager_->newStream(response_encoder, is_internally_created);
   }
 
-  SyntheticReadCallbacks& readCallbacks() { return *read_callbacks_; }
+  SyntheticReadCallbacks& readCallbacksForTest() { return read_callbacks_; }
 
 private:
-  std::unique_ptr<SyntheticReadCallbacks> read_callbacks_;
-
-  // Need to store the factory due to the shared_ptrs that need to be kept
-  // alive: date provider, route config manager, scoped route config manager.
-  std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
-      http_connection_manager_factory_;
-
-  // Http::ServerConnectionCallbacks is the API surface that this class provides
-  // via its handle().
-  std::unique_ptr<Http::ApiListener> http_api_listener_;
+  SyntheticReadCallbacks read_callbacks_;
+  Http::ApiListenerPtr http_connection_manager_;
 };
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  Server::Instance& server, const std::string& name)
     : ApiListenerImplBase(config, server, name) {
-  std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
-      http_connection_manager_factory;
-
   if (config.api_listener().api_listener().type_url() ==
       absl::StrCat("type.googleapis.com/",
                    envoy::extensions::filters::network::http_connection_manager::v3::
@@ -87,7 +71,7 @@ HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& co
             EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),
                                               factory_context_.messageValidationVisitor());
 
-    http_connection_manager_factory = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
+    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
         HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
             typed_config.config(), factory_context_, false);
   } else {
@@ -95,30 +79,19 @@ HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& co
         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
         config.api_listener().api_listener(), factory_context_.messageValidationVisitor());
 
-    http_connection_manager_factory =
+    http_connection_manager_factory_ =
         Envoy::Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFactory::
             createHttpConnectionManagerFactoryFromProto(typed_config, factory_context_, true);
   }
-
-  tls_ = ThreadLocal::TypedSlot<HttpConnectionManagerState>::makeUnique(server.threadLocal());
-  tls_->set([this, http_connection_manager_factory](
-                Event::Dispatcher& dispatcher) -> std::shared_ptr<HttpConnectionManagerState> {
-    auto read_callbacks = std::make_unique<SyntheticReadCallbacks>(*this, dispatcher);
-    return std::make_shared<HttpConnectionManagerState>(std::move(read_callbacks),
-                                                        http_connection_manager_factory);
-  });
 }
 
-Http::ApiListenerOptRef HttpApiListener::http() {
-  OptRef<HttpConnectionManagerState> http_connection_manager_state = tls_->get();
-  return Http::ApiListenerOptRef(std::ref(http_connection_manager_state->httpApiListener()));
+Http::ApiListenerPtr HttpApiListener::createHttpApiListener(Event::Dispatcher& dispatcher) {
+  return std::make_unique<HttpConnectionManagerWrapper>(*this, dispatcher);
 }
 
-void HttpApiListener::shutdown() { tls_.reset(); }
-
-Network::ReadFilterCallbacks& HttpApiListener::readCallbacksForTest() {
-  OptRef<HttpConnectionManagerState> http_connection_manager_state = tls_->get();
-  return http_connection_manager_state->readCallbacks();
+Network::ReadFilterCallbacks&
+HttpApiListener::readCallbacksForTest(Http::ApiListener& http_api_listener) {
+  return dynamic_cast<HttpConnectionManagerWrapper&>(http_api_listener).readCallbacksForTest();
 }
 
 } // namespace Server
