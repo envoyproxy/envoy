@@ -29,15 +29,15 @@ class GolangConfigFactory
 public:
   GolangConfigFactory() : FactoryBase(CanonicalName) {}
 
-private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::golang::v3alpha::Config& proto_config,
-      Server::Configuration::FactoryContext& context) override;
-
   bool isTerminalFilterByProto(const Protobuf::Message&,
                                Server::Configuration::ServerFactoryContext&) override {
     return is_terminal_filter_;
   }
+
+private:
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::golang::v3alpha::Config& proto_config,
+      Server::Configuration::FactoryContext& context) override;
 
   bool is_terminal_filter_{true};
 };

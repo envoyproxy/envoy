@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.network.golang]
 // [#next-free-field: 6]
 message Config {
-  // Is terminal network filter
+  // Bool true if this filter must be the last filter in a filter chain, false otherwise.
   bool is_terminal_filter = 1;
 
   // Globally unique ID for a dynamic library file.
