@@ -349,6 +349,10 @@ new_features:
     other way around.
 - area: http
   change: |
+    added check for existing metadata before setting metadata due to 'auto_sni', 'auto_san_validation', or
+    'override_auto_sni_header' to prevent triggering ENVOY_BUG when an earlier filter has set the metadata.
+- area: http
+  change: |
     add :ref:`periodic access logging
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
     to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION%
