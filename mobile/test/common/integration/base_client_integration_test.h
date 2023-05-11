@@ -76,6 +76,7 @@ protected:
   Platform::EngineSharedPtr engine_;
   Thread::ThreadPtr envoy_thread_;
   bool explicit_flow_control_ = false;
+  uint64_t min_delivery_size_ = 10;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
