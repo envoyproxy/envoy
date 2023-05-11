@@ -126,13 +126,13 @@ jobs:
       echo "disk space at end of build:"
       df -h
     displayName: "Check disk space at end"
-    condition: always()
+    condition: not(canceled())
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/build_images"
       artifactName: docker
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
   - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
     displayName: "Cache/save (publish_docker)"
 
