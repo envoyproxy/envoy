@@ -127,11 +127,16 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
 
 std::vector<ParentHistogram::Bucket>
 interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
-                            std::function<ParentHistogram::Bucket()> next_bucket) {
+                            std::function<const ParentHistogram::Bucket&()> next_bucket) {
   if (max_buckets == InterpolateRetainAllBuckets) {
     max_buckets = num_src_buckets;
   }
   const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
+  std::vector<ParentHistogram::Bucket> buckets(num_buckets);
+  if (num_buckets == 0) {
+    return buckets;
+  }
+
   uint32_t num_src_buckets_per_bucket = 1;
 
   // Determine how we will map source buckets to destination buckets.
@@ -151,10 +156,8 @@ interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
     ASSERT(remainder < num_buckets);
   }
 
-  std::vector<ParentHistogram::Bucket> buckets(num_buckets);
   uint32_t src = 0;
   for (uint32_t dest = 0; dest < num_buckets; ++dest) {
-    ParentHistogram::Bucket& bucket = buckets[dest];
     uint32_t merges = num_src_buckets_per_bucket;
 
     // If there is still a remainder we'll consume one extra
@@ -166,15 +169,21 @@ interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
       --remainder;
     }
 
-    // Finally we save the aggregated counts and averaged values
-    // into the destination bucket.
-    for (uint32_t i = 0; i < merges; ++i, ++src) {
+    ParentHistogram::Bucket& bucket = buckets[dest];
+    bucket = next_bucket();
+    double combined_max = bucket.min_value_ + bucket.width_;
+    ++src;
+
+    // Finally we save the aggregated counts and maxed values into the
+    // destination bucket.
+    for (uint32_t i = 1; i < merges; ++i, ++src) {
       ASSERT(src < num_src_buckets);
-      ParentHistogram::Bucket src_bucket = next_bucket();
+      const ParentHistogram::Bucket& src_bucket = next_bucket();
       bucket.count_ += src_bucket.count_;
-      bucket.value_ += src_bucket.value_;
+      bucket.min_value_ = std::min(src_bucket.min_value_, bucket.min_value_);
+      combined_max = std::max(combined_max, src_bucket.min_value_ + src_bucket.width_);
     }
-    bucket.value_ /= merges;
+    bucket.width_ = combined_max - bucket.min_value_;
   }
 
   ASSERT(src == num_src_buckets);

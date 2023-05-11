@@ -60,7 +60,8 @@ void StatsTextRender::addDetail(const std::vector<Stats::ParentHistogram::Bucket
                                 Buffer::Instance& response) {
   absl::string_view delim = "";
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    response.addFragments({delim, absl::StrCat(bucket.value_, ":", bucket.count_)});
+    response.addFragments({delim, absl::StrCat(bucket.min_value_, ",", bucket.width_, ":",
+                                               bucket.count_)});
     delim = ", ";
   }
 }
@@ -191,7 +192,8 @@ void StatsJsonRender::populateDetail(absl::string_view name,
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     ProtobufWkt::Struct bucket_json;
     ProtoMap& bucket_fields = *bucket_json.mutable_fields();
-    bucket_fields["value"] = ValueUtil::numberValue(bucket.value_);
+    bucket_fields["min_value"] = ValueUtil::numberValue(bucket.min_value_);
+    bucket_fields["width"] = ValueUtil::numberValue(bucket.width_);
     bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
     *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
   }

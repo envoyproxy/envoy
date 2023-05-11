@@ -7,11 +7,13 @@ namespace Envoy {
 namespace Stats {
 
 bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b) {
-  return a.count_ == b.count_ && std::abs(a.value_ - b.value_) < 0.001;
+  return a.count_ == b.count_ && std::abs(a.min_value_ - b.min_value_) < 0.001 &&
+         std::abs(a.width_ - b.width_) < 0.001;
 }
 
 std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket) {
-  return out << "(value=" << bucket.value_ << ", count=" << bucket.count_ << ")";
+  return out << "(min_value=" << bucket.min_value_ << ", width=" << bucket.width_
+             << ", count=" << bucket.count_ << ")";
 }
 
 namespace TestUtil {

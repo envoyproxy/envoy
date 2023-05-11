@@ -170,24 +170,29 @@ public:
 
   // Holds detailed value and counts for a histogram bucket.
   struct Bucket {
-    double value_{0};
+    double min_value_{0}; // Bound of bucket that's closest to zero.
+    double width_{0};
     uint64_t count_{0};
   };
 
+  static constexpr uint32_t UnlimitedBuckets = 0;
+
   /**
-   * @param max_buckets controls the maximum number of buckets. If 0 (the default) is
-   *        provided, then the full bucket resolution that the circlhist library
-   *        has calculated based on the data. If a non-zero value is provided, and
-   *        the number of buckets provided by the library is larger than the max, then
-   *        the histogram data will be collapsed by merging adjacent buckets until
-   *        the target size is reached.
+   * @param max_buckets controls the maximum number of buckets. If
+   *        UnlimitedBuckets (the default) is provided, then the full bucket
+   *        resolution that the `circlhist` library has calculated based on the
+   *        data. If a non-zero value is provided, and the number of buckets
+   *        provided by the library is larger than the max, then the histogram
+   *        data will be collapsed by merging adjacent buckets until the target
+   *        size is reached.
    *
    * @return a vector of buckets.
    */
-  virtual std::vector<Bucket> detailedTotalBuckets(uint32_t max_buckets = 0) const PURE;
+  virtual std::vector<Bucket>
+  detailedTotalBuckets(uint32_t max_buckets = UnlimitedBuckets) const PURE;
 
   /**
-   * Using a similar API to detailedTotalBuckets, provideds bucket data collected
+   * Using a similar API to detailedTotalBuckets, provides bucket data collected
    * since the most recent stat sink. Note that the number of interval buckets is
    * likely to be much smaller than the number of detailed buckets.
    *

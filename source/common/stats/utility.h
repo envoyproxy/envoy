@@ -251,7 +251,7 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  */
 std::vector<ParentHistogram::Bucket>
 interpolateHistogramBuckets(uint32_t max_buckets, uint32_t num_src_buckets,
-                            std::function<ParentHistogram::Bucket()> next_bucket);
+                            std::function<const ParentHistogram::Bucket&()> next_bucket);
 
 } // namespace Utility
 
