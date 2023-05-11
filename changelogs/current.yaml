@@ -55,12 +55,6 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
-- area: config
-  change: |
-    Removed legacy behavior and runtime flag associated with
-    ''envoy.reloadable_features.delta_xds_subscription_state_tracking_fix''.
-    The default bahavior is that the incremental (Delta-xDS) protocol will
-    update after the resources are successfully ingested and the ACK is sent.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -108,6 +102,9 @@ removed_config_or_runtime:
 - area: udp
   change: |
     removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
+- area: config
+  change: |
+    removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
 
 new_features:
 - area: access_log

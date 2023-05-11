@@ -192,20 +192,18 @@ void DeltaSubscriptionState::handleGoodResponse(
                                           message.removed_resources());
   }
 
-  {
-    const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
-      for (const auto& resource : message.resources()) {
+  const auto scoped_update = ttl_.scopedTtlUpdate();
+  if (requested_resource_state_.contains(Wildcard)) {
+    for (const auto& resource : message.resources()) {
+      addResourceStateFromServer(resource);
+    }
+  } else {
+    // We are not subscribed to wildcard, so we only take resources that we explicitly requested
+    // and ignore the others.
+    // NOTE: This is not gonna work for xdstp resources with glob resource matching.
+    for (const auto& resource : message.resources()) {
+      if (requested_resource_state_.contains(resource.name())) {
         addResourceStateFromServer(resource);
-      }
-    } else {
-      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
-      // and ignore the others.
-      // NOTE: This is not gonna work for xdstp resources with glob resource matching.
-      for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
-          addResourceStateFromServer(resource);
-        }
       }
     }
   }
