@@ -32,10 +32,14 @@ private:
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
-  CELFormatterCommandParser() = default;
+  CELFormatterCommandParser()
+      : expr_builder_(Extensions::Filters::Common::Expr::createBuilder(nullptr)){};
   ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command,
                                                  const std::string& subcommand,
                                                  absl::optional<size_t>& max_length) const override;
+
+private:
+  Extensions::Filters::Common::Expr::BuilderPtr expr_builder_;
 };
 
 } // namespace Formatter

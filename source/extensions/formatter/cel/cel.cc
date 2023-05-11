@@ -82,7 +82,6 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
                            parse_status.status().ToString());
     }
 
-    auto expr_builder_ = Expr::createBuilder(nullptr);
     return std::make_unique<CELFormatter>(*expr_builder_, parse_status.value().expr(), max_length);
   }
 
