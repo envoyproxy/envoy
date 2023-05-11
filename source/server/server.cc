@@ -842,7 +842,6 @@ void InstanceImpl::startWorkers() {
   });
 }
 
-
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
 #ifdef ENVOY_ENABLE_YAML
