@@ -431,6 +431,14 @@ public:
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  /**
+   * @param common_lb_config The config field to be stored
+   * @return shared_ptr to the CommonLbConfig
+   */
+  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
