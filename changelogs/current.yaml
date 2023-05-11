@@ -55,11 +55,6 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
-- area: resource_monitors
-  change: |
-    Removed legacy behavior that was previously allowed users to set
-    ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true and
-    not count pages allocated by TCMalloc as free memory in fixed heap monitor.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -107,6 +102,9 @@ removed_config_or_runtime:
 - area: udp
   change: |
     removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
+- area: resource_monitors
+  change: |
+    removed runtime key ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` and legacy code paths.
 
 new_features:
 - area: access_log
