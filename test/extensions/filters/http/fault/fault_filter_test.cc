@@ -294,7 +294,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   envoy::config::core::v3::Metadata dynamic_metadata;
   ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
-          .WillByDefault(ReturnRef(dynamic_metadata));
+      .WillByDefault(ReturnRef(dynamic_metadata));
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
@@ -328,7 +328,6 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
   EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
-
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
