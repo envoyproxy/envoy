@@ -112,7 +112,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
 - area: config
   change: |
-    Removed all legacy behavior and runtime flag associated with
+    Removed legacy behavior and runtime flag associated with
     ''envoy.reloadable_features.delta_xds_subscription_state_tracking_fix''.
     The default bahavior is that the incremental (Delta-xDS) protocol will
     update after the resources are successfully ingested and the ACK is sent.
