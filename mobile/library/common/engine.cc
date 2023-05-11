@@ -109,8 +109,8 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
           // on-the-fly without risking contention on system with lots of threads.
           // It also comes with ease of programming.
           stat_name_set_ = client_scope_->symbolTable().makeSet("pulse");
-          auto api_listener = server_->listenerManager().apiListener()->get()
-              .createHttpApiListener(server_->dispatcher());
+          auto api_listener = server_->listenerManager().apiListener()->get().createHttpApiListener(
+              server_->dispatcher());
           ASSERT(api_listener != nullptr);
           http_client_ = std::make_unique<Http::Client>(std::move(api_listener), *dispatcher_,
                                                         server_->serverFactoryContext().scope(),
@@ -158,9 +158,7 @@ envoy_status_t Engine::terminate() {
     ASSERT(dispatcher_);
 
     // We must destroy the Http::ApiListener in the main thread.
-    dispatcher_->post([this]() {
-      http_client_->shutdownApiListener();
-    });
+    dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
 
     // Exit the event loop and finish up in Engine::run(...)
     if (std::this_thread::get_id() == main_thread_.get_id()) {

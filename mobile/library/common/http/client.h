@@ -127,9 +127,7 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::string, "client_cancelled_stream");
   }
 
-  void shutdownApiListener() {
-    api_listener_.reset();
-  }
+  void shutdownApiListener() { api_listener_.reset(); }
 
 private:
   class DirectStream;
