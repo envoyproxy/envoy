@@ -425,6 +425,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  if (bootstrap_.has_application_log_format() &&
+      bootstrap_.application_log_format().has_json_format()) {
+    Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
+  }
+
 #ifdef ENVOY_PERFETTO
   perfetto::TracingInitArgs args;
   // Include in-process events only.
