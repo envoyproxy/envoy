@@ -157,31 +157,6 @@ function bazel_contrib_binary_build() {
 }
 
 function run_ci_verify () {
-    local images image oci_archive
-    echo "verify examples..."
-
-    images=("" "contrib" "google-vrp")
-
-    for image in "${images[@]}"; do
-        if [[ -n "$image" ]]; then
-            variant="${image}-dev"
-            filename="envoy-${image}.tar"
-        else
-            variant=dev
-            filename="envoy.tar"
-        fi
-        oci_archive="${ENVOY_DOCKER_BUILD_DIR}/docker/${filename}"
-
-        echo "Copy oci image: oci-archive:${oci_archive} docker-daemon:envoyproxy/envoy:${variant}"
-        skopeo copy -q "oci-archive:${oci_archive}" "docker-daemon:envoyproxy/envoy:${variant}"
-        rm "$oci_archive"
-    done
-
-    docker images | grep envoy
-
-    export DEBIAN_FRONTEND=noninteractive
-    sudo apt-get -qq update -y
-    sudo apt-get -qq install -y --no-install-recommends expect
     export DOCKER_NO_PULL=1
     export DOCKER_RMI_CLEANUP=1
     # This is set to simulate an environment where users have shared home drives protected
@@ -531,6 +506,11 @@ case $CI_TARGET in
     docs-upload)
         setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
+        ;;
+
+    docker-upload)
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
         ;;
 
     fix_proto_format)
