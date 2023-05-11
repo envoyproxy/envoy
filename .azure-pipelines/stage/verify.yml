@@ -1,6 +1,10 @@
 
 parameters:
 
+- name: bucketGCP
+  type: string
+  default: ""
+
 # Auth
 - name: authGCP
   type: string
@@ -15,12 +19,40 @@ jobs:
   steps:
   - bash: .azure-pipelines/cleanup.sh
     displayName: "Removing tools from agent"
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "docker"
-      itemPattern: "docker/envoy*.tar"
-      targetPath: $(Build.StagingDirectory)
+  - bash: |
+      set -e
+
+      if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+          DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+      else
+          DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+      fi
+
+      tmpdir=$(mktemp -d)
+      cd "$tmpdir"
+      images=("" "contrib" "google-vrp")
+      for image in "${images[@]}"; do
+          if [[ -n "$image" ]]; then
+              variant="${image}-dev"
+              filename="envoy-${image}.tar"
+          else
+              variant=dev
+              filename="envoy.tar"
+          fi
+          echo "Download docker image (https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/docker/${filename}) ..."
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/docker/${filename}"
+          echo "Copy oci image: oci-archive:${filename} docker-daemon:envoyproxy/envoy:${variant}"
+          skopeo copy -q "oci-archive:${filename}" "docker-daemon:envoyproxy/envoy:${variant}"
+          rm "$filename"
+      done
+      docker images | grep envoy
+
+  - bash: |
+      set -e
+      export DEBIAN_FRONTEND=noninteractive
+      sudo apt-get -qq update -y
+      sudo apt-get -qq install -y --no-install-recommends expect
+
   - bash: ./ci/do_ci.sh verify_examples
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
