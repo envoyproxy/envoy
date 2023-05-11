@@ -210,11 +210,19 @@ func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
 		h.headers[key] = []string{value}
 	}
 
-	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value, false)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
-	panic("unsupported yet")
+	h.initHeaders()
+	if h.headers != nil {
+		if trailers, found := h.headers[key]; found {
+			h.headers[key] = append(trailers, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value, true)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Del(key string) {

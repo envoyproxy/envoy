@@ -332,6 +332,7 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
   }
 
   bool done = false;
+  Buffer::OwnedImpl body;
   switch (state.state()) {
   case FilterState::WaitingTrailer:
     done = doTrailerGo(state, trailers);
@@ -344,13 +345,17 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
     // do data first
     if (!state.isBufferDataEmpty()) {
       done = doDataGo(state, state.getBufferData(), false);
-    }
-    // NP: can not use done as condition here, since done will be false
-    // maybe we can remove the done variable totally? by using state_ only?
-    // continue trailers
-    if (state.state() == FilterState::WaitingTrailer) {
+      // NP: can not use done as condition here, since done will be false
+      // maybe we can remove the done variable totally? by using state_ only?
+      // continue trailers
+      if (state.state() == FilterState::WaitingTrailer) {
+        done = doTrailerGo(state, trailers);
+      }
+    } else {
       done = doTrailerGo(state, trailers);
     }
+    state.doDataList.moveOut(body);
+    state.addBody(body);
     break;
   case FilterState::ProcessingHeader:
   case FilterState::ProcessingData:
@@ -820,7 +825,7 @@ CAPIStatus Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value, headerAction act) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -835,7 +840,18 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  trailers_->setCopy(Http::LowerCaseString(key), value);
+  switch (act) {
+  case HeaderAdd:
+    trailers_->addCopy(Http::LowerCaseString(key), value);
+    break;
+
+  case HeaderSet:
+    trailers_->setCopy(Http::LowerCaseString(key), value);
+    break;
+
+  default:
+    RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+  }
   return CAPIStatus::CAPIOK;
 }
 
