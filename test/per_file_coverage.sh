@@ -11,7 +11,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
-"source/common/http:96.5"
 "source/common/http/http2:95.2"
 "source/common/json:93.4"
 "source/common/matcher:94.6"
