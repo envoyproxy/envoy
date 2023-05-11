@@ -516,10 +516,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
-    : api_(factory_context.serverFactoryContext().api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
-          factory_context.serverFactoryContext().threadLocal())),
-      stats_(generateCryptoMbStats("cryptomb", factory_context.statsScope())) {
+    : api_(factory_context.api()),
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
+      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
     throw EnvoyException("Multi-buffer CPU instructions not available.");
@@ -528,7 +527,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
-  std::string private_key = Config::DataSource::read(conf.private_key(), false, api_);
+  std::string private_key =
+      Config::DataSource::read(conf.private_key(), false, factory_context.api());
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));

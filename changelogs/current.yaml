@@ -68,6 +68,11 @@ bug_fixes:
 - area: tls
   change: |
     Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
+- area: ext_authz
+  change: |
+    Fix a bug where the ext_authz filter will ignore the request body when the
+    :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` is set to true and
+    HTTP authorization service is configured.
 - area: router
   change: |
     Fixed the bug that updating :ref:`scope_key_builder
