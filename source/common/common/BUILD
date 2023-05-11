@@ -211,6 +211,7 @@ envoy_cc_library(
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//source/common/protobuf:protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],

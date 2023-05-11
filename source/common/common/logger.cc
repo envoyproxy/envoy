@@ -265,7 +265,8 @@ void Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
   if (auto status =
           Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
       !status.ok()) {
-    throw EnvoyException("failed to set log format as JSON string from struct");
+    throw EnvoyException(
+        fmt::format("failed to set log format as JSON string from struct: {}", status.ToString()));
   }
 
   setLogFormat(format_as_json);
