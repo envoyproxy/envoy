@@ -89,7 +89,7 @@ message CustomResponse {
   //         action:
   //           name: action
   //           typed_config:
-  //             "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+  //             "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
   //             status_code: 299
   //             uri: "https://foo.example/gateway_error"
   //             response_headers_to_add:
