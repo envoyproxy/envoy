@@ -16,6 +16,7 @@ import java.util.concurrent.Executors
 open class StreamPrototype(private val engine: EnvoyEngine) {
   private val callbacks = StreamCallbacks()
   private var explicitFlowControl = false
+  private var minDeliverySize: Long = 0
   private var useByteBufferPosition = false
 
   /**
@@ -27,10 +28,23 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   open fun start(executor: Executor = Executors.newSingleThreadExecutor()): Stream {
     val engineStream = engine.startStream(
       createCallbacks(executor),
-      explicitFlowControl
+      explicitFlowControl,
+      minDeliverySize
     )
     return Stream(engineStream, useByteBufferPosition)
   }
+
+  /**
+   * Sets min delivery: data will be buffered in the C++ layer until the min delivery length or end stream is read.
+   *
+   * @param value set the minimum delivery size fo for this stream
+   * @return This stream, for chaining syntax.
+   */
+  fun setMinDeliverySize(value: Long): StreamPrototype {
+    this.minDeliverySize = value
+    return this
+  }
+
 
   /**
    * Allows explicit flow control to be enabled. When flow control is enabled, the owner of a stream
