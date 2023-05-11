@@ -273,7 +273,7 @@ void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
 }
 
 // Handle an awful corner case where we explicitly shove a yaml percent in a proto string
-// value. Basically due to prior paring logic we have to handle any combination
+// value. Basically due to prior parsing logic we have to handle any combination
 // of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
 // E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
 void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
