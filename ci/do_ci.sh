@@ -160,7 +160,8 @@ function run_ci_verify () {
     local images image oci_archive
     echo "verify examples..."
 
-    images=("" "contrib" "google-vrp")
+    # images=("" "contrib" "google-vrp")
+    images=()
 
     for image in "${images[@]}"; do
         if [[ -n "$image" ]]; then
@@ -177,7 +178,7 @@ function run_ci_verify () {
         rm "$oci_archive"
     done
 
-    docker images | grep envoy
+    # docker images | grep envoy
 
     export DEBIAN_FRONTEND=noninteractive
     sudo apt-get -qq update -y

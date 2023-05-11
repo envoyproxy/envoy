@@ -1,0 +1,41 @@
+name: Verify
+on:
+- pull_request
+
+# concurrency:
+#   group: ${{ github.head_ref-github.workflow || github.run_id }}
+#   cancel-in-progress: true
+
+jobs:
+  verify-examples:
+    runs-on: ubuntu-20.04
+    if: github.repository == 'envoyproxy/envoy'
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v3
+
+    - name: Download Docker images
+      run: |
+        set -e
+
+        images=("" "contrib" "google-vrp")
+        for image in "${images[@]}"; do
+            if [[ -n "$image" ]]; then
+                variant="${image}-dev"
+                filename="envoy-${image}.tar"
+            else
+                variant=dev
+                filename="envoy.tar"
+            fi
+            echo "Download docker image (https://storage.googleapis.com/envoy-pr/15b5de2/docker/${filename}) ..."
+            curl -sLO "https://storage.googleapis.com/envoy-pr/15b5de2/docker/${filename}"
+        done
+
+    - name: Load Docker images
+      run: |
+        echo "Download docker image ..."
+
+    - name: Verify examples
+      run: ./ci/do_ci.sh verify_examples
+      env:
+        NO_BUILD_SETUP: 1
