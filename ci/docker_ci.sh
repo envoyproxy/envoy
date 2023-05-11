@@ -20,6 +20,9 @@ set -e
 # AZP_BRANCH=refs/tags/v1.77.3
 ##
 
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
+DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-400}"
+
 
 function is_windows() {
     [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
@@ -232,7 +235,16 @@ build_and_maybe_push_image () {
 
     if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
         echo "..."
-        docker "${docker_build_args[@]}"
+        timeout "$DOCKER_BUILD_TIMEOUT" docker "${docker_build_args[@]}" || {
+            if [[ "$?" == 124 ]]; then
+                echo "Docker build timed out ..." >&2
+            else
+                echo "Docker build errored ..." >&2
+            fi
+            sleep 5
+            echo "trying again ..." >&2
+            docker "${docker_build_args[@]}"
+        }
     fi
     if [[ -z "$PUSH_IMAGES_TO_REGISTRY" ]]; then
         return
@@ -279,7 +291,11 @@ tag_image () {
 
     if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
         echo "..."
-        docker "${docker_tag_args[@]}"
+        docker "${docker_tag_args[@]}" || {
+            echo "Retry Docker tag in 5s ..." >&2
+            sleep 5
+            docker "${docker_tag_args[@]}"
+        }
     fi
 }
 

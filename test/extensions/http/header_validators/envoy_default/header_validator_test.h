@@ -21,7 +21,7 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-class HeaderValidatorTest : public testing::Test {
+class HeaderValidatorTest {
 protected:
   void setHeaderStringUnvalidated(Envoy::Http::HeaderString& header_string,
                                   absl::string_view value) {

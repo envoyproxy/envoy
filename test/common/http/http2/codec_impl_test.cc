@@ -75,7 +75,7 @@ public:
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::HeaderValidator* header_validator) {
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
     header_validator_ = header_validator;
   }
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
@@ -106,7 +106,7 @@ public:
   }
 
 private:
-  Http::HeaderValidator* header_validator_{nullptr};
+  Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
 } // namespace
@@ -405,9 +405,9 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ =
-        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
-            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats());
     request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }
@@ -457,7 +457,7 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -605,9 +605,11 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -2924,8 +2926,11 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(client_callbacks_, onGoAway(_));
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 }
@@ -3633,6 +3638,10 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#26490) : this test needs UHV for both client and server
+  return;
+#endif
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
@@ -4235,6 +4244,65 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
   }
 }
 
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway) {
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
+
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  } else {
+    // nghttp2 does not raise the headers to the decoder.
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  }
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDispatch) {
+  initialize();
+
+  int times_shed_load_invoked = 0;
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
+      .WillRepeatedly(Invoke([&times_shed_load_invoked]() {
+        ++times_shed_load_invoked;
+        return false;
+      }));
+
+  // Drive new streams to be created within a single server dispatch.
+  const int num_streams_to_create = 20;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+
+  std::vector<RequestEncoder*> request_encoders;
+  std::vector<ResponseEncoder*> response_encoders;
+  request_encoders.reserve(num_streams_to_create);
+  response_encoders.reserve(num_streams_to_create);
+  for (int i = 0; i < num_streams_to_create; ++i) {
+    request_encoders.push_back(&client_->newStream(response_decoder_));
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoders.push_back(&encoder);
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          return request_decoder_;
+        }));
+
+    EXPECT_TRUE(request_encoders[i]->encodeHeaders(request_headers, true).ok());
+  }
+
+  // All the newly created streams are queued in the connection buffer.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);
+  driveToCompletion();
+  EXPECT_EQ(1, times_shed_load_invoked);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
 TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
   // Per https://datatracker.ietf.org/doc/html/rfc9113#section-8.2.1,
   // leading & trailing whitespace characters in headers are not valid, but this is a new
@@ -4386,10 +4454,8 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
 TEST_P(Http2CodecImplTest, BadResponseHeader) {
   initialize();
 #ifdef ENVOY_ENABLE_UHV
-  // UHV mode makes no effect on nghttp2
-  if (http2_implementation_ != Http2Impl::Oghttp2) {
-    return;
-  }
+  // TODO(#26490): this test needs UHV for both client and server codecs
+  return;
 #endif
 
   InSequence s;

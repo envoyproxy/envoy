@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -111,6 +112,9 @@ public:
       cc->on_trailers_calls++;
       return nullptr;
     };
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
 
   envoy_headers defaultRequestHeaders() {
@@ -155,6 +159,9 @@ public:
   bool explicit_flow_control_{GetParam()};
   Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
   envoy_stream_t stream_ = 1;
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
@@ -479,7 +486,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_info_.setResponseCode(503);
   stream_info_.setResponseCodeDetails("nope");
   stream_info_.setAttemptCount(123);
-  response_encoder_->getStream().resetStream(Http::StreamResetReason::ConnectionFailure);
+  response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(cc_.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks_ were called.
   ASSERT_EQ(cc_.on_complete_calls, 0);
@@ -631,7 +638,10 @@ TEST_P(ClientTest, Encode100Continue) {
 
   // Encode 100 continue should blow up.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+// Death tests are not supported on iOS.
+#ifndef TARGET_OS_IOS
   EXPECT_DEATH(response_encoder_->encode1xxHeaders(response_headers), "panic: not implemented");
+#endif
 }
 
 TEST_P(ClientTest, EncodeMetadata) {
@@ -658,7 +668,10 @@ TEST_P(ClientTest, EncodeMetadata) {
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
   MetadataMapVector metadata_map_vector;
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
+// Death tests are not supported on iOS.
+#ifndef TARGET_OS_IOS
   EXPECT_DEATH(response_encoder_->encodeMetadata(metadata_map_vector), "panic: not implemented");
+#endif
 }
 
 TEST_P(ClientTest, NullAccessors) {

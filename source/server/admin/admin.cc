@@ -240,13 +240,15 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
-                                                 Http::ServerConnectionCallbacks& callbacks) {
+                                                 Http::ServerConnectionCallbacks& callbacks,
+                                                 Server::OverloadManager& overload_manager) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
-      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+      overload_manager);
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

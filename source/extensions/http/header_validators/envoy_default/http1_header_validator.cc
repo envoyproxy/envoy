@@ -22,6 +22,7 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
+using ValidationResult = ::Envoy::Http::HeaderValidator::ValidationResult;
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -59,7 +60,6 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
   // submitting the header map for validation in UHV.
-
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
@@ -99,8 +99,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-HeaderValidator::ValidationResult
-Http1HeaderValidator::validateRequestHeaders(const RequestHeaderMap& header_map) {
+ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
@@ -296,8 +295,8 @@ void Http1HeaderValidator::sanitizeContentLength(::Envoy::Http::RequestHeaderMap
   }
 }
 
-HeaderValidator::HeadersTransformationResult
-Http1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
+::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
+ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
   if (!config_.uri_path_normalization_options().skip_path_normalization()) {
@@ -306,10 +305,10 @@ Http1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& h
       return path_result;
     }
   }
-  return HeadersTransformationResult::success();
+  return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }
 
-HeaderValidator::ValidationResult
+ValidationResult
 Http1HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
@@ -378,18 +377,19 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   return HeaderValueValidationResult::success();
 }
 
-HeaderValidator::ValidationResult
+ValidationResult
 Http1HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }
 
-HeaderValidator::TrailersTransformationResult
-Http1HeaderValidator::transformRequestTrailers(::Envoy::Http::RequestTrailerMap& trailer_map) {
+::Envoy::Http::HeaderValidator::TransformationResult
+ServerHttp1HeaderValidator::transformRequestTrailers(
+    ::Envoy::Http::RequestTrailerMap& trailer_map) {
   sanitizeHeadersWithUnderscores(trailer_map);
-  return HeadersTransformationResult::success();
+  return ::Envoy::Http::HeaderValidator::TransformationResult::success();
 }
 
-HeaderValidator::ValidationResult Http1HeaderValidator::validateResponseTrailers(
+ValidationResult Http1HeaderValidator::validateResponseTrailers(
     const ::Envoy::Http::ResponseTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }

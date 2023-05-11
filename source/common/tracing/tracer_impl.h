@@ -61,7 +61,7 @@ using EgressConfig = ConstSingleton<EgressConfigImpl>;
 
 class NullTracer : public Tracer {
 public:
-  // Tracing::HttpTracer
+  // Tracing::Tracer
   SpanPtr startSpan(const Config&, TraceContext&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
@@ -72,7 +72,7 @@ class TracerImpl : public Tracer {
 public:
   TracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info);
 
-  // Tracing::HttpTracer
+  // Tracing::Tracer
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override;

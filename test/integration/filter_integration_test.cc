@@ -12,11 +12,7 @@ public:
     config_helper_.prependFilter(config, testing_downstream_filter_);
   }
 
-  void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters",
-                                      testing_downstream_filter_ ? "false" : "true");
-    UpstreamDownstreamIntegrationTest::initialize();
-  }
+  void initialize() override { UpstreamDownstreamIntegrationTest::initialize(); }
 
   template <class T> void changeHeadersForStopAllTests(T& headers, bool set_buffer_limit) {
     headers.addCopy("content_size", std::to_string(count_ * size_));

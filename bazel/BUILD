@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("//bazel:utils.bzl", "json_data")
+load("@envoy_api//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
@@ -371,6 +371,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_yaml",
+    values = {"define": "envoy_yaml=disabled"},
+)
+
+config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
 )
@@ -637,6 +642,11 @@ selects.config_setting_group(
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "android_system_helper",
+    values = {"define": "system-helper=android"},
 )
 
 config_setting(
