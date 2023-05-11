@@ -314,6 +314,35 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
                             "refresh_delay is required for REST API configuration sources");
 }
 
+// Test if invalid xDS GRPC retry configuration is handled with assertion
+TEST_F(SubscriptionFactoryTest, GrpcSubscriptionInvalidRetryConfig) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  uint64_t test_base_interval_ms = 10000;
+  uint64_t test_max_interval_ms = 5000;
+  api_config_source->mutable_grpc_services(0)
+      ->mutable_envoy_grpc()
+      ->mutable_retry_policy()
+      ->mutable_retry_back_off()
+      ->mutable_base_interval()
+      ->set_seconds(test_base_interval_ms);
+  api_config_source->mutable_grpc_services(0)
+      ->mutable_envoy_grpc()
+      ->mutable_retry_policy()
+      ->mutable_retry_back_off()
+      ->mutable_max_interval()
+      ->set_seconds(test_max_interval_ms);
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                            EnvoyException,
+                            "max_interval must be greater than or equal to the base_interval");
+}
+
 TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

@@ -621,7 +621,7 @@ protected:
   void onProtocolConstraintViolation();
 
   // Whether to use the new HTTP/2 library.
-  const bool use_oghttp2_library_;
+  bool use_oghttp2_library_;
   static Http2Callbacks http2_callbacks_;
 
   // If deferred processing, the streams will be in LRU order based on when the
@@ -768,7 +768,8 @@ public:
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
 
 private:
   // ConnectionImpl
@@ -796,6 +797,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  bool sent_go_away_on_dispatch_{false};
 };
 
 } // namespace Http2

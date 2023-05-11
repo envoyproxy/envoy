@@ -23,7 +23,7 @@
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"

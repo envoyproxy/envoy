@@ -43,6 +43,7 @@ typedef enum { // NOLINT(modernize-use-using)
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
 CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text,
                                            void* headers, long long int grpc_status, void* details);
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details);
 
 CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key, void* value);
 CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
@@ -59,7 +60,10 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 
-CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message);
+// TODO: implement get dynamic metadata
+CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
+
+void envoyGoFilterHttpLog(uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 

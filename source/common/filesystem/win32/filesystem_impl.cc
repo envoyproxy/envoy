@@ -189,8 +189,11 @@ Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
 
 Api::IoCallBoolResult InstanceImplWin32::createPath(absl::string_view path) {
   std::error_code ec;
+  while (!path.empty() && path.back() == '/') {
+    path.remove_suffix(1);
+  }
   bool result = std::filesystem::create_directories(std::string{path}, ec);
-  return result ? resultSuccess(true) : resultFailure(false, ec.value());
+  return ec ? resultFailure(false, ec.value()) : resultSuccess(result);
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
