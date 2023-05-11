@@ -26,7 +26,7 @@ public:
 
 private:
   const google::api::expr::v1alpha1::Expr parsed_expr_;
-  absl::optional<size_t> max_length_;
+  const absl::optional<size_t> max_length_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
 };
 
