@@ -156,6 +156,7 @@ paths:
     - test/test_common/test_time.h
     - test/test_common/utility.cc
     - test/tools/wee8_compile/wee8_compile.cc
+    - test/extensions/filters/http/stateful_session/stateful_session_integration_test.cc
 
   # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
   # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
