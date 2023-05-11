@@ -167,6 +167,7 @@ stages:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
+      bucketGCP: $(GcsArtifactBucket)
 
 - stage: macos
   displayName: macOS

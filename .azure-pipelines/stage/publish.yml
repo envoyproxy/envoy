@@ -84,7 +84,7 @@ jobs:
     parameters:
       name: publish_docker
       # VERSION.txt is included to refresh Docker images for release
-      key: "ci/Dockerfile-envoy | VERSION.txt"
+      key: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
       version: "$(cacheKeyDockerBuild)"
       path: ""
   - bash: |
@@ -122,17 +122,26 @@ jobs:
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
       DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
+
   - bash: |
       echo "disk space at end of build:"
       df -h
     displayName: "Check disk space at end"
     condition: not(canceled())
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathtoPublish: "$(Build.StagingDirectory)/build_images"
-      artifactName: docker
-    timeoutInMinutes: 10
-    condition: not(canceled())
+
+  # Publish docker
+  - script: |
+      ci/run_envoy_docker.sh 'ci/do_ci.sh docker-upload'
+    displayName: "Upload Docker to GCS"
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+
   - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
     displayName: "Cache/save (publish_docker)"
 
