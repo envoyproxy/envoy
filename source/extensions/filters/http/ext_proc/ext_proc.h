@@ -84,8 +84,6 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        filter_state_name_(
-            PROTOBUF_GET_STRING_OR_DEFAULT(config, filter_state_name, "ext-proc-logging-info")),
         metadata_(config.metadata()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -106,8 +104,6 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-  const std::string& filterStateName() const { return filter_state_name_; }
-
   const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
 
 private:
@@ -125,7 +121,6 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  const std::string filter_state_name_;
   const envoy::config::core::v3::Metadata metadata_;
 };
 

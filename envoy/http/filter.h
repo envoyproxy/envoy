@@ -746,6 +746,11 @@ public:
    * load balancing.
    */
   virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
+
+  /**
+   * @return absl::string_view the name of the filter as configured in XDS.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
 };
 
 /**
