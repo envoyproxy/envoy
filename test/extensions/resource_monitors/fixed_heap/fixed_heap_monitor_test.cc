@@ -77,6 +77,7 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
   EXPECT_NEAR(resource.pressure(), expected_usage, 0.0005);
 }
 
+//// TODO(Diazalan): Remove two legacy tests after flag is deprecated
 TEST(FixedHeapMonitorTest, LegacyComputesCorrectUsage) {
 
   TestScopedRuntime scoped_runtime;
@@ -96,8 +97,6 @@ TEST(FixedHeapMonitorTest, LegacyComputesCorrectUsage) {
   EXPECT_FALSE(resource.hasError());
   EXPECT_EQ(resource.pressure(), 0.7);
 }
-
-
 
 TEST(FixedHeapMonitorTest, LegacyComputeUsageWithRealMemoryStats) {
 
