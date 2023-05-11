@@ -10,7 +10,6 @@ import java.util.regex.Matcher;
 import java.lang.StringBuilder;
 import javax.annotation.Nullable;
 
-import io.envoyproxy.envoymobile.engine.VirtualClusterConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
@@ -45,7 +44,6 @@ public class EnvoyConfiguration {
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
-  public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
   public final Integer h2ConnectionKeepaliveTimeoutSeconds;
@@ -57,15 +55,12 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
-  public final List<String> legacyVirtualClusters;
-  public final List<VirtualClusterConfig> virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
   public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
-  public final Boolean enableSkipDNSLookupForProxiedRequests;
   public final String rtdsLayerName;
   public final Integer rtdsTimeoutSeconds;
   public final String adsAddress;
@@ -117,8 +112,6 @@ public class EnvoyConfiguration {
    *     decompression.
    *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
-   * @param enableHappyEyeballs                           whether to enable RFC 6555 handling for
-   *     IPv4/IPv6.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
    *                                                      pings on stream creation.
@@ -134,16 +127,10 @@ public class EnvoyConfiguration {
    *     Client.
    * @param trustChainVerification                        whether to mute TLS Cert verification -
    *     for tests.
-   * @param legacyVirtualClusters                               the JSON list of virtual cluster
-   *     configs.
-   * @param virtualClusters                          the structured list of virtual cluster
-   *     configs.
    * @param nativeFilterChain                             the configuration for native filters.
    * @param httpPlatformFilterFactories                   the configuration for platform filters.
    * @param stringAccessors                               platform string accessors to register.
    * @param keyValueStores                                platform key-value store implementations.
-   * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
-   *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    * @param rtdsLayerName                                 the RTDS layer name for this client.
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
@@ -170,21 +157,20 @@ public class EnvoyConfiguration {
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
       boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification, List<String> legacyVirtualClusters,
-      List<VirtualClusterConfig> virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+      TrustChainVerification trustChainVerification,
+      List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation, String rtdsLayerName,
-      Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
-      Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
-      boolean enableCds) {
+      Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
+      String rtdsLayerName, Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort,
+      String adsToken, Integer adsTokenLifetime, String adsRootCerts, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
+      Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -202,7 +188,6 @@ public class EnvoyConfiguration {
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
-    this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
         h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -214,8 +199,6 @@ public class EnvoyConfiguration {
     this.appVersion = appVersion;
     this.appId = appId;
     this.trustChainVerification = trustChainVerification;
-    this.legacyVirtualClusters = legacyVirtualClusters;
-    this.virtualClusters = virtualClusters;
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
@@ -238,7 +221,6 @@ public class EnvoyConfiguration {
       this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
-    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
     this.rtdsLayerName = rtdsLayerName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.adsAddress = adsAddress;
@@ -262,23 +244,20 @@ public class EnvoyConfiguration {
     Collections.reverse(reverseFilterChain);
 
     byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters_legacy = JniBridgeUtility.stringsToJniBytes(legacyVirtualClusters);
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-    byte[][] clusters = JniBridgeUtility.clusterConfigToJniBytes(virtualClusters);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
         dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
         enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters_legacy,
-        clusters, filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
+        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
         adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
         nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }

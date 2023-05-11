@@ -73,7 +73,7 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body().add(MessageUtil::getJsonStringFromMessageOrDie(request_));
+  request.body().add(MessageUtil::getJsonStringFromMessageOrError(request_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   request.headers().setContentLength(request.body().length());
 }

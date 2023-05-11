@@ -50,6 +50,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "character_set_validation_test",
+    srcs = ["character_set_validation_test.cc"],
+    deps = [
+        "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
     deps = [
@@ -65,6 +74,7 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -102,6 +112,7 @@ envoy_proto_library(
             "//test/fuzz:utility_lib",
             "//test/mocks/http:http_mocks",
             "//test/mocks/network:network_mocks",
+            "//test/mocks/server:overload_manager_mocks",
             "//test/test_common:test_runtime_lib",
         ],
     )

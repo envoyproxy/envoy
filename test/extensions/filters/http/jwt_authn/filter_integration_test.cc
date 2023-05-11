@@ -33,7 +33,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener) {
@@ -50,7 +50,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getFilterConfig(bool use_local_jwks) {

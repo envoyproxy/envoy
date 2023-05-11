@@ -8,10 +8,10 @@
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/grpc/common.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/common.h"
@@ -48,17 +48,19 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
     if (should_use_unified_) {
       xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-          random_, *stats_store_.rootScope(), rate_limit_settings_, local_info_, false,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          *stats_store_.rootScope(), rate_limit_settings_, local_info_, false,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-          random_, *stats_store_.rootScope(), rate_limit_settings_, local_info_,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          *stats_store_.rootScope(), rate_limit_settings_, local_info_,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(

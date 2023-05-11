@@ -1,5 +1,6 @@
 * See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 * See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines and maintainer responsibilities.
+* See [CODEOWNERS](CODEOWNERS) for a detailed list of owners for the various source directories.
 
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.
@@ -52,10 +53,6 @@ routing PRs, questions, etc. to the right place.
 
 The following Envoy maintainers have final say over any changes only affecting /mobile
 
-* JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
-  * iOS (swift/objective-c) platform bindings.
-* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
-  * iOS (swift/objective-c) platform bindings.
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
 
@@ -112,6 +109,8 @@ contributors to envoy-setec and relevant Slack channels from:
 * Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@rowe-clan.net)
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
+* JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
+* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 
 # Friends of Envoy
 

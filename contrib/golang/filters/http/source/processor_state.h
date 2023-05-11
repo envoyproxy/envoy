@@ -164,6 +164,7 @@ public:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
 
   const StreamInfo::StreamInfo& streamInfo() const { return filter_callbacks_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return filter_callbacks_->streamInfo(); }
 
   void setEndStream(bool end_stream) { end_stream_ = end_stream; }
   bool getEndStream() { return end_stream_; }
