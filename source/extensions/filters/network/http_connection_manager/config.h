@@ -286,7 +286,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   bool flush_access_log_on_new_request_;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
-  bool flush_log_on_tunnel_successfully_established_;
+  bool flush_log_on_tunnel_successfully_established_{false};
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
