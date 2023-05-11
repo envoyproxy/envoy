@@ -48,11 +48,11 @@ public:
   QatConfigTest()
       : api_(Api::createApiForTest(store_, time_system_)),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));
-    ON_CALL(factory_context_.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm_));
+    ON_CALL(factory_context_, singletonManager()).WillByDefault(ReturnRef(fsm_));
   }
 
   Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml) {

@@ -97,10 +97,9 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
   // A reference to this is held in the factory closure to keep the singleton
   // instance alive.
-  auto alts_shared_state =
-      factory_ctxt.serverFactoryContext().singletonManager().getTyped<AltsSharedState>(
-          SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state),
-          [] { return std::make_shared<AltsSharedState>(); });
+  auto alts_shared_state = factory_ctxt.singletonManager().getTyped<AltsSharedState>(
+      SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state),
+      [] { return std::make_shared<AltsSharedState>(); });
   auto config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
           message, factory_ctxt.messageValidationVisitor());
