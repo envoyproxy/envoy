@@ -81,7 +81,6 @@ void UdpUpstream::resetStream() { upstream_request_ = nullptr; }
 
 void UdpUpstream::onSocketReadReady() {
   uint32_t packets_dropped = 0;
-  socket_->connectionInfoProvider().dumpState(std::cout, 2);
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this,
       dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped);
