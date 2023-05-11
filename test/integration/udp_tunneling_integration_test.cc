@@ -38,10 +38,10 @@ public:
     response_->waitForHeaders();
   }
 
-  void sendBidirectionalData(const char* downstream_send_data = "hello",
-                             const char* upstream_received_data = "hello",
-                             const char* upstream_send_data = "there!",
-                             const char* downstream_received_data = "there!") {
+  void sendBidirectionalData(std::string downstream_send_data = "hello",
+                             std::string upstream_received_data = "hello",
+                             std::string upstream_send_data = "there!",
+                             std::string downstream_received_data = "there!") {
     // Send some data upstream.
     codec_client_->sendData(*request_encoder_, downstream_send_data, false);
     Network::UdpRecvData request_datagram;
@@ -50,7 +50,7 @@ public:
 
     // Send some data downstream.
     fake_upstreams_[0]->sendUdpDatagram(upstream_send_data, request_datagram.addresses_.peer_);
-    response_->waitForBodyData(strlen(downstream_received_data));
+    response_->waitForBodyData(downstream_received_data.length());
     EXPECT_EQ(downstream_received_data, response_->body());
   }
 
@@ -77,13 +77,24 @@ TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
                                      {":scheme", "https"},
                                      {":authority", "example.org"}});
   setUpConnection();
-  sendBidirectionalData();
+  std::string sent_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  std::string received_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+      );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
 }
 
 INSTANTIATE_TEST_SUITE_P(HttpVersions, ConnectUdpTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 

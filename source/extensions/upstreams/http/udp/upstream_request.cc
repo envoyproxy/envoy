@@ -16,6 +16,10 @@
 #include "source/common/router/router.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+#include "quiche/common/masque/connect_udp_datagram_payload.h"
+#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/quic/core/http/quic_spdy_stream.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
@@ -46,10 +50,16 @@ UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_request, Network
 
 void UdpUpstream::encodeData(Buffer::Instance& data, bool /*end_stream*/) {
   // TODO: If the data is in the Capsule format, parses it and extracts the UDP proxying payload.
-  bytes_meter_->addWireBytesSent(data.length());
-  Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
-      socket_->ioHandle(), data, /*local_ip=*/nullptr, *host_->address());
-  // TODO: Error Statistics
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    ENVOY_LOG_MISC(trace, absl::BytesToHexString(absl::string_view(
+                              reinterpret_cast<const char*>(slice.mem_), slice.len_)));
+    absl::string_view mem_slice(static_cast<const char*>(slice.mem_), slice.len_);
+    if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
+      ENVOY_LOG_MISC(error, "Capsule ingestion error occured: slice = {}", mem_slice);
+      break;
+    }
+  }
+  capsule_parser_.ErrorIfThereIsRemainingBufferedData();
 }
 
 Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
@@ -89,9 +99,47 @@ void UdpUpstream::onSocketReadReady() {
 void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr,
                                 Network::Address::InstanceConstSharedPtr,
                                 Buffer::InstancePtr buffer, MonotonicTime) {
-  // TODO: Converts data to a HTTP Datagram.
-  bytes_meter_->addWireBytesReceived(buffer->length());
-  upstream_request_->decodeData(*buffer, false);
+  std::string data = buffer->toString();
+  quiche::QuicheBuffer serialized_capsule =
+      SerializeCapsule(quiche::Capsule::Datagram(data), &capsule_buffer_allocator_);
+
+  Buffer::InstancePtr capsule_data = std::make_unique<Buffer::OwnedImpl>();
+  capsule_data->add(serialized_capsule.AsStringView());
+  bytes_meter_->addWireBytesReceived(capsule_data->length());
+  upstream_request_->decodeData(*capsule_data, false);
+}
+
+bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
+  quiche::CapsuleType capsule_type = capsule.capsule_type();
+  if (capsule_type != quiche::CapsuleType::DATAGRAM) {
+    // Silently drops Datagram Capsules with an unknown type.
+    return true;
+  }
+
+  std::unique_ptr<quiche::ConnectUdpDatagramPayload> connect_udp_datagram_payload =
+      quiche::ConnectUdpDatagramPayload::Parse(capsule.datagram_capsule().http_datagram_payload);
+  if (!connect_udp_datagram_payload) {
+    // Indicates parsing failure to reset the data stream.
+    return false;
+  }
+
+  if (connect_udp_datagram_payload->GetType() !=
+      quiche::ConnectUdpDatagramPayload::Type::kUdpPacket) {
+    // Silently drops Datagrams with an unknown Context ID.
+    return true;
+  }
+
+  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add(connect_udp_datagram_payload->GetUdpProxyingPayload());
+  bytes_meter_->addWireBytesSent(buffer->length());
+  Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
+      socket_->ioHandle(), *buffer, /*local_ip=*/nullptr, *host_->address());
+  // TODO: Error Statistics
+  return true;
+}
+
+void UdpUpstream::OnCapsuleParseFailure(absl::string_view error_message) {
+  upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ProtocolError, error_message);
 }
 
 } // namespace Udp

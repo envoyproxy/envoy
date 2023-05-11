@@ -3159,6 +3159,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_connect_udp_datagram_payload_lib",
+    srcs = ["quiche/common/masque/connect_udp_datagram_payload.cc"],
+    hdrs = ["quiche/common/masque/connect_udp_datagram_payload.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_data_lib",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
     hdrs = ["quiche/common/quiche_stream.h"],

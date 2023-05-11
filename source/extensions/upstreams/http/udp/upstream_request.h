@@ -15,6 +15,9 @@
 #include "source/common/router/upstream_request.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/quic/core/http/quic_spdy_stream.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
@@ -44,7 +47,9 @@ private:
   Upstream::HostConstSharedPtr host_;
 };
 
-class UdpUpstream : public Router::GenericUpstream, public Network::UdpPacketProcessor {
+class UdpUpstream : public Router::GenericUpstream,
+                    public Network::UdpPacketProcessor,
+                    public quiche::CapsuleParser::Visitor {
 public:
   UdpUpstream(Router::UpstreamToDownstream* upstream_request, Network::SocketPtr socket,
               Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher);
@@ -68,12 +73,16 @@ public:
     return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
   }
   void onDatagramsDropped(uint32_t) override {
-    // Maintain stats.
+    // TODO: Maintain stats.
   }
   size_t numPacketsExpectedPerEventLoop() const override {
-    // TODO(mattklein123) change this to a reasonable number if needed.
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
+
+  // quiche::CapsuleParser::Visitor
+  // Converts a given Capsule to a HTTP/3 Datagrams and send it.
+  bool OnCapsule(const quiche::Capsule& capsule) override;
+  void OnCapsuleParseFailure(absl::string_view error_message) override;
 
 private:
   void onSocketReadReady();
@@ -83,6 +92,8 @@ private:
   Upstream::HostConstSharedPtr host_;
   Event::Dispatcher& dispatcher_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  quiche::CapsuleParser capsule_parser_{this};
+  quiche::SimpleBufferAllocator capsule_buffer_allocator_;
 };
 
 } // namespace Udp
