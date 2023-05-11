@@ -1252,6 +1252,32 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(3U, cluster.info().use_count());
 }
 
+TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
+  create(defaultConfig());
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.3);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_EQ(common_config_ptr_a, common_config_ptr_b);
+}
+
+TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
+  create(defaultConfig());
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.5);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_NE(common_config_ptr_a, common_config_ptr_b);
+}
+
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 

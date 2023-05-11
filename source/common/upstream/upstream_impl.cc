@@ -1064,7 +1064,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       typed_metadata_(config.has_metadata()
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
-      common_lb_config_(config.common_lb_config()),
+      common_lb_config_(
+          factory_context.clusterManager().getCommonLbConfigPtr(config.common_lb_config())),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
@@ -1083,7 +1084,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
-                  common_lb_config_.ignore_new_hosts_until_first_hc()),
+                  common_lb_config_->ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false) {
@@ -1194,7 +1195,7 @@ ClusterInfoImpl::ClusterInfoImpl(
   // TODO(htuch): Remove this temporary workaround when we have
   // https://github.com/bufbuild/protoc-gen-validate/issues/97 resolved. This just provides
   // early validation of sanity of fields that we should catch at config ingestion.
-  DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
+  DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
   // Create upstream filter factories
   const auto& filters = config.filters();

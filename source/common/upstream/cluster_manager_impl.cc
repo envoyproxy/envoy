@@ -299,7 +299,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
-      cluster_timeout_budget_stat_names_(stats.symbolTable()) {
+      cluster_timeout_budget_stat_names_(stats.symbolTable()),
+      common_lb_config_pool_(
+          std::make_shared<SharedPool::ObjectSharedPool<
+              const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
+              main_thread_dispatcher)) {
   if (admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
