@@ -347,9 +347,9 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     LibQatCryptoSharedPtr libqat)
-    : api_(factory_context.serverFactoryContext().api()), libqat_(libqat) {
+    : api_(factory_context.api()), libqat_(libqat) {
 
-  manager_ = factory_context.serverFactoryContext().singletonManager().getTyped<QatManager>(
+  manager_ = factory_context.singletonManager().getTyped<QatManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(qat_manager),
       [libqat] { return std::make_shared<QatManager>(libqat); });
 
@@ -358,7 +358,8 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 
-  std::string private_key = Config::DataSource::read(conf.private_key(), false, api_);
+  std::string private_key =
+      Config::DataSource::read(conf.private_key(), false, factory_context.api());
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));

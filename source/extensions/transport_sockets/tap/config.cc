@@ -44,14 +44,11 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-
-  auto& server_context = context.serverFactoryContext();
   return std::make_unique<TapSocketFactory>(
       outer_config,
-      std::make_unique<SocketTapConfigFactoryImpl>(
-          server_context.mainThreadDispatcher().timeSource()),
-      server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
+      std::make_unique<SocketTapConfigFactoryImpl>(context.mainThreadDispatcher().timeSource()),
+      context.admin(), context.singletonManager(), context.threadLocal(),
+      context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -68,13 +65,11 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
       *inner_factory_config, context, server_names);
-  auto& server_context = context.serverFactoryContext();
   return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,
-      std::make_unique<SocketTapConfigFactoryImpl>(
-          server_context.mainThreadDispatcher().timeSource()),
-      server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
+      std::make_unique<SocketTapConfigFactoryImpl>(context.mainThreadDispatcher().timeSource()),
+      context.admin(), context.singletonManager(), context.threadLocal(),
+      context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {

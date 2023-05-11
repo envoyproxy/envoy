@@ -71,7 +71,7 @@ public:
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config,
-                                                       context.serverFactoryContext());
+                                                       context.getServerFactoryContext());
   }
   std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {

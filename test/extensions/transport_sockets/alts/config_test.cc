@@ -19,8 +19,7 @@ namespace {
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   NiceMock<MockTransportSocketFactoryContext> factory_context;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
-  EXPECT_CALL(factory_context.server_context_, singletonManager())
-      .WillRepeatedly(ReturnRef(singleton_manager));
+  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -40,8 +39,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   NiceMock<MockTransportSocketFactoryContext> factory_context;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
-  EXPECT_CALL(factory_context.server_context_, singletonManager())
-      .WillRepeatedly(ReturnRef(singleton_manager));
+  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();

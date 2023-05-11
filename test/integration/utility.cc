@@ -135,8 +135,8 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
-  ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
-  ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
+  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;

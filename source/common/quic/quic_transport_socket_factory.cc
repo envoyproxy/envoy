@@ -30,8 +30,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   }
 
   auto factory = std::make_unique<QuicServerTransportSocketFactory>(
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
-      context.statsScope(), std::move(server_config));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true), context.scope(),
+      std::move(server_config));
   factory->initialize();
   return factory;
 }
@@ -59,9 +59,9 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
 QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Ssl::ClientContextConfigPtr config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
+    : QuicTransportSocketFactoryBase(factory_context.scope(), "client"),
       fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-          std::move(config), factory_context.sslContextManager(), factory_context.statsScope())) {}
+          std::move(config), factory_context.sslContextManager(), factory_context.scope())) {}
 
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>();

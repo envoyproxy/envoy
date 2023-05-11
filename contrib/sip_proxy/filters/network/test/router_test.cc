@@ -105,8 +105,7 @@ public:
 
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
-    EXPECT_CALL(factory_context_.server_context_, localInfo())
-        .WillRepeatedly(testing::ReturnRef(local_info_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
 
     transaction_infos_ = std::make_shared<TransactionInfos>();
     context_.cluster_manager_.initializeThreadLocalClusters({cluster_name_});

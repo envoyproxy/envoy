@@ -882,14 +882,11 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.serverFactoryContext().admin()),
-        server_scope_(c.serverFactoryContext().serverScope()), stats_scope_(stats_scope),
-        cluster_manager_(c.clusterManager()), local_info_(c.serverFactoryContext().localInfo()),
-        dispatcher_(c.serverFactoryContext().mainThreadDispatcher()), runtime_(runtime),
-        singleton_manager_(c.serverFactoryContext().singletonManager()),
-        tls_(c.serverFactoryContext().threadLocal()), api_(c.serverFactoryContext().api()),
-        options_(c.serverFactoryContext().options()),
-        message_validation_visitor_(c.messageValidationVisitor()) {}
+      : admin_(c.admin()), server_scope_(*c.stats().rootScope()), stats_scope_(stats_scope),
+        cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
+        dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
+        singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
+        options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -1377,7 +1374,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
           server_context, cluster_context.sslContextManager(), *stats_scope,
-          cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
+          cluster_context.clusterManager(), server_context.serverScope().store(),
+          cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory = createTransportSocketFactory(cluster, *transport_factory_context_);

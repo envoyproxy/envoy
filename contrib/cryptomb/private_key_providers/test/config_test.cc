@@ -35,8 +35,8 @@ parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
 class CryptoMbConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   CryptoMbConfigTest() : api_(Api::createApiForTest(store_, time_system_)) {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(tls_));
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, threadLocal()).WillByDefault(ReturnRef(tls_));
     ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));

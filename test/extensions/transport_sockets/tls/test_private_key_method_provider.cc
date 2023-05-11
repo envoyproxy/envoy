@@ -350,8 +350,7 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     }
   }
 
-  std::string private_key =
-      factory_context.serverFactoryContext().api().fileSystem().fileReadToEnd(private_key_path);
+  std::string private_key = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));

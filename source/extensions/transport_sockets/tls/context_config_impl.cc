@@ -173,9 +173,8 @@ ContextConfigImpl::ContextConfigImpl(
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : api_(factory_context.serverFactoryContext().api()),
-      options_(factory_context.serverFactoryContext().options()),
-      singleton_manager_(factory_context.serverFactoryContext().singletonManager()),
+    : api_(factory_context.api()), options_(factory_context.options()),
+      singleton_manager_(factory_context.singletonManager()),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),

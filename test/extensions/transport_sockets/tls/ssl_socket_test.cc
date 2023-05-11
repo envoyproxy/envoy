@@ -329,7 +329,7 @@ void testUtil(const TestUtilOptions& options) {
   NiceMock<Runtime::MockLoader> runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
-  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   // For private key method testing.
   NiceMock<Ssl::MockContextManager> context_manager;
@@ -370,7 +370,7 @@ void testUtil(const TestUtilOptions& options) {
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
-  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+  ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
@@ -684,7 +684,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   NiceMock<Runtime::MockLoader> runtime;
-  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const envoy::config::core::v3::TransportSocket& transport_socket =
@@ -708,7 +708,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
-  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+  ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(options.clientCtxProto(), client_factory_context);
@@ -3420,7 +3420,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   NiceMock<Runtime::MockLoader> runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
-  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
@@ -3454,7 +3454,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
-  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+  ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
@@ -3572,7 +3572,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   NiceMock<Runtime::MockLoader> runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
-  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
@@ -3595,7 +3595,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
-  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+  ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
@@ -4294,7 +4294,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
-  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
@@ -4321,7 +4321,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
-  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+  ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_ctx_proto, client_factory_context);
@@ -5683,14 +5683,14 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Stats::TestUtil::TestStore stats_store;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-
-  EXPECT_CALL(factory_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(factory_context.server_context_, mainThreadDispatcher())
-      .WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -5704,8 +5704,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 
   ContextManagerImpl manager(time_system_);
   ServerSslSocketFactory server_ssl_socket_factory(
-      std::move(server_cfg), manager, *factory_context.server_context_.store_.rootScope(),
-      std::vector<std::string>{});
+      std::move(server_cfg), manager, *stats_store.rootScope(), std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createDownstreamTransportSocket();
   EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
   transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
@@ -5723,14 +5722,15 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 // Validate that if upstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle upstream connection.
 TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
+  Stats::TestUtil::TestStore stats_store;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context.server_context_, mainThreadDispatcher())
-      .WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   auto sds_secret_configs =
@@ -5742,8 +5742,8 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(
-      std::move(client_cfg), manager, *factory_context.server_context_.store_.rootScope());
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                   *stats_store.rootScope());
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr, nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
@@ -5764,15 +5764,17 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
 
   // Make SslSocket.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Stats::TestUtil::TestStore stats_store;
+  ON_CALL(factory_context, stats()).WillByDefault(ReturnRef(stats_store));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  ON_CALL(factory_context.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
+  ON_CALL(factory_context, localInfo()).WillByDefault(ReturnRef(local_info));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(
-      std::move(client_cfg), manager, *factory_context.server_context_.store_.rootScope());
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                   *stats_store.rootScope());
 
   Network::TransportSocketPtr transport_socket =
       client_ssl_socket_factory.createTransportSocket(nullptr, nullptr);

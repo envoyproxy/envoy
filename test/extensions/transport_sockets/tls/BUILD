@@ -13,7 +13,6 @@ envoy_package()
 
 envoy_cc_test(
     name = "ssl_socket_test",
-    size = "large",
     srcs = [
         "ssl_certs_test.h",
         "ssl_socket_test.cc",

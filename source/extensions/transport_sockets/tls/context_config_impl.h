@@ -46,7 +46,7 @@ public:
   const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   AccessLog::AccessLogManager& accessLogManager() const override {
-    return factory_context_.serverFactoryContext().accessLogManager();
+    return factory_context_.accessLogManager();
   }
 
   bool isReady() const override {

@@ -516,7 +516,8 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.server_context_, params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
+      params.server_context_.clusterManager(), params.stats_,
+      params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory =
