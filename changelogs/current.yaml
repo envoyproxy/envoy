@@ -102,6 +102,9 @@ removed_config_or_runtime:
 - area: udp
   change: |
     removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
+- area: header_formatters
+  change: |
+    removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
 
 new_features:
 - area: access_log
