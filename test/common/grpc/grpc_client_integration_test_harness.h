@@ -493,7 +493,7 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it

@@ -53,9 +53,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
 TestServer::TestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       version_(Network::Address::IpVersion::v4), upstream_config_(time_system_), port_(0) {
-  ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-  ON_CALL(factory_context_, statsScope())
-      .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
 }
 
 void TestServer::startTestServer(bool use_quic) {
