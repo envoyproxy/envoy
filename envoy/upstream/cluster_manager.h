@@ -511,7 +511,7 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
