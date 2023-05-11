@@ -52,8 +52,8 @@ TEST_F(StatsRenderTest, TextHistogramDetailed) {
   StatsTextRender renderer(params_);
   constexpr absl::string_view expected =
       "h1:\n"
-      "  totals=200:1, 300:2\n"
-      "  intervals=200:1, 300:2\n"
+      "  totals=200,10:1, 300,10:2\n"
+      "  intervals=200,10:1, 300,10:2\n"
       "  summary=P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) P90(308.5,308.5) "
       "P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) P99.9(309.985,309.985) "
       "P100(310,310)\n";
@@ -332,8 +332,12 @@ TEST_F(StatsRenderTest, JsonHistogramDetailed) {
                     {"cumulative": 309.985, "interval": 309.985},
                     {"cumulative": 310, "interval": 310}
                 ],
-                "totals": [{"value": 200, "count": 1},{"count": 2, "value": 300}],
-                "intervals":[{"value": 200, "count": 1},{"value": 300, "count": 2}]}]}}]}
+                "totals": [
+                    {"min_value": 200, "width": 10, "count": 1},
+                    {"min_value": 300, "width": 10, "count": 2}],
+                "intervals":[
+                    {"min_value": 200, "width": 10, "count": 1},
+                    {"min_value": 300, "width": 10, "count": 2}]}]}}]}
   )EOF";
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               JsonStringEq(expected));
