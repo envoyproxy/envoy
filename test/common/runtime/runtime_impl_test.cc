@@ -740,6 +740,40 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   ProtobufWkt::Value empty_value;
   const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
       .createEntry(empty_value);
+
+  // Make sure the hacky fractional percent function works.
+  ProtobufWkt::Value fractional_value;
+  fractional_value.set_string_value(" numerator:  11 ");
+  auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                   .createEntry(fractional_value);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::HUNDRED);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 11);
+
+  // Make sure the hacky percent function works with numerator and denominator
+  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+
+  // Make sure the hacky fractional percent function works with million
+  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::MILLION);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+
+  // Test atoi failure for the hacky fractional percent value function.
+  fractional_value.set_string_value(" numerator:  1.1 ");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value);
+  ASSERT_FALSE(entry.fractional_percent_value_.has_value());
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {
