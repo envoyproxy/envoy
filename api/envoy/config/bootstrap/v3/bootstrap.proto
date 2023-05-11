@@ -106,8 +106,8 @@ message Bootstrap {
       option (validate.required) = true;
 
       // Flush application logs in JSON format. The configured JSON struct can
-      // support all the format tags specified in the --log-format section,
-      // in :ref:`operations CLI <operations_cli>`.
+      // support all the format tags specified in the in :option:`--log-format`
+      // command line option section.
       google.protobuf.Struct json_format = 1;
     }
   }
@@ -373,7 +373,7 @@ message Bootstrap {
   core.v3.TypedExtensionConfig listener_manager = 37;
 
   // Optional field to set the application logs format. If this field is set, it will override
-  // the default log format, or the format that is specified by the CLI option ``--log-foramt``.
+  // the default log format, or the format that is specified by the :option:`--log-format` command line option.
   ApplicationLogFormat application_log_format = 38;
 }
 
