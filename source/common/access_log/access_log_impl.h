@@ -230,6 +230,24 @@ private:
 };
 
 /**
+ * Filters requests based on access log type
+ */
+class LogTypeFilter : public Filter {
+public:
+  using LogTypeHashSet = absl::flat_hash_set<AccessLogType>;
+
+  LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& filter_config);
+
+  bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+                AccessLogType access_log_type) const override;
+
+private:
+  LogTypeHashSet types_;
+  bool exclude_;
+};
+
+/**
  * Filters requests based on dynamic metadata
  */
 class MetadataFilter : public Filter {
