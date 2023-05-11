@@ -15,7 +15,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/subset/v3;subsetv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Ring Hash Load Balancing Policy]
+// [#protodoc-title: Subset Load Balancing Policy]
 // [#extension: envoy.load_balancing_policies.subset]
 // [#not-implemented-hide:]
 
@@ -210,8 +210,7 @@ message Subset {
   LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
       [(validate.rules).enum = {defined_only: true}];
 
-  // The child LB policy to create for endpoint-picking within the chosen subset. This child LB policy could not be
-  // another subset LB policy.
+  // The child LB policy to create for endpoint-picking within the chosen subset.
   config.cluster.v3.LoadBalancingPolicy subset_lb_policy = 9
       [(validate.rules).message = {required: true}];
 }
