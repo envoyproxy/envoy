@@ -6,6 +6,7 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
@@ -215,18 +216,6 @@ TEST(ValidationTest, Admin) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
     ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
-
-struct MockLogSink : Logger::SinkDelegate {
-  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
-    setDelegate();
-  }
-  ~MockLogSink() override { restoreDelegate(); }
-
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
-  MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  void flush() override {}
-};
 
 TEST_P(JsonApplicationLogsValidationServerTest, ValidateJsonApplicationLogs) {
   Thread::MutexBasicLockable access_log_lock;

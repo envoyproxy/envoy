@@ -4,6 +4,7 @@
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
@@ -176,17 +177,6 @@ TEST_P(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
       "StreamAggregatedResources gRPC config stream closed: 14, connection error: desc = "
       "\\\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\\\"");
 }
-
-struct MockLogSink : SinkDelegate {
-  MockLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setDelegate(); }
-  ~MockLogSink() override { restoreDelegate(); }
-
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
-  MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  void flush() override {}
-};
-
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {

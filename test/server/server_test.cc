@@ -20,6 +20,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -1623,16 +1624,6 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
 }
-
-struct MockLogSink : Logger::SinkDelegate {
-  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) { setDelegate(); }
-  ~MockLogSink() override { restoreDelegate(); }
-
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
-  MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  void flush() override {}
-};
 
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
