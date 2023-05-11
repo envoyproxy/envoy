@@ -563,19 +563,20 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   // No need to set information using address_provider in case routing via Router::UpstreamRequest
   // because in that case the information is already set in the
   // Router::UpstreamRequest::onPoolReady.
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+  if ((!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) ||
+      (upstream_info.upstreamLocalAddress() == nullptr)) {
     upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
     upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
-    upstream_info.setUpstreamHost(host);
-    upstream_info.setUpstreamSslConnection(ssl_info);
   }
+  upstream_info.setUpstreamHost(host);
+  upstream_info.setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();
   if (info) {
     upstream_info.setUpstreamFilterState(info->filterState());
   }
-}
+} // namespace TcpProxy
 
 const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   const Router::MetadataMatchCriteria* route_criteria =
