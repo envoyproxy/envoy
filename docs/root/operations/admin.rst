@@ -701,7 +701,7 @@ modify different aspects of the server:
                   { "min_value": 1, "width": 0.25, "count": 25 },
                   { "min_value": 2, "width": 0.25, "count": 9 }
                 ],
-2                "intervals": [
+                "intervals": [
                   { "min_value": 1, "width": 0.25, "count": 2 },
                   { "min_value": 2, "width": 0.25, "count": 3 }
                 ],
