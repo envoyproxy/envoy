@@ -217,10 +217,10 @@ steps:
     testRunTitle: "${{ parameters.ciTarget }}"
     searchFolder: $(Build.StagingDirectory)/bazel_root
   timeoutInMinutes: 10
-  condition: eq('${{ parameters.publishTestResults }}', 'true')
+  condition: eq(${{ parameters.publishTestResults }}, 'true')
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
     artifactName: ${{ parameters.ciTarget }}
   timeoutInMinutes: 10
-  condition: eq('${{ parameters.publishEnvoy }}', 'true')
+  condition: eq(${{ parameters.publishEnvoy }}, 'true')
