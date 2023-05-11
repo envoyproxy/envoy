@@ -104,7 +104,7 @@ public:
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
-  static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  static absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          Server::Configuration::ServerFactoryContext& server_context, ClusterManager& cm,
          LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
@@ -118,7 +118,7 @@ public:
                     ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          ClusterFactoryContext& context) override;
   std::string name() const override { return name_; }
