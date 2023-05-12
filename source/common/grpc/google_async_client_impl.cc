@@ -1,11 +1,14 @@
 #include "source/common/grpc/google_async_client_impl.h"
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/google_grpc_creds_impl.h"
@@ -161,7 +164,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      options_(options) {}
+      options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
+                                             Network::ConnectionInfoProviderSharedPtr{}) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
