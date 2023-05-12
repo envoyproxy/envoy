@@ -1850,8 +1850,11 @@ absl::optional<std::string> GrpcStatusFormatter::format(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
-  if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
-    return absl::nullopt;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return absl::nullopt;
+    }
   }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
@@ -1885,8 +1888,11 @@ ProtobufWkt::Value GrpcStatusFormatter::formatValue(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
-  if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
-    return unspecifiedValue();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return unspecifiedValue();
+    }
   }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
