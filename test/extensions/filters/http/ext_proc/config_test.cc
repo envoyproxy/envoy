@@ -30,7 +30,6 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     response_body_mode: buffered
     request_trailer_mode: skip
     response_trailer_mode: send
-  filter_state_name: 'foo'
   metadata:
     filter_metadata:
       com.scooby.doo:
