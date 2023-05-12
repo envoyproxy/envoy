@@ -262,8 +262,8 @@ public:
     // Initialize the transport socket factory using a customized ssl option.
     ssl_client_option_.setAlpn(true).setSan(san_to_match_).setSni("lyft.com");
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
-    ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
+    ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(stats_scope_));
     ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;
