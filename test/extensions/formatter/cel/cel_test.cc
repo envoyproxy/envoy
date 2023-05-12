@@ -40,6 +40,22 @@ TEST_F(CELFormatterTest, TestFormatValue) {
               ProtoEq(ValueUtil::stringValue("GET")));
 }
 
+TEST_F(CELFormatterTest, TestParseFail) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  EXPECT_EQ(nullptr,
+            cel_parser->parse("INVALID_CMD", "requests.headers['missing_headers']", max_length));
+}
+
+TEST_F(CELFormatterTest, TestNullFormatValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "requests.headers['missing_headers']", max_length);
+  EXPECT_THAT(formatter->formatValue(request_headers_, response_headers_, response_trailers_,
+                                     stream_info_, body_, AccessLog::AccessLogType::NotSet),
+              ProtoEq(ValueUtil::nullValue()));
+}
+
 TEST_F(CELFormatterTest, TestRequestHeader) {
   const std::string yaml = R"EOF(
   text_format_source:
