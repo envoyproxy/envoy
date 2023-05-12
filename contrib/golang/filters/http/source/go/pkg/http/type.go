@@ -173,7 +173,7 @@ type requestOrResponseTrailerMapImpl struct {
 	headerMapImpl
 }
 
-func (h *requestOrResponseTrailerMapImpl) initHeaders() {
+func (h *requestOrResponseTrailerMapImpl) initTrailers() {
 	if h.headers == nil {
 		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
 	}
@@ -184,7 +184,7 @@ func (h *requestOrResponseTrailerMapImpl) GetRaw(key string) string {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
-	h.initHeaders()
+	h.initTrailers()
 	value, ok := h.headers[key]
 	if !ok {
 		return "", false
@@ -193,7 +193,7 @@ func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Values(key string) []string {
-	h.initHeaders()
+	h.initTrailers()
 	value, ok := h.headers[key]
 	if !ok {
 		return nil
@@ -205,7 +205,7 @@ func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
 	// Get all header values first before setting a value, since the set operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
-	h.initHeaders()
+	h.initTrailers()
 	if h.headers != nil {
 		h.headers[key] = []string{value}
 	}
@@ -214,7 +214,7 @@ func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
-	h.initHeaders()
+	h.initTrailers()
 	if h.headers != nil {
 		if trailers, found := h.headers[key]; found {
 			h.headers[key] = append(trailers, value)
@@ -230,7 +230,7 @@ func (h *requestOrResponseTrailerMapImpl) Del(key string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {
-	h.initHeaders()
+	h.initTrailers()
 	for key, values := range h.headers {
 		for _, value := range values {
 			if !f(key, value) {
