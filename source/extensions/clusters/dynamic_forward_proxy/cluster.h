@@ -54,11 +54,6 @@ public:
   void checkIdleSubCluster();
 
 private:
-  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig() = default;
-    ~ThreadLocalConfig() override = default;
-  };
-
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -186,9 +181,6 @@ private:
 
   mutable absl::Mutex cluster_map_lock_;
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
-
-  // only for using tls_.isShutdown() in Cluster::~Cluster().
-  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   Upstream::ClusterManager& cm_;
   const size_t max_sub_clusters_;

@@ -299,7 +299,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
-      cluster_timeout_budget_stat_names_(stats.symbolTable()) {
+      cluster_timeout_budget_stat_names_(stats.symbolTable()), shutdown_(false) {
   if (admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {

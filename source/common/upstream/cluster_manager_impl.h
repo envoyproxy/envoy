@@ -281,6 +281,7 @@ public:
 
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    shutdown_ = true;
     if (resume_cds_ != nullptr) {
       resume_cds_->cancel();
     }
@@ -291,6 +292,8 @@ public:
     warming_clusters_.clear();
     updateClusterCounts();
   }
+
+  bool isShutdown() override { return shutdown_; }
 
   const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const override {
     return bind_config_;
@@ -809,6 +812,8 @@ private:
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
+
+  std::atomic<bool> shutdown_{};
 };
 
 } // namespace Upstream
