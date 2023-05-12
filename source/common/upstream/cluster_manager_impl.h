@@ -29,7 +29,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
@@ -86,7 +85,7 @@ public:
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state,
                       absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) override;
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
@@ -348,6 +347,17 @@ public:
 
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
+
+  /*
+   * Return shared_ptr for common_lb_config which is stored in an ObjectSharedPool
+   *
+   * @param common_lb_config The config field to be stored in ObjectSharedPool
+   * @return shared_ptr to the CommonLbConfig in ObjectSharedPool
+   */
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
+    return common_lb_config_pool_->getObject(common_lb_config);
+  }
 
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
@@ -803,6 +813,9 @@ private:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  std::shared_ptr<SharedPool::ObjectSharedPool<
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>
+      common_lb_config_pool_;
 
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
