@@ -4,6 +4,7 @@ package envoy.config.common.mutation_rules.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -90,8 +91,7 @@ message HeaderMutationRules {
 // The HeaderForwardingRules structure specifies what headers are
 // allowed to be forwarded to the ext_proc service.
 message HeaderForwardingRules {
-  // Only allow headers that matching this regular expression to be forwarded.
-  repeated type.matcher.v3.RegexMatcher headers_to_forward = 1;
+  type.matcher.v3.ListStringMatcher headers_to_forward = 1;
 }
 
 // The HeaderMutation structure specifies an action that may be taken on HTTP
