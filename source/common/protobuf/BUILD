@@ -111,8 +111,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "visitor_lib",
-    srcs = ["visitor.cc"],
-    hdrs = ["visitor.h"],
+    srcs = [
+        "visitor.cc",
+        "visitor_helper.cc",
+    ],
+    hdrs = [
+        "visitor.h",
+        "visitor_helper.h",
+    ],
     deps = [
         ":message_validator_lib",
         ":protobuf",
