@@ -3,6 +3,7 @@
 import os
 import sys
 
+# Workaround for https://github.com/bazelbuild/rules_python/issues/1221
 sys.path += [os.path.dirname(__file__)]
 
 import generate_listeners
