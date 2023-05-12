@@ -15,6 +15,7 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   Stats::StatNameManagedStorage prefix(stat_prefix, context.scope().symbolTable());
+  // TODO(tyxia) Here need factoryContext??
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       prefix.statName(), context,
       std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), proto_config));

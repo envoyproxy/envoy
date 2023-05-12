@@ -250,6 +250,18 @@ public:
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
+
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProtoServer(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::ServerFactoryContext&) {
+    return nullptr;
+  }
+
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::ServerFactoryContext&) {
+    return nullptr;
+  }
 };
 
 class UpstreamHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {

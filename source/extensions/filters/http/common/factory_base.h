@@ -71,11 +71,48 @@ public:
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, context);
+
+
+    // TODO(tyxia) I can only test the filter which has implemented server_context version
+    // ext_proc.
+    // return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+    //                                               proto_config, context.messageValidationVisitor()),
+    //                                           stats_prefix, context.getServerFactoryContext());
   }
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
+////////////
+  Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProtoServer(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::ServerFactoryContext& server_context) override {
+    return createFilterFactoryFromProtoTypedServer(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, server_context.messageValidationVisitor()),
+                                             stats_prefix, server_context);
+  }
+
+  virtual Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProtoTypedServer(const ConfigProto&,
+                                    const std::string&,
+                                    Server::Configuration::ServerFactoryContext&) {return nullptr;}
+
+  virtual Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::ServerFactoryContext& server_context) override{
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, server_context.messageValidationVisitor()),
+        stats_prefix, server_context);
+  }
+
+  virtual Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const Protobuf::Message&, const std::string&,
+                                    Server::Configuration::ServerFactoryContext&) {
+    return nullptr;
+  }
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
@@ -113,6 +150,13 @@ public:
             proto_config, context.getServerFactoryContext().messageValidationVisitor()),
         stats_prefix, DualInfo(context), context.getServerFactoryContext());
   }
+
+  // Envoy::Http::FilterFactoryCb
+  // createFilterFactoryFromProto(const Protobuf::Message&,
+  //                              const std::string&,
+  //                              Server::Configuration::ServerFactoryContext&) override {
+  //   return nullptr;
+  // }
 
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
