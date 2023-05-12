@@ -21,6 +21,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
+        "//test/common/mocks/common:common_mocks",
     ],
 )
 

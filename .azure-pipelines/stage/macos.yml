@@ -37,7 +37,7 @@ jobs:
       testResultsFiles: "**/bazel-testlogs/**/test.xml"
       testRunTitle: "macOS"
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
 
 - job: tested
   displayName: Complete

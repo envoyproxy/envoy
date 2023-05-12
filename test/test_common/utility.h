@@ -307,6 +307,20 @@ public:
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a histogram to have samples.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the histogram was populated within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForNumHistogramSamplesGe(
+      Stats::Store& store, const std::string& name, uint64_t min_sample_count_required,
+      Event::TestTimeSystem& time_system, Event::Dispatcher& main_dispatcher,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
    * Read a histogram's sample count from the main thread.
    * @param store supplies the stats store.
    * @param name histogram name.
