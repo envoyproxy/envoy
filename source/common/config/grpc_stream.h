@@ -26,7 +26,7 @@ class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
-             Stats::Scope& scope, JitteredExponentialBackOffStrategyPtr backoff_strategy,
+             Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
@@ -228,7 +228,7 @@ private:
   // Reestablishes the gRPC channel when necessary, with some backoff politeness.
   Event::TimerPtr retry_timer_;
   TimeSource& time_source_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
+  BackOffStrategyPtr backoff_strategy_;
 
   // Prevents the Envoy from making too many requests.
   TokenBucketPtr limit_request_;

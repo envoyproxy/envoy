@@ -29,8 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
@@ -957,8 +955,16 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  Config::GrpcMuxImpl::shutdownAll();
-  Config::NewGrpcMuxImpl::shutdownAll();
+  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+      "envoy.config_mux.new_grpc_mux_factory");
+  if (factory) {
+    factory->shutdownAll();
+  }
+  factory =
+      Config::Utility::getFactoryByName<Config::MuxFactory>("envoy.config_mux.grpc_mux_factory");
+  if (factory) {
+    factory->shutdownAll();
+  }
   Config::XdsMux::GrpcMuxSotw::shutdownAll();
   Config::XdsMux::GrpcMuxDelta::shutdownAll();
 

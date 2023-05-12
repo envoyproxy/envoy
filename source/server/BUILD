@@ -414,8 +414,6 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:grpc_mux_lib",
-        "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",

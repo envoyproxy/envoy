@@ -156,7 +156,7 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
-        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",

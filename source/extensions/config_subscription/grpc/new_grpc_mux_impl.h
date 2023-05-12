@@ -35,8 +35,7 @@ public:
                  const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
-                 CustomConfigValidatorsPtr&& config_validators,
-                 JitteredExponentialBackOffStrategyPtr backoff_strategy,
+                 CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
                  XdsConfigTrackerOptRef xds_config_tracker);
 
   ~NewGrpcMuxImpl() override;
@@ -191,6 +190,9 @@ private:
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
+
+class NewGrpcMuxFactory;
+DECLARE_FACTORY(NewGrpcMuxFactory);
 
 } // namespace Config
 } // namespace Envoy

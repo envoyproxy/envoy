@@ -4,7 +4,6 @@
 #include "envoy/config/xds_resources_delegate.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"

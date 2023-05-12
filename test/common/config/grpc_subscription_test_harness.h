@@ -11,8 +11,8 @@
 
 #include "source/common/common/hash.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"

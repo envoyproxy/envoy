@@ -1,4 +1,4 @@
-#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -40,7 +40,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
                                CustomConfigValidatorsPtr&& config_validators,
-                               JitteredExponentialBackOffStrategyPtr backoff_strategy,
+                               BackOffStrategyPtr backoff_strategy,
                                XdsConfigTrackerOptRef xds_config_tracker)
     : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
                    std::move(backoff_strategy), rate_limit_settings),
@@ -327,6 +327,30 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   }
   return absl::nullopt;
 }
+
+// A factory class for creating NewGrpcMuxImpl so it does not have to be
+// hard-compiled into cluster_manager_impl.cc
+class NewGrpcMuxFactory : public MuxFactory {
+public:
+  std::string name() const override { return "envoy.config_mux.new_grpc_mux_factory"; }
+  void shutdownAll() override { return NewGrpcMuxImpl::shutdownAll(); }
+  std::shared_ptr<GrpcMux>
+  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
+         const envoy::config::core::v3::ApiConfigSource& ads_config,
+         const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
+         BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
+         OptRef<XdsResourcesDelegate>) override {
+    return std::make_shared<Config::NewGrpcMuxImpl>(
+        std::move(async_client), dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+        scope, Utility::parseRateLimitSettings(ads_config), local_info,
+        std::move(config_validators), std::move(backoff_strategy), xds_config_tracker);
+  }
+};
+
+REGISTER_FACTORY(NewGrpcMuxFactory, MuxFactory);
 
 } // namespace Config
 } // namespace Envoy

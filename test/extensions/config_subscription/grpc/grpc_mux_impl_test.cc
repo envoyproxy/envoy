@@ -8,11 +8,11 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
