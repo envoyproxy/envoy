@@ -93,14 +93,24 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
 ValidationResult Http1HeaderValidator::validateContentLengthAndTransferEncoding(
     const ::Envoy::Http::RequestOrResponseHeaderMap& header_map) {
-  if (header_map.TransferEncoding()) {
-    if (header_map.ContentLength() &&
-        hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
-        !config_.http1_protocol_options().allow_chunked_length()) {
-      // Configuration does not allow chunked length, reject the request
-      return {ValidationResult::Action::Reject,
-              Http1ResponseCodeDetail::get().ChunkedContentLength};
-    }
+  /**
+   * Validate Transfer-Encoding and Content-Length headers.
+   * HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
+   * https://www.rfc-editor.org/rfc/rfc9112.html#section-6.2:
+   *
+   * A sender MUST NOT send a Content-Length header field in any message that
+   * contains a Transfer-Encoding header field.
+   *
+   * The http1_protocol_options.allow_chunked_length config setting can
+   * override the RFC compliance to allow a Transfer-Encoding of "chunked" with
+   * a Content-Length set. In this exception case, we remove the Content-Length
+   * header in the transform[Request/Response]Headers() method.
+   */
+  if (header_map.TransferEncoding() && header_map.ContentLength() &&
+      hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
+      !config_.http1_protocol_options().allow_chunked_length()) {
+    // Configuration does not allow chunked encoding and content-length, reject the request
+    return {ValidationResult::Action::Reject, Http1ResponseCodeDetail::get().ChunkedContentLength};
   }
   return ValidationResult::success();
 }
@@ -274,14 +284,11 @@ void Http1HeaderValidator::sanitizeContentLength(
   // override the RFC compliance to allow a Transfer-Encoding of "chunked" with
   // a Content-Length set. In this exception case, we remove the Content-Length
   // header.
-  if (header_map.TransferEncoding()) {
-    if (header_map.ContentLength() &&
-        hasChunkedTransferEncoding(header_map.TransferEncoding()->value())) {
-      if (config_.http1_protocol_options().allow_chunked_length()) {
-        // Allow a chunked transfer encoding and remove the content length.
-        header_map.removeContentLength();
-      }
-    }
+  if (header_map.TransferEncoding() && header_map.ContentLength() &&
+      hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
+      config_.http1_protocol_options().allow_chunked_length()) {
+    // Allow a chunked transfer encoding and remove the content length.
+    header_map.removeContentLength();
   }
 }
 
