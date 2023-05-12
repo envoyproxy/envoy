@@ -36,6 +36,14 @@ public:
 
   StreamActivation() = default;
 
+  // Non-copyable/non-assignable
+  StreamActivation(const StreamActivation&) = delete;
+  StreamActivation& operator=(const StreamActivation&) = delete;
+
+  // Move-constructible/move-assignable
+  StreamActivation(StreamActivation&& other) = default;
+  StreamActivation& operator=(StreamActivation&& other) = default;
+
   absl::optional<CelValue> FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
   std::vector<const google::api::expr::runtime::CelFunction*>
   FindFunctionOverloads(absl::string_view) const override {
