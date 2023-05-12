@@ -15,7 +15,7 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
-        "//envoy/http:header_validator_interface",
+        "//envoy/http:header_validator_factory_interface",
         "//envoy/registry",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",

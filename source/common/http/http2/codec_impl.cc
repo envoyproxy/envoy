@@ -265,6 +265,8 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   Http::RequestHeaderMapPtr modified_headers;
@@ -282,6 +284,9 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   } else {
     encodeHeadersBase(headers, end_stream);
   }
+#else
+  encodeHeadersBase(headers, end_stream);
+#endif
   return okStatus();
 }
 
@@ -291,6 +296,8 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   Http::ResponseHeaderMapPtr modified_headers;
@@ -301,6 +308,9 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
   } else {
     encodeHeadersBase(headers, end_stream);
   }
+#else
+  encodeHeadersBase(headers, end_stream);
+#endif
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -516,9 +526,12 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
+#endif
 
   // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
   // proxying is on an upgrade path.
@@ -564,9 +577,12 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
+#endif
   request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
 }
 
@@ -1001,7 +1017,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
 void ConnectionImpl::goAway() {
   adapter_->SubmitGoAway(adapter_->GetHighestReceivedStreamId(),
                          http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
-
+  stats_.goaway_sent_.inc();
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -2030,10 +2046,13 @@ ServerConnectionImpl::ServerConnectionImpl(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count),
-      callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
+      callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
+          "envoy.load_shed_points.http2_server_go_away_on_dispatch")) {
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
@@ -2116,6 +2135,11 @@ Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
+      should_send_go_away_on_dispatch_->shouldShedLoad()) {
+    ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
+  }
   return ConnectionImpl::dispatch(data);
 }
 

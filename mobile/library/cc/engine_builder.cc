@@ -128,18 +128,6 @@ EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepaliv
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
-  virtual_clusters_.push_back(std::move(virtual_cluster));
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string name,
-                                                std::vector<MatcherData> matchers) {
-  std::pair<std::string, std::vector<MatcherData>> matcher(name, std::move(matchers));
-  virtual_cluster_data_.emplace_back(std::move(matcher));
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
   key_value_stores_[std::move(name)] = std::move(key_value_store);
@@ -193,11 +181,6 @@ EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
 }
 #endif
 
-EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
-  enable_happy_eyeballs_ = happy_eyeballs_on;
-  return *this;
-}
-
 #ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
@@ -207,11 +190,6 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
-  skip_dns_lookups_for_proxied_requests_ = value;
   return *this;
 }
 
@@ -391,31 +369,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
-  // Virtual clusters
-  for (auto& cluster : virtual_clusters_) {
-#ifdef ENVOY_ENABLE_YAML
-    MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
-                              ProtobufMessage::getStrictValidationVisitor());
-#else
-    UNREFERENCED_PARAMETER(cluster);
-    IS_ENVOY_BUG("virtual clusters can not be added when YAML is compiled out.");
-#endif
-  }
-
-  for (auto& name_and_data : virtual_cluster_data_) {
-    auto* virtual_cluster = api_service->add_virtual_clusters();
-    virtual_cluster->set_name(name_and_data.first);
-    for (auto& matcher : name_and_data.second) {
-      auto* match = virtual_cluster->add_headers();
-      match->set_name(matcher.name);
-      if (matcher.type == MatcherData::EXACT) {
-        match->set_exact_match(matcher.value);
-      } else {
-        ASSERT(matcher.type == MatcherData::SAFE_REGEX);
-        match->mutable_safe_regex_match()->set_regex(matcher.value);
-      }
-    }
-  }
 
   for (auto& direct_response_in : direct_responses_) {
     auto* this_route = api_service->add_routes();
@@ -612,11 +565,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
   auto* dns_cache_config = dfp_config.mutable_dns_cache_config();
   dns_cache_config->set_name("base_dns_cache");
-  if (enable_happy_eyeballs_) {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
-  } else {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_PREFERRED);
-  }
+  dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   dns_cache_config->mutable_host_ttl()->set_seconds(86400);
   dns_cache_config->mutable_dns_min_refresh_rate()->set_seconds(dns_min_refresh_seconds_);
   dns_cache_config->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
@@ -950,8 +899,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
   }
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
-      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();

@@ -196,11 +196,6 @@ void WebsocketWithCompressorIntegrationTest::sendBidirectionalData() {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {

@@ -44,9 +44,7 @@
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
-#include "source/common/upstream/ring_hash_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -301,7 +299,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
-      cluster_timeout_budget_stat_names_(stats.symbolTable()) {
+      cluster_timeout_budget_stat_names_(stats.symbolTable()),
+      common_lb_config_pool_(
+          std::make_shared<SharedPool::ObjectSharedPool<
+              const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
+              main_thread_dispatcher)) {
   if (admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
@@ -404,7 +406,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -417,7 +419,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -437,7 +439,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -452,7 +454,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -841,9 +843,15 @@ ClusterManagerImpl::ClusterDataPtr
 ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                 const uint64_t cluster_hash, const std::string& version_info,
                                 bool added_via_api, ClusterMap& cluster_map) {
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
-  auto& new_cluster = new_cluster_pair.first;
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
+      new_cluster_pair_or_error =
+          factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+
+  if (!new_cluster_pair_or_error.ok()) {
+    throw EnvoyException(std::string(new_cluster_pair_or_error.status().message()));
+  }
+  auto& new_cluster = new_cluster_pair_or_error->first;
+  auto& lb = new_cluster_pair_or_error->second;
   Cluster& cluster_reference = *new_cluster;
 
   if (!added_via_api) {
@@ -853,15 +861,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     }
   }
 
-  if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided &&
-      new_cluster_pair.second == nullptr) {
+  if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided && lb == nullptr) {
     throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
                                      "'{}' did not provide one. Check cluster documentation.",
                                      new_cluster->info()->name()));
   }
 
-  if (cluster_reference.info()->lbType() != LoadBalancerType::ClusterProvided &&
-      new_cluster_pair.second != nullptr) {
+  if (cluster_reference.info()->lbType() != LoadBalancerType::ClusterProvided && lb != nullptr) {
     throw EnvoyException(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
@@ -908,20 +914,22 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
+      cluster_entry_it->second->thread_aware_lb_ =
+          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
+                         random_, time_source_);
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
+      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.maglev");
+      cluster_entry_it->second->thread_aware_lb_ =
+          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
+                         random_, time_source_);
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
-    cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
+    cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
@@ -1901,7 +1909,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
       getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
-      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100) &&
+      !transport_socket_options->http11ProxyInfo()) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
@@ -1971,9 +1980,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
       dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
 }
 
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
+ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
+                                            ClusterManager& cm,
+                                            Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                            bool added_via_api) {
   return ClusterFactoryImplBase::create(cluster, context_, cm, dns_resolver_fn_,
                                         ssl_context_manager_, outlier_event_logger, added_via_api);
 }
