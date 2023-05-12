@@ -161,6 +161,10 @@ The following core load shed points are supported:
       not yet started, Envoy will send a local reply. Envoy will then close the
       connection.
 
+  * - envoy.load_shed_points.http2_server_go_away_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level which will eventually drain the HTTP/2 connection.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts

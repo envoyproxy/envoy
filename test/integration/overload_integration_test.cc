@@ -711,4 +711,50 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortClosesConnectionWhe
   test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPendingRequests) {
+  // Test only applies to HTTP2.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http2_server_go_away_on_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto [first_request_encoder, first_request_decoder] =
+      codec_client_->startRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_http2_total", 1);
+
+  // Put envoy in overloaded state to send GOAWAY frames.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http2_server_go_away_on_dispatch.scale_percent", 100);
+
+  auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for reply of the first request which should be allowed to complete.
+  // The downstream should also receive the GOAWAY.
+  Buffer::OwnedImpl first_request_body{"foo"};
+  first_request_encoder.encodeData(first_request_body, true);
+  ASSERT_TRUE(first_request_decoder->waitForEndStream());
+
+  EXPECT_TRUE(codec_client_->sawGoAway());
+  test_server_->waitForCounterEq("http2.goaway_sent", 1);
+
+  // The GOAWAY gets submitted with the first created stream as the last stream
+  // that will be processed on this connection, so the second stream's frames
+  // are ignored.
+  EXPECT_FALSE(second_request_decoder->complete());
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http2_server_go_away_on_dispatch.scale_percent", 0);
+}
+
 } // namespace Envoy

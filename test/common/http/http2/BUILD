@@ -57,6 +57,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/server:overload_manager_mocks",
     ],
 )
 
@@ -229,6 +230,7 @@ envoy_cc_fuzz_test(
         "//test/common/http/http2:http2_frame",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],

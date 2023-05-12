@@ -226,6 +226,7 @@ envoy_cc_library(
         "//envoy/config:config_provider_interface",
         "//envoy/config:subscription_interface",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:scopes_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
