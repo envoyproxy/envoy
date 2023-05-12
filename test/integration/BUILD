@@ -57,6 +57,9 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":ads_integration_lib",
         ":http_integration_lib",
@@ -213,6 +216,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "upstream_access_log_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -415,6 +421,9 @@ envoy_cc_test(
         "http2_flood_integration_test.cc",
     ],
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
@@ -441,6 +450,9 @@ envoy_cc_test(
         "multiplexed_integration_test.cc",
     ],
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -510,6 +522,9 @@ envoy_cc_test(
         "buffer_accounting_integration_test.cc",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":base_overload_integration_test_lib",
         ":http_integration_lib",
@@ -622,6 +637,9 @@ envoy_cc_test(
         "filter_integration_test.cc",
     ]),
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -696,6 +714,9 @@ envoy_cc_test(
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 48,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -719,6 +740,9 @@ envoy_cc_test(
         "multiplexed_upstream_integration_test.cc",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -836,6 +860,9 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -897,8 +924,6 @@ envoy_cc_test_library(
     ],
     deps = [
         ":utility_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
@@ -930,6 +955,9 @@ envoy_cc_test_library(
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
@@ -954,25 +982,25 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
-        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
-        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
-        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
-        "//source/extensions/load_balancing_policies/maglev:config",
-        "//source/server:proto_descriptors_lib",
-        "//source/extensions/request_id/uuid:config",
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
-        "//source/extensions/network/dns_resolver/cares:config",
-        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:process_context_lib",
+        "//source/server:proto_descriptors_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -1159,6 +1187,9 @@ envoy_cc_test(
         "integration_test.h",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/registry",
@@ -1221,6 +1252,9 @@ envoy_cc_test(
         "websocket_integration_test.h",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1361,10 +1395,14 @@ envoy_cc_test(
     size = "large",
     srcs = ["overload_integration_test.cc"],
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
@@ -1534,6 +1572,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1562,6 +1603,36 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_proxy_many_connections_test",
+    size = "large",
+    srcs = [
+        "tcp_proxy_many_connections_test.cc",
+    ],
+    shard_count = 1,
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_tunneling_integration_test",
     size = "large",
     srcs = [
@@ -1571,6 +1642,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1945,6 +2019,9 @@ envoy_cc_test(
     name = "cx_limit_integration_test",
     size = "large",
     srcs = ["cx_limit_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/network:filter_interface",
@@ -1960,6 +2037,9 @@ envoy_cc_test(
     name = "direct_response_integration_test",
     size = "large",
     srcs = ["direct_response_integration_test.cc"],
+    tags = [
+        "cpu:2",
+    ],
     deps = [
         ":http_integration_lib",
     ],
@@ -2036,6 +2116,7 @@ envoy_cc_test(
     data = ["//test/config/integration/certs"],
     shard_count = 12,
     tags = [
+        "cpu:4",
         "nofips",
     ],
     deps = select({
@@ -2073,6 +2154,7 @@ envoy_cc_test(
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
     tags = [
+        "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
         "nofips",
@@ -2159,6 +2241,9 @@ envoy_cc_test(
     srcs = ["tcp_proxy_odcds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":ads_integration_lib",

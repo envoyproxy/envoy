@@ -280,10 +280,9 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
   return succeeded;
 }
 
-testing::AssertionResult
-FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
-                        const FakeStream::ValidatorFunction& data_validator,
-                        std::chrono::milliseconds timeout) {
+AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
+                                        const FakeStream::ValidatorFunction& data_validator,
+                                        std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
@@ -341,10 +340,11 @@ public:
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action)
+          headers_with_underscores_action,
+      Server::OverloadManager& overload_manager)
       : ServerConnectionImpl(connection, callbacks, stats, random_generator, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action) {}
+                             headers_with_underscores_action, overload_manager) {}
 
   void updateConcurrentStreams(uint32_t max_streams) {
     absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
@@ -387,13 +387,14 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager_);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<TestHttp2ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action,
+        overload_manager_);
   } else {
     ASSERT(type == Http::CodecType::HTTP3);
 #ifdef ENVOY_ENABLE_QUIC
@@ -599,9 +600,10 @@ makeListenSocket(const FakeUpstreamConfig& config,
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
-                           const FakeUpstreamConfig& config)
+                           const FakeUpstreamConfig& config, const bool defer_initialization)
     : FakeUpstream(Network::Test::createRawBufferDownstreamSocketFactory(),
-                   makeListenSocket(config, makeAddress(port, version)), config) {}
+                   makeListenSocket(config, makeAddress(port, version)), config,
+                   defer_initialization) {}
 
 FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            const Network::Address::InstanceConstSharedPtr& address,
@@ -616,7 +618,8 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
                    makeListenSocket(config, makeAddress(port, version)), config) {}
 
 FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
-                           Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
+                           Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config,
+                           const bool defer_initialization)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       http3_options_(config.http3_options_), quic_options_(config.quic_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
@@ -636,6 +639,20 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+
+  if (!defer_initialization) {
+    initializeServer();
+  }
+}
+
+FakeUpstream::~FakeUpstream() { cleanUp(); };
+
+void FakeUpstream::initializeServer() {
+  if (initialized_) {
+    // Already initialized.
+    return;
+  }
+
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
     handler_->addListener(absl::nullopt, listener_, runtime_);
@@ -643,9 +660,8 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
+  initialized_ = true;
 }
-
-FakeUpstream::~FakeUpstream() { cleanUp(); };
 
 void FakeUpstream::cleanUp() {
   if (thread_.get()) {
@@ -704,6 +720,11 @@ void FakeUpstream::threadRoutine() {
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
                                                     milliseconds timeout) {
+  if (!initialized_) {
+    return AssertionFailure()
+           << "Must initialize the FakeUpstream first by calling initializeServer().";
+  }
+
   {
     absl::MutexLock lock(&lock_);
 
@@ -758,6 +779,10 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       FakeUpstream& upstream = *it;
       {
         absl::MutexLock lock(&upstream.lock_);
+        if (!upstream.isInitialized()) {
+          return AssertionFailure()
+                 << "Must initialize the FakeUpstream first by calling initializeServer().";
+        }
         if (!waitForWithDispatcherRun(
                 upstream.time_system_, upstream.lock_,
                 [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
@@ -783,7 +808,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
 }
 
 ABSL_MUST_USE_RESULT
-testing::AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
+AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(&lock_);
     return new_connections_.empty() ? AssertionSuccess() : AssertionFailure();
@@ -792,6 +817,11 @@ testing::AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
 
 AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connection,
                                                    milliseconds timeout) {
+  if (!initialized_) {
+    return AssertionFailure()
+           << "Must initialize the FakeUpstream first by calling initializeServer().";
+  }
+
   {
     absl::MutexLock lock(&lock_);
     const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -846,8 +876,13 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   return *connection_wrapper;
 }
 
-testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
-                                                          std::chrono::milliseconds timeout) {
+AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
+                                                 std::chrono::milliseconds timeout) {
+  if (!initialized_) {
+    return AssertionFailure()
+           << "Must initialize the FakeUpstream first by calling initializeServer().";
+  }
+
   absl::MutexLock lock(&lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !received_datagrams_.empty();
@@ -892,9 +927,14 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   });
 }
 
-testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::string& data,
-                                                          bool end_stream,
-                                                          std::chrono::milliseconds timeout) {
+AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::string& data,
+                                                 bool end_stream,
+                                                 std::chrono::milliseconds timeout) {
+  if (!initialized_) {
+    return AssertionFailure()
+           << "Must initialize the FakeUpstream first by calling initializeServer().";
+  }
+
   absl::MutexLock lock(&lock_);
   auto iter = consumed_connections_.begin();
   std::advance(iter, index);
@@ -993,9 +1033,8 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 }
 
 ABSL_MUST_USE_RESULT
-testing::AssertionResult
-FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
-                                          std::chrono::milliseconds timeout) {
+AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+                                                          std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     char peek_buf[200];

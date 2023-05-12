@@ -52,7 +52,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private boolean mEnableSocketTag = true;
   private boolean mEnableInterfaceBinding = false;
   private boolean mEnableProxying = false;
-  private boolean mEnableSkipDNSLookupForProxiedRequests = false;
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private int mMaxConnectionsPerHost = 7;
@@ -143,9 +142,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, statSinks, runtimeGuards,
-        mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation,
-        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
-        mCdsTimeoutSeconds, mEnableCds);
+        mEnablePlatformCertificatesValidation, mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress,
+        mAdsPort, mAdsToken, mAdsTokenLifetime, mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone,
+        mNodeSubZone, mCdsResourcesLocator, mCdsTimeoutSeconds, mEnableCds);
   }
 }

@@ -66,7 +66,7 @@ public:
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -103,6 +103,12 @@ public:
       return &scoped_route_config_provider_;
     }
     return nullptr;
+  }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    if (use_srds_) {
+      return scope_key_builder_;
+    }
+    return {};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -197,6 +203,7 @@ public:
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
