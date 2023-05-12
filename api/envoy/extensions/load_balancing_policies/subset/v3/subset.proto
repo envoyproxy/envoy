@@ -7,6 +7,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.subset.v3";
@@ -23,6 +24,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // endpoint metadata and selected by route and weighted cluster metadata.
 // [#next-free-field: 10]
 message Subset {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.LbSubsetConfig";
+
   // If NO_FALLBACK is selected, a result
   // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
   // any cluster endpoint may be returned (subject to policy, health checks,
