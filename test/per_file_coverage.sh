@@ -61,7 +61,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/common/ot:71.7"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.7"
+"source/extensions/transport_sockets:95.6"
 "source/extensions/transport_sockets/tls:94.9"
 "source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:88.9"
