@@ -282,8 +282,8 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
     return nullptr;
   }
 
-  return factory->createGenericConnPool(cluster, config_.usePost() /*should_tcp_proxy*/,
-                                        route_->route_entry_, protocol, context);
+  return factory->createGenericConnPool(cluster, false /*should_tcp_proxy*/, route_->route_entry_,
+                                        protocol, context);
 }
 
 HttpConnPool::~HttpConnPool() {
