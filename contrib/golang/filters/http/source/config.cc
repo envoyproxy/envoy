@@ -14,7 +14,7 @@ namespace Golang {
 
 Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", proto_config.library_id(),
                  proto_config.library_path());
@@ -30,7 +30,8 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   }
 
   auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id());
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+      proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
 
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(config, dso_lib);

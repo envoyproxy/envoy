@@ -1,6 +1,7 @@
 #include "source/extensions/http/stateful_session/cookie/cookie.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,18 +12,32 @@ namespace Cookie {
 void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     const Upstream::HostDescription& host, Envoy::Http::ResponseHeaderMap& headers) {
   absl::string_view host_address = host.address()->asStringView();
+  std::string encoded_address;
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
-    const std::string encoded_address =
-        Envoy::Base64::encode(host_address.data(), host_address.length());
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie")) {
+      auto expiry_time = std::chrono::duration_cast<std::chrono::seconds>(
+          (time_source_.monotonicTime() + std::chrono::seconds(factory_.ttl_)).time_since_epoch());
+      // Build proto message
+      envoy::Cookie cookie;
+      cookie.set_address(std::string(host_address));
+      cookie.set_expires(expiry_time.count());
+      std::string proto_string;
+      cookie.SerializeToString(&proto_string);
+
+      encoded_address = Envoy::Base64::encode(proto_string.data(), proto_string.length());
+    } else {
+      encoded_address = Envoy::Base64::encode(host_address.data(), host_address.length());
+    }
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));
   }
 }
 
 CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
-    const CookieBasedSessionStateProto& config)
+    const CookieBasedSessionStateProto& config, TimeSource& time_source)
     : name_(config.cookie().name()), ttl_(config.cookie().ttl().seconds()),
-      path_(config.cookie().path()) {
+      path_(config.cookie().path()), time_source_(time_source) {
   if (name_.empty()) {
     throw EnvoyException("Cookie key cannot be empty for cookie based stateful sessions");
   }

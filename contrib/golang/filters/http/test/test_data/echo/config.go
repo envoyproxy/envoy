@@ -11,22 +11,47 @@ const Name = "echo"
 
 func init() {
 	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
+	http.RegisterHttpFilterConfigParser(&parser{})
 }
 
-func ConfigFactory(config interface{}) api.StreamFilterFactory {
-	any, ok := config.(*anypb.Any)
-	if !ok {
-		return nil
-	}
+type config struct {
+	echoBody  string
+	matchPath string
+}
 
+type parser struct {
+}
+
+func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
-		return nil
+		return nil, err
+	}
+
+	v := configStruct.Value
+	conf := &config{}
+	if str, ok := v.AsMap()["echo_body"].(string); ok {
+		conf.echoBody = str
+	}
+	if str, ok := v.AsMap()["match_path"].(string); ok {
+		conf.matchPath = str
+	}
+	return conf, nil
+}
+
+func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
+	panic("TODO")
+}
+
+func ConfigFactory(c interface{}) api.StreamFilterFactory {
+	conf, ok := c.(*config)
+	if !ok {
+		panic("unexpected config type")
 	}
 	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
 		return &filter{
 			callbacks: callbacks,
-			config:    configStruct.Value,
+			config:    conf,
 		}
 	}
 }

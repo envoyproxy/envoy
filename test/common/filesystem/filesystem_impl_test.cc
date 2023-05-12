@@ -361,9 +361,9 @@ TEST_F(FileSystemImplTest, StatOnDirectoryReturnsDirectoryType) {
   EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
 }
 
-TEST_F(FileSystemImplTest, CreatePathCreatesDirectory) {
+TEST_F(FileSystemImplTest, CreatePathCreatesDirectoryAndReturnsSuccessForExistingDirectory) {
   const std::string new_dir_path = TestEnvironment::temporaryPath("envoy_test_dir");
-  const Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
+  Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
   Cleanup cleanup{[new_dir_path]() { TestEnvironment::removePath(new_dir_path); }};
   EXPECT_TRUE(result.return_value_);
   EXPECT_THAT(result.err_, ::testing::IsNull()) << result.err_->getErrorDetails();
@@ -373,6 +373,37 @@ TEST_F(FileSystemImplTest, CreatePathCreatesDirectory) {
   EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
   EXPECT_EQ(info_result.return_value_.name_, "envoy_test_dir");
   EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
+  // Ensure it returns true if we 'create' an existing path too.
+  result = file_system_.createPath(new_dir_path);
+  EXPECT_FALSE(result.return_value_);
+  EXPECT_THAT(result.err_, ::testing::IsNull()) << result.err_->getErrorDetails();
+}
+
+TEST_F(FileSystemImplTest, CreatePathCreatesDirectoryGivenTrailingSlash) {
+  const std::string new_dir_path = TestEnvironment::temporaryPath("envoy_test_dir/");
+  const Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
+  Cleanup cleanup{[new_dir_path]() {
+    TestEnvironment::removePath(new_dir_path.substr(0, new_dir_path.size() - 1));
+  }};
+  EXPECT_TRUE(result.return_value_);
+  EXPECT_THAT(result.err_, ::testing::IsNull()) << result.err_->getErrorDetails();
+  // A bit awkwardly using file_system_.stat to test that the directory exists, because
+  // otherwise we might have to do windows/linux conditional code for this.
+  const Api::IoCallResult<FileInfo> info_result =
+      file_system_.stat(absl::string_view{new_dir_path}.substr(0, new_dir_path.size() - 1));
+  EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+  EXPECT_EQ(info_result.return_value_.name_, "envoy_test_dir");
+  EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
+}
+
+TEST_F(FileSystemImplTest, CreatePathReturnsErrorOnNoPermissionToWriteDir) {
+#ifdef WIN32
+  GTEST_SKIP() << "It's hard to not have permission to create a directory on Windows";
+#endif
+  const std::string new_dir_path = "/should_fail_to_create_directory_in_root/x/y";
+  const Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
+  EXPECT_FALSE(result.return_value_);
+  EXPECT_THAT(result.err_, testing::Not(testing::IsNull()));
 }
 
 TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {

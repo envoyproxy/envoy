@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
@@ -54,6 +55,7 @@ public:
 };
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
+using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 /**
  * Interface for access log filters.
@@ -69,7 +71,8 @@ public:
   virtual bool evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers) const PURE;
+                        const Http::ResponseTrailerMap& response_trailers,
+                        AccessLogType access_log_type) const PURE;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;
@@ -88,11 +91,13 @@ public:
    * @param response_trailers supplies response trailers.
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
+   * @param access_log_type supplies additional information about the type of the
+   * log record, i.e the location in the code which recorded the log.
    */
   virtual void log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info) PURE;
+                   const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

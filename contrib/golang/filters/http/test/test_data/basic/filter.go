@@ -104,6 +104,13 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
+
+	_, found := header.Get("x-set-metadata")
+	if found {
+		md := f.callbacks.StreamInfo().DynamicMetadata()
+		md.Set("filter.go", "foo", "bar")
+	}
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
@@ -133,6 +140,8 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("req-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("req-downstream-local-address", f.callbacks.StreamInfo().DownstreamLocalAddress())
+	header.Set("req-downstream-remote-address", f.callbacks.StreamInfo().DownstreamRemoteAddress())
 	if !endStream && strings.Contains(f.databuffer, "decode-header") {
 		return api.StopAndBuffer
 	}
@@ -202,6 +211,12 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	}
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
+	}
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+		header.Set("rsp-upstream-host", upstream_host_address)
+	}
+	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
+		header.Set("rsp-upstream-cluster", upstream_cluster_name)
 	}
 
 	origin, found := header.Get("x-test-header-0")

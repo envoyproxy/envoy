@@ -7,6 +7,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/substitute.h"
@@ -54,7 +55,8 @@ public:
         mock_server_connection_,
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
         mock_server_callbacks_, server_settings_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-        Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        overload_manager_);
 
     Status status = server_->dispatch(payload);
   }
@@ -71,6 +73,7 @@ private:
   NiceMock<MockRequestDecoder> orphan_request_decoder_;
   NiceMock<Network::MockConnection> mock_server_connection_;
   NiceMock<MockServerConnectionCallbacks> mock_server_callbacks_;
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
 
   ServerConnectionPtr server_;
 };

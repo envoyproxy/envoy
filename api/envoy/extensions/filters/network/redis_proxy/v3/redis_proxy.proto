@@ -31,7 +31,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -127,12 +127,18 @@ message RedisProxy {
 
     // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
+
+    // Ops or connection timeout triggers reconnection to redis server which could result in reconnection
+    // storm to busy redis server. This config is a protection to rate limit reconnection rate.
+    // If not set, there will be no rate limiting on the reconnection.
+    ConnectionRateLimit connection_rate_limit = 10;
   }
 
   message PrefixRoutes {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
 
+    // [#next-free-field: 6]
     message Route {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
@@ -174,6 +180,10 @@ message RedisProxy {
 
       // Indicates that the route has a request mirroring policy.
       repeated RequestMirrorPolicy request_mirror_policy = 4;
+
+      // Indicates how redis key should be formatted. To substitute redis key into the formatting
+      // expression, use %KEY% as a string replacement command.
+      string key_formatter = 5;
     }
 
     reserved 3;
@@ -214,6 +224,13 @@ message RedisProxy {
     // Commands fault is restricted to, if any. If not set, fault applies to all commands
     // other than auth and ping (due to special handling of those commands in Envoy).
     repeated string commands = 4;
+  }
+
+  // Configuration to limit reconnection rate to redis server to protect redis server
+  // from client reconnection storm.
+  message ConnectionRateLimit {
+    // Reconnection rate per sec. Rate limiting is implemented with TokenBucket.
+    uint32 connection_rate_limit_per_sec = 1;
   }
 
   reserved 2;

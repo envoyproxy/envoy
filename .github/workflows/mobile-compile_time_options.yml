@@ -36,6 +36,7 @@ jobs:
       run: |
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --define=signal_trace=disabled \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
@@ -67,6 +68,7 @@ jobs:
           ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --define=signal_trace=disabled \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
@@ -80,7 +82,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_build
     runs-on: macos-12
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
     - uses: actions/checkout@v3
       with:
@@ -103,13 +105,29 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-        $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-          --fat_apk_cpu=x86_64 \
-          --define=admin_html=enabled \
-          --define=envoy_mobile_request_compression=disabled \
-          --define=envoy_enable_http_datagrams=disabled \
-          --define=google_grpc=disabled \
-          --@envoy//bazel:http3=False \
-          --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-          //:android_dist
+        cd mobile \
+        && ./bazelw build \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --fat_apk_cpu=x86_64 \
+            --define=signal_trace=disabled \
+            --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_enable_http_datagrams=disabled \
+            --define=google_grpc=disabled \
+            --define=envoy_yaml=disabled \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+            //:android_dist \
+        && ./bazelw test \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=ci \
+            --fat_apk_cpu=x86_64 \
+            --define=signal_trace=disabled \
+            --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_enable_http_datagrams=disabled \
+            --define=google_grpc=disabled \
+            --define=envoy_yaml=disabled \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+            //test/java/integration:android_engine_socket_tag_test \
+            //test/java/integration:android_engine_start_test \
+            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests

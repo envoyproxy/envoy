@@ -16,7 +16,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -174,11 +174,20 @@ enum class FilterTrailersStatus {
 
 /**
  * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
- * iteration.
+ * iteration except in the case of local replies.
  */
 enum class FilterMetadataStatus {
-  // Continue filter chain iteration.
+  // Continue filter chain iteration for metadata only. Does not unblock returns of StopIteration*
+  // from (decode|encode)(Headers|Data).
   Continue,
+
+  // Continue filter chain iteration. If headers have not yet been sent to the next filter, they
+  // will be sent first via (decode|encode)Headers().
+  ContinueAll,
+
+  // Stops iteration of the entire filter chain. Only to be used in the case of sending a local
+  // reply from (decode|encode)Metadata.
+  StopIterationForLocalReply,
 };
 
 /**
@@ -423,9 +432,9 @@ public:
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 
   /**
-￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
-    * for upstream filters.
-    */
+   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
+   * for upstream filters.
+   */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 };
 

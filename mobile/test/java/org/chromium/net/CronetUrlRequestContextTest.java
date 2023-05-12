@@ -28,11 +28,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
-import org.chromium.net.impl.CronetUrlRequestContext;
-import org.chromium.net.impl.NativeCronetEngineBuilderImpl;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
+import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.FileUtils;
@@ -140,9 +139,6 @@ public class CronetUrlRequestContextTest {
     String userAgentValue = "User-Agent-Value";
     ExperimentalCronetEngine.Builder cronetEngineBuilder =
         new ExperimentalCronetEngine.Builder(getContext());
-    if (mTestRule.testingJavaImpl()) {
-      cronetEngineBuilder = CronetTestRule.createJavaEngineBuilder(getContext());
-    }
     cronetEngineBuilder.setUserAgent(userAgentValue);
     final CronetEngine cronetEngine = cronetEngineBuilder.build();
     NativeTestServer.shutdownNativeTestServer(); // startNativeTestServer returns false if it's
@@ -160,7 +156,6 @@ public class CronetUrlRequestContextTest {
   @SmallTest
   @Feature({"Cronet"})
   // TODO: Remove the annotation after fixing http://crbug.com/637979 & http://crbug.com/637972
-  @OnlyRunNativeCronet
   @Ignore("Properly implement shutdown sequence")
   public void testShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -211,7 +206,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Test is running on main thread")
   public void testShutdownDuringInit() throws Exception {
     final ConditionVariable block = new ConditionVariable(false);
@@ -235,8 +229,8 @@ public class CronetUrlRequestContextTest {
 
     // Create new request context, but its initialization on the main thread
     // will be stuck behind blockingTask.
-    final CronetUrlRequestContext cronetEngine =
-        (CronetUrlRequestContext) new CronetEngine.Builder(getContext()).build();
+    final CronvoyUrlRequestContext cronetEngine =
+        (CronvoyUrlRequestContext) new CronetEngine.Builder(getContext()).build();
     // Unblock the main thread, so context gets initialized and shutdown on
     // it.
     block.open();
@@ -249,7 +243,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Properly implement shutdown sequence")
   public void testInitAndShutdownOnMainThread() throws Exception {
     final ConditionVariable block = new ConditionVariable(false);
@@ -259,8 +252,8 @@ public class CronetUrlRequestContextTest {
       @Override
       public void run() {
         // Create new request context, loading the library.
-        final CronetUrlRequestContext cronetEngine =
-            (CronetUrlRequestContext) new CronetEngine.Builder(getContext()).build();
+        final CronvoyUrlRequestContext cronetEngine =
+            (CronvoyUrlRequestContext) new CronetEngine.Builder(getContext()).build();
         // Shutdown right after init.
         cronetEngine.shutdown();
         // Verify that context is shutdown.
@@ -276,7 +269,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // JavaCronetEngine doesn't support throwing on repeat shutdown()
   @Ignore("Properly implement shutdown sequence")
   public void testMultipleShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -293,7 +285,6 @@ public class CronetUrlRequestContextTest {
   @SmallTest
   @Feature({"Cronet"})
   // TODO: Remove the annotation after fixing http://crbug.com/637972
-  @OnlyRunNativeCronet
   @Ignore("Properly implement shutdown sequence")
   public void testShutdownAfterError() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -311,7 +302,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // JavaCronetEngine doesn't support throwing on shutdown()
   @Ignore("Shutdown not properly implemented")
   public void testShutdownAfterCancel() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -338,7 +328,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No netlogs for pure java impl
   @Ignore("Netlog not implemented")
   public void testNetLog() throws Exception {
     Context context = getContext();
@@ -367,7 +356,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No netlogs for pure java impl
   @Ignore("Netlog not implemented")
   public void testBoundedFileNetLog() throws Exception {
     Context context = getContext();
@@ -399,7 +387,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No netlogs for pure java impl
   @Ignore("Netlog not implemented")
   // Tests that if stopNetLog is not explicitly called, CronetEngine.shutdown()
   // will take care of it. crbug.com/623701.
@@ -428,7 +415,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // No netlogs for pure java impl
   @Ignore("Netlog not implemented")
   // Tests that if stopNetLog is not explicitly called, CronetEngine.shutdown()
   // will take care of it. crbug.com/623701.
@@ -460,7 +446,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   // Tests that NetLog contains events emitted by all live CronetEngines.
   public void testNetLogContainEventsFromAllLiveEngines() throws Exception {
@@ -502,7 +487,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   // Tests that NetLog contains events emitted by all live CronetEngines.
   public void testBoundedFileNetLogContainEventsFromAllLiveEngines() throws Exception {
@@ -572,7 +556,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Caching not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1578")
   // Tests that if CronetEngine is shut down on the network thread, an appropriate exception
   // is thrown.
@@ -631,7 +614,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Caching not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1578")
   // Tests that if CronetEngine is shut down when reading from disk cache,
   // there isn't a crash. See crbug.com/486120.
@@ -678,7 +660,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -705,7 +686,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -735,7 +715,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testNetLogStartMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -763,7 +742,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogStartMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -795,7 +773,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testNetLogStopMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -824,7 +801,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogStopMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -857,7 +833,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testNetLogWithBytes() throws Exception {
     Context context = getContext();
@@ -883,7 +858,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogWithBytes() throws Exception {
     Context context = getContext();
@@ -962,7 +936,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Caching not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1578")
   public void testEnableHttpCacheDisabled() throws Exception {
     CronetEngine cronetEngine =
@@ -1006,7 +979,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Caching not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1578")
   public void testNoConcurrentDiskUsage() throws Exception {
     CronetEngine cronetEngine = createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK);
@@ -1027,7 +999,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Caching not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1578")
   public void testEnableHttpCacheDiskNoHttp() throws Exception {
     CronetEngine cronetEngine =
@@ -1194,7 +1165,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet // Java engine doesn't produce metrics
   @Ignore("UMA not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1615")
   public void testGetGlobalMetricsDeltas() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
@@ -1292,7 +1262,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Library Loader not needed")
   public void testSetLibraryLoaderIsEnforcedByDefaultEmbeddedProvider() throws Exception {
     CronetEngine.Builder builder = new CronetEngine.Builder(getContext());
@@ -1309,11 +1278,10 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   @Ignore("Library Loader not needed")
   public void testSetLibraryLoaderIsIgnoredInNativeCronetEngineBuilderImpl() throws Exception {
     CronetEngine.Builder builder =
-        new CronetEngine.Builder(new NativeCronetEngineBuilderImpl(getContext()));
+        new CronetEngine.Builder(new NativeCronvoyEngineBuilderImpl(getContext()));
     TestBadLibraryLoader loader = new TestBadLibraryLoader();
     builder.setLibraryLoader(loader);
     CronetEngine engine = builder.build();
@@ -1324,10 +1292,9 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   public void testNativeCronetEngineBuilderImplSetsCorrectVersionString() throws Exception {
     CronetEngine.Builder builder =
-        new CronetEngine.Builder(new NativeCronetEngineBuilderImpl(getContext()));
+        new CronetEngine.Builder(new NativeCronvoyEngineBuilderImpl(getContext()));
     CronetEngine engine = builder.build();
     assertTrue(engine.getVersionString().startsWith("Cronet/"));
   }
