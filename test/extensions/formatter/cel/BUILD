@@ -14,13 +14,13 @@ envoy_package()
 envoy_extension_cc_test(
     name = "cel_test",
     srcs = ["cel_test.cc"],
-    extension_names = ["envoy.formatter.cel"],
     copts = select({
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [
             "-DUSE_CEL_PARSER",
         ],
     }),
+    extension_names = ["envoy.formatter.cel"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ]  + select(
+    ] + select(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
