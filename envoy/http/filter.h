@@ -748,7 +748,7 @@ public:
   virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
 
   /**
-   * @return absl::string_view the name of the filter as configured in XDS.
+   * @return absl::string_view the name of the filter as configured in the filter chain..
    */
   virtual absl::string_view filterConfigName() const PURE;
 };
