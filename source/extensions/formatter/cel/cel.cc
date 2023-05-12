@@ -47,9 +47,7 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
     return absl::nullopt;
   }
   auto result = Expr::print(eval_status.value());
-  if (max_length_.has_value()) {
-    truncate(result, max_length_);
-  }
+  truncate(result, max_length_);
   return result;
 }
 
