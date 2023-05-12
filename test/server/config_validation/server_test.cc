@@ -15,6 +15,8 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Server {
 namespace {
