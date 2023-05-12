@@ -15,7 +15,7 @@ namespace Formatter {
 class CELFormatter : public ::Envoy::Formatter::FormatterProvider {
 public:
   CELFormatter(Extensions::Filters::Common::Expr::Builder&,
-               const google::api::expr::v1alpha1::Expr&, absl::optional<size_t>);
+               const google::api::expr::v1alpha1::Expr&, absl::optional<size_t>&);
 
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,

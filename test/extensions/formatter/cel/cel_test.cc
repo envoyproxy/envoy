@@ -30,8 +30,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-#ifndef WIN32 // CEL is not supported on Windows
-
+#ifdef USE_CEL_PARSER
 TEST_F(CELFormatterTest, TestFormatValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   absl::optional<size_t> max_length = absl::nullopt;
@@ -125,7 +124,6 @@ TEST_F(CELFormatterTest, TestInvalidExpression) {
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
       EnvoyException, "Not able to parse filter expression: .*");
 }
-
 #endif
 
 } // namespace Formatter

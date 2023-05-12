@@ -1,14 +1,9 @@
 #include "source/extensions/formatter/cel/cel.h"
 
-#include <sys/stat.h>
-
-#include <string>
-
 #include "source/common/config/metadata.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
@@ -20,12 +15,12 @@ namespace Formatter {
 
 namespace {
 
-std::string truncate(std::string str, absl::optional<size_t> max_length) {
+void truncate(std::string& str, absl::optional<size_t> max_length) {
   if (!max_length) {
-    return str;
+    return;
   }
 
-  return str.substr(0, max_length.value());
+  str = str.substr(0, max_length.value());
 }
 
 } // namespace
@@ -34,7 +29,7 @@ namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(Expr::Builder& builder,
                            const google::api::expr::v1alpha1::Expr& input_expr,
-                           absl::optional<size_t> max_length)
+                           absl::optional<size_t>& max_length)
     : parsed_expr_(input_expr), max_length_(max_length) {
   compiled_expr_ = Expr::createExpression(builder, parsed_expr_);
 }
@@ -53,7 +48,7 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
   }
   auto result = Expr::print(eval_status.value());
   if (max_length_.has_value()) {
-    return truncate(result, max_length_);
+    truncate(result, max_length_);
   }
   return result;
 }

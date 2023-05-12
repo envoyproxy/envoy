@@ -10,7 +10,6 @@ namespace Formatter {
 
 ::Envoy::Formatter::CommandParserPtr
 CELFormatterFactory::createCommandParserFromProto(const Protobuf::Message&) {
-
 #if defined(USE_CEL_PARSER)
   return std::make_unique<CELFormatterCommandParser>();
 #else
