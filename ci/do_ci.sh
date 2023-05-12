@@ -679,6 +679,35 @@ case $CI_TARGET in
         bazel_envoy_binary_build sizeopt
         ;;
 
+    trigger_verify)
+        setup_clang_toolchain
+        WORKFLOW="envoy-verify.yml"
+        # This may be a merge commit in a PR
+        COMMIT="$(git rev-parse HEAD)"
+        # For a PR this should be the last actual commit
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        # ENVOY_HEAD_REF must also be set in PRs to provide a unique key for job grouping and cancellation.
+        echo "Trigger workflow (${WORKFLOW})"
+        echo "  Repo: ${ENVOY_REPO}"
+        echo "  Branch: ${ENVOY_BRANCH}"
+        echo "  Inputs:"
+        echo "    ref: ${COMMIT}"
+        echo "    sha: ${ENVOY_COMMIT}"
+        echo "    head_ref: ${ENVOY_HEAD_REF}"
+        GITHUB_APP_KEY="$(echo "$GITHUB_TOKEN" | base64 -d -w0)"
+        export GITHUB_APP_KEY
+        INPUTS="{\"ref\":\"$COMMIT\",\"sha\":\"$ENVOY_COMMIT\",\"head_ref\":\"$ENVOY_HEAD_REF\"}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:trigger \
+              -- --repo="$ENVOY_REPO" \
+                 --trigger-app-id="$GITHUB_APP_ID" \
+                 --trigger-installation-id="$GITHUB_INSTALL_ID" \
+                 --trigger-ref="$ENVOY_BRANCH" \
+                 --trigger-workflow="$WORKFLOW" \
+                 --trigger-inputs="$INPUTS"
+        ;;
+
     tsan)
         setup_clang_toolchain
         echo "bazel TSAN debug build with tests"
