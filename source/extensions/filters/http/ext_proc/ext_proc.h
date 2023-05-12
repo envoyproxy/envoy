@@ -191,7 +191,7 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
-  void onNewTimeout(const uint32_t message_timeout_ms);
+  void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
                         bool end_stream) {
