@@ -15,6 +15,7 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
@@ -685,12 +686,11 @@ public:
 
   /**
    * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
-   * Instead, it returns error if duration is out-of-range.
    * @param duration protobuf.
-   * @param error bool, set into true in case of duration out-of-range; otherwise false.
-   * @return duration in milliseconds.
+   * @return duration in milliseconds or an error status.
    */
-  static uint64_t durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration, bool& error);
+  static absl::StatusOr<uint64_t>
+  durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration);
 
   /**
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.

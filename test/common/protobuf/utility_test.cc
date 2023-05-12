@@ -1711,54 +1711,43 @@ TEST(DurationUtilTest, NoThrow) {
     ProtobufWkt::Duration duration;
     duration.set_seconds(5);
     duration.set_nanos(10000000);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_FALSE(error);
-    EXPECT_TRUE(ms == 5010);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result.value() == 5010);
   }
 
   // Below are out-of-range tests
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(-1);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_TRUE(error);
-    EXPECT_TRUE(ms == 0);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_nanos(-1);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_TRUE(error);
-    EXPECT_TRUE(ms == 0);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_nanos(1000000000);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_TRUE(error);
-    EXPECT_TRUE(ms == 0);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_TRUE(error);
-    EXPECT_TRUE(ms == 0);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
   {
     ProtobufWkt::Duration duration;
     constexpr int64_t kMaxInt64Nanoseconds =
         std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
     duration.set_seconds(kMaxInt64Nanoseconds + 1);
-    bool error = false;
-    auto ms = DurationUtil::durationToMillisecondsNoThrow(duration, error);
-    EXPECT_TRUE(error);
-    EXPECT_TRUE(ms == 0);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
 }
 

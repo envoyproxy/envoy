@@ -647,18 +647,20 @@ namespace {
 
 absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
                                      int64_t max_seconds_value) {
-  if (duration.seconds() < 0 || duration.nanos() < 0 || duration.nanos() > 999999999 ||
-      duration.seconds() > max_seconds_value) {
-    ENVOY_LOG_MISC(warn, "Duration out-of-range: {}", duration.DebugString());
-    return absl::OutOfRangeError("Duration out-of-range");
+  if (duration.seconds() < 0 || duration.nanos() < 0) {
+    return absl::OutOfRangeError(
+        fmt::format("Expected positive duration: {}", duration.DebugString()));
+  }
+  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
+    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
   }
   return absl::OkStatus();
 }
 
 void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
-  if (!validateDurationNoThrow(duration, max_seconds_value).ok()) {
-    throw DurationUtil::OutOfRangeException(
-        fmt::format("Duration out-of-range: {}", duration.DebugString()));
+  const auto result = validateDurationNoThrow(duration, max_seconds_value);
+  if (!result.ok()) {
+    throw DurationUtil::OutOfRangeException(std::string(result.message()));
   }
 }
 
@@ -688,10 +690,11 @@ uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& durat
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
-uint64_t DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration,
-                                                     bool& error) {
-  if ((error = !validateDurationAsMillisecondsNoThrow(duration).ok())) {
-    return 0;
+absl::StatusOr<uint64_t>
+DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
+  const auto result = validateDurationAsMillisecondsNoThrow(duration);
+  if (!result.ok()) {
+    return result;
   }
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
