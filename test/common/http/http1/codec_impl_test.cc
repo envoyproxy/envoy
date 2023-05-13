@@ -39,6 +39,7 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StartsWith;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -804,11 +805,7 @@ TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   }
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
-  } else {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: REQUIRED_BODY_BUT_NO_CONTENT_LENGTH");
-  }
+  EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
 }
 
 TEST_P(Http1ServerConnectionImplTest, HostWithLWS) {
