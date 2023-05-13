@@ -33,7 +33,7 @@ public:
   }
 
   const Envoy::Http::TestRequestHeaderMapImpl default_request_headers_ = {{":method", "GET"},
-                                                                          {":path", "/"},
+                                                                          {":path", "/test"},
                                                                           {":scheme", "http"},
                                                                           {"match-header", "route"},
                                                                           {":authority", "host"}};
@@ -78,6 +78,21 @@ public:
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
     )EOF";
+
+  void setPerRouteConfig(const std::string& per_route_cfg, const std::string& path) {
+    config_helper_.addConfigModifier(
+        [this, per_route_cfg, path](ConfigHelper::HttpConnectionManager& cm) {
+          auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+          auto* route = vh->mutable_routes()->Mutable(0);
+          route->mutable_route()->set_cluster("cluster_0");
+          route->mutable_match()->set_prefix(path);
+          const auto matcher = TestUtility::parseYaml<ExtensionWithMatcherPerRoute>(per_route_cfg);
+          Any cfg_any;
+          ASSERT_TRUE(cfg_any.PackFrom(matcher));
+          route->mutable_typed_per_filter_config()->insert(
+              MapPair<std::string, Any>("envoy.filters.http.match_delegate", cfg_any));
+        });
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
@@ -92,14 +107,7 @@ TEST_P(MatchDelegateInegrationTest, BasicFlow) {
 }
 
 TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
-  config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& cm) {
-    auto* config = cm.mutable_route_config()
-                       ->mutable_virtual_hosts()
-                       ->Mutable(0)
-                       ->mutable_typed_per_filter_config();
-    const auto matcher = TestUtility::parseYaml<ExtensionWithMatcherPerRoute>(per_route_config_);
-    (*config)["envoy.filters.http.match_delegate"].PackFrom(matcher);
-  });
+  setPerRouteConfig(per_route_config_, "/test");
   initialize();
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
