@@ -43,8 +43,6 @@ public:
 
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
-    bool hasMatchTree() { return has_match_tree_; }
-
   private:
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
     bool has_match_tree_{};
