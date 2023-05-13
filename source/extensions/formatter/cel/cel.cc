@@ -13,18 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-namespace {
-
-void truncate(std::string& str, absl::optional<size_t> max_length) {
-  if (!max_length) {
-    return;
-  }
-
-  str = str.substr(0, max_length.value());
-}
-
-} // namespace
-
 namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(Expr::Builder& builder,
@@ -46,8 +34,11 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
   if (!eval_status.has_value() || eval_status.value().IsError()) {
     return absl::nullopt;
   }
-  auto result = Expr::print(eval_status.value());
-  truncate(result, max_length_);
+  const auto result = Expr::print(eval_status.value());
+  if (max_length_) {
+    return result.substr(0, max_length_.value());
+  }
+
   return result;
 }
 
