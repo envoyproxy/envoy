@@ -234,8 +234,8 @@ public:
     return constRootScope()->iterate(fn);
   }
 
-  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{}
-  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{}
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
 
 protected:
   /**
