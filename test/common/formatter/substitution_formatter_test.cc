@@ -2764,6 +2764,74 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   }
 }
 
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest_validate_grpc_header_before_log_grpc_status) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
+  });
+
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::CamelString);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  std::vector<std::string> grpc_statuses{
+      "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
+      "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
+      "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
+      "DataLoss", "Unauthenticated"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i],
+              formatter.format(request_header, response_header, response_trailer, stream_info, body,
+                               AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("-1")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("42738")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("-1")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::SnakeString);
@@ -2864,6 +2932,86 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   }
 }
 
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest_validate_grpc_header_before_log_grpc_status) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
+  });
+
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::SnakeString);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  std::vector<std::string> grpc_statuses{"OK",
+                                         "CANCELLED",
+                                         "UNKNOWN",
+                                         "INVALID_ARGUMENT",
+                                         "DEADLINE_EXCEEDED",
+                                         "NOT_FOUND",
+                                         "ALREADY_EXISTS",
+                                         "PERMISSION_DENIED",
+                                         "RESOURCE_EXHAUSTED",
+                                         "FAILED_PRECONDITION",
+                                         "ABORTED",
+                                         "OUT_OF_RANGE",
+                                         "UNIMPLEMENTED",
+                                         "INTERNAL",
+                                         "UNAVAILABLE",
+                                         "DATA_LOSS",
+                                         "UNAUTHENTICATED"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i],
+              formatter.format(request_header, response_header, response_trailer, stream_info, body,
+                               AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("-1")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("42738")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("-1")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::Number);
@@ -2946,6 +3094,71 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
                 ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  }
+}
+
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest_validate_grpc_header_before_log_grpc_status) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
+  });
+
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::Number);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
+
+  for (size_t i = 0; i < grpcStatuses; ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(std::to_string(i),
+              formatter.format(request_header, response_header, response_trailer, stream_info, body,
+                               AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(i)));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(-1)));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(42738)));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(-1)));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
+                                      stream_info, body, AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(42738)));
+    response_header.clear();
   }
 }
 
