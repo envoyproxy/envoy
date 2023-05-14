@@ -6,6 +6,7 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
+#include "envoy/config/custom_config_validators.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -19,7 +20,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -42,8 +42,7 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
-              XdsConfigTrackerOptRef xds_config_tracker,
+              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
               const std::string& target_xds_authority);
 
@@ -241,33 +240,8 @@ private:
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
 using GrpcMuxImplSharedPtr = std::shared_ptr<GrpcMuxImpl>;
 
-class NullGrpcMuxImpl : public GrpcMux,
-                        GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
-public:
-  void start() override {}
-  ScopedResume pause(const std::string&) override {
-    return std::make_unique<Cleanup>([] {});
-  }
-  ScopedResume pause(const std::vector<std::string>) override {
-    return std::make_unique<Cleanup>([] {});
-  }
-
-  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
-                           const SubscriptionOptions&) override {
-    ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
-  }
-
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    ENVOY_BUG(false, "unexpected request for on demand update");
-  }
-
-  void onWriteable() override {}
-  void onStreamEstablished() override {}
-  void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
-                           ControlPlaneStats&) override {}
-};
+class GrpcMuxFactory;
+DECLARE_FACTORY(GrpcMuxFactory);
 
 } // namespace Config
 } // namespace Envoy
