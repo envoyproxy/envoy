@@ -26,6 +26,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -181,6 +182,10 @@ http_filters:
 }
 
 TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string config_yaml = R"EOF(
 route_config:
   virtual_hosts:
@@ -359,6 +364,10 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:
@@ -476,6 +485,10 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
 
 // validate the optional unknown factory will be ignored for per route typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerRouteTypedConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:

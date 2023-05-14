@@ -24,6 +24,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -570,6 +571,10 @@ key:
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.
 TEST_F(ScopedRdsTest, OptionalUnknownFactoryForPerVirtualHostTypedConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   setup(optional_http_filters);

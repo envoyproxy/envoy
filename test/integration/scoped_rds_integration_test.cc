@@ -465,6 +465,9 @@ key:
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route", "cluster_0"), "1");
   };
 
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
+
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              http_connection_manager) {

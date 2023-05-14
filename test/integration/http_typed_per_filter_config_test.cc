@@ -48,6 +48,9 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
 }
 
 TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
