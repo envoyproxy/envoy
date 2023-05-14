@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/config_validator.h"
+#include "envoy/config/subscription.h"
 
 namespace Envoy {
 namespace Config {

@@ -143,6 +143,10 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: access_log
+  change: |
+    added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
+    to filter access log records based on the type of the record.
 - area: ext_proc
   change: |
     added new configuration field

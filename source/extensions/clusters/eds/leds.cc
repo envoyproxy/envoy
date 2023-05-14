@@ -17,7 +17,7 @@ LedsSubscription::LedsSubscription(
     Stats::Scope& cluster_stats_scope, const UpdateCb& callback)
     : Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>(
           factory_context.messageValidationVisitor(), leds_config.leds_collection_name()),
-      local_info_(factory_context.serverFactoryContext().localInfo()), cluster_name_(cluster_name),
+      local_info_(factory_context.localInfo()), cluster_name_(cluster_name),
       stats_scope_(cluster_stats_scope.createScope("leds.")),
       stats_({ALL_LEDS_STATS(POOL_COUNTER(*stats_scope_))}), callback_(callback) {
   const xds::core::v3::ResourceLocator leds_resource_locator =
