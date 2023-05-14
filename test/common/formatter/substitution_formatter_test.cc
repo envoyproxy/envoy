@@ -2764,7 +2764,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest_validate_grpc_header_before_log_grpc_status) {
+TEST(SubstitutionFormatterTest,
+     GrpcStatusFormatterCamelStringTest_validate_grpc_header_before_log_grpc_status) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
@@ -2932,7 +2933,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest_validate_grpc_header_before_log_grpc_status) {
+TEST(SubstitutionFormatterTest,
+     GrpcStatusFormatterSnakeStringTest_validate_grpc_header_before_log_grpc_status) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
@@ -3097,7 +3099,8 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest_validate_grpc_header_before_log_grpc_status) {
+TEST(SubstitutionFormatterTest,
+     GrpcStatusFormatterNumberTest_validate_grpc_header_before_log_grpc_status) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
