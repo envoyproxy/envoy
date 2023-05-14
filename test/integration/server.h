@@ -357,8 +357,8 @@ public:
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
 
-  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {};
-  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{};
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{};
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
