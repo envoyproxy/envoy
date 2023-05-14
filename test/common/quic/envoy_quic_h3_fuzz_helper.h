@@ -4,6 +4,8 @@
 
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/core/quic_versions.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/crypto/null_decrypter.h"
 
 namespace Envoy {
 namespace Quic {
@@ -44,62 +46,32 @@ private:
   size_t idx_{0};
 };
 
-class FuzzEncrypter : public quic::QuicEncrypter {
+class FuzzEncrypter : public quic::NullEncrypter {
 public:
-  bool SetKey(absl::string_view key) override { return key.empty(); };
-  bool SetNoncePrefix(absl::string_view nonce_prefix) override { return nonce_prefix.empty(); };
-  bool SetIV(absl::string_view iv) override { return iv.empty(); };
-  bool SetHeaderProtectionKey(absl::string_view key) override { return key.empty(); };
-  size_t GetKeySize() const override { return 0; };
-  size_t GetNoncePrefixSize() const override { return 0; };
-  size_t GetIVSize() const override { return 0; };
+  FuzzEncrypter(quic::Perspective perspective)
+    : NullEncrypter(perspective) {};
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
-                     size_t* output_length, size_t max_output_length) override {
+                     size_t* output_length, size_t max_output_length) {
     ASSERT(plaintext.length() <= max_output_length);
     memcpy(output, plaintext.data(), plaintext.length());
     *output_length = plaintext.length();
     return true;
   };
-  std::string GenerateHeaderProtectionMask(absl::string_view) override { return {5, 0}; };
-  size_t GetMaxPlaintextSize(size_t ciphertext_size) const override { return ciphertext_size; }
-  size_t GetCiphertextSize(size_t plaintext_size) const override { return plaintext_size; }
-  absl::string_view GetKey() const override { return {}; };
-  absl::string_view GetNoncePrefix() const override { return {}; };
-  quic::QuicPacketCount GetConfidentialityLimit() const override {
-    return std::numeric_limits<quic::QuicPacketCount>::max();
-  }
+  size_t GetMaxPlaintextSize(size_t ciphertext_size) const { return ciphertext_size; }
+  size_t GetCiphertextSize(size_t plaintext_size) const { return plaintext_size; }
 };
 
-class FuzzDecrypter : public quic::QuicDecrypter {
+class FuzzDecrypter : public quic::NullDecrypter {
 public:
-  explicit FuzzDecrypter() = default;
-  FuzzDecrypter(const FuzzDecrypter&) = delete;
-  FuzzDecrypter& operator=(const FuzzDecrypter&) = delete;
-  ~FuzzDecrypter() override = default;
-
-  bool SetKey(absl::string_view key) override { return key.empty(); };
-  bool SetNoncePrefix(absl::string_view nonce_prefix) override { return nonce_prefix.empty(); };
-  bool SetIV(absl::string_view iv) override { return iv.empty(); };
-  bool SetPreliminaryKey(absl::string_view) override { return false; };
-  bool SetHeaderProtectionKey(absl::string_view key) override { return key.empty(); };
-  bool SetDiversificationNonce(const quic::DiversificationNonce&) override { return true; };
+  FuzzDecrypter(quic::Perspective perspective)
+    : NullDecrypter(perspective) {};
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
-                     size_t* output_length, size_t max_output_length) override {
+                     size_t* output_length, size_t max_output_length) {
     ASSERT(ciphertext.length() <= max_output_length);
     memcpy(output, ciphertext.data(), ciphertext.length());
     *output_length = ciphertext.length();
     return true;
   };
-  std::string GenerateHeaderProtectionMask(quic::QuicDataReader*) override { return {5, 0}; };
-  size_t GetKeySize() const override { return 0; };
-  size_t GetNoncePrefixSize() const override { return 0; };
-  size_t GetIVSize() const override { return 0; };
-  absl::string_view GetKey() const override { return {}; };
-  absl::string_view GetNoncePrefix() const override { return {}; };
-  uint32_t cipher_id() const override { return 0; };
-  quic::QuicPacketCount GetIntegrityLimit() const override {
-    return std::numeric_limits<quic::QuicPacketCount>::max();
-  }
 };
 
 } // namespace Quic

@@ -202,8 +202,8 @@ protected:
         false, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection_socket),
         connection_id_generator());
 
-    auto decrypter = std::make_unique<FuzzDecrypter>();
-    auto encrypter = std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT);
+    auto decrypter = std::make_unique<FuzzDecrypter>(quic::Perspective::IS_SERVER);
+    auto encrypter = std::make_unique<FuzzEncrypter>(quic::Perspective::IS_SERVER);
     connection->InstallDecrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
                                  std::move(decrypter));
     connection->SetEncrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,

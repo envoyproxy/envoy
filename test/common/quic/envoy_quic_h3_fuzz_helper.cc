@@ -166,14 +166,15 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
       framer_({quic_version_}, connection_helper_->GetClock()->Now(), quic::Perspective::IS_CLIENT,
               quic::kQuicDefaultConnectionIdLength),
       h3packetizer_(open_h3_streams_) {
+  quic::Perspective p = quic::Perspective::IS_CLIENT;
   framer_.SetEncrypter(quic::ENCRYPTION_INITIAL,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
   framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
   framer_.SetEncrypter(quic::ENCRYPTION_ZERO_RTT,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
   framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
 }
 
 void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
@@ -396,8 +397,9 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
                           quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength);
 
+  auto encrypter = new FuzzEncrypter(quic::Perspective::IS_CLIENT);
   framer.SetEncrypter(quic::ENCRYPTION_INITIAL,
-                      std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+                      std::unique_ptr<quic::QuicEncrypter>(encrypter));
   quic_packet_sizes_[idx_] =
       framer.BuildDataPacket(header, frames, quic_packets_[idx_], sizeof(quic_packets_[idx_]),
                              quic::EncryptionLevel::ENCRYPTION_INITIAL);
