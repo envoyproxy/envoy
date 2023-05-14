@@ -89,6 +89,7 @@ paths:
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
     - source/common/matcher/field_matcher.h
+    - source/common/protobuf/visitor_helper.h
     - source/extensions/common/matcher/trie_matcher.h
     # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
     exclude:
