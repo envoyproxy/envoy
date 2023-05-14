@@ -78,6 +78,11 @@ bug_fixes:
     Fixed the bug that updating :ref:`scope_key_builder
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
+- area: logging
+  change: |
+    GRPC_STATUS_NUMBER will not be showed in access_log, for non-grpc request.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
