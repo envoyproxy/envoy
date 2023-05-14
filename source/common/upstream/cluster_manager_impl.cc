@@ -812,8 +812,13 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
       ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      for (auto& cb : cluster_manager->update_callbacks_) {
-        cb->onClusterRemoval(cluster_name);
+      for (auto cb_it = cluster_manager->update_callbacks_.begin();
+           cb_it != cluster_manager->update_callbacks_.end();) {
+        // The current callback may remove itself from the list, so a handle for
+        // the next item is fetched before calling the callback.
+        auto curr_cb_it = cb_it;
+        ++cb_it;
+        (*curr_cb_it)->onClusterRemoval(cluster_name);
       }
       cluster_manager->thread_local_clusters_.erase(cluster_name);
     });
@@ -1145,8 +1150,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     }
 
     if (new_cluster != nullptr) {
-      for (auto& cb : cluster_manager->update_callbacks_) {
-        cb->onClusterAddOrUpdate(*new_cluster);
+      for (auto cb_it = cluster_manager->update_callbacks_.begin();
+           cb_it != cluster_manager->update_callbacks_.end();) {
+        // The current callback may remove itself from the list, so a handle for
+        // the next item is fetched before calling the callback.
+        auto curr_cb_it = cb_it;
+        ++cb_it;
+        (*curr_cb_it)->onClusterAddOrUpdate(*new_cluster);
       }
     }
   });
