@@ -10297,6 +10297,10 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10339,6 +10343,10 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10378,6 +10386,10 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10416,6 +10428,10 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10432,6 +10448,31 @@ virtual_hosts:
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilterButNoRuntime) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                     optional_http_filters),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {

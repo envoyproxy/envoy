@@ -66,6 +66,14 @@ bug_fixes:
     Fixed the bug that updating :ref:`scope_key_builder
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
+- area: http
+  change: |
+    The :ref:`is_optional <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>` field of
+    HTTP filter can only be used for configuration loading of
+    :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>` and will be ignored for
+    loading of route or virtual host level filter config.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

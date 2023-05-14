@@ -2108,7 +2108,11 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
+
+  // Ignore the optional_http_filters if the ignore_optional_option_from_hcm_for_route_config_ is
+  // set to true by the runtime feature.
+  bool is_optional = !ignore_optional_option_from_hcm_for_route_config_ &&
+                     (optional_http_filters.find(name) != optional_http_filters.end());
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -2147,7 +2151,10 @@ PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator) {
+    ProtobufMessage::ValidationVisitor& validator)
+    : ignore_optional_option_from_hcm_for_route_config_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config")) {
+
   for (const auto& it : typed_configs) {
     const auto& name = it.first;
     auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
