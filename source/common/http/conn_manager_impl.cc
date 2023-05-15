@@ -970,7 +970,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
-      Code response_code = Code::BadRequest;
+      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
+                               ? Code::NotImplemented
+                               : Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
       if (redirect && !is_grpc) {
@@ -1715,6 +1717,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   chargeStats(headers);
 
+  if (state_.is_tunneling_ &&
+      connection_manager_.config_.flushAccessLogOnTunnelSuccessfullyEstablished()) {
+    filter_manager_.log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+  }
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
