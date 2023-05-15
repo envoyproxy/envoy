@@ -970,7 +970,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
-      Code response_code = Code::BadRequest;
+      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
+                               ? Code::NotImplemented
+                               : Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
       if (redirect && !is_grpc) {

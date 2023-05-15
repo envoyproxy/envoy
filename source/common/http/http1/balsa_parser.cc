@@ -150,6 +150,10 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = false;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+#ifdef ENVOY_ENABLE_UHV
+  // UHV - disable transfer-encoding validations in Balsa
+  http_validation_policy.validate_transfer_encoding = false;
+#endif
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
