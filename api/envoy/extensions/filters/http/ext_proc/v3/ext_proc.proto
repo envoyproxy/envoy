@@ -183,12 +183,12 @@ message ExternalProcessor {
   bool disable_clear_route_cache = 11;
 
   // [#not-implemented-hide:]
-  // Allow headers matching the ``forward_rules`` to be forwarded to the external processing service.
+  // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
   HeaderForwardingRules forward_rules = 12;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
-// allowed to be forwarded to the external processing service.
+// allowed to be forwarded to the external processing server.
 message HeaderForwardingRules {
   type.matcher.v3.ListStringMatcher allowed_headers = 1;
 }
