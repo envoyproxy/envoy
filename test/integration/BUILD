@@ -82,6 +82,9 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [":http_integration_lib"],
 )
 
@@ -89,6 +92,9 @@ envoy_cc_test(
     name = "api_listener_integration_test",
     size = "large",
     srcs = ["api_listener_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/mocks/http:stream_encoder_mock",
@@ -125,6 +131,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -144,6 +153,9 @@ envoy_cc_test(
     name = "eds_integration_test",
     size = "large",
     srcs = ["eds_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -163,6 +175,9 @@ envoy_cc_test(
     name = "leds_integration_test",
     size = "large",
     srcs = ["leds_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -185,6 +200,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "filter_manager_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":filter_manager_integration_proto_cc_proto",
@@ -270,6 +288,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":vhds_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -300,6 +321,9 @@ envoy_cc_test(
         "drain_close_integration_test.cc",
     ]),
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:utility_lib",
@@ -359,6 +383,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
@@ -373,6 +400,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "header_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
