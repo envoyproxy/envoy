@@ -52,7 +52,7 @@ struct HttpClientStats {
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
   Client(ApiListenerPtr&& api_listener, Event::ProvisionalDispatcher& dispatcher,
-	 Stats::Scope& scope, Random::RandomGenerator& random)
+         Stats::Scope& scope, Random::RandomGenerator& random)
       : api_listener_(std::move(api_listener)), dispatcher_(dispatcher),
         stats_(
             HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."),
