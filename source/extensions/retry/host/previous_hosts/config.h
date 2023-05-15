@@ -13,8 +13,8 @@ namespace Host {
 class PreviousHostsRetryPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
   Upstream::RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&,
-                                                            uint32_t retry_count) override {
-    return std::make_shared<PreviousHostsRetryPredicate>(retry_count);
+                                                            uint32_t) override {
+    return std::make_shared<PreviousHostsRetryPredicate>();
   }
 
   std::string name() const override { return "envoy.retry_host_predicates.previous_hosts"; }
