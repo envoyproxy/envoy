@@ -6,8 +6,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/new_delta_subscription_state.h"
-#include "source/common/config/old_delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/new_delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/old_delta_subscription_state.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/types/variant.h"
