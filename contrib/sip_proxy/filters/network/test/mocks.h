@@ -209,9 +209,10 @@ public:
   MOCK_METHOD(void, deleteTrafficRoutingAssistant,
               (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
-  MOCK_METHOD(void, complete,
-              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
-              ());
+  MOCK_METHOD(void, complete,                                                    // NOLINT
+              (const TrafficRoutingAssistant::ResponseType&, const std::string&, // NOLINT
+               const absl::any&),                                                // NOLINT
+              ());                                                               // NOLINT
   MOCK_METHOD(void, doSubscribe,
               (const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity),
               ());
