@@ -31,7 +31,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -955,18 +954,15 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
-      "envoy.config_mux.new_grpc_mux_factory");
-  if (factory) {
-    factory->shutdownAll();
+  std::vector<std::string> muxes = {
+      "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
+      "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};
+  for (auto name : muxes) {
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (factory) {
+      factory->shutdownAll();
+    }
   }
-  factory =
-      Config::Utility::getFactoryByName<Config::MuxFactory>("envoy.config_mux.grpc_mux_factory");
-  if (factory) {
-    factory->shutdownAll();
-  }
-  Config::XdsMux::GrpcMuxSotw::shutdownAll();
-  Config::XdsMux::GrpcMuxDelta::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();
