@@ -90,7 +90,7 @@ public:
     cluster_scope_ = stats_.createScope("cluster.xds_cluster.");
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         server_context_, ssl_context_manager_, *cluster_scope_, server_context_.cluster_manager_,
-        validation_visitor_);
+        stats_, validation_visitor_);
 
     // Setup LEDS subscription.
     EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,

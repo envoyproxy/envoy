@@ -59,9 +59,8 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
     handle_.setLibqat(libqat_);
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(factory_context_.server_context_, singletonManager())
-        .WillByDefault(testing::ReturnRef(fsm_));
+    ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(factory_context_, singletonManager()).WillByDefault(testing::ReturnRef(fsm_));
   }
 
   Stats::TestUtil::TestStore store_;
