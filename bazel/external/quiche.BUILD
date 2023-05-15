@@ -4501,6 +4501,7 @@ envoy_cc_library(
         ":quic_platform_base",
         ":quiche_common_endian_lib",
         ":quiche_common_print_elements_lib",
+        ":quiche_web_transport_web_transport_lib",
     ],
 )
 
