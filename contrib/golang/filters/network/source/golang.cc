@@ -92,7 +92,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
-  ENVOY_CONN_LOG(debug, "onData, addr: {}, len: {}, end: {}", read_callbacks_->connection(), addr_,
+  ENVOY_CONN_LOG(debug, "onWrite, addr: {}, len: {}, end: {}", read_callbacks_->connection(), addr_,
                  data.length(), end_stream);
 
   Buffer::RawSliceVector slice_vector = data.getRawSlices();

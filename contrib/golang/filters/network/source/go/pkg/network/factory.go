@@ -34,6 +34,7 @@ type FilterFactory interface {
 }
 
 type ConfigParser interface {
+	// TODO: should return error when the config is invalid.
 	ParseConfig(any *anypb.Any) interface{}
 }
 
