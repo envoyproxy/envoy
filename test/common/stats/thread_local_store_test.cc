@@ -1652,26 +1652,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 
   // Verifies that if we ask for more buckets than there are, we just get our one bucket.
-  EXPECT_THAT(parent_histogram->detailedTotalBuckets(10), UnorderedElementsAre(Bucket{10, 1, 1}));
-}
-
-TEST_F(HistogramTest, ParentHistogramBucketManyBucketDetail) {
-  ScopeSharedPtr scope1 = store_->createScope("scope1.");
-  Histogram& histogram = scope_.histogramFromString("histogram", Histogram::Unit::Unspecified);
-  store_->mergeHistograms([]() -> void {});
-  ASSERT_EQ(1, store_->histograms().size());
-  ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];
-
-  for (uint32_t i = 0; i < 1000; ++i) {
-    uint64_t value = i * 1000;
-    EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), value));
-    histogram.recordValue(value);
-  }
-  store_->mergeHistograms([]() -> void {});
-  EXPECT_LT(100, parent_histogram->detailedTotalBuckets().size());
-  for (uint32_t i = 1; i < 100; ++i) {
-    EXPECT_EQ(i, parent_histogram->detailedTotalBuckets(i).size());
-  }
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 }
 
 TEST_F(HistogramTest, ForEachHistogram) {

@@ -46,9 +46,9 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     break;
   case Utility::HistogramBucketsMode::Detailed:
     response.addFragments({name, ":\n  totals="});
-    addDetail(histogram.detailedTotalBuckets(64), response);
+    addDetail(histogram.detailedTotalBuckets(), response);
     response.add("\n  intervals=");
-    addDetail(histogram.detailedIntervalBuckets(64), response);
+    addDetail(histogram.detailedIntervalBuckets(), response);
     response.addFragments({"\n  summary=", histogram.quantileSummary(), "\n"});
     break;
   }
@@ -171,14 +171,14 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     break;
   }
   case Utility::HistogramBucketsMode::Detailed: {
-    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedTotalBuckets(64);
+    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedTotalBuckets();
     ProtobufWkt::Struct histogram_obj;
     ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
     histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
     populateQuantiles(histogram, "supported_percentiles",
                       histogram_obj_fields["percentiles"].mutable_list_value());
-    populateDetail("totals", histogram.detailedTotalBuckets(64), histogram_obj_fields);
-    populateDetail("intervals", histogram.detailedIntervalBuckets(64), histogram_obj_fields);
+    populateDetail("totals", histogram.detailedTotalBuckets(), histogram_obj_fields);
+    populateDetail("intervals", histogram.detailedIntervalBuckets(), histogram_obj_fields);
     *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
     break;
   }

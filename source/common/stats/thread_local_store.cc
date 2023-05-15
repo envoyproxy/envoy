@@ -959,27 +959,17 @@ std::string ParentHistogramImpl::bucketSummary() const {
 }
 
 std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram) {
-  uint32_t index = 0;
-  ParentHistogram::Bucket bucket;
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+  const uint32_t num_buckets = hist_num_buckets(&histogram);
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
   hist_bucket_t hist_bucket;
-  return Utility::interpolateHistogramBuckets(
-      max_buckets, hist_num_buckets(&histogram), [&index, &bucket, &hist_bucket, &histogram]() {
-        hist_bucket_idx_bucket(&histogram, index++, &hist_bucket, &bucket.count_);
-        bucket.min_value_ = hist_bucket_to_double(hist_bucket);
-        bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
-        return bucket;
-      });
-}
-
-std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedTotalBuckets(uint32_t max_buckets) const {
-  return detailedlBucketsHelper(max_buckets, *cumulative_histogram_);
-}
-
-std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedIntervalBuckets(uint32_t max_buckets) const {
-  return detailedlBucketsHelper(max_buckets, *interval_histogram_);
+  for (uint32_t i = 0; i < num_buckets; ++i) {
+    ParentHistogram::Bucket& bucket = buckets[i];
+    hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
+    bucket.min_value_ = hist_bucket_to_double(hist_bucket);
+    bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
+  }
+  return buckets;
 }
 
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
