@@ -6,8 +6,8 @@ load(
     "envoy_proto_library",
 )
 load(
-    "filter_fuzz_support.bzl",
-    "fuzz_filters_targets",
+    "//source/extensions:all_extensions.bzl",
+    "envoy_select_network_filters",
 )
 
 licenses(["notice"])  # Apache 2
@@ -104,7 +104,7 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-    ] + fuzz_filters_targets(_readfilter_fuzz_filters),
+    ] + envoy_select_network_filters(_readfilter_fuzz_filters),
 )
 
 _writefilter_fuzz_filters = [
@@ -144,5 +144,5 @@ envoy_cc_fuzz_test(
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
-    ] + fuzz_filters_targets(_writefilter_fuzz_filters),
+    ] + envoy_select_network_filters(_writefilter_fuzz_filters),
 )
