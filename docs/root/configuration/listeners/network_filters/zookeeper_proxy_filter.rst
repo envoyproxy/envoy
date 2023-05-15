@@ -31,8 +31,9 @@ in the configuration snippet below:
 Statistics
 ----------
 
-Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*. The
-following counters are available:
+Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
+*_resp_fast* and *_resp_slow* metrics will only be emitted when enabling the latency threshold metrics.
+The following counters are available:
 
 .. csv-table::
   :header: Name, Type, Description

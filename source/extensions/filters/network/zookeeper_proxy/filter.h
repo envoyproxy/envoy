@@ -146,7 +146,7 @@ struct ZooKeeperProxyStats {
   ALL_ZOOKEEPER_PROXY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-enum class ErrorBudgetResponseType { FAST, SLOW };
+enum class ErrorBudgetResponseType { FAST, SLOW, NONE };
 
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride;
 using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThresholdOverride_Opcode;
@@ -159,7 +159,8 @@ using OpcodeMap = absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t>;
  */
 class ZooKeeperFilterConfig {
 public:
-  ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
+  ZooKeeperFilterConfig(const std::string& stat_prefix, const uint32_t max_packet_bytes,
+                        const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
                         const LatencyThresholdOverrideList& latency_threshold_overrides,
                         Stats::Scope& scope);
@@ -168,9 +169,9 @@ public:
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
 
   // The OpCodeInfo is created as a public member of ZooKeeperFilterConfig.
-  // Therefore, its lifetime is tie to that of ZooKeeperFilterConfig.
+  // Therefore, its lifetime is tied to that of ZooKeeperFilterConfig.
   // When the ZooKeeperFilterConfig object is destroyed, the OpCodeInfo will be destroyed as well.
-  // The the lifetime of scope is tie to the context passed to network filters to access server
+  // The the lifetime of scope is tied to the context passed to network filters to access server
   // resources. The values of counter elements in OpCodeInfo are used to track total op-code usage,
   // as well as the StatName under which to collect the latency, fast/slow responses for that
   // op-code. The latency-name will be joined with the stat_prefix_, which varies per filter
@@ -206,39 +207,10 @@ private:
   }
 
   int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
-
-  static const OpcodeMap& opcodeMap() {
-    CONSTRUCT_ON_FIRST_USE(OpcodeMap, {{LatencyThresholdOverride::Connect, 0},
-                                       {LatencyThresholdOverride::Create, 1},
-                                       {LatencyThresholdOverride::Delete, 2},
-                                       {LatencyThresholdOverride::Exists, 3},
-                                       {LatencyThresholdOverride::GetData, 4},
-                                       {LatencyThresholdOverride::SetData, 5},
-                                       {LatencyThresholdOverride::GetAcl, 6},
-                                       {LatencyThresholdOverride::SetAcl, 7},
-                                       {LatencyThresholdOverride::GetChildren, 8},
-                                       {LatencyThresholdOverride::Sync, 9},
-                                       {LatencyThresholdOverride::Ping, 11},
-                                       {LatencyThresholdOverride::GetChildren2, 12},
-                                       {LatencyThresholdOverride::Check, 13},
-                                       {LatencyThresholdOverride::Multi, 14},
-                                       {LatencyThresholdOverride::Create2, 15},
-                                       {LatencyThresholdOverride::Reconfig, 16},
-                                       {LatencyThresholdOverride::CheckWatches, 17},
-                                       {LatencyThresholdOverride::RemoveWatches, 18},
-                                       {LatencyThresholdOverride::CreateContainer, 19},
-                                       {LatencyThresholdOverride::CreateTtl, 21},
-                                       {LatencyThresholdOverride::Close, -11},
-                                       {LatencyThresholdOverride::SetAuth, 100},
-                                       {LatencyThresholdOverride::SetWatches, 101},
-                                       {LatencyThresholdOverride::GetEphemerals, 103},
-                                       {LatencyThresholdOverride::GetAllChildrenNumber, 104},
-                                       {LatencyThresholdOverride::SetWatches2, 105}});
-  }
-
   LatencyThresholdOverrideMap
   parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 
+  const bool enable_latency_threshold_metrics_;
   const std::chrono::milliseconds default_latency_threshold_;
   // Key: opcode enum value defined in decoder.h, value: latency threshold override in millisecond.
   const LatencyThresholdOverrideMap latency_threshold_override_map_;

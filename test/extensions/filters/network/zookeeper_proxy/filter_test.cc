@@ -28,14 +28,14 @@ MATCHER_P(MapEq, rhs, "") { return protoMapEq(arg, rhs); }
 
 class ZooKeeperFilterTest : public testing::Test {
 public:
-  ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
-
-  void
-  initialize(std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
-             const LatencyThresholdOverrideList& latency_threshold_overrides =
-                 LatencyThresholdOverrideList()) {
+  void initialize(
+      const bool enable_latency_threshold_metrics = true,
+      const std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
+      const LatencyThresholdOverrideList& latency_threshold_overrides =
+          LatencyThresholdOverrideList()) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
-        stat_prefix_, 1048576, default_latency_threshold, latency_threshold_overrides, scope_);
+        stat_prefix_, 1048576, enable_latency_threshold_metrics, default_latency_threshold,
+        latency_threshold_overrides, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -661,13 +661,35 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
+TEST_F(ZooKeeperFilterTest, DisableErrorBudgetCalculation) {
+  // Disable the error budget metrics emitting.
+  std::chrono::milliseconds default_latency_threshold(200);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+
+  initialize(false, default_latency_threshold, latency_threshold_overrides);
+
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
+            ErrorBudgetResponseType::NONE);
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
+            ErrorBudgetResponseType::NONE);
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(200)),
+            ErrorBudgetResponseType::NONE);
+
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(201)),
+            ErrorBudgetResponseType::NONE);
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(202)),
+            ErrorBudgetResponseType::NONE);
+  EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(203)),
+            ErrorBudgetResponseType::NONE);
+}
+
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig) {
   // Set default latency threshold as 200 milliseconds. The latency thresholds of all other opcode
   // fallback to the default threshold.
   std::chrono::milliseconds default_latency_threshold(200);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(default_latency_threshold, latency_threshold_overrides);
+  initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::FAST);
@@ -694,7 +716,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) 
   threshold_override->set_opcode(LatencyThresholdOverride::Multi);
   threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(default_latency_threshold, latency_threshold_overrides);
+  initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::FAST);
@@ -724,7 +746,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresho
   threshold_override->set_opcode(LatencyThresholdOverride::Create);
   threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(default_latency_threshold, latency_threshold_overrides);
+  initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(150)),
             ErrorBudgetResponseType::FAST);
