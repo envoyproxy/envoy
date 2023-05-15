@@ -170,6 +170,7 @@ proto_library(
         "//envoy/extensions/filters/network/zookeeper_proxy/v3:pkg",
         "//envoy/extensions/filters/udp/dns_filter/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
+        "//envoy/extensions/formatter/cel/v3:pkg",
         "//envoy/extensions/formatter/metadata/v3:pkg",
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",

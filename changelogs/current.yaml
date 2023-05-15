@@ -113,6 +113,9 @@ new_features:
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
     recorded. Please refer to the access log configuration documentation for more information.
+- area: access_log
+  change: |
+    added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
