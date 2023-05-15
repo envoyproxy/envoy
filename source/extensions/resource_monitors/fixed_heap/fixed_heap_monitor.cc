@@ -28,8 +28,7 @@ void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& call
 
   auto computeUsedMemory = [this]() -> size_t {
     // TODO(Diazalan): Remove if statement once runtime guard is deprecated
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.count_mapped_pages_as_free")) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.count_mapped_pages_as_free")) {
       const size_t physical = stats_->reservedHeapBytes();
       const size_t unmapped = stats_->unmappedHeapBytes();
       ASSERT(physical >= unmapped);

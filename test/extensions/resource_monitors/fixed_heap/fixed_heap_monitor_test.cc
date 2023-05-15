@@ -81,8 +81,7 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
 TEST(FixedHeapMonitorTest, LegacyComputesCorrectUsage) {
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.count_mapped_pages_as_free", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.count_mapped_pages_as_free", "false"}});
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
@@ -101,8 +100,7 @@ TEST(FixedHeapMonitorTest, LegacyComputesCorrectUsage) {
 TEST(FixedHeapMonitorTest, LegacyComputeUsageWithRealMemoryStats) {
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.count_mapped_pages_as_free", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.count_mapped_pages_as_free", "false"}});
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   const uint64_t max_heap = 1024 * 1024 * 1024;
