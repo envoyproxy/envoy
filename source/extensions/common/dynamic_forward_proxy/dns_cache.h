@@ -25,10 +25,8 @@ public:
       return std::string(host);
     }
     if (Http::HeaderUtility::hostHasPort(host)) {
-      std::cerr << "Returning original host header " << host << "\n";
       return std::string(host);
     }
-    std::cerr << "normalizing host header " << host << ":" << default_port << "\n";
     return absl::StrCat(host, ":", default_port);
   }
 

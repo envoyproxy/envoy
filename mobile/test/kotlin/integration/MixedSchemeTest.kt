@@ -34,7 +34,6 @@ class ReceiveDataTest {
     val dataExpectation2 = CountDownLatch(1)
 
     var status2: Int? = null
-    var body2: ByteBuffer? = null
 
     val requestHeaders2 = RequestHeadersBuilder(
       method = RequestMethod.GET,
@@ -50,7 +49,6 @@ class ReceiveDataTest {
         headersExpectation2.countDown()
       }
       .setOnResponseData { data, _, _ ->
-        body2 = data
         dataExpectation2.countDown()
       }
       .setOnError { _, _ ->
@@ -78,14 +76,12 @@ class ReceiveDataTest {
     val dataExpectation = CountDownLatch(1)
 
     var status: Int? = null
-    var body: ByteBuffer? = null
     client.newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _, _ ->
         status = responseHeaders.httpStatus
         headersExpectation.countDown()
       }
       .setOnResponseData { data, _, _ ->
-        body = data
         dataExpectation.countDown()
       }
       .setOnError { _, _ -> fail("Unexpected error") }
