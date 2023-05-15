@@ -28,6 +28,11 @@ minor_behavior_changes:
     behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers``
     to false.
+- area: dns
+  change: |
+    Changing the DNS cache to use host:port as the cache key rather than host. This allows a
+    downstream DFP filter to serve both secure and insecure clusters. This behavioral change
+    can be reverted by setting runtime flag ``envoy.reloadable_features.dfp_mixed_scheme`` to false.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag

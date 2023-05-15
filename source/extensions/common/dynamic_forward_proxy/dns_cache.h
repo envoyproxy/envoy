@@ -7,6 +7,9 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "source/common/http/header_utility.h"
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -17,6 +20,18 @@ namespace DynamicForwardProxy {
  */
 class DnsHostInfo {
 public:
+  static std::string normalizeHostForDfp(absl::string_view host, uint16_t default_port) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
+      return std::string(host);
+    }
+    if (Http::HeaderUtility::hostHasPort(host)) {
+      std::cerr << "Returning original host header " << host << "\n";
+      return std::string(host);
+    }
+    std::cerr << "normalizing host header " << host << ":" << default_port << "\n";
+    return absl::StrCat(host, ":", default_port);
+  }
+
   virtual ~DnsHostInfo() = default;
 
   /**

@@ -6,6 +6,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -158,14 +159,33 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
             .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
   }
 
-  absl::string_view host;
+  absl::string_view raw_host;
   if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->asString();
+    raw_host = dynamic_host_filter_state->asString();
   } else if (context->downstreamHeaders()) {
-    host = context->downstreamHeaders()->getHostValue();
+    raw_host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
-    host = context->downstreamConnection()->requestedServerName();
+    raw_host = context->downstreamConnection()->requestedServerName();
   }
+
+  const bool is_secure = cluster_.info()
+                             ->transportSocketMatcher()
+                             .resolve(nullptr)
+                             .factory_.implementsSecureTransport();
+  uint32_t port = is_secure ? 443 : 80;
+  if (context->downstreamConnection()) {
+    const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+    if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
+        dynamic_port_filter_state->value() <= 65535) {
+      port = dynamic_port_filter_state->value();
+    }
+  }
+
+  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (host.empty()) {
     return nullptr;
