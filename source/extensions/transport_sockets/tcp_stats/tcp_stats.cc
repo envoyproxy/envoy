@@ -166,7 +166,7 @@ void TcpStatsSocket::recordStats() {
   config_->stats_.cx_tx_mss_bytes_.recordValue(tcp_info->tcpi_snd_mss);
   config_->stats_.cx_rx_mss_bytes_.recordValue(tcp_info->tcpi_rcv_mss);
   config_->stats_.cx_advmss_bytes_.recordValue(tcp_info->tcpi_advmss);
-  // Don't record congestion window if send mss is 0.
+  // Record congestion window only when `snd_mss` is greater than 0.
   if (tcp_info->tcpi_snd_mss > 0) {
     // Convert packets to bytes.
     config_->stats_.cx_congestion_window_.recordValue(tcp_info->tcpi_snd_cwnd *
