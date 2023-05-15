@@ -1852,7 +1852,7 @@ absl::optional<std::string> GrpcStatusFormatter::format(
     absl::string_view, AccessLog::AccessLogType) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
-    if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
       return absl::nullopt;
     }
   }
@@ -1890,7 +1890,7 @@ ProtobufWkt::Value GrpcStatusFormatter::formatValue(
     absl::string_view, AccessLog::AccessLogType) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
-    if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
       return unspecifiedValue();
     }
   }
