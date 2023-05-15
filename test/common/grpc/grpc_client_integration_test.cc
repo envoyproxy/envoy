@@ -57,6 +57,8 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
   stream_0->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+  EXPECT_EQ(stream_0->grpc_stream_.streamInfo().getUpstreamBytesMeter()->wireBytesReceived(), 0UL);
+  EXPECT_EQ(stream_1->grpc_stream_.streamInfo().getUpstreamBytesMeter()->wireBytesSent(), 0UL);
 }
 
 // Validate that multiple request-reply unary RPCs works.
