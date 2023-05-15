@@ -555,8 +555,10 @@ public:
                    Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
                    const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
                    std::unique_ptr<Router::GenericConnPool>&);
+  ~CombinedUpstream() override;
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
+  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   void setRequestEncoder(Http::RequestEncoder&, bool) override {}
   bool isValidResponse(const Http::ResponseHeaderMap&) override;
 };

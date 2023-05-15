@@ -258,14 +258,13 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     protocol = Http::Protocol::Http3;
   } else if (type_ == Http::CodecType::HTTP2) {
     protocol = Http::Protocol::Http2;
-
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-      absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
-      generic_conn_pool_ = nullptr;
-      generic_conn_pool_ = createConnPool(thread_local_cluster, context, upstream_protocol);
-      return;
-    }
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+    absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
+    generic_conn_pool_ = nullptr;
+    generic_conn_pool_ = createConnPool(thread_local_cluster, context, upstream_protocol);
+    return;
   }
   conn_pool_data_ =
       thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
@@ -361,6 +360,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
   upstream_request_ = std::make_unique<UpstreamRequest>(
       *this, std::move(conn_pool), /*can_send_early_data_=*/false, /*can_use_http3_=*/true);
 }
+CombinedUpstream::~CombinedUpstream() { upstream_request_->resetStream(); }
 
 void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
   auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
@@ -387,6 +387,15 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
 
 void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_request_->acceptDataFromRouter(data, end_stream);
+}
+
+Tcp::ConnectionPool::ConnectionData*
+CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    upstream_request_->resetStream();
+  }
+  return nullptr;
 }
 
 bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
