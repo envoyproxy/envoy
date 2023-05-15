@@ -2471,6 +2471,67 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnTunnelEstablished) {
+  setup(false, "");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+      .WillOnce(Invoke([&](absl::string_view, const FilterChainFactory::UpgradeMap*,
+                           FilterChainManager& manager) -> bool {
+        FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
+        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+        manager.applyFilterFactoryCb({}, filter_factory);
+        manager.applyFilterFactoryCb({}, handler_factory);
+        return true;
+      }));
+
+  flush_log_on_tunnel_successfully_established_ = true;
+
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info,
+                          AccessLog::AccessLogType access_log_type) {
+        // First call to log() is made when a new HTTP tunnel has been established.
+        EXPECT_EQ(access_log_type,
+                  AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+      }))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info,
+                          AccessLog::AccessLogType access_log_type) {
+        // Second call to log() is made when the request is completed, so it is expected
+        // that the response code is available and matches the response headers.
+        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, access_log_type);
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.route());
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   access_log_flush_interval_ = std::chrono::milliseconds(30 * 1000);
   stream_idle_timeout_ = std::chrono::milliseconds(0);

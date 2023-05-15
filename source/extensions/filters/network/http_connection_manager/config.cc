@@ -564,6 +564,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     flush_access_log_on_new_request_ =
         config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(

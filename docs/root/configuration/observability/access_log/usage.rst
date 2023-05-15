@@ -1061,6 +1061,8 @@ The following command operators are supported:
   * TcpPeriodic - On any TCP Proxy filter periodic log record.
   * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
   * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
   * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
   * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.

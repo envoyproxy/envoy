@@ -597,6 +597,7 @@ public:
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
+  MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,

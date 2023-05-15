@@ -62,6 +62,9 @@ public:
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_log_on_tunnel_successfully_established_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
@@ -211,6 +214,7 @@ public:
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   bool flush_access_log_on_new_request_ = false;
+  bool flush_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;
