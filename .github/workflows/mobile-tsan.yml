@@ -1,18 +1,15 @@
 name: mobile_tsan
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
-
-concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      run:
+        required: true
+        type: string
 
 jobs:
   tsan:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' && inputs.run == 'true' }}
     name: tsan
     runs-on: ubuntu-20.04
     timeout-minutes: 90
@@ -23,17 +20,11 @@ jobs:
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: steps.should_run.outputs.run_ci_job == 'true'
       run: |
         cd mobile && ./bazelw test \
             --test_output=all \

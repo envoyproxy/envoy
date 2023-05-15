@@ -1,18 +1,15 @@
 name: mobile_cc_tests
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
-
-concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      run:
+        required: true
+        type: string
 
 jobs:
   cctests:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' && inputs.run == 'true' }}
     name: cc_tests
     runs-on: ubuntu-20.04
     timeout-minutes: 120

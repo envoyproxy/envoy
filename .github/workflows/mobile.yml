@@ -1,0 +1,136 @@
+name: Mobile
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  repo:
+    if: github.repository == 'envoyproxy/envoy'
+    name: mobile
+    runs-on: ubuntu-20.04
+    outputs:
+      android_build: ${{ steps.should_run.outputs.android_build }}
+      android_build_all: ${{ steps.should_run.outputs.android_build_all }}
+      android_tests: ${{ steps.should_run.outputs.android_tests }}
+      asan: ${{ steps.should_run.outputs.asan }}
+      cc_tests: ${{ steps.should_run.outputs.cc_tests }}
+      compile_time_options: ${{ steps.should_run.outputs.compile_time_options }}
+      coverage: ${{ steps.should_run.outputs.coverage }}
+      formatting: ${{ steps.should_run.outputs.formatting }}
+      ios_build: ${{ steps.should_run.outputs.ios_build }}
+      ios_build_all: ${{ steps.should_run.outputs.ios_build_all }}
+      ios_tests: ${{ steps.should_run.outputs.ios_tests }}
+      perf: ${{ steps.should_run.outputs.perf }}
+      release_validation: ${{ steps.should_run.outputs.release_validation }}
+      tsan: ${{ steps.should_run.outputs.tsan }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/what_to_run.sh
+
+  asan:
+    needs: repo
+    uses: ./.github/workflows/mobile-asan.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.asan }}
+
+  android_build:
+    needs: repo
+    uses: ./.github/workflows/mobile-android_build.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.android_build }}
+      run_all: ${{ needs.repo.outputs.android_build_all }}
+
+  android_tests:
+    needs: repo
+    uses: ./.github/workflows/mobile-android_tests.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.android_tests }}
+
+  cc:
+    needs: repo
+    uses: ./.github/workflows/mobile-cc_tests.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.cc_tests }}
+
+  compile_time_options:
+    needs: repo
+    uses: ./.github/workflows/mobile-compile_time_options.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.compile_time_options }}
+
+  core:
+    needs: repo
+    uses: ./.github/workflows/mobile-core.yml
+    secrets: inherit
+
+  coverage:
+    needs: repo
+    uses: ./.github/workflows/mobile-coverage.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.coverage }}
+
+  docs:
+    needs: repo
+    uses: ./.github/workflows/mobile-docs.yml
+    secrets: inherit
+
+  format:
+    needs: repo
+    if: needs.repo.outputs.formatting == 'true'
+    uses: ./.github/workflows/mobile-format.yml
+    secrets: inherit
+
+  ios:
+    needs: repo
+    uses: ./.github/workflows/mobile-ios_build.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.ios_build }}
+      run_all: ${{ needs.repo.outputs.ios_build_all }}
+
+  ios_tests:
+    needs: repo
+    uses: ./.github/workflows/mobile-ios_tests.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.ios_tests }}
+
+  perf:
+    needs: repo
+    uses: ./.github/workflows/mobile-perf.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.perf }}
+
+  release_validation:
+    needs: repo
+    uses: ./.github/workflows/mobile-release_validation.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.release_validation }}
+
+  tsan:
+    needs: repo
+    uses: ./.github/workflows/mobile-tsan.yml
+    secrets: inherit
+    with:
+      run: ${{ needs.repo.outputs.tsan }}

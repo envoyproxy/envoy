@@ -1,18 +1,15 @@
 name: mobile_perf
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
-
-concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      run:
+        required: true
+        type: string
 
 jobs:
   sizecurrent:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' && inputs.run == 'true' }}
     name: size_current
     runs-on: ubuntu-20.04
     timeout-minutes: 120
@@ -39,7 +36,7 @@ jobs:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizemain:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' && inputs.run == 'true' }}
     name: size_main
     runs-on: ubuntu-20.04
     timeout-minutes: 90
@@ -68,7 +65,7 @@ jobs:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizecompare:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' && inputs.run == 'true' }}
     name: size_compare
     needs: [sizecurrent, sizemain]
     runs-on: ubuntu-20.04

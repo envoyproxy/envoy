@@ -1,14 +1,7 @@
 name: mobile_core
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
-
-concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
   unittests:
