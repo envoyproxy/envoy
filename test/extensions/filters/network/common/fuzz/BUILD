@@ -8,7 +8,6 @@ load(
 load(
     "filter_fuzz_support.bzl",
     "fuzz_filters_targets",
-    "generate_from_template",
 )
 
 licenses(["notice"])  # Apache 2
@@ -116,12 +115,6 @@ _writefilter_fuzz_filters = [
     # TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it
     # supports untrusted data.
 ]
-
-generate_from_template(
-    name = "uber_per_writefilter",
-    filters = _writefilter_fuzz_filters,
-    template_file = "uber_per_writefilter.tmpl.cc",
-)
 
 envoy_cc_test_library(
     name = "uber_writefilter_lib",
