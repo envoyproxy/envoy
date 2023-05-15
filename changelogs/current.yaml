@@ -158,6 +158,11 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: fault
+  change: |
+    added new field :ref:`metadata
+    <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.metadata>` to aid in logging.
+    This metadata can be accessed from StreamInfo's dynamicMetadata().
 
 deprecated:
 - area: access_log
