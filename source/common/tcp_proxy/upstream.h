@@ -471,7 +471,7 @@ private:
     return requests;
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
-  TimeSource& timeSource() override { throw std::logic_error("Not implemented"); }
+  TimeSource& timeSource() override { return config().timeSource(); }
 
   Upstream::ClusterInfoConstSharedPtr cluster_;
   HttpConnPool& parent_;
