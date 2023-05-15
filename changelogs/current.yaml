@@ -193,6 +193,11 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_log_on_tunnel_successfully_established>`.
     Enabling this option will write a log to all access loggers when HTTP tunnels (e.g. Websocket and CONNECT)
     are successfully established.
+- area: fault
+  change: |
+    added new field :ref:`metadata
+    <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.metadata>` to aid in logging.
+    This metadata can be accessed from StreamInfo's dynamicMetadata().
 
 deprecated:
 - area: access_log
