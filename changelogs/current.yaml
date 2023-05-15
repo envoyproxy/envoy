@@ -59,7 +59,7 @@ minor_behavior_changes:
   change: |
     Changed behavior of the fixed heap monitor to count unused mapped pages as
     free memory. This change can be reverted temporarily by setting the runtime guard
-    ``envoy.reloadable_features.count_mapped_pages_as_free`` to false.
+    ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
