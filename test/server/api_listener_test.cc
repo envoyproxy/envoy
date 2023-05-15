@@ -169,16 +169,12 @@ api_listener:
   Network::MockConnectionCallbacks network_connection_callbacks;
   // TODO(junr03): potentially figure out a way of unit testing this behavior without exposing a
   // ForTest function.
-  http_api_listener.readCallbacksForTest(*api_listener)
-      .connection()
-      .addConnectionCallbacks(network_connection_callbacks);
-  EXPECT_FALSE(http_api_listener.readCallbacksForTest(*api_listener)
-                   .connection()
-                   .lastRoundTripTime()
-                   .has_value());
-  http_api_listener.readCallbacksForTest(*api_listener)
-      .connection()
-      .configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+  auto& connection = dynamic_cast<HttpApiListener::ApiListenerWrapper*>(api_listener.get())
+                         ->readCallbacks()
+                         .connection();
+  connection.addConnectionCallbacks(network_connection_callbacks);
+  EXPECT_FALSE(connection.lastRoundTripTime().has_value());
+  connection.configureInitialCongestionWindow(100, std::chrono::microseconds(123));
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.

@@ -31,32 +31,18 @@ void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConn
   }
 }
 
-// This class wraps a HttpConnectionManager used as an Http::ApiListener and the associated
-// SyntheticReadCallbacks to ensure that both objects have the same lifetime.
-class HttpApiListener::HttpConnectionManagerWrapper : public Http::ApiListener {
-public:
-  HttpConnectionManagerWrapper(HttpApiListener& parent, Event::Dispatcher& dispatcher)
-      : read_callbacks_(parent, dispatcher),
-        http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
+HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
+  // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
+  // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
+  // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
+  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
+}
 
-  ~HttpConnectionManagerWrapper() override {
-    // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
-    // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
-    // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
-    read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
-  }
-
-  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                  bool is_internally_created = false) override {
-    return http_connection_manager_->newStream(response_encoder, is_internally_created);
-  }
-
-  SyntheticReadCallbacks& readCallbacksForTest() { return read_callbacks_; }
-
-private:
-  SyntheticReadCallbacks read_callbacks_;
-  Http::ApiListenerPtr http_connection_manager_;
-};
+Http::RequestDecoder&
+HttpApiListener::ApiListenerWrapper::newStream(Http::ResponseEncoder& response_encoder,
+                                               bool is_internally_created) {
+  return http_connection_manager_->newStream(response_encoder, is_internally_created);
+}
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  Server::Instance& server, const std::string& name)
@@ -86,12 +72,7 @@ HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& co
 }
 
 Http::ApiListenerPtr HttpApiListener::createHttpApiListener(Event::Dispatcher& dispatcher) {
-  return std::make_unique<HttpConnectionManagerWrapper>(*this, dispatcher);
-}
-
-Network::ReadFilterCallbacks&
-HttpApiListener::readCallbacksForTest(Http::ApiListener& http_api_listener) {
-  return dynamic_cast<HttpConnectionManagerWrapper&>(http_api_listener).readCallbacksForTest();
+  return std::make_unique<ApiListenerWrapper>(*this, dispatcher);
 }
 
 } // namespace Server

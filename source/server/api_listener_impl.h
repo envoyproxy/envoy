@@ -198,6 +198,27 @@ protected:
  */
 class HttpApiListener : public ApiListenerImplBase {
 public:
+  // Class to wrap an Http::ApiListener and the associated SyntheticReadCallbacks to ensure that
+  // both objects have the same lifetime.
+  //
+  // Public for testing.
+  class ApiListenerWrapper : public Http::ApiListener {
+  public:
+    ApiListenerWrapper(HttpApiListener& parent, Event::Dispatcher& dispatcher)
+        : read_callbacks_(parent, dispatcher),
+          http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
+    ~ApiListenerWrapper() override;
+
+    Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
+                                    bool is_internally_created = false) override;
+
+    SyntheticReadCallbacks& readCallbacks() { return read_callbacks_; }
+
+  private:
+    SyntheticReadCallbacks read_callbacks_;
+    Http::ApiListenerPtr http_connection_manager_;
+  };
+
   HttpApiListener(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
                   const std::string& name);
 
@@ -205,11 +226,7 @@ public:
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
   Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) override;
 
-  Network::ReadFilterCallbacks& readCallbacksForTest(Http::ApiListener& http_api_listener);
-
 private:
-  class HttpConnectionManagerWrapper;
-
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.
   std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
