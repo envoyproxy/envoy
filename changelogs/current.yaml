@@ -163,6 +163,12 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: access_log
+  change: |
+    added additional HCM access log option :ref:`flush_log_on_tunnel_successfully_established
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_log_on_tunnel_successfully_established>`.
+    Enabling this option will write a log to all access loggers when HTTP tunnels (e.g. Websocket and CONNECT)
+    are successfully established.
 
 deprecated:
 - area: access_log

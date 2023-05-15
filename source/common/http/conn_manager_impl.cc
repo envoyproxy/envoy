@@ -1715,6 +1715,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   chargeStats(headers);
 
+  if (state_.is_tunneling_ &&
+      connection_manager_.config_.flushAccessLogOnTunnelSuccessfullyEstablished()) {
+    filter_manager_.log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+  }
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
