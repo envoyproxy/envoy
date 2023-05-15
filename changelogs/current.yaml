@@ -57,10 +57,9 @@ minor_behavior_changes:
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 - area: resource_monitors
   change: |
-    Changed behavior of the fixed heap monitor to count pages allocated to
-    TCMalloc as free memory if it's not used by Envoy. This change can be
-    reverted temporarily by setting the runtime guard
-    ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to false.
+    Changed behavior of the fixed heap monitor to count unused mapped pages as
+    free memory. This change can be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.count_mapped_pages_as_free`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
