@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_contrib_package",
-    "envoy_select_boringssl",
 )
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load(
@@ -36,9 +35,7 @@ configure_make(
     ],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
-    deps = envoy_select_boringssl(
-        ["@boringssl_fips//:ssl"],
-        ["@boringssl//:ssl"],
-    ),
+    # Use boringssl alias to select fips vs non-fips version.
+    deps = ["//bazel:boringssl"],
     alwayslink = True,
 )

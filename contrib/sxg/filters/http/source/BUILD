@@ -3,7 +3,6 @@ load(
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -31,10 +30,9 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
-    ] + envoy_select_boringssl(
-        ["@boringssl_fips//:ssl"],
-        ["@boringssl//:ssl"],
-    ),
+        # use boringssl alias to select fips vs non-fips version.
+        "//bazel:boringssl",
+    ],
 )
 
 envoy_cc_contrib_extension(
