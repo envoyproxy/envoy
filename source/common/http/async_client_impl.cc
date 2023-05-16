@@ -329,9 +329,7 @@ void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
-void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) {
-  response_->body().move(data);
-}
+void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) { response_->body().move(data); }
 
 void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
