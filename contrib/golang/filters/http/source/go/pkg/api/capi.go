@@ -36,7 +36,7 @@ type HttpCAPI interface {
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
+	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
