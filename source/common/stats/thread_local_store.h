@@ -219,6 +219,9 @@ public:
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
   const TagProducer& tagProducer() const { return *tag_producer_; }
+  void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
+  void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                            StatNameTagVector& tags) override;
 
 private:
   friend class ThreadLocalStoreTestingPeer;

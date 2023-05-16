@@ -29,6 +29,7 @@ envoy_cc_extension(
         "//envoy/http:request_id_extension_interface",
         "//envoy/registry",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:scopes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:options_interface",
         "//envoy/stats:stats_interface",

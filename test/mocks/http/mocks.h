@@ -597,6 +597,7 @@ public:
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
+  MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,
@@ -619,6 +620,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
   MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
   MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
+  MOCK_METHOD(OptRef<const Router::ScopeKeyBuilder>, scopeKeyBuilder, ());
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
