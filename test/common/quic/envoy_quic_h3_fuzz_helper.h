@@ -2,10 +2,10 @@
 
 #include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 
+#include "quiche/quic/core/crypto/null_decrypter.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/core/quic_versions.h"
-#include "quiche/quic/core/crypto/null_encrypter.h"
-#include "quiche/quic/core/crypto/null_decrypter.h"
 
 namespace Envoy {
 namespace Quic {
@@ -54,8 +54,7 @@ private:
 // and just pass the plain or cipher text as is.
 class FuzzEncrypter : public quic::NullEncrypter {
 public:
-  FuzzEncrypter(quic::Perspective perspective)
-    : NullEncrypter(perspective) {};
+  FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective){};
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
                      size_t* output_length, size_t max_output_length) {
     ASSERT(plaintext.length() <= max_output_length);
@@ -69,8 +68,7 @@ public:
 
 class FuzzDecrypter : public quic::NullDecrypter {
 public:
-  FuzzDecrypter(quic::Perspective perspective)
-    : NullDecrypter(perspective) {};
+  FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective){};
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
                      size_t* output_length, size_t max_output_length) {
     ASSERT(ciphertext.length() <= max_output_length);

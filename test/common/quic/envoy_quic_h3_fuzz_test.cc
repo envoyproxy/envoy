@@ -108,10 +108,9 @@ struct Harness {
         dispatcher_(api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread")),
         version_manager_(quic::CurrentSupportedHttp3Versions()),
         connection_helper_(std::unique_ptr<quic::QuicConnectionHelperInterface>(
-              new EnvoyQuicConnectionHelper(*dispatcher_.get()))),
+            new EnvoyQuicConnectionHelper(*dispatcher_.get()))),
         alarm_factory_(std::unique_ptr<quic::QuicAlarmFactory>(
-              new EnvoyQuicAlarmFactory(*dispatcher_.get(),
-                *connection_helper_->GetClock()))),
+            new EnvoyQuicAlarmFactory(*dispatcher_.get(), *connection_helper_->GetClock()))),
         packetizer_(quic_version, connection_helper_.get()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
@@ -122,29 +121,27 @@ struct Harness {
         listener_config_(&mock_listener_config_),
         quic_stat_names_(listener_config_->listenerScope().symbolTable()),
         http3_stats_({ALL_HTTP3_CODEC_STATS(
-           POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "http3."),
-           POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))}),
+            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "http3."),
+            POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))}),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         connection_stats_({QUIC_CONNECTION_STATS(
-            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "quic.connection"))})
-  {
+            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "quic.connection"))}) {
     SetQuicFlag(quic_allow_chlo_buffering, false);
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     ON_CALL(http_connection_callbacks_, newStream(_, _))
-    .WillByDefault(Invoke([&](Http::ResponseEncoder&, bool) -> Http::RequestDecoder& {
-      return orphan_request_decoder_;
-    }));
+        .WillByDefault(Invoke([&](Http::ResponseEncoder&, bool) -> Http::RequestDecoder& {
+          return orphan_request_decoder_;
+        }));
   }
 
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
     auto connection_socket = Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
     auto connection = std::make_unique<EnvoyQuicServerConnection>(
         quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_.get(),
-        *alarm_factory_.get(), &writer_, false,
-        quic::ParsedQuicVersionVector{quic_version_}, std::move(connection_socket),
-        generator_);
+        *alarm_factory_.get(), &writer_, false, quic::ParsedQuicVersionVector{quic_version_},
+        std::move(connection_socket), generator_);
 
     auto decrypter = std::make_unique<FuzzDecrypter>(quic::Perspective::IS_SERVER);
     auto encrypter = std::make_unique<FuzzEncrypter>(quic::Perspective::IS_SERVER);
@@ -182,9 +179,9 @@ struct Harness {
       quic::QuicReceivedPacket p(payload, size, receipt_time, false);
       session->ProcessUdpPacket(srv_addr_, cli_addr_, p);
     });
-  
+
     session->connection()->CloseConnection(quic::QUIC_PEER_GOING_AWAY, "Fuzzer case done",
-        quic::ConnectionCloseBehavior::SILENT_CLOSE);
+                                           quic::ConnectionCloseBehavior::SILENT_CLOSE);
     packetizer_.reset();
   }
 
