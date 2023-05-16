@@ -32,7 +32,6 @@ jobs:
       run: ./mobile/tools/should_run_ci.sh
     - name: 'Run coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      continue-on-error: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
