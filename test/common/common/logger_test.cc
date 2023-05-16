@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
 
@@ -266,16 +268,13 @@ TEST(LoggerTest, TestJsonFormatError) {
   log_struct.set_value("asdf");
 
   // This scenario shouldn't happen in production, the test is added mainly for coverage.
-  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_FALSE(status.ok());
+  EXPECT_THROW(Envoy::Logger::Registry::setJsonLogFormat(log_struct), EnvoyException);
 }
 
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
   ProtobufWkt::Struct log_struct;
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-
-  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_TRUE(status.ok());
+  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
@@ -291,9 +290,7 @@ TEST(LoggerTest, TestJsonFormatNullField) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%v");
   (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-
-  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_TRUE(status.ok());
+  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
@@ -310,9 +307,7 @@ TEST(LoggerTest, TestJsonFormat) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%v");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-
-  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_TRUE(status.ok());
+  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {

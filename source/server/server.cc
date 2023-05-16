@@ -425,14 +425,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
-  if (bootstrap_.has_application_log_format() &&
+  if (!options_.logFormatSet() && bootstrap_.has_application_log_format() &&
       bootstrap_.application_log_format().has_json_format()) {
-    auto status =
-        Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
-    if (!status.ok()) {
-      throw EnvoyException(fmt::format("failed to set log format as JSON string from struct: {}",
-                                       status.ToString()));
-    }
+    Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
   }
 
 #ifdef ENVOY_PERFETTO

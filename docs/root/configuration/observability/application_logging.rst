@@ -42,8 +42,4 @@ to print the logs in custom JSON format. The json format struct can support all 
       FixedValue: "SomeFixedValue"
 
 .. note::
-  The JSON log format will be applied only after the bootstrap config initialization.
-  Therefore, some of the logs will be printed in the default log format, or the one that is specified by the CLI option ``--log-format``.
-  For full JSON application logs experience, it is possible to set ``--log-format`` with JSON format,
-  so both logs before bootstrap initialization and after, are written in JSON format.
-  For example: ``--log-format '{"Timestamp":"%Y-%m-%dT%T.%F","ThreadId":"%t","SourceLine":"%s:%#","Level":"%l","Message":"%_"}'``.
+  In case the CLI option ``--log-format`` is used, its value will override ``application_log_format`` format.

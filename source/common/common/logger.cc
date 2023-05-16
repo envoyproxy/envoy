@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 
@@ -254,7 +256,7 @@ void Registry::setLogFormat(const std::string& log_format) {
   }
 }
 
-ProtobufUtil::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+void Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   json_options.always_print_primitive_fields = true;
@@ -262,11 +264,13 @@ ProtobufUtil::Status Registry::setJsonLogFormat(const Protobuf::Message& log_for
   std::string format_as_json;
   auto status =
       Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
-  if (status.ok()) {
-    setLogFormat(format_as_json);
+
+  if (!status.ok()) {
+    throw EnvoyException(
+        fmt::format("failed to set log format as JSON string from struct: {}", status.ToString()));
   }
 
-  return status;
+  setLogFormat(format_as_json);
 }
 
 Logger* Registry::logger(const std::string& log_name) {

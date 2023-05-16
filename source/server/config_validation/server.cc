@@ -85,14 +85,9 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  if (bootstrap_.has_application_log_format() &&
+  if (!options.logFormatSet() && bootstrap_.has_application_log_format() &&
       bootstrap_.application_log_format().has_json_format()) {
-    auto status =
-        Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
-    if (!status.ok()) {
-      throw EnvoyException(fmt::format("failed to set log format as JSON string from struct: {}",
-                                       status.ToString()));
-    }
+    Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
   }
 
   // Inject regex engine to singleton.

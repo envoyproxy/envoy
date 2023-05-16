@@ -75,7 +75,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server:93.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:profiler-lib:83"
 "source/extensions/load_balancing_policies/common:94" # Death tests don't report LCOV
-"source/server/config_validation:87.3"
+"source/server/config_validation:88.2"
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/http:93.8"
 "source/extensions/health_checkers/grpc:92.0"

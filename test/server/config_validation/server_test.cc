@@ -16,6 +16,8 @@
 #include "test/test_common/test_time.h"
 
 using testing::HasSubstr;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -218,6 +220,28 @@ TEST(ValidationTest, Admin) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
     ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
+
+TEST_P(JsonApplicationLogsValidationServerTest, OptionOverridesJsonApplicationLogsConfig) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[info][misc]"));
+    EXPECT_THAT(msg, HasSubstr("hello"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+  server.shutdown();
+}
 
 TEST_P(JsonApplicationLogsValidationServerTest, ValidateJsonApplicationLogs) {
   Thread::MutexBasicLockable access_log_lock;

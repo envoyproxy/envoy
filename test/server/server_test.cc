@@ -1625,6 +1625,21 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
 }
 
+TEST_P(ServerInstanceImplTest, OptionOverridesJsonApplicationLogsConfig) {
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[info][misc]"));
+    EXPECT_THAT(msg, HasSubstr("hello"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
 

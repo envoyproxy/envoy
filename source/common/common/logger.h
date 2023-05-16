@@ -357,7 +357,7 @@ public:
   /**
    * Sets the log format from a struct as a JSON string.
    */
-  static ProtobufUtil::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
+  static void setJsonLogFormat(const Protobuf::Message& log_format_struct);
 
   /**
    * @return std::vector<Logger>& the installed loggers.

@@ -373,7 +373,8 @@ message Bootstrap {
   core.v3.TypedExtensionConfig listener_manager = 37;
 
   // Optional field to set the application logs format. If this field is set, it will override
-  // the default log format, or the format that is specified by the :option:`--log-format` command line option.
+  // the default log format. In case the :option:`--log-format` command line option is used,
+  // it will override ``application_log_format`` configurations.
   ApplicationLogFormat application_log_format = 38;
 }
 
