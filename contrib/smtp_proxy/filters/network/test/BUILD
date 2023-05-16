@@ -51,7 +51,7 @@ envoy_cc_test(
     deps = [
         ":smtp_test_utils_lib",
         "//contrib/smtp_proxy/filters/network/source:filter",
-	"//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//test/mocks/network:network_mocks",
     ],
 )

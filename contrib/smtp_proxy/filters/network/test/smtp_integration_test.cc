@@ -24,7 +24,7 @@ namespace NetworkFilters {
 namespace SmtpProxy {
 
 class SmtpBaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public BaseIntegrationTest {
+                                public BaseIntegrationTest {
 public:
   // Tuple to store upstream and downstream startTLS configuration.
   // The first string contains string to enable/disable SSL.
@@ -32,26 +32,26 @@ public:
   using SSLConfig = std::tuple<const absl::string_view, const absl::string_view>;
 
   std::string smtpConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
-                             std::string additional_filters) {
-    std::string main_config = fmt::format(
-        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/smtp_proxy/filters/network/test/smtp_test_config.yaml-template")),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        std::get<1>(upstream_ssl_config), // upstream SSL transport socket
-        Network::Test::getAnyAddressString(GetParam()),
-        std::get<0>(downstream_ssl_config),  // downstream SSL termination
-        std::get<0>(upstream_ssl_config),    // upstream_SSL option
-        additional_filters,                  // additional filters to insert after smtp
-        std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
+                         std::string additional_filters) {
+    std::string main_config =
+        fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+                        "contrib/smtp_proxy/filters/network/test/smtp_test_config.yaml-template")),
+                    Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
+                    Network::Test::getLoopbackAddressString(GetParam()),
+                    std::get<1>(upstream_ssl_config), // upstream SSL transport socket
+                    Network::Test::getAnyAddressString(GetParam()),
+                    std::get<0>(downstream_ssl_config),  // downstream SSL termination
+                    std::get<0>(upstream_ssl_config),    // upstream_SSL option
+                    additional_filters,                  // additional filters to insert after smtp
+                    std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
 
     return main_config;
   }
 
   SmtpBaseIntegrationTest(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
-                              std::string additional_filters = "")
+                          std::string additional_filters = "")
       : BaseIntegrationTest(GetParam(), smtpConfig(downstream_ssl_config, upstream_ssl_config,
-                                                       additional_filters)) {
+                                                   additional_filters)) {
     skip_tag_extraction_rule_check_ = true;
   };
 

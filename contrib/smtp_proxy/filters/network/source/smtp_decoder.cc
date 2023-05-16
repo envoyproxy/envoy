@@ -34,11 +34,8 @@ const size_t kMaxReplyLine = 1024;
 // unbounded amount.
 const size_t kMaxReplyBytes = 65536;
 
-Decoder::Result GetLine(Buffer::Instance& data,
-			size_t start,
-			std::unique_ptr<char[]>& raw_line,
-			absl::string_view& line,
-			size_t max_line) {
+Decoder::Result GetLine(Buffer::Instance& data, size_t start, std::unique_ptr<char[]>& raw_line,
+                        absl::string_view& line, size_t max_line) {
   ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
     if (data.length() >= 512) {
@@ -66,8 +63,9 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
   std::unique_ptr<char[]> raw_line;
   absl::string_view line;
   Result res = GetLine(data, 0, raw_line, line, kMaxCommandLine);
-  if (res != Result::ReadyForNext) return res;
-
+  if (res != Result::ReadyForNext) {
+    return res;
+  }
   result.wire_len = line.size();
 
   ASSERT(absl::ConsumeSuffix(&line, CRLF));
@@ -83,18 +81,23 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
     result.rest = std::string(line.substr(space + 1));
   }
 
-  static const struct { Command::Verb verb; absl::string_view raw_verb; } kCommands[] = {
-    {Decoder::Command::HELO, "HELO"},
-    {Decoder::Command::EHLO, "EHLO"},
-    {Decoder::Command::STARTTLS, "STARTTLS"},
+  static const struct {
+    Command::Verb verb;
+    absl::string_view raw_verb;
+  } kCommands[] = {
+      {Decoder::Command::HELO, "HELO"},
+      {Decoder::Command::EHLO, "EHLO"},
+      {Decoder::Command::STARTTLS, "STARTTLS"},
   };
 
   for (const auto& c : kCommands) {
-    if (absl::AsciiStrToUpper(result.raw_verb) != c.raw_verb) continue;
+    if (absl::AsciiStrToUpper(result.raw_verb) != c.raw_verb) {
+      continue;
+    }
     result.verb = c.verb;
     break;
   }
-  
+
   // We aren't too picky here since we're only going to look at the
   // first ~2 commands (EHLO, STARTTLS) and the filter is going to
   // hang up if the first isn't EHLO.
@@ -104,45 +107,60 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
 Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& result) {
   std::unique_ptr<char[]> raw_line;
 
-  std::optional<int> code;
+  absl::optional<int> code;
   size_t line_off = 0;
   std::string msg;
   for (;;) {
     absl::string_view line;
     Result res = GetLine(data, line_off, raw_line, line, kMaxReplyLine);
-    if (res != Result::ReadyForNext) return res;
+    if (res != Result::ReadyForNext) {
+      return res;
+    }
     line_off += line.size();
-    if (line_off > kMaxReplyBytes) return Result::Bad;
-
+    if (line_off > kMaxReplyBytes) {
+      return Result::Bad;
+    }
     // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.2
     //  Reply-line     = *( Reply-code "-" [ textstring ] CRLF )
     //                 Reply-code [ SP textstring ] CRLF
     //  Reply-code     = %x32-35 %x30-35 %x30-39
-    if (line.size() < 3) return Result::Bad;
-    for (int i = 0; i < 3; ++i) {
-      if (!absl::ascii_isdigit(line[i])) return Result::Bad;
+    if (line.size() < 3) {
+      return Result::Bad;
     }
-    absl::string_view code_str = line.substr(0,3);
+    for (int i = 0; i < 3; ++i) {
+      if (!absl::ascii_isdigit(line[i])) {
+        return Result::Bad;
+      }
+    }
+    absl::string_view code_str = line.substr(0, 3);
     int this_code;
     ASSERT(absl::SimpleAtoi(code_str, &this_code));
 
-    if (code && this_code != *code) return Result::Bad;
+    if (code && this_code != *code) {
+      return Result::Bad;
+    }
     code = this_code;
 
     line = line.substr(3);
     char sp_or_dash = ' ';
     if (!line.empty() && line != CRLF) {
       sp_or_dash = line[0];
-      if (sp_or_dash != ' ' && sp_or_dash != '-') return Result::Bad;
+      if (sp_or_dash != ' ' && sp_or_dash != '-') {
+        return Result::Bad;
+      }
       line = line.substr(1);
       absl::StrAppend(&msg, line);
     }
 
     // ignore enhanced code for now
 
-    if (sp_or_dash == ' ') break;  // last line of multiline
+    if (sp_or_dash == ' ') {
+      break; // last line of multiline
+    }
   }
-  if (!code) return Result::Bad;  // assert
+  if (!code) {
+    return Result::Bad; // assert
+  }
   result.code = *code;
   result.msg = msg;
   result.wire_len = line_off;
@@ -152,11 +170,15 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
 // line is
 // 234-SIZE 1048576\r\n
 bool MatchCapability(absl::string_view line, absl::string_view cap) {
-  line = line.substr(4);  // 234-
+  line = line.substr(4); // 234-
   line = line.substr(0, line.size() - CRLF.size());
-  if (!absl::StartsWithIgnoreCase(line, cap)) return false;
+  if (!absl::StartsWithIgnoreCase(line, cap)) {
+    return false;
+  }
   line = line.substr(cap.size());
-  if (line.empty() || line[0] == ' ') return true;
+  if (line.empty() || line[0] == ' ') {
+    return true;
+  }
   return false;
 }
 
@@ -167,15 +189,18 @@ void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in
 
   while (!caps.empty()) {
     size_t crlf = caps.find(CRLF);
-    if (crlf == absl::string_view::npos) break;  // invalid input
+    if (crlf == absl::string_view::npos)
+      break; // invalid input
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
-    if (!first && MatchCapability(line, cap)) return;
+    if (!first && MatchCapability(line, cap)) {
+      return;
+    }
     first = false;
     if (caps.empty()) {
       std::string line_out(line);
       line_out[3] = '-';
-      absl::StrAppend(&caps_out, line_out, line_out.substr(0,3), " ", cap, "\r\n");
+      absl::StrAppend(&caps_out, line_out, line_out.substr(0, 3), " ", cap, "\r\n");
       break;
     }
 
@@ -192,10 +217,14 @@ void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps
   size_t last = 0;
   while (!caps.empty()) {
     size_t crlf = caps.find(CRLF);
-    if (crlf == absl::string_view::npos) return;  // invalid input
+    if (crlf == absl::string_view::npos) {
+      return; // invalid input
+    }
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
-    if (!first && MatchCapability(line, cap)) continue;
+    if (!first && MatchCapability(line, cap)) {
+      continue;
+    }
     first = false;
     last = caps_out.size();
     absl::StrAppend(&caps_out, line);
@@ -208,7 +237,9 @@ bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view ca
   bool first = true;
   while (!caps.empty()) {
     size_t crlf = caps.find("\r\n");
-    if (crlf == absl::string_view::npos) break;  // invalid input
+    if (crlf == absl::string_view::npos) {
+      break; // invalid input
+    }
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
     if (first) {
@@ -216,11 +247,12 @@ bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view ca
       continue;
     }
 
-    if (MatchCapability(line, cap)) return true;
+    if (MatchCapability(line, cap)) {
+      return true;
+    }
   }
   return false;
 }
-
 
 } // namespace SmtpProxy
 } // namespace NetworkFilters

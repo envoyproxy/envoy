@@ -27,12 +27,7 @@ public:
   };
 
   struct Command {
-    enum Verb {
-      UNKNOWN,
-      HELO,
-      EHLO,
-      STARTTLS
-    };
+    enum Verb { UNKNOWN, HELO, EHLO, STARTTLS };
     Verb verb = UNKNOWN;
     std::string raw_verb;
     std::string rest;
@@ -50,12 +45,10 @@ public:
   // is returned. Otherwise:
   // NeedMoreData: buffer contains an incomplete command
   // Bad: buffer contains data that is not a prefix of a valid command
-  virtual Result DecodeCommand(Buffer::Instance& data,
-			       Command& result) = 0;
+  virtual Result DecodeCommand(Buffer::Instance& data, Command& result) = 0;
   // Attempts to decode an SMTP response from data.
-  virtual Result DecodeResponse(Buffer::Instance& data,
-				Response& result) = 0;
-  
+  virtual Result DecodeResponse(Buffer::Instance& data, Response& result) = 0;
+
   // The following routines operate on the full wire bytes of a
   // response to EHLO that has previously been validated by
   // DecodeResponse() e.g.
@@ -79,11 +72,9 @@ public:
 
   // if data starts with a valid smtp command, decodes into result and returns ReadyForNext
   // else returns NeedMoreData
-  Result DecodeCommand(Buffer::Instance& data,
-		       Command& result) override;
+  Result DecodeCommand(Buffer::Instance& data, Command& result) override;
 
-  Result DecodeResponse(Buffer::Instance& data,
-			Response& result) override;
+  Result DecodeResponse(Buffer::Instance& data, Response& result) override;
 
   void AddEsmtpCapability(absl::string_view, std::string&) override;
   void RemoveEsmtpCapability(absl::string_view, std::string&) override;

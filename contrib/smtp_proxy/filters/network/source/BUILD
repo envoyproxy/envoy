@@ -31,7 +31,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
-	"//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha:pkg_cc_proto",
     ],

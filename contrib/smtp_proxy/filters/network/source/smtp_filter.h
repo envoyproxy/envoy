@@ -19,19 +19,19 @@ namespace SmtpProxy {
 /**
  * All Smtp proxy stats. @see stats_macros.h
  */
-#define ALL_SMTP_PROXY_STATS(COUNTER)                                                          \
-  COUNTER(sessions)                                                                            \
-  COUNTER(sessions_upstream_desync)                                                            \
-  COUNTER(sessions_downstream_desync)                                                          \
-  COUNTER(sessions_bad_line)                                                                   \
-  COUNTER(sessions_bad_pipeline)                                                               \
-  COUNTER(sessions_bad_ehlo)                                                                   \
-  COUNTER(sessions_non_esmtp)                                                                  \
-  COUNTER(sessions_esmtp_unencrypted)                                                          \
-  COUNTER(sessions_downstream_terminated_ssl)                                                  \
-  COUNTER(sessions_upstream_terminated_ssl)                                                    \
-  COUNTER(sessions_downstream_ssl_err)                                                         \
-  COUNTER(sessions_upstream_ssl_err)                                                           \
+#define ALL_SMTP_PROXY_STATS(COUNTER)                                                              \
+  COUNTER(sessions)                                                                                \
+  COUNTER(sessions_upstream_desync)                                                                \
+  COUNTER(sessions_downstream_desync)                                                              \
+  COUNTER(sessions_bad_line)                                                                       \
+  COUNTER(sessions_bad_pipeline)                                                                   \
+  COUNTER(sessions_bad_ehlo)                                                                       \
+  COUNTER(sessions_non_esmtp)                                                                      \
+  COUNTER(sessions_esmtp_unencrypted)                                                              \
+  COUNTER(sessions_downstream_terminated_ssl)                                                      \
+  COUNTER(sessions_upstream_terminated_ssl)                                                        \
+  COUNTER(sessions_downstream_ssl_err)                                                             \
+  COUNTER(sessions_upstream_ssl_err)                                                               \
   COUNTER(sessions_upstream_ssl_command_err)
 
 /**
@@ -48,19 +48,15 @@ class SmtpFilterConfig {
 public:
   struct SmtpFilterConfigOptions {
     std::string stats_prefix_;
-    envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode
-        downstream_ssl_;
-    envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode
-        upstream_ssl_;
+    envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode downstream_ssl_;
+    envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode upstream_ssl_;
   };
   SmtpFilterConfig(const SmtpFilterConfigOptions& config_options, Stats::Scope& scope);
 
-  envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode
-      downstream_ssl_{
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
-  envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode
-      upstream_ssl_{
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
+  envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode downstream_ssl_{
+      envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
+  envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::SSLMode upstream_ssl_{
+      envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
   Stats::Scope& scope_;
   SmtpProxyStats stats_;
 
@@ -72,8 +68,7 @@ private:
 
 using SmtpFilterConfigSharedPtr = std::shared_ptr<SmtpFilterConfig>;
 
-class SmtpFilter : public Network::Filter,
-		   Logger::Loggable<Logger::Id::filter> {
+class SmtpFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
   SmtpFilter(SmtpFilterConfigSharedPtr config);
   ~SmtpFilter() override = default;
@@ -99,7 +94,7 @@ public:
   const SmtpProxyStats& getStats() const { return config_->stats_; }
   Network::Connection& connection() const { return read_callbacks_->connection(); }
   const SmtpFilterConfigSharedPtr& getConfig() const { return config_; }
-  
+
 private:
   enum State {
     PASSTHROUGH,

@@ -5,6 +5,7 @@ import logging
 
 
 class InMemoryHandler:
+
     async def handle_EHLO(self, server, session, envelope, hostname, responses) -> list[str]:
         session.host_name = hostname
         print(responses)
@@ -38,8 +39,8 @@ class InMemoryHandler:
 logging.basicConfig(level=logging.DEBUG)
 
 from aiosmtpd.controller import Controller
-controller = Controller(InMemoryHandler(), hostname="localhost", port=9025,
-                        proxy_protocol_timeout=30
-                        )
+
+controller = Controller(
+    InMemoryHandler(), hostname="localhost", port=9025, proxy_protocol_timeout=30)
 controller.start()
 time.sleep(1000000)
