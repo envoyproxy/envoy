@@ -46,6 +46,7 @@ READFILTER_FUZZ_FILTERS = [
     # test/common/http/conn_manager_impl_fuzz_test.cc
     "envoy.filters.network.http_connection_manager",
     "envoy.filters.network.local_ratelimit",
+    "envoy.filters.network.ratelimit",
     "envoy.filters.network.rbac",
     # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
     # "envoy.filters.network.tcp_proxy",
