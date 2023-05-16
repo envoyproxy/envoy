@@ -434,6 +434,16 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterTrailersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterTrailersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
   if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
@@ -446,16 +456,6 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   if (!state.sendTrailers()) {
     ENVOY_LOG(trace, "Skipped trailer processing");
     return FilterTrailersStatus::Continue;
-  }
-
-  switch (openStream()) {
-  case StreamOpenState::Error:
-    return FilterTrailersStatus::StopIteration;
-  case StreamOpenState::IgnoreError:
-    return FilterTrailersStatus::Continue;
-  case StreamOpenState::Ok:
-    // Fall through
-    break;
   }
 
   sendTrailers(state, trailers);
@@ -514,6 +514,17 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   body_req->set_body(data.toString());
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
+                              bool end_stream) {
+  if (state.hasBufferedData()) {
+    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
+  } else {
+    // If there is no buffered data, sends an empty body.
+    Buffer::OwnedImpl data("");
+    sendBodyChunk(state, data, new_state, end_stream);
+  }
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
