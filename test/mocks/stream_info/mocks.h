@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -138,6 +139,11 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(std::shared_ptr<envoy::data::core::v3::HealthCheckEvent>, healthCheckEvent, (),
+              (const));
+  MOCK_METHOD(void, setHealthCheckEvent,
+              (std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event));
+
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -162,6 +168,7 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
+  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> health_check_event_;
 };
 
 } // namespace StreamInfo

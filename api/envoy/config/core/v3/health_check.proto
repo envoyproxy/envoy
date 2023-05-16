@@ -4,6 +4,7 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/event_service_config.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
@@ -60,7 +61,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -369,6 +370,10 @@ message HealthCheck {
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.
   string event_log_path = 17;
+
+  // Specifies the event logger for health check event. The underlying typed_config should be 
+  // :ref:`access logs <arch_overview_access_logs>`.
+  repeated TypedExtensionConfig event_logger = 25;
 
   // [#not-implemented-hide:]
   // The gRPC service for the health check event service.

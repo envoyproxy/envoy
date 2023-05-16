@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/socket.h"
@@ -831,6 +832,17 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return the health check event.
+   */
+  virtual std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> healthCheckEvent() const PURE;
+
+  /**
+   * @param event the health check event.
+   */
+  virtual void
+  setHealthCheckEvent(std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

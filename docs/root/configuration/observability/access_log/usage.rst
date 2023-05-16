@@ -1072,3 +1072,7 @@ The following command operators are supported:
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
+
+%HEALTH_CHECK_EVENT%
+  HTTP/TCP/THRIFT/UDP
+    Log the json text of :ref:`HealthCheckEvent <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>`.

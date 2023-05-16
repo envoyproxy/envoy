@@ -5,6 +5,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
@@ -394,6 +395,15 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_transport_failure_reason_;
   }
 
+  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> healthCheckEvent() const override {
+    return health_check_event_;
+  };
+
+  void
+  setHealthCheckEvent(std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event) override {
+    health_check_event_ = event;
+  }
+
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -448,6 +458,7 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> health_check_event_;
 };
 
 } // namespace StreamInfo

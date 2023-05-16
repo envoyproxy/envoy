@@ -190,6 +190,15 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamTransportFailureReason())
       .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
+
+  ON_CALL(*this, setHealthCheckEvent(_))
+      .WillByDefault(Invoke([this](std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event) {
+        health_check_event_ = event;
+      }));
+
+  ON_CALL(*this, healthCheckEvent()).WillByDefault(Invoke([this]() {
+    return health_check_event_;
+  }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

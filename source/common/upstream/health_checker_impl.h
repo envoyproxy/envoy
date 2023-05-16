@@ -9,9 +9,11 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/network/socket.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/health_checker_config.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
+#include "envoy/upstream/health_checker.h"
 
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/logger.h"
@@ -46,6 +48,41 @@ struct HealthCheckerEqualTo {
 };
 
 /**
+ * Health checker factory context.
+ */
+class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
+public:
+  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
+                                  Event::Dispatcher& dispatcher,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api, AccessLog::AccessLogManager& log_manager)
+      : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
+        validation_visitor_(validation_visitor), log_manager_(log_manager), api_(api) {}
+  Upstream::Cluster& cluster() override { return cluster_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
+  HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
+  Api::Api& api() override { return api_; }
+
+  AccessLog::AccessLogManager& accessLogManager() override { return log_manager_; }
+  void setEventLogger(HealthCheckEventLoggerPtr event_logger) override {
+    event_logger_ = std::move(event_logger);
+  }
+
+private:
+  Upstream::Cluster& cluster_;
+  Envoy::Runtime::Loader& runtime_;
+  Event::Dispatcher& dispatcher_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  AccessLog::AccessLogManager& log_manager_;
+  Api::Api& api_;
+  HealthCheckEventLoggerPtr event_logger_;
+};
+
+/**
  * Factory for creating health checker implementations.
  */
 class HealthCheckerFactory : public Logger::Loggable<Logger::Id::health_checker> {
@@ -69,7 +106,8 @@ public:
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+         Server::Configuration::ServerFactoryContext& server_factory_context);
 };
 
 /**
