@@ -60,6 +60,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cluster_manager_impl_test",
+    size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
     args = [
         # Force creation of c-ares DnsResolverImpl when running test on macOS.
