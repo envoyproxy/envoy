@@ -82,7 +82,7 @@ bug_fixes:
   change: |
     Do not display GRPC_STATUS_NUMBER for non gRPC requests.
     This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
+    ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false. 
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
