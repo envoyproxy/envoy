@@ -22,7 +22,9 @@ message SmtpProxy {
   enum SSLMode {
     // Do not encrypt upstream connection to the server.
     DISABLE = 0;
+
     ENABLE = 1;
+
     // Establish upstream SSL connection to the server. If the server does not
     // accept the request for SSL connection, the session is terminated.
     REQUIRE = 2;
