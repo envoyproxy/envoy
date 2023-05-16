@@ -1705,6 +1705,52 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
+TEST(DurationUtilTest, NoThrow) {
+  {
+    // In range test
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(5);
+    duration.set_nanos(10000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result.value() == 5010);
+  }
+
+  // Below are out-of-range tests
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+}
+
 // Verify WIP accounting of the file based annotations. This test uses the strict validator to test
 // that code path.
 TEST_F(ProtobufUtilityTest, MessageInWipFile) {

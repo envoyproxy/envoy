@@ -357,13 +357,8 @@ public:
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
 
-  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
-  };
-
-  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
-  };
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{};
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{};
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
@@ -475,8 +470,14 @@ public:
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_,
-                                                          server().dispatcher(), timeout));
+    waitForNumHistogramSamplesGe(name, 1, timeout);
+  }
+
+  void waitForNumHistogramSamplesGe(
+      const std::string& name, uint64_t sample_count,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForNumHistogramSamplesGe(
+        statStore(), name, sample_count, time_system_, server().dispatcher(), timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

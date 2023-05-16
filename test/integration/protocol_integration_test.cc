@@ -411,7 +411,7 @@ name: add-trailers-filter
   }
 }
 
-TEST_P(ProtocolIntegrationTest, AccessLogTest) {
+TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }

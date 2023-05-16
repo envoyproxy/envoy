@@ -915,7 +915,6 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
   }
-#endif
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
@@ -930,6 +929,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
       return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
+#endif
 
   auto statusor = onHeadersCompleteBase();
   if (!statusor.ok()) {

@@ -854,11 +854,6 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
-  return;
-#endif
-
   config_helper_.disableDelayClose();
   initialize();
 
@@ -917,6 +912,28 @@ TEST_P(IntegrationTest, TestSmuggling) {
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
+}
+
+TEST_P(IntegrationTest, TestInvalidTransferEncoding) {
+  config_helper_.disableDelayClose();
+  initialize();
+
+  // Verify that sending `Transfer-Encoding: chunked` as a second header is detected and triggers
+  // the "bad Transfer-Encoding" check.
+  std::string response;
+  const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
+                              "identity\r\ntransfer-encoding: chunked \r\n\r\n";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
+#else
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+  } else {
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
+  }
+#endif
 }
 
 TEST_P(IntegrationTest, TestPipelinedResponses) {
@@ -986,11 +1003,6 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 }
 
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
@@ -1109,11 +1121,6 @@ TEST_P(IntegrationTest, BadHeader) {
 }
 
 TEST_P(IntegrationTest, Http10Disabled) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
@@ -1121,11 +1128,6 @@ TEST_P(IntegrationTest, Http10Disabled) {
 }
 
 TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
@@ -1135,11 +1137,6 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 
 // Turn HTTP/1.0 support on and verify 09 style requests work.
 TEST_P(IntegrationTest, Http09Enabled) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
@@ -1165,11 +1162,6 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
     return;
   }
 
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
@@ -1186,11 +1178,6 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
 
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
@@ -1392,11 +1379,6 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
@@ -2163,6 +2145,27 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(IntegrationTest, ConnectWithTEChunked) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write(
+      "CONNECT host.com:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\npayload", false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 400 Bad Request\r\n"))
+      << tcp_client->data();
+#else
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 501 Not Implemented\r\n"))
+      << tcp_client->data();
+#endif
+  tcp_client->close();
 }
 
 // Verifies that a 204 response returns without a body

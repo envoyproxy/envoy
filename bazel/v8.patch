@@ -93,3 +93,16 @@ index ce3f569fd5..dc8a4c4f6a 100644
  }  // extern "C"
 +
 +#endif
+diff --git a/third_party/inspector_protocol/code_generator.py b/third_party/inspector_protocol/code_generator.py
+index c3768b8..d4a1dda 100644
+--- a/third_party/inspector_protocol/code_generator.py
++++ b/third_party/inspector_protocol/code_generator.py
+@@ -16,6 +16,8 @@ try:
+ except ImportError:
+   import simplejson as json
+
++sys.path += [os.path.dirname(__file__)]
++
+ import pdl
+
+ try:

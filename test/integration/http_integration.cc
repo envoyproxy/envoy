@@ -380,8 +380,15 @@ void HttpIntegrationTest::initialize() {
   // Config Google QUIC flow control window.
   quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
       Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+  // Adjust timeouts.
+  quic::QuicTime::Delta connect_timeout =
+      quic::QuicTime::Delta::FromSeconds(5 * TSAN_TIMEOUT_FACTOR);
+  quic_connection_persistent_info->quic_config_.set_max_time_before_crypto_handshake(
+      connect_timeout);
+  quic_connection_persistent_info->quic_config_.set_max_idle_time_before_crypto_handshake(
+      connect_timeout);
 
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

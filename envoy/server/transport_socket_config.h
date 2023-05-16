@@ -30,23 +30,14 @@ public:
   virtual ~TransportSocketFactoryContext() = default;
 
   /**
-   * @return ServerFactoryContext& the server factory context.
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& serverFactoryContext() PURE;
+  virtual ServerFactoryContext& getServerFactoryContext() PURE;
 
   /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
-   * static cluster. So we need to provide an cluster manager reference here.
-   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
+   * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
-   * messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+  virtual OptRef<Server::Admin> admin() PURE;
 
   /**
    * @return Ssl::ContextManager& the SSL context manager.
@@ -56,7 +47,7 @@ public:
   /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
-  virtual Stats::Scope& statsScope() PURE;
+  virtual Stats::Scope& scope() PURE;
 
   /**
    * Return the instance of secret manager.
@@ -64,9 +55,60 @@ public:
   virtual Secret::SecretManager& secretManager() PURE;
 
   /**
-   * @return the init manager of the particular context.
+   * @return the instance of ClusterManager.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return information about the local environment the server is running in.
+   */
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
+
+  /**
+   * @return Event::Dispatcher& the main thread's dispatcher.
+   */
+  virtual Event::Dispatcher& mainThreadDispatcher() PURE;
+
+  /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Options& options() PURE;
+
+  /**
+   * @return the server-wide stats store.
+   */
+  virtual Stats::Store& stats() PURE;
+
+  /**
+   * @return a reference to the instance of an init manager.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return the server's singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return the server's TLS slot allocator.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
+
+  /**
+   * @return reference to the access log manager object
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 };
 
 using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
