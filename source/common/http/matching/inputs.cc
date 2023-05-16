@@ -11,6 +11,8 @@ REGISTER_FACTORY(HttpRequestTrailersDataInputFactory, Matcher::DataInputFactory<
 REGISTER_FACTORY(HttpResponseTrailersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(HttpRequestQueryParamsDataInputFactory,
                  Matcher::DataInputFactory<HttpMatchingData>);
+REGISTER_FACTORY(HttpCelDataInputFactory,
+                 Matcher::DataInputFactory<HttpMatchingData>);
 
 } // namespace Matching
 } // namespace Http

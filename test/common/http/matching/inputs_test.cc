@@ -174,6 +174,70 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   }
 }
 
+
+TEST(MatchingData, HttpCelDataInput) {
+  std::string checked_expr_config = R"pb(
+    expr {
+      id: 8
+      call_expr {
+        function: "_==_"
+        args {
+          id: 6
+          call_expr {
+            function: "_[_]"
+            args {
+              id: 5
+              select_expr {
+                operand {
+                  id: 4
+                  ident_expr {name: "request"}
+                }
+                field: "headers"
+              }
+            }
+            args {
+              id: 7
+              const_expr {
+                string_value: "authenticated_user"
+              }
+            }
+          }
+        }
+        args {
+          id: 9
+          const_expr { string_value: "staging" }
+        }
+      }
+    }
+  )pb";
+  //google::api::expr::CheckedExpr checked_expr;
+  google::api::expr::v1alpha1::CheckedExpr checked_expr;
+  Protobuf::TextFormat::ParseFromString(checked_expr_config, &checked_expr);
+
+  xds::type::matcher::v3::CelMatcher cel_matcher;
+  cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+  xds::type::matcher::v3::Matcher matcher;
+
+  auto* inner_matcher = matcher.mutable_matcher_list()->add_matchers();
+  auto* single_predicate = inner_matcher->mutable_predicate()
+                               ->mutable_single_predicate();
+  // Empty input!!
+  xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
+  single_predicate->mutable_input()->set_name("envoy.matching.inputs.HttpAttributesCelMatchInput");
+  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(
+      cel_match_input);
+
+  auto* custom_matcher = single_predicate->mutable_custom_match();
+  //custom_matcher->set_name("xds.type.matcher.CelMatcher");
+  custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
+
+  HttpMatchingDataImpl data(createStreamInfo());
+  {
+    TestRequestHeaderMapImpl request_headers({{"authenticated_user", "staging"}});
+    data.onRequestHeaders(request_headers);
+  }
+}
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

@@ -8,10 +8,16 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
+#include "source/common/matcher/cel_matcher.h"
 
 namespace Envoy {
 namespace Http {
 namespace Matching {
+
+using Envoy::Extensions::Filters::Common::Expr::StreamActivation;
+
 /**
  * Common base class for all the header/trailer DataInputs.
  */
@@ -198,6 +204,83 @@ public:
 
 DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
+class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
+ public:
+  HttpCelDataInput() = default;
+  Matcher::DataInputGetResult get(const Envoy::Http::HttpMatchingData& data) const override {
+    // TODO(tyxia) How to differentiate those cases!!!!!
+    RequestHeaderMapOptConstRef maybe_request_headers = data.requestHeaders();
+    ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
+    ResponseTrailerMapOptConstRef maybe_response_trailers = data.responseTrailers();
+    // Returns NotAvailable state when all of three are empty. CEL matcher can support mix matching
+    // condition of request headers, response headers and response trailers.
+    if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+    }
+    // TODO(tyxia)
+    // Protobuf::Arena arena;
+    // TODO(tyxia) Provide mutiple headers
+    // std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
+    //     Extensions::Filters::Common::Expr::createActivation(data.streamInfo(), maybe_request_headers.ptr(),
+    //                                                         nullptr, nullptr);
+
+    std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
+        Extensions::Filters::Common::Expr::createActivation(
+            data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
+            maybe_response_trailers.ptr());
+
+    // TODO(tyxia) Simlar with the case above.
+    if (activation == nullptr) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+    }
+    std::unique_ptr<StreamActivation> stream_activation =
+        absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
+
+    // static_assert(std::is_move_constructible<StreamActivation>::value, "not move constructible");
+    // static_assert(std::is_move_assignable<StreamActivation>::value, "not move assignable");
+
+    // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+    //         std::make_unique<Matcher::CelMatchData>(std::move(*stream_activation))};
+
+     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            // TODO(tyxia) make unique
+            std::make_shared<Matcher::CelMatchData>()};
+
+    // absl::optional<StreamActivation> opt_ret;
+    // opt_ret.emplace(std::move(*stream_activation));
+    // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+    //         std::move(opt_ret)};
+
+    // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+    //         std::move(activation)};
+  }
+
+  virtual absl::string_view dataInputType() const override {
+     return "cel_data_input";
+  }
+
+ private:
+};
+
+class HttpCelDataInputFactory : public Matcher::DataInputFactory<Envoy::Http::HttpMatchingData> {
+ public:
+   HttpCelDataInputFactory() = default;
+   std::string name() const override { return "envoy.matching.inputs.cel_data_input"; }
+
+   virtual Matcher::DataInputFactoryCb<Envoy::Http::HttpMatchingData>
+   createDataInputFactoryCb(const Protobuf::Message&,
+                            ProtobufMessage::ValidationVisitor&) override {
+     return [] { return std::make_unique<HttpCelDataInput>(); };
+   }
+
+   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+     return std::make_unique<xds::type::matcher::v3::HttpAttributesCelMatchInput>();
+   }
+
+ private:
+};
+
+DECLARE_FACTORY(HttpCelDataInputFactory);
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
