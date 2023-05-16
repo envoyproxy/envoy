@@ -4417,6 +4417,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
   initialize();
 
@@ -4443,6 +4444,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
   // For H/1 this test is equivalent to InvalidRequestHeaderName
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
