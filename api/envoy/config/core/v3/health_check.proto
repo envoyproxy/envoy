@@ -371,7 +371,7 @@ message HealthCheck {
   // If empty, no event log will be written.
   string event_log_path = 17;
 
-  // Specifies the event logger for health check event. The underlying typed_config should be 
+  // Specifies the event logger for health check event. The underlying typed_config should be
   // :ref:`access logs <arch_overview_access_logs>`.
   repeated TypedExtensionConfig event_logger = 25;
 
