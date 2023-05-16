@@ -126,7 +126,7 @@ protected:
   //
   // Tests that need access to this method should go through the TestEngineBuilder class, which
   // provides access to this method.
-  EngineBuilder& setOverrideConfigForTests(std::string config);
+  EngineBuilder& setOverrideConfigForTests(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config);
 
 private:
   struct NativeFilterConfig {
@@ -153,7 +153,7 @@ private:
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
-  std::string config_override_for_tests_ = "";
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_override_for_tests_{};
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;
