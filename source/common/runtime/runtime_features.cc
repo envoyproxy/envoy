@@ -33,12 +33,8 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
-<<<<<<< HEAD
-RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
-=======
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
->>>>>>> upstream/main
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
