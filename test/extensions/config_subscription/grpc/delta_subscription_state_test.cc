@@ -4,10 +4,10 @@
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/config/delta_subscription_state.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/delta_subscription_state.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

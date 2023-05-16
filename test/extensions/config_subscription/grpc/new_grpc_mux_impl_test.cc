@@ -7,11 +7,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/empty_string.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"

@@ -369,6 +369,7 @@ EXTENSIONS = {
     # Formatter
     #
 
+    "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
 
