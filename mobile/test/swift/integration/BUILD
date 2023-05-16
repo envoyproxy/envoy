@@ -20,64 +20,16 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
-    name = "direct_response_contains_headers_match_test",
+    name = "end_to_end_networking_test",
     srcs = [
-        "DirectResponseContainsHeadersMatchIntegrationTest.swift",
+        "EndToEndNetworkingTest.swift",
     ],
     tags = [
         "no-remote-exec",
     ],
     visibility = ["//visibility:public"],
-    data = [
-        "@envoy//test/config/integration/certs",
-    ],
     deps = [
         "//test/objective-c:envoy_test_server_interface",
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "direct_response_exact_match_test",
-    srcs = [
-        "DirectResponseExactPathMatchIntegrationTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "direct_response_filter_mutation",
-    srcs = [
-        "DirectResponseFilterMutationIntegrationTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "direct_response_prefix_headers_match",
-    srcs = [
-        "DirectResponsePrefixHeadersMatchIntegrationTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
     ],
@@ -87,36 +39,6 @@ envoy_mobile_swift_test(
     name = "cancel_stream_test",
     srcs = [
         "CancelStreamTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "direct_response_prefix_path_match",
-    srcs = [
-        "DirectResponsePrefixPathMatchIntegrationTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "direct_response_suffix_headers_match",
-    srcs = [
-        "DirectResponseSuffixHeadersMatchIntegrationTest.swift",
     ],
     tags = [
         "no-remote-exec",

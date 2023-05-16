@@ -319,46 +319,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   remote_service->set_name("remote_service");
   remote_service->add_domains("127.0.0.1");
 
-  for (auto& direct_response_in : direct_responses_) {
-    auto* direct_response_route = remote_service->add_routes();
-    auto* direct_response = direct_response_route->mutable_direct_response();
-    direct_response->set_status(direct_response_in.status);
-    direct_response->mutable_body()->set_inline_string(direct_response_in.body);
-    auto* direct_response_route_match = direct_response_route->mutable_match();
-    auto matcher = direct_response_in.matcher;
-    if (!matcher.fullPath.empty()) {
-      direct_response_route_match->set_path(matcher.fullPath);
-    } else if (!matcher.pathPrefix.empty()) {
-      direct_response_route_match->set_prefix(matcher.pathPrefix);
-    }
-
-    for (auto& header : matcher.headers) {
-      auto* direct_response_headers = direct_response_route_match->add_headers();
-      direct_response_headers->set_name(header.name);
-      switch (header.mode) {
-      case DirectResponseTesting::MatchMode::Contains:
-        direct_response_headers->set_contains_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Exact:
-        direct_response_headers->set_exact_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Prefix:
-        direct_response_headers->set_prefix_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Suffix:
-        direct_response_headers->set_suffix_match(header.value);
-        break;
-      }
-    }
-
-    for (auto& header_in : direct_response_in.headers) {
-      auto* resp_header = direct_response_route->add_response_headers_to_add();
-      auto* header = resp_header->mutable_header();
-      header->set_key(header_in.first);
-      header->set_value(header_in.second);
-    }
-  }
-
   auto* route = remote_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->mutable_direct_response()->set_status(404);
@@ -369,38 +329,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
-
-  for (auto& direct_response_in : direct_responses_) {
-    auto* this_route = api_service->add_routes();
-    auto* mutable_route = this_route->mutable_route();
-    mutable_route->set_cluster("fake_remote");
-    auto* direct_response_route_match = this_route->mutable_match();
-    auto matcher = direct_response_in.matcher;
-    if (!matcher.fullPath.empty()) {
-      direct_response_route_match->set_path(matcher.fullPath);
-    } else if (!matcher.pathPrefix.empty()) {
-      direct_response_route_match->set_prefix(matcher.pathPrefix);
-    }
-
-    for (auto& header : matcher.headers) {
-      auto* direct_response_headers = direct_response_route_match->add_headers();
-      direct_response_headers->set_name(header.name);
-      switch (header.mode) {
-      case DirectResponseTesting::MatchMode::Contains:
-        direct_response_headers->set_contains_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Exact:
-        direct_response_headers->set_exact_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Prefix:
-        direct_response_headers->set_prefix_match(header.value);
-        break;
-      case DirectResponseTesting::MatchMode::Suffix:
-        direct_response_headers->set_suffix_match(header.value);
-        break;
-      }
-    }
-  }
 
   route = api_service->add_routes();
   route->mutable_match()->set_prefix("/");
