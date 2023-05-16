@@ -174,7 +174,7 @@ public:
   CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action);
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
-  CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
+  CAPIStatus setTrailer(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
