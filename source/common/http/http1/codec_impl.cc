@@ -303,9 +303,7 @@ void StreamEncoderImpl::endEncode() {
   notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
-  if (connect_request_ || is_tcp_tunneling_ ||
-      (is_response_to_connect_request_ &&
-       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
+  if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
