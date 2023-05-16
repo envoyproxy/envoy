@@ -12,11 +12,13 @@ Upstream::LoadBalancerPtr Factory::create(const Upstream::ClusterInfo& cluster,
                                           const Upstream::PrioritySet* local_priority_set,
                                           Runtime::Loader& runtime, Random::RandomGenerator& random,
                                           TimeSource& time_source) {
+  auto child_lb_creator = std::make_unique<Upstream::LegacyChildLoadBalancerCreatorImpl>(
+      cluster.lbType(), cluster.lbRingHashConfig(), cluster.lbMaglevConfig(),
+      cluster.lbRoundRobinConfig(), cluster.lbLeastRequestConfig(), cluster.lbConfig());
+
   return std::make_unique<Upstream::SubsetLoadBalancer>(
-      cluster.lbType(), priority_set, local_priority_set, cluster.lbStats(), cluster.statsScope(),
-      runtime, random, cluster.lbSubsetInfo(), cluster.lbRingHashConfig(), cluster.lbMaglevConfig(),
-      cluster.lbRoundRobinConfig(), cluster.lbLeastRequestConfig(), cluster.lbConfig(),
-      time_source);
+      cluster.lbSubsetInfo(), std::move(child_lb_creator), priority_set, local_priority_set,
+      cluster.lbStats(), cluster.statsScope(), runtime, random, time_source);
 }
 
 /**
