@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Quic {
 
+// This class serializes structured protobuf `HTTP/3` messages to bytes as they
+// would be sent over the wire.
 class H3Packetizer {
 public:
   H3Packetizer(std::set<uint32_t>& streams) : open_h3_streams_(streams){};
@@ -20,6 +22,8 @@ private:
   std::set<uint32_t>& open_h3_streams_;
 };
 
+// This class serializes structured protobuf `QUIC + HTTP/3` messages to bytes as they
+// would be sent over the wire.
 class QuicPacketizer {
 public:
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
@@ -46,6 +50,8 @@ private:
   size_t idx_{0};
 };
 
+// The following two classes handle the encryption and decryption in the fuzzer
+// and just pass the plain or cipher text as is.
 class FuzzEncrypter : public quic::NullEncrypter {
 public:
   FuzzEncrypter(quic::Perspective perspective)

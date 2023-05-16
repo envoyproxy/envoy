@@ -178,19 +178,11 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
 }
 
 void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
-  for (auto& quic_frame_or_junk : input.frames()) {
+  for (auto& quic_frame : input.frames()) {
     if (idx_ >= sizeof(quic_packet_sizes_) / sizeof(quic_packet_sizes_[0])) {
       return;
     }
-    if (quic_frame_or_junk.has_qframe()) {
-      serializePacket(quic_frame_or_junk.qframe());
-    } else if (quic_frame_or_junk.has_junk()) {
-      const std::string& junk = quic_frame_or_junk.junk();
-      size_t len = std::min(junk.size(), sizeof(quic_packets_[0]));
-      std::memcpy(quic_packets_[idx_], junk.data(), len);
-      quic_packet_sizes_[idx_] = len;
-      idx_++;
-    }
+    serializePacket(quic_frame);
   }
 }
 

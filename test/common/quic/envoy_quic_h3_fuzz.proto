@@ -219,14 +219,7 @@ message QuicFrame {
   }
 }
 
-message QuicFrameOrJunk {
-  oneof frame {
-    QuicFrame qframe = 1;
-    bytes junk = 2;
-  }
-}
-
 message QuicH3FuzzCase {
   // QUIC frames to be processed
-  repeated QuicFrameOrJunk frames = 1;
+  repeated QuicFrame frames = 1;
 }
