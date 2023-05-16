@@ -57,13 +57,13 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   EXPECT_EQ("fOo", command.raw_verb);
   EXPECT_EQ("bar", command.rest);
 
-  data_.add("eHlO gargantua1\r\n");
+  data_.add("eHlO example.com\r\n");
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
   data_.drain(data_.length());
   EXPECT_EQ(17, command.wire_len);
   EXPECT_EQ(Decoder::Command::EHLO, command.verb);
   EXPECT_EQ("eHlO", command.raw_verb);
-  EXPECT_EQ("gargantua1", command.rest);
+  EXPECT_EQ("example.com", command.rest);
 }
 
 TEST_F(SmtpProxyDecoderTest, DecodeResponse) {

@@ -104,9 +104,6 @@ public:
   char buf_[256];
 };
 
-// TODO other flows:
-// proxy protocol on/off
-
 TEST_F(SmtpFilterTest, BadPipeline) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
@@ -116,7 +113,7 @@ TEST_F(SmtpFilterTest, BadPipeline) {
   ExpectInjectWriteData("503 bad pipeline\r\n", true);
   EXPECT_CALL(connection_, close(_));
 
-  ReadExpectConsumed("ehlo gargantua1\r\nstuff");
+  ReadExpectConsumed("ehlo example.com\r\nstuff");
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_bad_pipeline_.value(), 1);
 }
@@ -141,7 +138,7 @@ TEST_F(SmtpFilterTest, NoEsmtp) {
   ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
   WriteExpectConsumed("220 upstream ESMTP\r\n");
 
-  absl::string_view helo = "helo client.com\r\n";
+  absl::string_view helo = "helo example.com\r\n";
   ExpectInjectReadData(helo, false);
   ReadExpectConsumed(helo);
 
@@ -159,7 +156,7 @@ TEST_F(SmtpFilterTest, NoStarttls) {
   ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
   WriteExpectConsumed("220 upstream ESMTP\r\n");
 
-  absl::string_view ehlo_command = "ehlo gargantua1\r\n";
+  absl::string_view ehlo_command = "ehlo example.com\r\n";
   ExpectInjectReadData(ehlo_command, false);
   ReadExpectConsumed(ehlo_command);
 
@@ -184,7 +181,7 @@ TEST_F(SmtpFilterTest, DownstreamStarttls) {
   ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
   WriteExpectConsumed("220 upstream ESMTP\r\n");
 
-  absl::string_view ehlo_command = "ehlo gargantua1\r\n";
+  absl::string_view ehlo_command = "ehlo example.com\r\n";
   ExpectInjectReadData(ehlo_command, false);
   ReadExpectConsumed(ehlo_command);
 
@@ -209,7 +206,7 @@ TEST_F(SmtpFilterTest, DownstreamStarttls) {
 
   // PASSTHROUGH after downstream STARTTLS
 
-  const absl::string_view kEhlo2 = "ehlo gargantua1\r\n";
+  const absl::string_view kEhlo2 = "ehlo example.com\r\n";
   ReadExpectContinue(kEhlo2);
 
   WriteExpectContinue("200-upstream smtp ok\r\n"
@@ -221,6 +218,7 @@ TEST_F(SmtpFilterTest, DownstreamStarttls) {
   ASSERT_THAT(filter_->getStats().sessions_downstream_terminated_ssl_.value(), 1);
 }
 
+// TODO(jsbucy): other flows:
 // downstream startUpstreamSecureTransport() err
 // downstream REQUIRE + not invoked
 
@@ -234,7 +232,7 @@ TEST_F(SmtpFilterTest, UpstreamStarttls) {
   ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
   WriteExpectConsumed("220 upstream ESMTP\r\n");
 
-  absl::string_view ehlo_command = "ehlo gargantua1\r\n";
+  absl::string_view ehlo_command = "ehlo example.com\r\n";
   ExpectInjectReadData(ehlo_command, false);
   ReadExpectConsumed(ehlo_command);
 
@@ -252,7 +250,7 @@ TEST_F(SmtpFilterTest, UpstreamStarttls) {
 
   // PASSTHROUGH after upstream STARTTLS
 
-  const absl::string_view kEhlo2 = "ehlo gargantua1\r\n";
+  const absl::string_view kEhlo2 = "ehlo example.com\r\n";
   ReadExpectContinue(kEhlo2);
 
   WriteExpectContinue("200-upstream smtp ok\r\n"
@@ -274,7 +272,7 @@ TEST_F(SmtpFilterTest, UpstreamStarttlsErr) {
   ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
   WriteExpectConsumed("220 upstream ESMTP\r\n");
 
-  absl::string_view ehlo_command = "ehlo gargantua1\r\n";
+  absl::string_view ehlo_command = "ehlo example.com\r\n";
   ExpectInjectReadData(ehlo_command, false);
   ReadExpectConsumed(ehlo_command);
 

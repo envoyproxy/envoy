@@ -66,7 +66,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     config_->stats_.sessions_bad_line_.inc();
     Buffer::OwnedImpl err("500 syntax error\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-    // TODO may not always want to hang up here though the decoder
+    // TODO(jsbucy): may not always want to hang up here though the decoder
     // isn't very picky and only enforces an upper bound on max line
     // length. This will break if the server advertises an extension
     // that allows a huge command line and the command immediately
