@@ -2386,7 +2386,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
-  EXPECT_NE(nullptr, cluster.info()->loadBalancingPolicy());
+  EXPECT_TRUE(cluster.info()->loadBalancerConfig().has_value());
   EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
 }
 
