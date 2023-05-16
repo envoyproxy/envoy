@@ -318,10 +318,16 @@ TEST_F(AccessLogManagerImplTest, ReopenFile) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
+  {
+    Thread::LockGuard lock(file_->open_mutex_);
+    while (file_->num_opens_ != 2) {
+      file_->open_event_.wait(file_->open_mutex_);
+    }
+  }
 }
 
-// Test that the flush timer will trigger file reopen even if no data is waiting.
-TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
+// Test that the `reopen()` will trigger file reopen even if no data is waiting.
+TEST_F(AccessLogManagerImplTest, ReopenFileNoWrite) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -360,7 +366,6 @@ TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
   log_file->reopen();
-  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->open_mutex_);
@@ -420,10 +425,16 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
+  log_file->write("drop data during reopen fail");
   log_file->reopen();
 
-  log_file->write("drop data during reopen fail");
-  timer->invokeCallback();
+  {
+    Thread::LockGuard lock(file_->open_mutex_);
+    while (file_->num_opens_ != 2) {
+      file_->open_event_.wait(file_->open_mutex_);
+    }
+    timer->invokeCallback();
+  }
 
   {
     Thread::LockGuard lock(file_->open_mutex_);

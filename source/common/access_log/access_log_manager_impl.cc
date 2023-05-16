@@ -72,7 +72,11 @@ Api::IoCallBoolResult AccessLogFileImpl::open() {
   return result;
 }
 
-void AccessLogFileImpl::reopen() { reopen_file_ = true; }
+void AccessLogFileImpl::reopen() {
+  Thread::LockGuard write_lock(write_lock_);
+  reopen_file_ = true;
+  flush_event_.notifyOne();
+}
 
 AccessLogFileImpl::~AccessLogFileImpl() {
   {
@@ -127,6 +131,10 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
 
 void AccessLogFileImpl::flushThreadFunc() {
 
+  // Local cache of `reopen_file_` so that `reopen_file_` is only used while protected by a mutex,
+  // but the actual reopen operation does not need to happen inside the mutex.
+  bool reopen = false;
+
   while (true) {
     std::unique_lock<Thread::BasicLockable> flush_lock;
 
@@ -135,7 +143,7 @@ void AccessLogFileImpl::flushThreadFunc() {
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
-      while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_) {
+      while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_ && !reopen) {
         // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
       }
@@ -147,10 +155,15 @@ void AccessLogFileImpl::flushThreadFunc() {
       flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
+
+      if (reopen_file_) {
+        reopen = true;
+        reopen_file_ = false;
+      }
     }
 
-    // if we failed to reopen before, do it next loop.
-    if (reopen_file_) {
+    // If we failed to reopen before, do it next loop.
+    if (reopen) {
       if (file_->isOpen()) {
         const Api::IoCallBoolResult result = file_->close();
         ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
@@ -160,7 +173,7 @@ void AccessLogFileImpl::flushThreadFunc() {
       if (!open_result.return_value_) {
         stats_.reopen_failed_.inc();
       } else {
-        reopen_file_ = false;
+        reopen = false;
       }
     }
     // doWrite no matter file isOpen, if not, we can drain buffer
