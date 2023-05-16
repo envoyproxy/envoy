@@ -168,6 +168,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     raw_host = context->downstreamConnection()->requestedServerName();
   }
 
+  // For host lookup, we need to make sure to match the host of any DNS cache
+  // insert. Two code points currently do DNS cache insert: the http DFP filter,
+  // which inserts for HTTP traffic, and sets port based on the cluster's
+  // security level, and the SNI DFP network filter which sets port based on
+  // stream metadata, or configuration (which is then added as stream metadata).
   const bool is_secure = cluster_.info()
                              ->transportSocketMatcher()
                              .resolve(nullptr)
