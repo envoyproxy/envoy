@@ -267,7 +267,6 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
-  // These checks are now part of UHV
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
