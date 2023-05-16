@@ -286,12 +286,6 @@ EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_response) {
-  direct_responses_.push_back(direct_response);
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::setOverrideConfigForTests(std::string config) {
   config_override_for_tests_ = std::move(config);
   return *this;
@@ -468,14 +462,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     tag_filter->mutable_typed_config()->PackFrom(tag_config);
   }
 
-  if (!direct_responses_.empty()) {
-    auto* cache_reset_filter = hcm->add_http_filters();
-    cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
-    cache_reset_filter->mutable_typed_config()->set_type_url(
-        "type.googleapis.com/"
-        "envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
-  }
-
   // Set up the always-present filters
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
       network_config;
@@ -545,35 +531,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   auto* static_resources = bootstrap->mutable_static_resources();
 
-  if (!direct_responses_.empty()) {
-    auto* fake_remote_listener = static_resources->add_listeners();
-    fake_remote_listener->set_name("fake_remote_listener");
-    auto* base_address = fake_remote_listener->mutable_address();
-    base_address->mutable_socket_address()->set_address("127.0.0.1");
-    base_address->mutable_socket_address()->set_port_value(10101);
-    auto* filter = fake_remote_listener->add_filter_chains()->add_filters();
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-        fake_remote_listener_config;
-    filter->set_name("envoy.filters.network.http_connection_manager");
-    fake_remote_listener_config.set_stat_prefix("remote_hcm");
-    auto* route_config = fake_remote_listener_config.mutable_route_config();
-    route_config->set_name("remote_route");
-    auto* virtual_host = route_config->add_virtual_hosts();
-    virtual_host->add_domains("*");
-    virtual_host->set_name("remote_service");
-    auto* route = virtual_host->add_routes();
-    route->mutable_match()->set_prefix("/");
-    route->mutable_direct_response()->set_status(404);
-    route->mutable_direct_response()->mutable_body()->set_inline_string("not found");
-    route->add_request_headers_to_remove("x-forwarded-proto");
-    route->add_request_headers_to_remove("x-envoy-mobile-cluster");
-    auto* router_filter = fake_remote_listener_config.add_http_filters();
-    envoy::extensions::filters::http::router::v3::Router router_config;
-    router_filter->set_name("envoy.router");
-    router_filter->mutable_typed_config()->PackFrom(router_config);
-    filter->mutable_typed_config()->PackFrom(fake_remote_listener_config);
-  }
-
   // Finally create the base listener, and point it at the HCM.
   auto* base_listener = static_resources->add_listeners();
   base_listener->set_name("base_api_listener");
@@ -623,22 +580,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::config::core::v3::TransportSocket base_tls_socket;
   base_tls_socket.set_name("envoy.transport_sockets.http_11_proxy");
   base_tls_socket.mutable_typed_config()->PackFrom(ssl_proxy_socket);
-
-  if (!direct_responses_.empty()) {
-    // fake remote cluster
-    auto* fake_remote_cluster = static_resources->add_clusters();
-    fake_remote_cluster->set_name("fake_remote");
-    fake_remote_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-    fake_remote_cluster->mutable_connect_timeout()->set_seconds(30);
-    fake_remote_cluster->mutable_load_assignment()->set_cluster_name("fake_remote");
-    auto* address = fake_remote_cluster->mutable_load_assignment()
-                        ->add_endpoints()
-                        ->add_lb_endpoints()
-                        ->mutable_endpoint()
-                        ->mutable_address();
-    address->mutable_socket_address()->set_address("127.0.0.1");
-    address->mutable_socket_address()->set_port_value(10101);
-  }
 
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();

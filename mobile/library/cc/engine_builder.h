@@ -10,6 +10,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
+
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
@@ -104,10 +105,6 @@ public:
 
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
-  // Add a direct response. For testing purposes only.
-  // TODO(jpsim): Move this out of the main engine builder API
-  EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
-
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
@@ -189,7 +186,6 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
-  std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;

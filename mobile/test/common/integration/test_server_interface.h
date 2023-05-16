@@ -12,7 +12,7 @@ extern "C" { // functions
  * Starts the server. Can only have one server active per JVM. This is blocking until the port can
  * start accepting requests.
  */
-void start_server(bool use_quic, bool disable_https = false);
+void start_server(bool use_quic, bool disable_https);
 
 /**
  * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all

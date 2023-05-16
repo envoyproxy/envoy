@@ -20,7 +20,7 @@ final class EndToEndNetworkingTest: XCTestCase {
     )
     .build()
 
-    let engine = TestEngineBuilder()
+    let engine = EngineBuilder()
       .build()
 
     var responseBuffer = Data()
