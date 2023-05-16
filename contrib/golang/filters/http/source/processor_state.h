@@ -171,8 +171,6 @@ public:
   // seen trailers also means stream is end
   bool isStreamEnd() { return end_stream_ || seen_trailers_; }
 
-  virtual void addBody(Buffer::Instance& data) PURE;
-
   BufferList doDataList;
 
 protected:
@@ -219,8 +217,6 @@ public:
                                        details);
   };
 
-  void addBody(Buffer::Instance& data) override { decoder_callbacks_->addDecodedData(data, false); }
-
 private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 };
@@ -252,8 +248,6 @@ public:
     encoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
                                        details);
   };
-
-  void addBody(Buffer::Instance& data) override { encoder_callbacks_->addEncodedData(data, false); }
 
 private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

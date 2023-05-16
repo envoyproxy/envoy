@@ -349,13 +349,13 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
       // maybe we can remove the done variable totally? by using state_ only?
       // continue trailers
       if (state.state() == FilterState::WaitingTrailer) {
+        state.continueDoData();
         done = doTrailerGo(state, trailers);
       }
     } else {
+      state.continueDoData();
       done = doTrailerGo(state, trailers);
     }
-    state.doDataList.moveOut(body);
-    state.addBody(body);
     break;
   case FilterState::ProcessingHeader:
   case FilterState::ProcessingData:
