@@ -33,20 +33,16 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  std::string _error;
-  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
-      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&_error));
-  Envoy::TestEnvironment::setRunfiles(runfiles.get());
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
   certs->mutable_certificate_chain()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+      "../envoy/test/config/integration/certs/upstreamcert.pem");
   certs->mutable_private_key()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+      "../envoy/test/config/integration/certs/upstreamkey.pem");
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
   ctx->mutable_trusted_ca()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      "../envoy/test/config/integration/certs/upstreamcacert.pem");
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);

@@ -13,7 +13,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartQuicTestServer(JNIEnv* env,
                                                                                 jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(true);
+  start_server(true, false);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -34,7 +34,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartTestServer(JNIEnv* env,
                                                                             jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(false);
+  start_server(false, false);
 }
 
 extern "C" JNIEXPORT void JNICALL

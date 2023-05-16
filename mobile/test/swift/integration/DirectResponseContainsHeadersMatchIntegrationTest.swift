@@ -23,17 +23,6 @@ final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
     .build()
 
     let engine = TestEngineBuilder()
-    .addLogLevel(LogLevel.trace)
-      // .addDirectResponse(
-      //   .init(
-      //     matcher: RouteMatcher(
-      //       fullPath: "/v1/abc", headers: [
-      //         .init(name: "x-foo", value: "123", mode: .contains),
-      //       ]
-      //     ),
-      //     status: 200, body: "hello world", headers: ["x-response-foo": "aaa"]
-      //   )
-      // )
       .build()
 
     var responseBuffer = Data()
