@@ -1084,31 +1084,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  filter_manager_.streamInfo().protocol(protocol);
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeEndDecode(end_stream);
-
-  // Make sure we are getting a codec version we support.
-  if (protocol == Protocol::Http10) {
-    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
-    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
-    // HTTP/1.1.
-    //
-    // The protocol may have shifted in the HTTP/1.0 case so reset it.
-    filter_manager_.streamInfo().protocol(protocol);
-    if (!connection_manager_.config_.http1Settings().accept_http_10_) {
-      // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(Code::UpgradeRequired, "", nullptr, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().LowVersion);
-      return;
-    }
-    if (!request_headers_->Host() &&
-        !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
-      // Add a default host if configured to do so.
-      request_headers_->setHost(
-          connection_manager_.config_.http1Settings().default_host_for_http_10_);
-    }
-  }
 
   if (!validateHeaders()) {
     ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
