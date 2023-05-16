@@ -38,7 +38,7 @@ public:
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
    */
-  void startTestServer(bool use_quic);
+  void startTestServer(bool use_quic, bool disable_https);
 
   /**
    * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all

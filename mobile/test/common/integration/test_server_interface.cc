@@ -9,13 +9,13 @@ static std::weak_ptr<Envoy::TestServer> weak_test_server_;
 
 static std::shared_ptr<Envoy::TestServer> test_server() { return weak_test_server_.lock(); }
 
-void start_server(bool use_quic) {
+void start_server(bool use_quic, bool disable_https) {
   Envoy::ExtensionRegistry::registerFactories();
   strong_test_server_ = std::make_shared<Envoy::TestServer>();
   weak_test_server_ = strong_test_server_;
 
   if (auto e = test_server()) {
-    e->startTestServer(use_quic);
+    e->startTestServer(use_quic, disable_https);
   }
 }
 

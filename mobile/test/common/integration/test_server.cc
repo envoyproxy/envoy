@@ -4,7 +4,7 @@
 
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
-
+#include "test/test_common/network_utility.h"
 
 namespace Envoy {
 
@@ -64,32 +64,34 @@ TestServer::TestServer()
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
 }
 
-void TestServer::startTestServer(bool use_quic) {
+void TestServer::startTestServer(bool use_quic, bool disable_https) {
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock, false, false);
   // end pre-setup
-
+  ASSERT(!(use_quic && disable_https), "test_server doesn't support QUIC without https");
+  Network::DownstreamTransportSocketFactoryPtr factory;
   if (use_quic) {
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
+    factory = createQuicUpstreamTlsContext(factory_context_);
   } else {
-    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+    if (disable_https) {
+      upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
+      factory = Network::Test::createRawBufferDownstreamSocketFactory();
+    } else {
+      upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+      factory = createUpstreamTlsContext(factory_context_);
+    }
   }
-
-  Network::DownstreamTransportSocketFactoryPtr factory =
-      use_quic ? createQuicUpstreamTlsContext(factory_context_)
-               : createUpstreamTlsContext(factory_context_);
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
 
-    upstream_->setResponseHeaders(
-        std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
-            {{"x-response-foo", "aaa"},
-            {":status", "200"}})));
-    upstream_->setResponseBody("hello world");
+  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{"x-response-foo", "aaa"}, {":status", "200"}})));
+  upstream_->setResponseBody("hello world");
 
   // Legacy behavior for cronet tests.
   if (use_quic) {

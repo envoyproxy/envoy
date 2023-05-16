@@ -11,12 +11,12 @@ final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
   }
 
   func testDirectResponseWithContainsHeadersMatch() {
-    TestServerInterface.startTestServer()
+    TestServerInterface.startHttpTestServer()
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
-
+    let port = String(TestServerInterface.getServerPort())
     let requestHeaders = RequestHeadersBuilder(
-      method: .get, scheme: "http", authority: "127.0.0.1", path: "/"
+      method: .get, scheme: "http", authority: "localhost"+":"+port, path: "/"
     )
     .add(name: "x-foo", value: "123")
     .add(name: "x-foo", value: "456")
