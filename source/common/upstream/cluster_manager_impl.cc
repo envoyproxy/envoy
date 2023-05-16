@@ -303,7 +303,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       common_lb_config_pool_(
           std::make_shared<SharedPool::ObjectSharedPool<
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
-              main_thread_dispatcher)) {
+              main_thread_dispatcher)),
+      shutdown_(false) {
   if (admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {

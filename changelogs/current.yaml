@@ -121,6 +121,11 @@ new_features:
 - area: access_log
   change: |
     added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: dynamic_forward_proxy
+  change: |
+    added :ref:`sub_clusters_config
+    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
+    independent sub cluster for each host:port, with STRICT_DNS cluster type.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
