@@ -319,20 +319,17 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
 // on_match test cases.
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
-createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) {
+createMatchTreeWithOnNoMatch(const std::string& name, const std::string&) {
   auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
       std::make_unique<InputType>(name),
       Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
           []() { return std::make_unique<ActionType>(); }, nullptr});
-
-  // No action is set on match. i.e., nullptr action factory cb.
-  tree->addChild(
-      value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; }, nullptr});
   return tree;
 }
 
 TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {
-  // The filter is added, but since we match on the request header we skip the filter.
+  // The filter is added, but since it is not matched onequest header then the `on_no_match` action
+  // will be invoked. The skip action is provided to `on_no_match` so we skip the filter.
   std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
       new Envoy::Http::MockStreamDecoderFilter());
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
