@@ -1,8 +1,8 @@
 import Envoy
-import TestExtensions
-import XCTest
 import EnvoyTestServerInterface
 import Foundation
+import TestExtensions
+import XCTest
 
 final class EndToEndNetworkingTest: XCTestCase {
   override static func setUp() {
@@ -16,7 +16,7 @@ final class EndToEndNetworkingTest: XCTestCase {
     let dataExpectation = self.expectation(description: "Response data received")
     let port = String(TestServerInterface.getServerPort())
     let requestHeaders = RequestHeadersBuilder(
-      method: .get, scheme: "http", authority: "localhost"+":"+port, path: "/"
+      method: .get, scheme: "http", authority: "localhost:" + port, path: "/"
     )
     .build()
 
