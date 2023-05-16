@@ -50,7 +50,7 @@ Note that this filter also supports per route configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-Above shows an example of route-level config overriding the config on the virutal-host level.
+Above shows an example of route-level config overriding the config on the virtual-host level.
 
 .. include:: _include/aws_credentials.rst
 
