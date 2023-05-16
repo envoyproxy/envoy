@@ -10,7 +10,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
-
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"

@@ -29,17 +29,16 @@ envoy_mobile_objc_test(
     ],
 )
 
-
 envoy_objc_library(
     name = "envoy_test_server_interface",
+    testonly = True,
     srcs = [
         "EnvoyTestServerInterface.mm",
     ],
     hdrs = ["EnvoyTestServerInterface.h"],
-    visibility = ["//visibility:public"],
     module_name = "EnvoyTestServerInterface",
+    visibility = ["//visibility:public"],
     deps = [
-        "//test/common/integration:test_server_interface_lib"
-        ],
-    testonly = True,
+        "//test/common/integration:test_server_interface_lib",
+    ],
 )
