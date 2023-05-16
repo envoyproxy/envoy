@@ -6,7 +6,7 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/config/api_version.h"
 
-#include "test/common/config/delta_subscription_test_harness.h"
+#include "test/extensions/config_subscription/grpc/delta_subscription_test_harness.h"
 
 namespace Envoy {
 namespace Config {

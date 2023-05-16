@@ -10,6 +10,11 @@ behavior_changes:
   change: |
     Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
     need to include the new config_subscriptions explicitly.
+- area: http
+  change: |
+    When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
+    value in the list. This resolves issues where a retry caused the same value to be appended multiple times. This
+    behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -113,6 +118,9 @@ new_features:
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
     recorded. Please refer to the access log configuration documentation for more information.
+- area: access_log
+  change: |
+    added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
@@ -163,6 +171,12 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: access_log
+  change: |
+    added additional HCM access log option :ref:`flush_log_on_tunnel_successfully_established
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_log_on_tunnel_successfully_established>`.
+    Enabling this option will write a log to all access loggers when HTTP tunnels (e.g. Websocket and CONNECT)
+    are successfully established.
 
 deprecated:
 - area: access_log

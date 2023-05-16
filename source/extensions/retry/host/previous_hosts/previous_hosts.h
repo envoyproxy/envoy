@@ -6,8 +6,6 @@
 namespace Envoy {
 class PreviousHostsRetryPredicate : public Upstream::RetryHostPredicate {
 public:
-  PreviousHostsRetryPredicate(uint32_t retry_count) : attempted_hosts_(retry_count) {}
-
   bool shouldSelectAnotherHost(const Upstream::Host& candidate_host) override {
     return std::find(attempted_hosts_.begin(), attempted_hosts_.end(), &candidate_host) !=
            attempted_hosts_.end();
