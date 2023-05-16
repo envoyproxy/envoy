@@ -170,12 +170,10 @@ public:
 
   // Holds detailed value and counts for a histogram bucket.
   struct Bucket {
-    double min_value_{0}; // Bound of bucket that's closest to zero.
+    double lower_bound_{0}; // Bound of bucket that's closest to zero.
     double width_{0};
     uint64_t count_{0};
   };
-
-  static constexpr uint32_t UnlimitedBuckets = 0;
 
   /**
    * @return a vector of histogram buckets collected since binary start or reset.

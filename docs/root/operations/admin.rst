@@ -477,9 +477,7 @@ modify different aspects of the server:
 
   .. http:get:: /stats?histogram_buckets=detailed
 
-  Shows histograms as both percentile summary data, and raw bucket
-  data, up to 64 buckets. If the raw bucket data has more than 64
-  buckets, then adjacent buckets are combined until 64 is reached.
+  Shows histograms as both percentile summary data, and raw bucket data.
 
   Example output
   .. code-block:: text
@@ -489,7 +487,7 @@ modify different aspects of the server:
       intervals=1,0.25:2, 2,0.25:3
       summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.005) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)
 
-  Each bucket is shown as `min_value,width:count`. In the above example there are two
+  Each bucket is shown as `lower_bound,width:count`. In the above example there are two
   buckets. `totals` contains the accumulated data-points since the binary was started.
   `intervals` shows the new data points since the previous stats flush.
 
@@ -669,9 +667,7 @@ modify different aspects of the server:
 
   .. http:get:: /stats?format=json&histogram_buckets=detailed
 
-  Shows histograms as both percentile summary data, and raw bucket
-  data, up to 64 buckets. If the raw bucket data has more than 64
-  buckets, then adjacent buckets are combined until 64 is reached.
+  Shows histograms as both percentile summary data..
 
   Example output:
 
@@ -698,12 +694,12 @@ modify different aspects of the server:
                   { "interval": null "cumulative": 2.1 }
                 ],
                 "totals": [
-                  { "min_value": 1, "width": 0.25, "count": 25 },
-                  { "min_value": 2, "width": 0.25, "count": 9 }
+                  { "lower_bound": 1, "width": 0.25, "count": 25 },
+                  { "lower_bound": 2, "width": 0.25, "count": 9 }
                 ],
                 "intervals": [
-                  { "min_value": 1, "width": 0.25, "count": 2 },
-                  { "min_value": 2, "width": 0.25, "count": 3 }
+                  { "lower_bound": 1, "width": 0.25, "count": 2 },
+                  { "lower_bound": 2, "width": 0.25, "count": 3 }
                 ],
               },
             ]

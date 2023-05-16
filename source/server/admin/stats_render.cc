@@ -61,7 +61,7 @@ void StatsTextRender::addDetail(const std::vector<Stats::ParentHistogram::Bucket
   absl::string_view delim = "";
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     response.addFragments(
-        {delim, absl::StrCat(bucket.min_value_, ",", bucket.width_, ":", bucket.count_)});
+        {delim, absl::StrCat(bucket.lower_bound_, ",", bucket.width_, ":", bucket.count_)});
     delim = ", ";
   }
 }
@@ -192,7 +192,7 @@ void StatsJsonRender::populateDetail(absl::string_view name,
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     ProtobufWkt::Struct bucket_json;
     ProtoMap& bucket_fields = *bucket_json.mutable_fields();
-    bucket_fields["min_value"] = ValueUtil::numberValue(bucket.min_value_);
+    bucket_fields["lower_bound"] = ValueUtil::numberValue(bucket.lower_bound_);
     bucket_fields["width"] = ValueUtil::numberValue(bucket.width_);
     bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
     *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
@@ -257,7 +257,7 @@ void StatsJsonRender::populateQuantiles(const Stats::ParentHistogram& histogram,
     // to send them once.
     Stats::HistogramStatisticsImpl empty_statistics;
     ProtoMap& fields = *histograms_obj_.mutable_fields();
-    populateVector(label, empty_statistics.supportedQuantiles(), 100, fields);
+    populateVector(label, empty_statistics.supportedQuantiles(), 100 /* multiplier */, fields);
     found_used_histogram_ = true;
   }
 

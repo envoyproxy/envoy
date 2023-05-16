@@ -333,11 +333,11 @@ TEST_F(StatsRenderTest, JsonHistogramDetailed) {
                     {"cumulative": 310, "interval": 310}
                 ],
                 "totals": [
-                    {"min_value": 200, "width": 10, "count": 1},
-                    {"min_value": 300, "width": 10, "count": 2}],
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}],
                 "intervals":[
-                    {"min_value": 200, "width": 10, "count": 1},
-                    {"min_value": 300, "width": 10, "count": 2}]}]}}]}
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}]}]}}]}
   )EOF";
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               JsonStringEq(expected));

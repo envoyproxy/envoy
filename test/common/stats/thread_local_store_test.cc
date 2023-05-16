@@ -1728,9 +1728,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
   EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
-
-  // Verifies that if we ask for more buckets than there are, we just get our one bucket.
-  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
+  EXPECT_THAT(parent_histogram->detailedIntervalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 }
 
 TEST_F(HistogramTest, ForEachHistogram) {

@@ -966,7 +966,7 @@ ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
   for (uint32_t i = 0; i < num_buckets; ++i) {
     ParentHistogram::Bucket& bucket = buckets[i];
     hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
-    bucket.min_value_ = hist_bucket_to_double(hist_bucket);
+    bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
     bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
   }
   return buckets;
