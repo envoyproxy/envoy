@@ -6409,8 +6409,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
@@ -6491,8 +6490,7 @@ TEST(HealthCheckEventLoggerImplTest, AccessLoggers) {
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a

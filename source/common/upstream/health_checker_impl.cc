@@ -84,8 +84,7 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
   }
 
   std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager));
+      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api));
 
   if (!health_check_config.event_log_path().empty() ||
       !health_check_config.event_logger().empty()) {

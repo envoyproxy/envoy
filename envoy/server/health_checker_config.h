@@ -47,11 +47,6 @@ public:
    */
   virtual Api::Api& api() PURE;
 
-  /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
-
   virtual void setEventLogger(Upstream::HealthCheckEventLoggerPtr event_logger) PURE;
 };
 

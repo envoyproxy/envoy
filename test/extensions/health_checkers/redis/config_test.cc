@@ -7,6 +7,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/health_checker.h"
@@ -116,12 +117,13 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_NE(nullptr,
             dynamic_cast<CustomRedisHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
                     Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
-                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api, server_context)
                     .get()));
 }
 } // namespace

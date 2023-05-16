@@ -29,6 +29,8 @@ public:
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
+
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
       event_logger_ = std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();

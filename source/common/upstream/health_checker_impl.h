@@ -55,9 +55,9 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
                                   Event::Dispatcher& dispatcher,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api, AccessLog::AccessLogManager& log_manager)
+                                  Api::Api& api)
       : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
-        validation_visitor_(validation_visitor), log_manager_(log_manager), api_(api) {}
+        validation_visitor_(validation_visitor), api_(api) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -66,8 +66,6 @@ public:
     return validation_visitor_;
   }
   Api::Api& api() override { return api_; }
-
-  AccessLog::AccessLogManager& accessLogManager() override { return log_manager_; }
   void setEventLogger(HealthCheckEventLoggerPtr event_logger) override {
     event_logger_ = std::move(event_logger);
   }
@@ -77,7 +75,6 @@ private:
   Envoy::Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  AccessLog::AccessLogManager& log_manager_;
   Api::Api& api_;
   HealthCheckEventLoggerPtr event_logger_;
 };
