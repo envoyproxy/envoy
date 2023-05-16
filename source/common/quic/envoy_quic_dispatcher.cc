@@ -60,7 +60,9 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      quic_stats_(generateStats(listener_config.listenerScope())) {}
+      quic_stats_(generateStats(listener_config.listenerScope())),
+      connection_stats_({QUIC_CONNECTION_STATS(
+          POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -101,7 +103,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
-      listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info));
+      listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
+      connection_stats_);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =

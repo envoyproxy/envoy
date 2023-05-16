@@ -10,6 +10,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -33,8 +34,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrEq;
-using testing::StrNe;
 
 namespace Envoy {
 namespace ConfigTest {
@@ -56,13 +55,15 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options) {
+  ConfigTest(OptionsImpl& options) : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
+      return api_->threadFactory();
+    }));
     ON_CALL(file_system_, fileReadToEnd(_))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
@@ -112,12 +113,10 @@ public:
     }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
+        *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
+        server_.httpContext(),
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.dispatcher(), server_.localInfo(), server_.secretManager(),
-        server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
-        server_.routerContext(), server_.accessLogManager(), server_.singletonManager(),
-        server_.options(), server_.quic_stat_names_, server_);
+        ssl_context_manager_, server_.secretManager(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -168,7 +167,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  OptionsImpl options_;
+  OptionsImpl& options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
       std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
@@ -241,7 +240,8 @@ uint32_t run(const std::string& directory) {
       Server::InstanceUtil::loadBootstrapConfig(
           bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      ConfigTest test2(asConfigYaml(options, *api));
+      OptionsImpl config = asConfigYaml(options, *api);
+      ConfigTest test2(config);
     }
     num_tested++;
   }

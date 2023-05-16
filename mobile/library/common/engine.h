@@ -4,7 +4,6 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
@@ -39,6 +38,7 @@ public:
    */
   envoy_status_t run(std::string config, std::string log_level,
                      const std::string admin_address_path);
+  envoy_status_t run(std::unique_ptr<Envoy::OptionsImpl>&& options);
 
   /**
    * Immediately terminate the engine, if running.
@@ -100,7 +100,7 @@ public:
   Stats::Store& getStatsStore();
 
 private:
-  envoy_status_t main(std::string config, std::string log_level, std::string admin_address_path);
+  envoy_status_t main(std::unique_ptr<Envoy::OptionsImpl>&& options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 

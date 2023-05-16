@@ -102,7 +102,9 @@ void MultiConnectionBaseImpl::enableHalfClose(bool enabled) {
   }
 }
 
-bool MultiConnectionBaseImpl::isHalfCloseEnabled() { return connections_[0]->isHalfCloseEnabled(); }
+bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
+  return connections_[0]->isHalfCloseEnabled();
+}
 
 std::string MultiConnectionBaseImpl::nextProtocol() const {
   return connections_[0]->nextProtocol();
@@ -261,6 +263,11 @@ absl::string_view MultiConnectionBaseImpl::transportFailureReason() const {
   return connections_[0]->transportFailureReason();
 }
 
+absl::string_view MultiConnectionBaseImpl::localCloseReason() const {
+  // Note, this might change before connect finishes.
+  return connections_[0]->localCloseReason();
+}
+
 bool MultiConnectionBaseImpl::startSecureTransport() {
   if (!connect_finished_) {
     per_connection_state_.start_secure_transport_ = true;
@@ -311,9 +318,9 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
+void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {
   if (connect_finished_) {
-    connections_[0]->close(type);
+    connections_[0]->close(type, details);
     return;
   }
 
@@ -325,7 +332,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
     if (i != 0) {
       // Wait to close the final connection until the post-connection callbacks
       // have been added.
-      connections_[i]->close(ConnectionCloseType::NoFlush);
+      connections_[i]->close(ConnectionCloseType::NoFlush, details);
     }
   }
   connections_.resize(1);
@@ -336,7 +343,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
       connections_[0]->addConnectionCallbacks(*cb);
     }
   }
-  connections_[0]->close(type);
+  connections_[0]->close(type, details);
 }
 
 Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() {

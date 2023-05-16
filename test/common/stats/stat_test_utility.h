@@ -183,6 +183,7 @@ public:
   const TestStore& constStore() const override { return store_; }
 
 private:
+  std::string statNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags);
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
       return prefix;
@@ -190,7 +191,8 @@ private:
     return prefix + ".";
   }
 
-  void verifyConsistency(StatName ref_stat_name, StatName stat_name);
+  void verifyConsistency(StatName ref_stat_name, StatName stat_name,
+                         StatNameTagVectorOptConstRef tags);
 
   TestStore& store_;
   const std::string prefix_str_;

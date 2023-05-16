@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -74,34 +75,15 @@ public:
   static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
-class Request : public StreamBase {
+/**
+ * Using interface that provided by the TraceContext as the interface of generic request.
+ */
+class Request : public Tracing::TraceContext {
 public:
-  /**
-   * Get request host.
-   *
-   * @return The host of generic request. The meaning of the return value may be different For
-   * different application protocols. It typically should be domain, VIP, or service name that
-   * used to represents target service instances.
-   */
-  virtual absl::string_view host() const PURE;
-
-  /**
-   * Get request path.
-   *
-   * @return The path of generic request. The meaning of the return value may be different For
-   * different application protocols. It typically should be RPC service name that used to
-   * represents set of method or functionality provided by target service.
-   */
-  virtual absl::string_view path() const PURE;
-
-  /**
-   * Get request method.
-   *
-   * @return The method of generic request. The meaning of the return value may be different For
-   * different application protocols.
-   */
-  virtual absl::string_view method() const PURE;
+  // Used for matcher.
+  static constexpr absl::string_view name() { return "generic_proxy"; }
 };
+
 using RequestPtr = std::unique_ptr<Request>;
 using RequestSharedPtr = std::shared_ptr<Request>;
 

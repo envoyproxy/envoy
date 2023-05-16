@@ -125,36 +125,16 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.",
-        eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
-                                                factory_context, std::move(scope), false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ =
-        edsMultiplexingEnabled()
-            ? server_context_.cluster_manager_.multiplexed_subscription_factory_.callbacks_
-            : server_context_.cluster_manager_.subscription_factory_.callbacks_;
-  }
-
-  bool edsMultiplexingEnabled() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds") &&
-           (eds_cluster_.eds_cluster_config().eds_config().api_config_source().api_type() ==
-                envoy::config::core::v3::ApiConfigSource::GRPC ||
-            eds_cluster_.eds_cluster_config().eds_config().api_config_source().api_type() ==
-                envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    if (edsMultiplexingEnabled()) {
-      EXPECT_CALL(*server_context_.cluster_manager_.multiplexed_subscription_factory_.subscription_,
-                  start(_));
-    } else {
-      EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    }
+    EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
@@ -167,14 +147,12 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
-  Stats::TestUtil::TestStore stats_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  NiceMock<Random::MockRandomGenerator> random_;
-  TestScopedRuntime runtime_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -200,7 +178,8 @@ protected:
     doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_);
 
     // Make sure the cluster is rebuilt.
-    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+    EXPECT_EQ(0UL,
+              stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
     {
       auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
       EXPECT_EQ(hosts.size(), 2);
@@ -219,7 +198,7 @@ protected:
   }
 
   void resetCluster(const bool ignore_health_on_host_removal) {
-    const std::string config = R"EOF(
+    constexpr absl::string_view config = R"EOF(
       name: name
       connect_timeout: 0.25s
       type: EDS
@@ -258,7 +237,8 @@ protected:
     doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_);
 
     // Always rebuild if health check config is changed.
-    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+    EXPECT_EQ(0UL,
+              stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
@@ -286,7 +266,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   eds_callbacks_->onConfigUpdate({}, "");
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   eds_callbacks_->onConfigUpdate({}, removed_resources, "");
-  EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
+  EXPECT_EQ(2UL, stats_.findCounterByString("cluster.name.update_empty").value().get().value());
   EXPECT_TRUE(initialized_);
 }
 
@@ -313,7 +293,8 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
@@ -332,7 +313,8 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
   VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that onConfigUpdate() with no service name accepts config.
@@ -381,20 +363,18 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(
-      30UL,
-      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(30UL, stats_.findGaugeByString("cluster.name.max_host_weight").value().get().value());
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->weight(), 30);
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(
-      31UL,
-      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(31UL, stats_.findGaugeByString("cluster.name.max_host_weight").value().get().value());
   auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
@@ -430,7 +410,8 @@ TEST_F(EdsTest, EndpointMetadata) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
@@ -462,7 +443,8 @@ TEST_F(EdsTest, EndpointMetadata) {
 
   // We don't rebuild with the exact same config.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // New resources with Metadata updated.
   Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
@@ -620,7 +602,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(Host::Health::Healthy, hosts[0]->coarseHealth());
   }
 
-  const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
+  const auto rebuild_container =
+      stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value();
   // Now mark host 0 degraded via EDS, it should be degraded.
   endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::DEGRADED);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -630,7 +613,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   }
 
   // We should rebuild the cluster since we went from healthy -> degraded.
-  EXPECT_EQ(rebuild_container, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // Now mark the host as having been degraded through active hc.
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
@@ -645,7 +629,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   }
 
   // Since the host health didn't change, expect no rebuild.
-  EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container + 1,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that onConfigUpdate() updates the hostname.
@@ -2271,7 +2256,8 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   {
     auto& first_hosts_per_locality =
@@ -2304,13 +2290,15 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   // This should noop (regression test for earlier bug where we would still
   // rebuild).
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // Adjust locality weights, validate that we observe an update.
   cluster_load_assignment.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(60);
   cluster_load_assignment.mutable_endpoints(1)->mutable_load_balancing_weight()->set_value(40);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
@@ -2534,99 +2522,6 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
                             EnvoyException,
                             "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
                             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
-}
-
-TEST_F(EdsTest, MultiplexEdsEnabledViaRuntime) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsDisabledViaRuntime) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "false"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiTypeFallsbackToNonMultiplexedEds) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          api_config_source:
-            api_type: REST
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsEnabledByDefault) {
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
 }
 
 } // namespace

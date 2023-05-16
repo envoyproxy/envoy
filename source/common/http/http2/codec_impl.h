@@ -210,6 +210,11 @@ protected:
     // Http::MultiplexedStreamImplBase
     void destroy() override;
     void onPendingFlushTimer() override;
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      extend_stream_lifetime_flag_ = true;
+      return MultiplexedStreamImplBase::registerCodecEventCallbacks(codec_callbacks);
+    }
 
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
@@ -290,7 +295,6 @@ protected:
     void decodeData();
 
     // Get MetadataEncoder for this stream.
-    MetadataEncoder& getMetadataEncoderOld();
     NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
@@ -306,6 +310,13 @@ protected:
                           bool skip_encoding_empty_trailers);
     // Called from either process_buffered_data_callback_.
     void processBufferedData();
+
+    // Called when the frame with END_STREAM is sent for this stream.
+    void onEndStreamEncoded() {
+      if (codec_callbacks_) {
+        codec_callbacks_->onCodecEncodeComplete();
+      }
+    }
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -328,7 +339,6 @@ protected:
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
@@ -336,12 +346,15 @@ protected:
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
+    bool remote_rst_ : 1;
     bool data_deferred_ : 1;
     bool received_noninformational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     bool defer_processing_backedup_streams_ : 1;
+    // Latch whether this stream is operating with this flag.
+    bool extend_stream_lifetime_flag_ : 1;
     absl::string_view details_;
 
     /**
@@ -431,6 +444,10 @@ protected:
     // Client streams do not need a flush timer because we currently assume that any failure
     // to flush would be covered by a request/stream/etc. timeout.
     void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks*) override {
+      ENVOY_BUG(false, "CodecEventCallbacks for HTTP2 client stream unimplemented.");
+      return nullptr;
+    }
     // StreamImpl
     void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Do not use deferred reset on upstream connections.
@@ -493,8 +510,8 @@ protected:
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+      if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
       } else {
         return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
       }
@@ -514,11 +531,15 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                              Http::ResponseHeaderMapConstSharedPtr,
+                                              Http::ResponseTrailerMapConstSharedPtr,
+                                              StreamInfo::StreamInfo&) override {}
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    absl::variant<RequestHeaderMapSharedPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
@@ -535,9 +556,10 @@ protected:
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
   const StreamImpl* getStream(int32_t stream_id) const;
-  // Same as getStream, but without the ASSERT.
-  StreamImpl* getStreamUnchecked(int32_t stream_id);
   StreamImpl* getStream(int32_t stream_id);
+  // Same as getStream, but without the ASSERT.
+  const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
+  StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
   /**
@@ -599,7 +621,7 @@ protected:
   void onProtocolConstraintViolation();
 
   // Whether to use the new HTTP/2 library.
-  const bool use_oghttp2_library_;
+  bool use_oghttp2_library_;
   static Http2Callbacks http2_callbacks_;
 
   // If deferred processing, the streams will be in LRU order based on when the
@@ -746,7 +768,8 @@ public:
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
 
 private:
   // ConnectionImpl
@@ -774,6 +797,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  bool sent_go_away_on_dispatch_{false};
 };
 
 } // namespace Http2

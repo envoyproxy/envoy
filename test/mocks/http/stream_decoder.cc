@@ -7,11 +7,12 @@ namespace Envoy {
 namespace Http {
 
 MockRequestDecoder::MockRequestDecoder() {
-  ON_CALL(*this, decodeHeaders_(_, _)).WillByDefault(Invoke([](RequestHeaderMapPtr& headers, bool) {
-    // Check to see that method is not-null. Path can be null for CONNECT and authority can be null
-    // at the codec level.
-    ASSERT_NE(nullptr, headers->Method());
-  }));
+  ON_CALL(*this, decodeHeaders_(_, _))
+      .WillByDefault(Invoke([](RequestHeaderMapSharedPtr& headers, bool) {
+        // Check to see that method is not-null. Path can be null for CONNECT and authority can be
+        // null at the codec level.
+        ASSERT_NE(nullptr, headers->Method());
+      }));
 }
 MockRequestDecoder::~MockRequestDecoder() = default;
 

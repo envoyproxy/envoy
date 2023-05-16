@@ -20,12 +20,28 @@ const envoy::service::secret::v3::SdsDummy _sds_dummy;
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   SdsIntegrationTest() {
+    override_builder_config_ = true;
     ExtensionRegistry::registerFactories();
     skip_tag_extraction_rule_check_ = true;
     upstream_tls_ = true;
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Change the base_h2 cluster to use SSL and SDS.
+      // The default stats config has overenthusiastic filters.
+      bootstrap.clear_stats_config();
+
+      // Add two clusters by default:
+      //  - base: An HTTP2 cluster with one fake upstream endpoint, for accepting requests from
+      //  EM.
+      //  - xds_cluster.lyft.com: An xDS management server cluster, with one fake upstream endpoint.
+      bootstrap.mutable_static_resources()->clear_clusters();
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          createSingleEndpointClusterConfig("base"));
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          createSingleEndpointClusterConfig(std::string(XDS_CLUSTER)));
+    });
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Change the base cluster to use SSL and SDS.
       auto* transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -40,7 +56,7 @@ public:
   }
 
   void createUpstreams() override {
-    // This is the fake upstream configured with SSL for the base_h2 cluster.
+    // This is the fake upstream configured with SSL for the base cluster.
     addFakeUpstream(Ssl::createUpstreamSslContext(context_manager_, *api_), upstreamProtocol(),
                     /*autonomous_upstream=*/true);
   }
@@ -96,7 +112,7 @@ TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
   // sending HTTP requests to the upstream cluster using the secret.
   ASSERT_TRUE(waitForCounterGe("sds.client_cert.update_success", 1));
   ASSERT_TRUE(
-      waitForCounterGe("cluster.base_h2.client_ssl_socket_factory.ssl_context_update_by_sds", 1));
+      waitForCounterGe("cluster.base.client_ssl_socket_factory.ssl_context_update_by_sds", 1));
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();

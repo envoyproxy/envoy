@@ -26,7 +26,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::HasSubstr;
 using testing::StartsWith;
 
 namespace Envoy {
@@ -171,7 +170,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
-      format: Format to use; One of (html, text, json)
+      format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
   /stats/prometheus: print server stats in prometheus format

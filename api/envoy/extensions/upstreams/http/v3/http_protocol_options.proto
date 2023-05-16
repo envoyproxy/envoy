@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.upstreams.http.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
@@ -58,7 +59,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -163,4 +164,14 @@ message HttpProtocolOptions {
   // upstream filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
+
+  // Configuration options for Unified Header Validation (UHV).
+  // UHV is an extensible mechanism for checking validity of HTTP responses.
+  //
+  // [#comment:TODO(yanavlasov): Make it a link to the default header validator doc when it becomes visible.]
+  // Leaving this field unspecified, selects the default header validator ``envoy.http.header_validators.envoy_default``.
+  //
+  // [#not-implemented-hide:]
+  // [#extension-category: envoy.http.header_validators]
+  config.core.v3.TypedExtensionConfig header_validation_config = 7;
 }

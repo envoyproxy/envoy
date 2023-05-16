@@ -24,20 +24,20 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
-#include "source/common/upstream/multiplexed_subscription_factory.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -53,25 +53,16 @@ class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 
-  ProdClusterManagerFactory(
-      Server::Configuration::ServerFactoryContext& server_context, OptRef<Server::Admin> admin,
-      Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
-      LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
-      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
-      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-      Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
-      Singleton::Manager& singleton_manager, const Server::Options& options,
-      Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
-      : server_context_(server_context),
-        context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
-                 singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
-        validation_context_(validation_context), http_context_(http_context),
-        grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
-        tls_(tls), dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
-        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
+  ProdClusterManagerFactory(Server::Configuration::ServerFactoryContext& context,
+                            Stats::Store& stats, ThreadLocal::Instance& tls,
+                            Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
+                            Ssl::ContextManager& ssl_context_manager,
+                            Secret::SecretManager& secret_manager,
+                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+      : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
+        dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
+        secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
+        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls, {context}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
 
@@ -94,30 +85,24 @@ public:
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state,
                       absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) override;
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
+  Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
 protected:
-  Server::Configuration::ServerFactoryContext& server_context_;
-  Server::FactoryContextBaseImpl context_;
-  ProtobufMessage::ValidationContext& validation_context_;
-  Http::Context& http_context_;
-  Grpc::Context& grpc_context_;
-  Router::Context& router_context_;
-  OptRef<Server::Admin> admin_;
+  Server::Configuration::ServerFactoryContext& context_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
+  Http::Context& http_context_;
+
   LazyCreateDnsResolver dns_resolver_fn_;
   Ssl::ContextManager& ssl_context_manager_;
-  const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
-  AccessLog::AccessLogManager& log_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
@@ -295,6 +280,7 @@ public:
 
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    shutdown_ = true;
     if (resume_cds_ != nullptr) {
       resume_cds_->cancel();
     }
@@ -305,6 +291,8 @@ public:
     warming_clusters_.clear();
     updateClusterCounts();
   }
+
+  bool isShutdown() override { return shutdown_; }
 
   const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const override {
     return bind_config_;
@@ -328,10 +316,6 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
-
-  Config::SubscriptionFactory& multiplexedSubscriptionFactory() override {
-    return *multiplexed_subscription_factory_;
-  }
 
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -367,6 +351,17 @@ public:
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
 
+  /*
+   * Return shared_ptr for common_lb_config which is stored in an ObjectSharedPool
+   *
+   * @param common_lb_config The config field to be stored in ObjectSharedPool
+   * @return shared_ptr to the CommonLbConfig in ObjectSharedPool
+   */
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
+    return common_lb_config_pool_->getObject(common_lb_config);
+  }
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -374,13 +369,14 @@ protected:
   struct ThreadLocalClusterUpdateParams {
     struct PerPriority {
       PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
-          : priority_(priority), hosts_added_(hosts_added), hosts_removed_(hosts_removed) {}
+          : hosts_added_(hosts_added), hosts_removed_(hosts_removed), priority_(priority) {}
 
-      const uint32_t priority_;
       const HostVector hosts_added_;
       const HostVector hosts_removed_;
       PrioritySet::UpdateHostsParams update_hosts_params_;
       LocalityWeightsConstSharedPtr locality_weights_;
+      // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+      const uint32_t priority_;
       uint32_t overprovisioning_factor_;
     };
 
@@ -528,6 +524,9 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
+      Tcp::AsyncTcpClientPtr
+      tcpAsyncClient(LoadBalancerContext* context,
+                     Tcp::AsyncTcpClientOptionsConstSharedPtr options) override;
 
       // Updates the hosts in the priority set.
       void updateHosts(const std::string& name, uint32_t priority,
@@ -654,8 +653,9 @@ private:
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
-          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()) {}
+          version_info_(version_info), cluster_(std::move(cluster)),
+          last_updated_(time_source.systemTime()),
+          added_via_api_(added_via_api), added_or_updated_{} {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -677,14 +677,15 @@ private:
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
-    const bool added_via_api_;
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
-    bool added_or_updated_{};
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
+    // Keep smaller fields near the end to reduce padding
+    const bool added_via_api_ : 1;
+    bool added_or_updated_ : 1;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -815,13 +816,17 @@ private:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  std::shared_ptr<SharedPool::ObjectSharedPool<
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>
+      common_lb_config_pool_;
 
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
-  std::unique_ptr<MultiplexedSubscriptionFactory> multiplexed_subscription_factory_;
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
+
+  std::atomic<bool> shutdown_{};
 };
 
 } // namespace Upstream

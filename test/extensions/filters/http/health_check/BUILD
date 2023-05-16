@@ -41,6 +41,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "health_check_integration_test",
+    size = "large",
     srcs = [
         "health_check_integration_test.cc",
     ],

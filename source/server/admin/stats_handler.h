@@ -79,15 +79,16 @@ public:
    * and for rendering in /stats?format=html. We share the same UrlHandler in
    * both contexts by defining an API for it here.
    *
+   * @param active_mode skips rendering a form-field for 'usedonly', which we
+   *        force-enable for active mode. It makes no sense to include stats
+   *        that have never been written in a top-most-frequently-updated list.
    * @return a URL handler for stats.
    */
-  Admin::UrlHandler statsHandler();
+  Admin::UrlHandler statsHandler(bool active_mode);
 
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
   Admin::RequestPtr makeRequest(AdminStream&);
-  // static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
-  //                                     StatsRequest::UrlHandlerFn url_handler_fn);
 
 private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,

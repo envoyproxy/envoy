@@ -28,6 +28,9 @@ public:
     return std::make_unique<
         envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto>();
   }
+
+private:
+  bool disableTunnelingByFilterState(StreamInfo::StreamInfo& downstream_info) const;
 };
 
 DECLARE_FACTORY(GenericConnPoolFactory);

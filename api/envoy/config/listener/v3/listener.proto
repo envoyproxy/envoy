@@ -379,6 +379,12 @@ message Listener {
 message ListenerManager {
 }
 
+// A placeholder proto so that users can explicitly configure the standard
+// Validation Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ValidationListenerManager {
+}
+
 // A placeholder proto so that users can explicitly configure the API
 // Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
 // [#not-implemented-hide:]

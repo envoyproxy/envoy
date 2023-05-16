@@ -23,6 +23,7 @@
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -787,6 +788,18 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
                             EnvoyException,
                             "listener foo: has different socket type. The listener only "
                             "support same socket type for all the addresses.");
+}
+
+TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    connection_balance_config:
+      exact_balance: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener named 'foo': address is necessary");
 }
 
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
@@ -3837,6 +3850,72 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateMatch) {
+  if (!use_matcher_) {
+    return;
+  }
+
+  std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - name: foo
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+            key: filter_state_key
+        exact_match_map:
+          map:
+            "filter_state_value":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+    )EOF";
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // No filter state value set - no match.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a non-matching key - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a matching key but unknown value - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Known filter state key and matching value - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationProtocolMatch) {
   std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -4910,6 +4989,82 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
   auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterStateMatch) {
+  if (!use_matcher_) {
+    return;
+  }
+
+  std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - name: foo
+    - name: bar
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+            key: filter_state_key
+        exact_match_map:
+          map:
+            "filter_state_value":
+              action:
+                name: bar
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bar
+      on_no_match:
+        action:
+          name: foo
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: foo
+    )EOF";
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // No filter state value set - match foo.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a non-matching key - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a matching key but unknown value - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Known filter state key and matching value - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "bar");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicationProtocolMatch) {

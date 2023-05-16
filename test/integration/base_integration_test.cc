@@ -208,7 +208,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       resource->PackFrom(listener);
     }
     TestEnvironment::writeStringToFileForTest(
-        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
+        lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
@@ -510,10 +510,13 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 }
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries) {
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
-  for (int i = 0; i < 1000; ++i) {
+  const int num_iterations = TSAN_TIMEOUT_FACTOR * 1000;
+  for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
     if (entries.size() >= entry + 1) {
@@ -524,6 +527,11 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
           << entries.size() << "\n"
           << contents;
       return entries[entry];
+    }
+    if (i % 25 == 0 && client_connection != nullptr) {
+      // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
+      // then run dispatcher to send any pending acks.
+      client_connection->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
@@ -564,11 +572,13 @@ void BaseIntegrationTest::createXdsConnection() {
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
-  AssertionResult result = xds_connection_->close();
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
-  xds_connection_.reset();
+  if (xds_connection_ != nullptr) {
+    AssertionResult result = xds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    xds_connection_.reset();
+  }
 }
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
@@ -585,25 +595,6 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
                                         expected_error_substring, expect_node);
-  }
-}
-
-AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
-    const std::string& expected_type_url, const std::string& expected_version,
-    const std::vector<std::string>& expected_resource_names,
-    const std::vector<std::string>& expected_resource_names_added,
-    const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream,
-    bool expect_node, const Protobuf::int32 expected_error_code,
-    const std::string& expected_error_message) {
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
-      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_message,
-                                       stream.get());
-  } else {
-    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, stream,
-                                        expected_error_code, expected_error_message, expect_node);
   }
 }
 
@@ -675,9 +666,10 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     try {
-      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
-                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
-                               nullptr, true);
+      Network::TcpListenSocket give_me_a_name(
+          Network::Utility::getAddressWithPort(
+              *Network::Test::getCanonicalLoopbackAddress(version_), port),
+          nullptr, true);
       return AssertionSuccess();
     } catch (const EnvoyException&) {
       // The nature of this function requires using a real sleep here.
@@ -820,98 +812,4 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   test_server_->statStore().forEachGauge(nullptr, check_metric);
   test_server_->statStore().forEachHistogram(nullptr, check_metric);
 }
-
-AssertionResult BaseIntegrationTest::internalCompareDiscoveryRequest(
-    const DiscoveryRequestExpectedContents& expected_request,
-    const envoy::service::discovery::v3::DiscoveryRequest& actual_request,
-    const std::set<std::string>& actual_sub) {
-
-  if (actual_request.type_url() != expected_request.type_url_) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
-                                             actual_request.type_url(), expected_request.type_url_);
-  }
-  auto sub_result =
-      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
-  if (!sub_result) {
-    return sub_result;
-  }
-
-  if (actual_request.error_detail().code() != expected_request.error_code_) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               actual_request.error_detail().code(), expected_request.error_code_,
-               actual_request.error_detail().message());
-  }
-  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      actual_request.error_detail().message().find(expected_request.error_substring_) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_request.error_substring_
-                              << "\" is not a substring of actual error message \""
-                              << actual_request.error_detail().message() << "\"";
-  }
-  return AssertionSuccess();
-}
-
-AssertionResult BaseIntegrationTest::internalCompareDeltaDiscoveryRequest(
-    const DiscoveryRequestExpectedContents& expected_request,
-    const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
-    const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub) {
-
-  if (actual_request.type_url() != expected_request.type_url_) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
-                                             actual_request.type_url(), expected_request.type_url_);
-  }
-  auto sub_result =
-      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
-  if (!sub_result) {
-    return sub_result;
-  }
-  auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
-                                  "expected_resource_unsubscriptions");
-  if (!unsub_result) {
-    return unsub_result;
-  }
-
-  if (actual_request.error_detail().code() != expected_request.error_code_) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               actual_request.error_detail().code(), expected_request.error_code_,
-               actual_request.error_detail().message());
-  }
-  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      actual_request.error_detail().message().find(expected_request.error_substring_) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_request.error_substring_
-                              << "\" is not a substring of actual error message \""
-                              << actual_request.error_detail().message() << "\"";
-  }
-  return AssertionSuccess();
-}
-
-AssertionResult BaseIntegrationTest::assertExpectedDiscoveryRequest(
-    const envoy::service::discovery::v3::DiscoveryRequest& request,
-    const BaseIntegrationTest::DiscoveryRequestExpectedContents& expected_request) {
-  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
-    return AssertionFailure() << "Weird node field";
-  }
-
-  // Convert subscribed/unsubscribed names into sets to ignore ordering.
-  const std::set<std::string> actual_sub{request.resource_names().begin(),
-                                         request.resource_names().end()};
-  return internalCompareDiscoveryRequest(expected_request, request, actual_sub);
-}
-
-AssertionResult BaseIntegrationTest::assertExpectedDeltaDiscoveryRequest(
-    const envoy::service::discovery::v3::DeltaDiscoveryRequest& request,
-    const BaseIntegrationTest::DiscoveryRequestExpectedContents& expected_request) {
-  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
-    return AssertionFailure() << "Weird node field";
-  }
-  const std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
-                                         request.resource_names_subscribe().end()};
-  const std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
-                                           request.resource_names_unsubscribe().end()};
-  return internalCompareDeltaDiscoveryRequest(expected_request, request, actual_sub, actual_unsub);
-}
-
 } // namespace Envoy

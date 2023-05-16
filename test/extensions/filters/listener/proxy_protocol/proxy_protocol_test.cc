@@ -4,6 +4,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -11,6 +12,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
@@ -31,6 +33,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
@@ -417,10 +420,10 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -430,6 +433,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -465,6 +473,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -492,10 +505,10 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -505,6 +518,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -540,6 +558,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -762,6 +785,12 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -771,12 +800,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -786,6 +809,11 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -821,6 +849,11 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -963,6 +996,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -972,12 +1011,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -987,6 +1020,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -1022,6 +1060,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, 17);
@@ -1056,6 +1099,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -1065,12 +1114,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -1080,6 +1123,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -1115,6 +1163,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, 10);
@@ -1556,6 +1609,129 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
   expectProxyProtoError();
 }
 
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(2, proxy_proto_data.tlv_vector_.size());
+  EXPECT_EQ(0x0, proxy_proto_data.tlv_vector_[0].type);
+  EXPECT_EQ(0xFF, proxy_proto_data.tlv_vector_[0].value[0]);
+  EXPECT_EQ(1, proxy_proto_data.tlv_vector_[0].value.size());
+  EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[1].type);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[1].value.begin(),
+                                   proxy_proto_data.tlv_vector_[1].value.end()));
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(0, proxy_proto_data.tlv_vector_.size());
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  pass_through_tlvs->add_tlv_type(0x02);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(1, proxy_proto_data.tlv_vector_.size());
+  EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[0].type);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
+                                   proxy_proto_data.tlv_vector_[0].value.end()));
+  disconnect();
+}
+
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   connect(false);
 
@@ -1698,6 +1874,11 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
+      }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
@@ -1732,6 +1913,11 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
 
   connect(false);

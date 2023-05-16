@@ -20,6 +20,7 @@ envoy_cc_library(
     deps = [
         ":rds_lib",
         ":route_lib",
+        ":upstream_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:proxy_config_interface",
         "//contrib/generic_proxy/filters/network/source/router:router_lib",
@@ -28,6 +29,9 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/tracing:tracer_config_lib",
+        "//source/common/tracing:tracer_lib",
+        "//source/common/tracing:tracer_manager_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -110,5 +114,20 @@ envoy_cc_library(
         "//envoy/rds:rds_interface",
         "//source/common/rds:rds_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_lib",
+    srcs = [
+        "upstream.cc",
+    ],
+    hdrs = [
+        "upstream.h",
+    ],
+    deps = [
+        "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
     ],
 )

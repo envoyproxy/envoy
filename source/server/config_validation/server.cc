@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
@@ -103,11 +104,9 @@ void ValidationInstance::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ =
-      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
-          .createListenerManager(*this, std::make_unique<ValidationListenerComponentFactory>(*this),
-                                 *this, false, quic_stat_names_);
+  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
+                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
@@ -120,11 +119,9 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(),
+      server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), dispatcher(), localInfo(), *secret_manager_, messageValidationContext(),
-      *api_, http_context_, grpc_context_, router_context_, accessLogManager(), singletonManager(),
-      options, quic_stat_names_, *this);
+      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

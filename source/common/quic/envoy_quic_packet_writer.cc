@@ -66,8 +66,7 @@ EnvoyQuicPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
       quicAddressToEnvoyAddressInstance(peer_address);
   Network::UdpPacketWriterBuffer write_location = envoy_udp_packet_writer_->getNextWriteLocation(
       local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
-  return quic::QuicPacketBuffer(reinterpret_cast<char*>(write_location.buffer_),
-                                write_location.release_buffer_);
+  return {reinterpret_cast<char*>(write_location.buffer_), write_location.release_buffer_};
 }
 
 quic::WriteResult EnvoyQuicPacketWriter::Flush() {

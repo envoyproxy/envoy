@@ -26,6 +26,7 @@ namespace Stats {
 
 class Sink;
 class SinkPredicates;
+class StatNamePool;
 
 /**
  * Store keeps track of all Scopes created in it, and the Scopes manage
@@ -152,10 +153,6 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
-  // TODO(#24007): Remove this operator overload: it is not needed anymore. Once
-  // #24567, #24843, and #24861 have landed we can remove this API.
-  operator Scope&() { return *rootScope(); }
-
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
   // when we resolve #24007 or in the next follow-up.
@@ -176,6 +173,26 @@ public:
    * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
+   */
+  virtual void extractAndAppendTags(StatName name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
+   */
+  virtual void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

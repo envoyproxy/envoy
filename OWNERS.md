@@ -1,5 +1,6 @@
 * See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 * See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines and maintainer responsibilities.
+* See [CODEOWNERS](CODEOWNERS) for a detailed list of owners for the various source directories.
 
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.
@@ -17,7 +18,7 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
@@ -35,10 +36,6 @@ routing PRs, questions, etc. to the right place.
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
-* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
-  * Event management, security, performance, data plane.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
@@ -49,15 +46,13 @@ routing PRs, questions, etc. to the right place.
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
+* Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
+  * Caches, file filters, and file I/O.
 
 # Envoy mobile maintainers
 
 The following Envoy maintainers have final say over any changes only affecting /mobile
 
-* JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
-  * iOS (swift/objective-c) platform bindings.
-* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
-  * iOS (swift/objective-c) platform bindings.
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
 
@@ -67,17 +62,14 @@ The following extension maintainers have final say over the extensions mentioned
 approve an extension PR, it will be merged by the maintainer on-call (or any other maintainer)
 without further review.
 
-* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+* Michael Warres ([mpwarres] (https://github.com/mpwarres)) (mpw@google.com)
   * Wasm
-* Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
-  * Thrift
 
 # Envoy security team
 
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -115,6 +107,10 @@ contributors to envoy-setec and relevant Slack channels from:
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
 * Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@rowe-clan.net)
+* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
+* JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
+* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 
 # Friends of Envoy
 

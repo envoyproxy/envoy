@@ -24,26 +24,6 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
                           Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method to get filter parameter, or report an error for an invalid regex.
-bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
-                 std::shared_ptr<std::regex>& regex) {
-  auto p = params.find("filter");
-  if (p != params.end()) {
-    const std::string& pattern = p->second;
-    if (!pattern.empty()) {
-      TRY_ASSERT_MAIN_THREAD { regex = std::make_shared<std::regex>(pattern); }
-      END_TRY
-      catch (std::regex_error& error) {
-        // Include the offending pattern in the log, but not the error message.
-        response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
-        ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // Helper method to get the histogram_buckets parameter. Returns false if histogram_buckets query
 // param is found and value is not "cumulative" or "disjoint", true otherwise.
 absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,

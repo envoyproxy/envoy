@@ -1052,10 +1052,10 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
     request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
     EXPECT_EQ(request_headers.protocol(), "HTTP/x");
 
-    // Authority.
-    EXPECT_EQ(request_headers.authority(), "");
+    // Host.
+    EXPECT_EQ(request_headers.host(), "");
     request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
-    EXPECT_EQ(request_headers.authority(), "test.com:233");
+    EXPECT_EQ(request_headers.host(), "test.com:233");
 
     // Path.
     EXPECT_EQ(request_headers.path(), "");

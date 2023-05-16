@@ -32,10 +32,8 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(
-      int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
-      spdlog::level::level_enum default_log_level,
-      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
+  OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
@@ -44,10 +42,8 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(
-      std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
-      spdlog::level::level_enum default_log_level,
-      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
+  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
 
   // Default constructor; creates "reasonable" defaults, but desired values should be set
   // explicitly.
@@ -64,7 +60,10 @@ public:
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
-    config_proto_ = config_proto;
+    *config_proto_ = config_proto;
+  }
+  void setConfigProto(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
+    config_proto_ = std::move(config_proto);
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
@@ -114,8 +113,6 @@ public:
 
   void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
 
-  void setListenerManager(absl::string_view manager) { listener_manager_ = std::string(manager); }
-
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -123,7 +120,7 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
-    return config_proto_;
+    return *config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
@@ -167,7 +164,6 @@ public:
   }
   uint32_t count() const;
   const std::string& socketPath() const override { return socket_path_; }
-  const std::string& listenerManager() const override { return listener_manager_; }
   mode_t socketMode() const override { return socket_mode_; }
 
   /**
@@ -193,7 +189,8 @@ private:
   std::string base_id_path_;
   uint32_t concurrency_{1};
   std::string config_path_;
-  envoy::config::bootstrap::v3::Bootstrap config_proto_;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_{
+      new envoy::config::bootstrap::v3::Bootstrap()};
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
@@ -228,7 +225,6 @@ private:
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
   std::string socket_path_{"@envoy_domain_socket"};
-  std::string listener_manager_ = Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   mode_t socket_mode_{0};
 };
 

@@ -78,7 +78,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
 } // namespace
 
 LocalizedSamplingRule LocalizedSamplingRule::createDefault() {
-  return LocalizedSamplingRule(DefaultFixedTarget, DefaultRate);
+  return {DefaultFixedTarget, DefaultRate};
 }
 
 bool LocalizedSamplingRule::appliesTo(const SamplingRequest& request) const {

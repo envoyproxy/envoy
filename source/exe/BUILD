@@ -8,6 +8,7 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_select_enable_http3",
+    "envoy_select_signal_trace",
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
@@ -77,13 +78,10 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }),
+    ] + envoy_select_signal_trace([
+        "//source/common/signal:sigaction_lib",
+        ":terminate_handler_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -107,13 +105,10 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }),
+    ] + envoy_select_signal_trace([
+        "//source/common/signal:sigaction_lib",
+        ":terminate_handler_lib",
+    ]),
 )
 
 # provides a library target for Envoy server builds with the versioning information set up correctly.
@@ -124,6 +119,7 @@ envoy_cc_library(
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
@@ -175,16 +171,14 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/grpc:google_grpc_context_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }),
+    ] + envoy_select_signal_trace([
+        "//source/common/signal:sigaction_lib",
+        ":terminate_handler_lib",
+    ]),
 )
 
 envoy_cc_library(

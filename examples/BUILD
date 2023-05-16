@@ -14,12 +14,14 @@ filegroup(
             "**/*.yaml",
         ],
         exclude = [
+            "cache/ci-responses.yaml",
             "cache/responses.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
             "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
+            "golang/*.yaml",
             "mysql/*",
             "postgres/*",
             "kafka/*.yaml",
@@ -27,10 +29,11 @@ filegroup(
     ),
 )
 
-genrule(
+filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
+            "golang/*.yaml",
             "mysql/*.yaml",
             "postgres/*.yaml",
             "kafka/*.yaml",
@@ -39,13 +42,6 @@ genrule(
             "**/*docker-compose*.yaml",
         ],
     ),
-    outs = ["example_configs.tar"],
-    cmd = (
-        "$(location //configs:configgen.sh) NO_CONFIGGEN $(@D) $(SRCS)"
-    ),
-    tools = [
-        "//configs:configgen.sh",
-    ],
 )
 
 filegroup(

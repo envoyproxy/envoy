@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package test.common.http.http2;
+import "test/fuzz/common.proto";
+
+message Http2DataFrame {
+  bytes data = 1;
+}
+
+message Http2HeaderFrame {
+  uint32 stream_dependency = 1;
+  uint32 weight = 2;
+  test.fuzz.Headers headers = 3;
+  bytes padding = 4;
+}
+
+message Http2PriorityFrame {
+  uint32 stream_dependency = 1;
+  uint32 weight = 2;
+}
+
+message Http2RstFrame {
+  uint32 error_code = 1;
+}
+
+message Http2Setting {
+  // Uses only lower 2 bytes
+  uint32 identifier = 1;
+  uint32 value = 2;
+}
+
+message Http2SettingsFrame {
+  repeated Http2Setting settings = 1;
+}
+
+message Http2PushPromiseFrame {
+  uint32 stream_id = 1;
+  test.fuzz.Headers headers = 2;
+  bytes padding = 3;
+}
+
+message Http2PingFrame {
+  uint64 data = 1;
+}
+
+message Http2GoAwayFrame {
+  uint32 last_stream_id = 1;
+  uint32 error_code = 2;
+  bytes debug_data = 3;
+}
+
+message Http2WindowUpdateFrame {
+  uint32 window_size_increment = 1;
+}
+
+message Http2ContinuationFrame {
+  test.fuzz.Headers headers = 1;
+}
+
+message Http2Frame {
+  uint32 streamid = 1;
+  // Uses only least significant byte
+  uint32 flags = 2;
+  oneof frame {
+    Http2DataFrame data = 3;
+    Http2HeaderFrame headers = 4;
+    Http2PriorityFrame priority = 5;
+    Http2RstFrame rst = 6;
+    Http2SettingsFrame settings = 7;
+    Http2PushPromiseFrame push_promise = 8;
+    Http2PingFrame ping = 9;
+    Http2GoAwayFrame go_away = 10;
+    Http2WindowUpdateFrame window_update = 11;
+    Http2ContinuationFrame continuation = 12;
+  }
+}
+
+// All junk frame
+message JunkFrame {
+  bytes data = 1;
+}
+
+message Http2FrameOrJunk {
+  oneof frame {
+    Http2Frame h2frame = 1;
+    JunkFrame junk = 2;
+  }
+}
+
+message Http2ConnectionFuzzCase {
+  Http2SettingsFrame settings = 1;
+  repeated Http2FrameOrJunk frames = 2;
+}

@@ -4,10 +4,10 @@
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
-#include "source/common/common/utility.h"
 
+#include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
-#include "test/test_common/utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/container/flat_hash_map.h"
 

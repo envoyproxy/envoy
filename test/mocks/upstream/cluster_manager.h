@@ -48,6 +48,7 @@ public:
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(bool, isShutdown, ());
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
@@ -56,7 +57,6 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
-  MOCK_METHOD(Config::SubscriptionFactory&, multiplexedSubscriptionFactory, ());
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
   const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
     return cluster_config_update_stat_names_;
@@ -85,6 +85,11 @@ public:
               (const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
+    return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
+        common_lb_config);
+  }
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 
@@ -95,7 +100,6 @@ public:
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
-  NiceMock<Config::MockSubscriptionFactory> multiplexed_subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
   Stats::TestUtil::TestSymbolTable symbol_table_;

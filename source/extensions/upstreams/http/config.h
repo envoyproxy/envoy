@@ -12,6 +12,7 @@
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -27,7 +28,7 @@ class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::ServerFactoryContext& server_context);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
@@ -54,6 +55,7 @@ public:
   const FiltersList http_filters_;
   const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
+  const Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool use_downstream_protocol_{};
   const bool use_http2_{};
   const bool use_http3_{};
@@ -69,7 +71,7 @@ public:
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config,
-                                                       context.messageValidationVisitor());
+                                                       context.getServerFactoryContext());
   }
   std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {

@@ -44,6 +44,8 @@ private:
   const ConnectionSocket::OptionsSharedPtr options_;
   // Index of the next address to use.
   size_t next_address_ = 0;
+  // True if the first connection has been created.
+  bool first_connection_created_ = false;
 };
 
 /**

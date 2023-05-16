@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -17,7 +18,6 @@ option java_package = "io.envoyproxy.envoy.service.ext_proc.v3";
 option java_outer_classname = "ExternalProcessorProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3;ext_procv3";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -122,7 +122,7 @@ message ProcessingRequest {
 
 // For every ProcessingRequest received by the server with the ``async_mode`` field
 // set to false, the server must send back exactly one ProcessingResponse message.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ProcessingResponse {
   oneof response {
     option (validate.required) = true;
@@ -171,6 +171,21 @@ message ProcessingResponse {
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
+
+  // When ext_proc server receives a request message, in case it needs more
+  // time to process the message, it sends back a ProcessingResponse message
+  // with a new timeout value. When Envoy receives this response message,
+  // it ignores other fields in the response, just stop the original timer,
+  // which has the timeout value specified in
+  // :ref:`message_timeout
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.message_timeout>`
+  // and start a new timer with this ``override_message_timeout`` value and keep the
+  // Envoy ext_proc filter state machine intact.
+  // Has to be >= 1ms and <=
+  // :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>`
+  // Such message can be sent at most once in a particular Envoy ext_proc filter processing state.
+  // To enable this API, one has to set ``max_message_timeout`` to a number >= 1ms.
+  google.protobuf.Duration override_message_timeout = 10;
 }
 
 // The following are messages that are sent to the server.

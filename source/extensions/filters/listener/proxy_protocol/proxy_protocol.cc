@@ -9,6 +9,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -17,12 +18,15 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET;
@@ -47,9 +51,20 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
-      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()) {
+      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()),
+      pass_all_tlvs_(proto_config.has_pass_through_tlvs()
+                         ? proto_config.pass_through_tlvs().match_type() ==
+                               ProxyProtocolPassThroughTLVs::INCLUDE_ALL
+                         : false) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
+  }
+
+  if (proto_config.has_pass_through_tlvs() &&
+      proto_config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
+    for (const auto& tlv_type : proto_config.pass_through_tlvs().tlv_type()) {
+      pass_through_tlvs_.insert(0xFF & tlv_type);
+    }
   }
 }
 
@@ -60,6 +75,13 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
   }
 
   return nullptr;
+}
+
+bool Config::isPassThroughTlvTypeNeeded(uint8_t tlv_type) const {
+  if (pass_all_tlvs_) {
+    return true;
+  }
+  return pass_through_tlvs_.contains(tlv_type);
 }
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
@@ -117,6 +139,29 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
     if (read_ext_state != ReadOrParseState::Done) {
       return read_ext_state;
     }
+  }
+
+  if (proxy_protocol_header_.has_value() &&
+      !cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolFilterState::key())) {
+    if (!proxy_protocol_header_.value().local_command_) {
+      auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+      ENVOY_LOG(
+          trace,
+          "Parsed proxy protocol header, length: {}, buffer: {}, TLV length: {}, TLV buffer: {}",
+          proxy_protocol_header_.value().wholeHeaderLength(),
+          Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()),
+          proxy_protocol_header_.value().extensions_length_,
+          Envoy::Hex::encode(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
+                             proxy_protocol_header_.value().extensions_length_));
+    }
+
+    cb_->filterState().setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+            proxy_protocol_header_.value().remote_address_,
+            proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   if (proxy_protocol_header_.has_value() && !proxy_protocol_header_.value().local_command_) {
@@ -360,10 +405,11 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     }
 
     // Only save to dynamic metadata if this type of TLV is needed.
+    absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
       ProtobufWkt::Value metadata_value;
-      metadata_value.set_string_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
+      metadata_value.set_string_value(tlv_value.data(), tlv_value.size());
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
@@ -374,7 +420,15 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
       cb_->setDynamicMetadata(metadata_key, metadata);
     } else {
-      ENVOY_LOG(trace, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
+      ENVOY_LOG(trace,
+                "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",
+                tlv_type);
+    }
+
+    // Save TLVs to the filter state.
+    if (config_->isPassThroughTlvTypeNeeded(tlv_type)) {
+      ENVOY_LOG(trace, "proxy_protocol: Storing parsed TLV of type {} to filter state.", tlv_type);
+      parsed_tlvs_.push_back({tlv_type, {tlv_value.begin(), tlv_value.end()}});
     }
 
     idx += tlv_value_length;
@@ -390,9 +444,9 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
     return ReadOrParseState::TryAgainLater;
   }
 
-  if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
-    // Ignores the extensions if this is a local command or there's no TLV needs to be saved
-    // to metadata. Those will drained from the buffer in the end.
+  if (proxy_protocol_header_.value().local_command_) {
+    // Ignores the extensions if this is a local command.
+    // Those will drained from the buffer in the end.
     return ReadOrParseState::Done;
   }
 

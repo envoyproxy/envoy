@@ -16,6 +16,8 @@ envoy_extension_cc_test(
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
     deps = [
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
@@ -28,6 +30,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "proxy_filter_integration_test",
+    size = "large",
     srcs = ["proxy_filter_integration_test.cc"],
     data = [
         "//test/config/integration/certs",

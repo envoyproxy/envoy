@@ -93,6 +93,7 @@ private:
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   FilterChainToConnectionMap connections_by_filter_chain_;
   QuicDispatcherStats quic_stats_;
+  QuicConnectionStats connection_stats_;
 };
 
 } // namespace Quic

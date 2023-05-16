@@ -1,0 +1,51 @@
+# envoy demo with golang extension enabled
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.golang
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+              library_id: simple
+              library_path: "lib/simple.so"
+              plugin_name: simple
+              plugin_config:
+                "@type": type.googleapis.com/xds.type.v3.TypedStruct
+                value:
+                  prefix_localreply_body: "Configured local reply from go"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: helloworld_service_cluster
+  clusters:
+  - name: helloworld_service_cluster
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: helloworld_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: helloworld_service
+                port_value: 8080

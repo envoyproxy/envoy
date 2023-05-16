@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
@@ -56,6 +57,7 @@ public:
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -114,6 +116,11 @@ private:
    */
   void endEncode();
 
+  /**
+   * Encapsulates notification to various objects that the encode completed.
+   */
+  void notifyEncodeComplete();
+
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
@@ -121,6 +128,7 @@ private:
 
   absl::string_view details_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_;
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 };
 
 /**
@@ -155,6 +163,10 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
+  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                            Http::ResponseHeaderMapConstSharedPtr,
+                                            Http::ResponseTrailerMapConstSharedPtr,
+                                            StreamInfo::StreamInfo&) override {}
 
   // For H/1, ResponseEncoder doesn't hold a pointer to RequestDecoder.
   // TODO(paulsohn): Enable H/1 codec to get a pointer to the new
@@ -452,7 +464,8 @@ public:
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -511,6 +524,7 @@ private:
   void onBody(Buffer::Instance& data) override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
+  Status sendOverloadError();
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
   HeaderMap& headersOrTrailers() override {
@@ -560,6 +574,7 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  Server::LoadShedPoint* abort_dispatch_{nullptr};
 };
 
 /**

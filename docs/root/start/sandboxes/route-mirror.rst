@@ -17,12 +17,12 @@ Requests for the path ``/service/1`` are statically mirrored.
 Each request is handled by the ``service1`` cluster, and in addition, forwarded to
 the ``service1-mirror`` cluster:
 
-.. literalinclude:: _include/route-mirror/front-envoy.yaml
+.. literalinclude:: _include/route-mirror/envoy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
    :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :caption: Envoy configuration with static route mirror policy :download:`envoy.yaml <_include/route-mirror/envoy.yaml>`
 
 Requests for the path ``/service/2`` are dynamically mirrored according to the presence and value of
 the ``x-mirror-cluster`` header.
@@ -33,12 +33,12 @@ to the cluster named in the header.
 For example, if we send a request with the header ``x-mirror-cluster: service2-mirror``,
 the request will be forwarded to the ``service2-mirror`` cluster.
 
-.. literalinclude:: _include/route-mirror/front-envoy.yaml
+.. literalinclude:: _include/route-mirror/envoy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
    :emphasize-lines: 12-17
-   :caption: Envoy configuration with header based route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :caption: Envoy configuration with header based route mirror policy :download:`envoy.yaml <_include/route-mirror/envoy.yaml>`
 
 
 .. warning::
@@ -73,9 +73,9 @@ Change to the ``examples/route-mirror`` directory.
 
     $ pwd
     envoy/examples/route-mirror
-    $ docker-compose build
-    $ docker-compose up -d
-    $ docker-compose ps
+    $ docker compose build
+    $ docker compose up -d
+    $ docker compose ps
     NAME                               COMMAND                  SERVICE             STATUS              PORTS
     route-mirror-envoy-front-proxy-1   "/docker-entrypoint.…"   envoy-front-proxy   running             0.0.0.0:10000->10000/tcp, :::10000->10000/tcp
     route-mirror-service1-1            "python3 /code/servi…"   service1            running (healthy)
@@ -107,12 +107,12 @@ in the hostname.
 
 .. code-block:: console
 
-   $ docker-compose logs service1
+   $ docker compose logs service1
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
-   $ docker-compose logs service1-mirror
+   $ docker compose logs service1-mirror
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
@@ -141,12 +141,12 @@ got the request.
 
 .. code-block:: console
 
-   $ docker-compose logs service2
+   $ docker compose logs service2
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-   $ docker-compose logs service2-mirror
+   $ docker compose logs service2-mirror
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
@@ -174,12 +174,12 @@ View the logs for ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
 
-   $ docker-compose logs service2
+   $ docker compose logs service2
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-   $ docker-compose logs service2-mirror
+   $ docker compose logs service2-mirror
    # No new logs
 
 .. seealso::

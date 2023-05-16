@@ -346,6 +346,8 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_duration:
+
 %DURATION%
   HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
@@ -381,6 +383,19 @@ The following command operators are supported:
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
+
+  TCP/UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+%ROUNDTRIP_DURATION%
+  HTTP/3 (QUIC)
+    Total duration in milliseconds of the request from the start time to receiving the final ack from
+    the downstream.
+
+  HTTP/1 and HTTP/2
+    Not implemented ("-").
 
   TCP/UDP
     Not implemented ("-").
@@ -501,6 +516,18 @@ The following command operators are supported:
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
   TCP/UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_transport_failure_reason:
+
+%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP/TCP
+    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured downstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+  UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
@@ -1023,6 +1050,24 @@ The following command operators are supported:
 
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+.. _config_access_log_format_access_log_type:
+
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

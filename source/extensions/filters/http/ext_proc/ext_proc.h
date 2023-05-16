@@ -33,7 +33,11 @@ namespace ExternalProcessing {
   COUNTER(streams_failed)                                                                          \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(message_timeouts)                                                                        \
-  COUNTER(rejected_header_mutations)
+  COUNTER(rejected_header_mutations)                                                               \
+  COUNTER(override_message_timeout_received)                                                       \
+  COUNTER(override_message_timeout_ignored)                                                        \
+  COUNTER(clear_route_cache_ignored)                                                               \
+  COUNTER(clear_route_cache_disabled)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -68,15 +72,20 @@ private:
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
-               const std::chrono::milliseconds message_timeout, Stats::Scope& scope,
+               const std::chrono::milliseconds message_timeout,
+               const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
+      : failure_mode_allow_(config.failure_mode_allow()),
+        disable_clear_route_cache_(config.disable_clear_route_cache()),
+        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
+
+  uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
@@ -88,6 +97,8 @@ public:
     return mutation_checker_;
   }
 
+  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -96,7 +107,9 @@ private:
   }
 
   const bool failure_mode_allow_;
+  const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
+  const uint32_t max_message_timeout_ms_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -178,6 +191,7 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
+  void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
                         bool end_stream) {
@@ -200,8 +214,7 @@ private:
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   // Return a pair of whether to terminate returning the current result.
-  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state,
-                                                          Buffer::Instance& data, bool end_stream);
+  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
@@ -227,6 +240,9 @@ private:
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
+
+  // Set to true then the mergePerRouteConfig() method has been called.
+  bool route_config_merged_ = false;
 };
 
 extern std::string responseCaseToString(

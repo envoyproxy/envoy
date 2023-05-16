@@ -12,7 +12,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/custom_config_validators_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -38,12 +37,6 @@ public:
                                 absl::string_view resource_type, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
                                 OpaqueResourceDecoderSharedPtr resource_decoder) override;
-
-protected:
-  virtual GrpcMuxSharedPtr
-  getOrCreateMux(const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                 absl::string_view type_url, Stats::Scope& scope,
-                 CustomConfigValidatorsPtr& custom_config_validators);
 
 private:
   const LocalInfo::LocalInfo& local_info_;

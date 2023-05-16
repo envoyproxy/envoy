@@ -21,13 +21,12 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Server {
 namespace {
 
-Event::PostCb emptyCallback = []() {};
+std::function<void()> emptyCallback = []() {};
 
 class WorkerImplTest : public testing::Test {
 public:

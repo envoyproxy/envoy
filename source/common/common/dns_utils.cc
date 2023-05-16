@@ -34,9 +34,6 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
 std::vector<Network::Address::InstanceConstSharedPtr>
 generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t port) {
   std::vector<Network::Address::InstanceConstSharedPtr> addresses;
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_multiple_dns_addresses")) {
-    return addresses;
-  }
   for (const auto& response : responses) {
     auto address = Network::Utility::getAddressWithPort(*(response.addrInfo().address_), port);
     if (address) {

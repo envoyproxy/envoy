@@ -119,9 +119,13 @@ void WebsocketWithCompressorIntegrationTest::validateUpgradeResponseHeaders(
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketWithCompressorIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, WebsocketWithCompressorIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
   return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -192,13 +196,6 @@ void WebsocketWithCompressorIntegrationTest::sendBidirectionalData() {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
-#ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
-#endif
-
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -246,9 +243,12 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   ASSERT_EQ(1, response_uncompressed_counter->value());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CompressorProxyingConnectIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CompressorProxyingConnectIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 void CompressorProxyingConnectIntegrationTest::initialize() {
   config_helper_.addConfigModifier(

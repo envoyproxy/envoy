@@ -110,159 +110,152 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_distroless_docker_image|
          $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
 
+
+Supported tags
+^^^^^^^^^^^^^^
+
+For stable Envoy versions images are created for the version and the latest of that minor version.
+
+For example, if the latest version in the v1.73.x series is v1.73.7 then images are created for:
+
+- ``envoyproxy/envoy:v1.73.7``
+- ``envoyproxy/envoy:v1.73-latest``
+
+A similar strategy is used to create images for each of the versioned variants.
+
+Supported architectures
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The Envoy project currently supports ``amd64`` and ``arm64`` architectures for its Linux build and images.
+
 .. _install_contrib:
 
-Contrib images
-~~~~~~~~~~~~~~
-
+Contrib builds
+^^^^^^^^^^^^^^
 As described in `this document <https://docs.google.com/document/d/1yl7GOZK1TDm_7vxQvt8UQEAu07UQFru1uEKXM6ZZg_g/edit#>`_,
 the Envoy project allows extensions to enter the repository as "contrib" extensions. The requirements
 for such extensions are lower, and as such they are only available by default in special images.
-The `envoyproxy/envoy-contrib <https://hub.docker.com/r/envoyproxy/envoy-contrib/tags/>`_ image
-contains all contrib extensions on top of an Ubuntu base. The
-`envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
-image contains all contrib extensions on top of an Ubuntu base as well as debug symbols. Throughout
-the documentation, extensions are clearly marked as being a contrib extension or a core extension.
 
-.. _install_tools:
+Throughout the documentation, extensions are clearly marked as being a contrib extension or a core extension.
 
-Tools images
-~~~~~~~~~~~~
+Image variants
+^^^^^^^^^^^^^^
 
-The Envoy project ships images for tools that are separate from the proxy binary but are useful
-in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
-tools in ``/usr/local/bin`` include:
+``envoyproxy/envoy:<version>``
+++++++++++++++++++++++++++++++
 
-* :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
+These images contains just the core Envoy binary built upon an Ubuntu base image.
+
+``envoyproxy/envoy:distroless-<version>``
++++++++++++++++++++++++++++++++++++++++++
+
+These images contains just the core Envoy binary built upon a distroless (nonroot/nossl) base image.
+
+These images are the most efficient and secure way to deploy Envoy in a container.
+
+``envoyproxy/envoy:contrib-<version>``
+++++++++++++++++++++++++++++++++++++++
+
+These images contain the Envoy binary built with all contrib extensions on top of an Ubuntu base.
+
+``envoyproxy/envoy:tools-<version>``
+++++++++++++++++++++++++++++++++++++
+
+These images contain tools that are separate from the proxy binary but are useful in supporting systems such as CI, configuration generation pipelines, etc
+
+``envoyproxy/envoy:dev`` / ``envoyproxy/envoy:dev-<SHA>`` / ``envoyproxy/envoy:<variant>-dev`` / ``envoyproxy/envoy:<variant>-dev-<SHA>``
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+The Envoy project considers the ``main`` branch to be release candidate quality at all times, and many organizations track and deploy ``main`` in production.
+
+We encourage you to do the same so that issues can be reported and resolved as quickly as possible.
+
+
+``envoyproxy/envoy:debug-<version>`` / ``envoyproxy/envoy:<variant>-debug-<version>``
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+These images are built for each of the variants, but with an Envoy binary containing debug symbols.
 
 .. _install_binaries:
 
 Pre-built Envoy Docker images
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The following table shows the available Docker images
+`envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy>`__
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+The following table shows the available Docker tag variants for the latest
+`envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy>`__ images.
 
 .. list-table::
    :widths: auto
-   :header-rows: 2
+   :header-rows: 1
    :stub-columns: 1
 
-   * -
-     -
-     - stable
-     - stable
-     - main
-     - main
-   * - Docker image
-     - Description
-     - amd64
-     - arm64
-     - amd64
-     - arm64
-   * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu 20.04 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-contrib <https://hub.docker.com/r/envoyproxy/envoy-contrib/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu 20.04 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
-     - Release binary with symbols stripped on top of a distroless base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows/tags/>`_
-     - Release binary with symbols stripped on top of a Windows Server 1809 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-     -
-   * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu 20.04 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu 20.04 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-tools <https://hub.docker.com/r/envoyproxy/envoy-tools/tags/>`_
-     - Release :ref:`tools <install_tools>` on top of an Ubuntu 20.04 base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-   * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu 20.04 base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-contrib-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-dev/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu 20.04 base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
-     - Release binary with symbols stripped on top of a distroless base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu 20.04 base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-contrib-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug-dev/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu 20.04 base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-windows-dev <https://hub.docker.com/r/envoyproxy/envoy-windows-dev/tags/>`_
-     - Release binary with symbols stripped on top of a Windows Server 1809 base. Includes build tools.
-     -
-     -
-     - latest
-     -
-   * - `envoyproxy/envoy-tools-dev <https://hub.docker.com/r/envoyproxy/envoy-tools-dev/tags/>`_
-     - Release :ref:`tools <install_tools>` on top of an Ubuntu 20.04 base.
-     -
-     -
-     - latest
-     - latest
-   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
-     - Build image which includes tools for building multi-arch Envoy and containers.
-     -
-     -
-     - See Docker Hub
-     - See Docker Hub
+   * - variant
+     - latest stable (amd64/arm64)
+     - main dev (amd64/arm64)
+   * - envoy (default)
+     - :dockerhub_envoy:`envoy`
+     - :dockerhub_envoy:`envoy-dev`
+   * - contrib
+     - :dockerhub_envoy:`contrib`
+     - :dockerhub_envoy:`contrib-dev`
+   * - distroless
+     - :dockerhub_envoy:`distroless`
+     - :dockerhub_envoy:`distroless-dev`
+   * - debug
+     - :dockerhub_envoy:`debug`
+     - :dockerhub_envoy:`debug-dev`
+   * - contrib-debug
+     - :dockerhub_envoy:`contrib-debug`
+     - :dockerhub_envoy:`contrib-debug-dev`
+   * - tools
+     - :dockerhub_envoy:`tools`
+     - :dockerhub_envoy:`tools-dev`
+
+
+`envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows>`__, `envoyproxy/envoy-windows-dev <https://hub.docker.com/r/envoyproxy/envoy-windows-dev>`__
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Release binary with symbols stripped on top of a Windows Server 1809 base.
+
+The ``windows-dev`` image also contains build tools.
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+   :stub-columns: 1
+
+   * - variant
+     - latest stable (amd64)
+     - main dev (amd64)
+   * - envoy-windows
+     - :dockerhub_envoy:`windows`
+     - :dockerhub_envoy:`windows-dev`
+
+.. _install_tools:
+
+`envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu>`__
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Build images are always versioned using their commit SHA, which is in turn committed to the Envoy repository
+to ensure reproducible builds.
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+   :stub-columns: 1
+
+   * - variant
+     - latest (amd64/arm64)
+   * - envoy-build-ubuntu (default)
+     - :dockerhub_envoy:`build-ubuntu`
+   * - envoy-build-ubuntu:mobile
+     - :dockerhub_envoy:`build-ubuntu-mobile`
 
 .. note::
-
-   In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
-
-   In the above *dev* repositories, the *latest* tag points to a container including the last
-   Envoy build on main that passed tests.
-
-   The Envoy project considers main to be release candidate quality at all times, and many
-   organizations track and deploy main in production. We encourage you to do the same so that
-   issues can be reported as early as possible in the development process.
-
    The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
-   building Envoy and related containers. This image requires 4-5GB of available disk space to use.
+   building Envoy and related containers.
 
-   All the docker images are available in Docker Hub, but `its rate limit policy <https://www.docker.com/increase-rate-limits>`_
-   doesn't apply to users since the "envoyproxy" namespace is allowlisted.
+   This image requires 4-5GB of available disk space to use.

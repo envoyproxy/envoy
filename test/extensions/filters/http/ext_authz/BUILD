@@ -63,6 +63,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_authz_integration_test",
+    size = "large",
     srcs = ["ext_authz_integration_test.cc"],
     data = [
         "ext_authz.yaml",
@@ -71,6 +72,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:options_mocks",

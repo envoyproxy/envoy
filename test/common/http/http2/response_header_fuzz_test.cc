@@ -36,7 +36,7 @@ void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  static ClientCodecFrameInjector codec;
+  ClientCodecFrameInjector codec;
   Frame frame;
   frame.assign(buf, buf + len);
   // Replay with the fuzzer bytes.

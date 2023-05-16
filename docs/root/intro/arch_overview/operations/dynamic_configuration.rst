@@ -77,6 +77,8 @@ to a route configuration to be requested as needed separately from the route con
 API is typically used in deployments in which there are a large number of virtual hosts in a route
 configuration.
 
+.. _arch_overview_dynamic_config_srds:
+
 SRDS
 ----
 

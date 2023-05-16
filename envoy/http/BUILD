@@ -29,9 +29,10 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":filter_interface",
         ":message_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -46,6 +47,7 @@ envoy_cc_library(
         ":metadata_interface",
         ":protocol_interface",
         ":stream_reset_handler_interface",
+        "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",
@@ -112,7 +114,7 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
     ],
@@ -237,10 +239,18 @@ envoy_cc_library(
     name = "header_validator_interface",
     hdrs = ["header_validator.h"],
     deps = [
-        "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
-        "//envoy/protobuf:message_validator_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_validator_factory_interface",
+    hdrs = ["header_validator_factory.h"],
+    deps = [
+        ":header_validator_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
     ],
 )
 

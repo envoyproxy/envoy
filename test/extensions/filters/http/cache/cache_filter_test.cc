@@ -27,7 +27,7 @@ class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCache& cache) {
+  CacheFilterSharedPtr makeFilter(OptRef<HttpCache> cache) {
     auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
                                                 context_.timeSource(), cache);
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
@@ -249,6 +249,13 @@ TEST_F(CacheFilterTest, CacheMiss) {
 
     filter->onDestroy();
   }
+}
+
+TEST_F(CacheFilterTest, Disabled) {
+  request_headers_.setHost("CacheDisabled");
+  CacheFilterSharedPtr filter = makeFilter(OptRef<HttpCache>{});
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+  filter->onDestroy();
 }
 
 TEST_F(CacheFilterTest, CacheMissWithTrailers) {

@@ -409,6 +409,12 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     }
   }
 
+  // Address field is not required for internal listeners.
+  if (!config.has_internal_listener() && !config.has_address()) {
+    throw EnvoyException(
+        fmt::format("error adding listener named '{}': address is necessary", name));
+  }
+
   auto it = error_state_tracker_.find(name);
   TRY_ASSERT_MAIN_THREAD {
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
@@ -855,7 +861,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   uint32_t i = 0;
 
   absl::BlockingCounter workers_waiting_to_run(workers_.size());
-  Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
+  std::function<void()> worker_started_running = [&workers_waiting_to_run]() {
     workers_waiting_to_run.DecrementCount();
   };
 

@@ -756,7 +756,7 @@ key:
                                        {"Pick-This-Cluster", "new_cluster"},
                                        {"Addr", "x-foo-key=foo"}});
     createRdsStream("foo_route1");
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+    sendRdsResponse(fmt::format(fmt::runtime(route_config_tmpl), "foo_route1"), "1");
     test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
     return response;
   }

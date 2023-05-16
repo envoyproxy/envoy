@@ -67,9 +67,11 @@ public:
    * @param stream, the stream to start.
    * @param bridge_callbacks, wrapper for callbacks for events on this stream.
    * @param explicit_flow_control, whether the stream will require explicit flow control.
+   * @param min_delivery_size, if greater than zero, indicates the smallest number of bytes that
+   * will be delivered up via the on_data callbacks without end stream.
    */
   void startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
-                   bool explicit_flow_control);
+                   bool explicit_flow_control, uint64_t min_delivery_size);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -164,6 +166,10 @@ private:
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                              Http::ResponseHeaderMapConstSharedPtr,
+                                              Http::ResponseTrailerMapConstSharedPtr,
+                                              StreamInfo::StreamInfo&) override {}
 
     void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 
@@ -198,12 +204,15 @@ private:
     absl::optional<envoy_error> error_;
     bool success_{};
 
-    // Buffered response data when in explicit flow control mode.
+    // Buffered response data when in explicit flow control or buffering due to min delivery size.
     Buffer::InstancePtr response_data_;
     ResponseTrailerMapPtr response_trailers_;
     // True if the bridge should operate in explicit flow control mode, and only send
     // data when it is requested by the caller.
     bool explicit_flow_control_{};
+    // If greater than zero, indicates the minimum size of data that should be
+    // delivered up via on_data without end stream.
+    uint64_t min_delivery_size_{};
     // Set true when the response headers have been forwarded to the bridge.
     bool response_headers_forwarded_{};
     // Called in closeStream() to communicate that the end of the stream has
@@ -231,6 +240,12 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      std::swap(codec_callbacks, codec_callbacks_);
+      return codec_callbacks;
+    }
+
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
       return parent_.address_provider_;
@@ -270,6 +285,25 @@ private:
     // Latches latency info from stream info before it goes away.
     void saveFinalStreamIntel();
 
+    // Various signals to propagate to the adapter.
+    enum class AdapterSignal { EncodeComplete, Error, Cancel };
+
+    // Used to notify adapter of stream's completion.
+    void notifyAdapter(AdapterSignal signal) {
+      if (codec_callbacks_) {
+        switch (signal) {
+        case AdapterSignal::EncodeComplete:
+          codec_callbacks_->onCodecEncodeComplete();
+          break;
+        case AdapterSignal::Error:
+          FALLTHRU;
+        case AdapterSignal::Cancel:
+          codec_callbacks_->onCodecLowLevelReset();
+        }
+        registerCodecEventCallbacks(nullptr);
+      }
+    }
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
@@ -277,6 +311,9 @@ private:
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Client& parent_;
+    // Used to communicate with the HTTP Connection Manager that
+    // it can destroy the active stream.
+    CodecEventCallbacks* codec_callbacks_{nullptr};
     // Response details used by the connection manager.
     absl::string_view response_details_;
     // Tracks read disable calls. Different buffers can call read disable, and
@@ -295,6 +332,10 @@ private:
     // back, avoids excessive buffering of response bodies if the response body is
     // read faster than the mobile caller can process it.
     bool explicit_flow_control_ = false;
+    // If this is non-zero, Envoy will buffer at the C++ layer until either
+    // min_delivery_size_ bytes are received or end_stream is received. If this is
+    // zero, it will deliver data as it arrivies, modulo explicit flow control rules.
+    uint64_t min_delivery_size_{};
     // Latest intel data retrieved from the StreamInfo.
     envoy_stream_intel stream_intel_{-1, -1, 0, 0};
     envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1, -1,

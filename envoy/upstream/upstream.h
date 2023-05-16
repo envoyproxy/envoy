@@ -16,6 +16,7 @@
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter_factory.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -853,7 +854,7 @@ public:
     static constexpr uint64_t HTTP3 = 0x10;
   };
 
-  virtual ~ClusterInfo() = default;
+  ~ClusterInfo() override = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
@@ -968,7 +969,7 @@ public:
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
 
   /**
@@ -1007,8 +1008,7 @@ public:
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
-  upstreamConfig() const PURE;
+  virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -1144,9 +1144,10 @@ public:
   virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
 
   /**
-   * @return eds cluster service_name of the cluster.
+   * @return const std::string& eds cluster service_name of the cluster. Empty if not an EDS
+   * cluster or eds cluster service_name is not set.
    */
-  virtual absl::optional<std::string> edsServiceName() const PURE;
+  virtual const std::string& edsServiceName() const PURE;
 
   /**
    * Create network filters on a new upstream connection.
@@ -1185,6 +1186,12 @@ public:
    * @return the Http3 Codec Stats.
    */
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
+
+  /**
+   * @return create header validator based on cluster configuration. Returns nullptr if
+   * ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
 protected:
   /**

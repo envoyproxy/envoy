@@ -90,10 +90,32 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_flush_interval()) {
-    const uint64_t flush_interval =
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
-    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_connected() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_connected or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
+  } else {
+    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
+
+    if (config.has_access_log_flush_interval()) {
+      const uint64_t flush_interval =
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
   }
 
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
@@ -191,7 +213,8 @@ Filter::~Filter() {
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpConnectionEnd);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -233,6 +256,13 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
          config_->stats().downstream_cx_tx_bytes_total_,
          config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
   }
+}
+
+void Filter::onInitFailure(UpstreamFailureReason reason) {
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   enumToInt(reason)));
 }
 
 void Filter::readDisableUpstream(bool disable) {
@@ -471,7 +501,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster.info()->upstreamConfig().value());
+        cluster.info()->upstreamConfig().ref());
   } else {
     factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.tcp.generic");
@@ -555,9 +585,9 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   }
 }
 
-ProtobufTypes::MessagePtr TunnelResponseHeaders::serializeAsProto() const {
+ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
   auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  response_headers_->iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     auto* new_header = proto_out->add_headers();
     new_header->set_key(std::string(e.key().getStringView()));
     new_header->set_value(std::string(e.value().getStringView()));
@@ -570,6 +600,10 @@ const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_headers");
 }
 
+const std::string& TunnelResponseTrailers::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
         config_message,
@@ -577,6 +611,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
       propagate_response_headers_(config_message.propagate_response_headers()),
+      propagate_response_trailers_(config_message.propagate_response_trailers()),
       post_path_(config_message.post_path()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
@@ -594,7 +629,7 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
   return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view());
+                               absl::string_view(), AccessLog::AccessLogType::NotSet);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -605,6 +640,17 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+}
+
+void TunnelingConfigHelperImpl::propagateResponseTrailers(
+    Http::ResponseTrailerMapPtr&& trailers,
+    const StreamInfo::FilterStateSharedPtr& filter_state) const {
+  if (!propagate_response_trailers_) {
+    return;
+  }
+  filter_state->setData(
+      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -656,7 +702,14 @@ Network::FilterStatus Filter::onNewConnection() {
   return establishUpstreamConnection();
 }
 
-bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
+bool Filter::startUpstreamSecureTransport() {
+  bool switched_to_tls = upstream_->startUpstreamSecureTransport();
+  if (switched_to_tls) {
+    StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+    upstream_info.setUpstreamSslConnection(upstream_->getUpstreamConnectionSslInfo());
+  }
+  return switched_to_tls;
+}
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -765,6 +818,13 @@ void Filter::onUpstreamConnection() {
       });
     }
   }
+
+  if (config_->flushAccessLogOnConnected()) {
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                      AccessLog::AccessLogType::TcpUpstreamConnected);
+    }
+  }
 }
 
 void Filter::onIdleTimeout() {
@@ -772,19 +832,23 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                      StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout);
 }
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      StreamInfo::LocalCloseReasons::get().MaxConnectionDurationReached);
 }
 
 void Filter::onAccessLogFlushInterval() {
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpPeriodic);
   }
   resetAccessLogFlushTimer();
 }

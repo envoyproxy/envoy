@@ -49,7 +49,7 @@ void Span::finishSpan() {
 void Span::injectContext(Tracing::TraceContext& trace_context,
                          const Upstream::HostDescriptionConstSharedPtr& upstream) {
   absl::string_view remote_address =
-      upstream != nullptr ? upstream->address()->asStringView() : trace_context.authority();
+      upstream != nullptr ? upstream->address()->asStringView() : trace_context.host();
 
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});

@@ -32,6 +32,7 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+from validate import validate_pb2
 
 import envoy_repo
 
@@ -239,9 +240,6 @@ def format_header_from_file(
         names = [s.capitalize() for s in file_proto.package.split('.')]
         options.csharp_namespace = '.'.join(names) + 'NS'
         options.ruby_package = '::'.join(names) + 'NS'
-
-    if file_proto.service:
-        options.java_generic_services = True
 
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
         options.Extensions[migrate_pb2.file_migrate].CopyFrom(
@@ -699,6 +697,13 @@ class ProtoFormatVisitor(visitor.Visitor):
         fields = ''
         oneof_index = None
         for index, field in enumerate(msg_proto.field):
+            if "/v3" in type_context.source_code_info.name:
+                if field.options.Extensions[validate_pb2.rules].string.min_bytes != 0:
+                    field.options.Extensions[
+                        validate_pb2.rules].string.min_len = field.options.Extensions[
+                            validate_pb2.rules].string.min_bytes
+                    field.options.Extensions[validate_pb2.rules].string.ClearField("min_bytes")
+
             if oneof_index is not None:
                 if not field.HasField('oneof_index') or field.oneof_index != oneof_index:
                     fields += '}\n\n'

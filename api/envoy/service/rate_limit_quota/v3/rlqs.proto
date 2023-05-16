@@ -15,7 +15,6 @@ option java_package = "io.envoyproxy.envoy.service.rate_limit_quota.v3";
 option java_outer_classname = "RlqsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/rate_limit_quota/v3;rate_limit_quotav3";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 

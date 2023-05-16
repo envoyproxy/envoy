@@ -8,6 +8,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -63,6 +64,7 @@ protected:
   const std::string operation_name_{"test"};
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Event::SimulatedTimeSystem time_system_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   envoy::config::trace::v3::OpenTelemetryConfig config_;
@@ -107,9 +109,8 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
       context_.server_factory_context_.api_.random_;
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(new_span_id));
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
 
   EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
 
@@ -146,6 +147,8 @@ resource_spans:
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
   TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
   auto* expected_span =
@@ -187,9 +190,8 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
     EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(new_span_id));
   }
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
@@ -212,9 +214,8 @@ TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT,
                                   "invalid00-0000000000000003-01");
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
 
   auto& null_span = *span;
   EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
@@ -226,9 +227,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   // Test baggage noop and other noop calls.
@@ -254,9 +254,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   // Flush after two spans.
@@ -267,8 +266,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   span->finishSpan();
   // Once we create a
   Tracing::SpanPtr second_span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::Sampling, true});
   EXPECT_NE(second_span.get(), nullptr);
   // Only now should we see the span exported.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
@@ -287,9 +286,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   // Set it to flush after 2 spans so that the span will only be flushed by timeout.
@@ -329,9 +327,8 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
     EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
   }
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   // The child should only generate a span ID for itself; the trace id should come from the parent..
@@ -359,9 +356,10 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   int64_t generated_int = 1;
   EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
   SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
-  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                                             timestamp, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   span->setTag("first_tag_name", "first_tag_value");
@@ -418,14 +416,36 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   span->setSampled(false);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
+  const std::string yaml_string = "{}";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to sendMessage to export that single span.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
   span->finishSpan();
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
@@ -450,9 +470,10 @@ TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
   int64_t generated_int = 1;
   EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
   SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
-  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
-                                             timestamp, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
   const std::string request_yaml = R"(

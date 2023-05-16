@@ -59,6 +59,27 @@ def envoy_select_static_extension_registration(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if Envoy Mobile request compression is enabled in the current build.
+def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_request_compression": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if Envoy Mobile stats reporting is enabled in the current build.
+def envoy_select_envoy_mobile_stats_reporting(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_stats_reporting": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if the Envoy Mobile listener is enabled in the current build.
+def envoy_select_envoy_mobile_listener(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_listener": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({
@@ -66,10 +87,31 @@ def envoy_select_enable_http3(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if yaml is enabled in the current build.
+def envoy_select_enable_yaml(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_yaml": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if HTTP datagram support is enabled in the current build.
+def envoy_select_enable_http_datagrams(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_http_datagrams": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if signal trace is enabled in the current build.
+def envoy_select_signal_trace(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": xs,
     })
 

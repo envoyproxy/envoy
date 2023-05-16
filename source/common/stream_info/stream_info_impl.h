@@ -17,6 +17,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -148,6 +149,14 @@ struct StreamInfoImpl : public StreamInfo {
       return {};
     }
     return *upstream_info_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+    if (!final_time_) {
+      return duration(time_source_.monotonicTime());
+    }
+
+    return requestComplete();
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -334,10 +343,56 @@ struct StreamInfoImpl : public StreamInfo {
     // These two are set in the constructor, but to T(recreate), and should be T(create)
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
+    downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+  }
+
+  // This function is used to copy over every field exposed in the StreamInfo interface, with a
+  // couple of exceptions noted below. Note that setFromForRecreateStream is reused here.
+  // * request_headers_ is a raw pointer; to avoid pointer lifetime issues, a request header pointer
+  // is required to be passed in here.
+  // * downstream_connection_info_provider_ is always set in the ctor.
+  void setFrom(StreamInfo& info, const Http::RequestHeaderMap* request_headers) {
+    setFromForRecreateStream(info);
+    route_name_ = info.getRouteName();
+    virtual_cluster_name_ = info.virtualClusterName();
+    response_code_ = info.responseCode();
+    response_code_details_ = info.responseCodeDetails();
+    connection_termination_details_ = info.connectionTerminationDetails();
+    upstream_info_ = info.upstreamInfo();
+    if (info.requestComplete().has_value()) {
+      // derive final time from other info's complete duration and start time.
+      final_time_ = info.startTimeMonotonic() + info.requestComplete().value();
+    }
+    response_flags_ = info.responseFlags();
+    health_check_request_ = info.healthCheck();
+    route_ = info.route();
+    metadata_ = info.dynamicMetadata();
+    filter_state_ = info.filterState();
+    request_headers_ = request_headers;
+    upstream_cluster_info_ = info.upstreamClusterInfo();
+    auto stream_id_provider = info.getStreamIdProvider();
+    if (stream_id_provider.has_value() && stream_id_provider->toStringView().has_value()) {
+      std::string id{stream_id_provider->toStringView().value()};
+      stream_id_provider_ = std::make_shared<StreamIdProviderImpl>(std::move(id));
+    }
+    trace_reason_ = info.traceReason();
+    filter_chain_name_ = info.filterChainName();
+    attempt_count_ = info.attemptCount();
+    upstream_bytes_meter_ = info.getUpstreamBytesMeter();
+    bytes_sent_ = info.bytesSent();
+    is_shadow_ = info.isShadow();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
   bool isShadow() const override { return is_shadow_; }
+
+  void setDownstreamTransportFailureReason(absl::string_view failure_reason) override {
+    downstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamTransportFailureReason() const override {
+    return downstream_transport_failure_reason_;
+  }
 
   TimeSource& time_source_;
   SystemTime start_time_;
@@ -392,6 +447,7 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
+  std::string downstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view DisableTunnelingFilterStateKey = "envoy.tcp_proxy.disable_tunneling";
+
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -115,6 +117,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   bool startUpstreamSecureTransport() override;
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
@@ -151,6 +154,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
@@ -187,7 +191,9 @@ private:
         parent_.doneReading();
       }
     }
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.config_.propagateResponseTrailers(std::move(trailers),
+                                                parent_.downstream_info_.filterState());
       if (Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.finish_reading_on_decode_trailers")) {
         parent_.doneReading();

@@ -111,8 +111,8 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Tracing::TraceContext& trace_context, const std::string&,
-                                   SystemTime start_time,
+                                   Tracing::TraceContext& trace_context,
+                                   const StreamInfo::StreamInfo& stream_info, const std::string&,
                                    const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
@@ -123,13 +123,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
-          tracer.startSpan(config, std::string(trace_context.authority()), start_time);
+          tracer.startSpan(config, std::string(trace_context.host()), stream_info.startTime());
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.authority()), start_time,
-                                         ret_span_context.first);
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
+                                         stream_info.startTime(), ret_span_context.first);
     }
-
   } catch (const ExtractorException& e) {
     return std::make_unique<Tracing::NullSpan>();
   }

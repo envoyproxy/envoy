@@ -92,7 +92,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
-  ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
+  ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() -> const std::string& {
+    return eds_service_name_.has_value() ? eds_service_name_.value() : Envoy::EMPTY_STRING;
+  }));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
   ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
@@ -153,7 +155,13 @@ MockClusterInfo::MockClusterInfo()
                 const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
                 lb_original_dst_config_.get());
           }));
-  ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
+  ON_CALL(*this, upstreamConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
+            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
+                upstream_config_.get());
+          }));
+
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
@@ -169,7 +177,12 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
+  ON_CALL(*this, clusterType())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
+                cluster_type_.get());
+          }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
   ON_CALL(*this, createFilterChain(_, _))
@@ -185,9 +198,28 @@ MockClusterInfo::MockClusterInfo()
             manager.applyFilterFactoryCb({}, factory_cb);
             return true;
           }));
+  ON_CALL(*this, loadBalancingPolicy).WillByDefault(ReturnRef(load_balancing_policy_));
+  ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
+    return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
+                                           protocol, codecStats(protocol))
+                                     : nullptr;
+  }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
+
+::Envoy::Http::HeaderValidatorStats& MockClusterInfo::codecStats(Http::Protocol protocol) const {
+  switch (protocol) {
+  case ::Envoy::Http::Protocol::Http10:
+  case ::Envoy::Http::Protocol::Http11:
+    return http1CodecStats();
+  case ::Envoy::Http::Protocol::Http2:
+    return http2CodecStats();
+  case ::Envoy::Http::Protocol::Http3:
+    return http3CodecStats();
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
   return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);

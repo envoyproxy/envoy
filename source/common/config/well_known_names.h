@@ -109,6 +109,8 @@ public:
   const std::string LOCAL_HTTP_RATELIMIT_PREFIX = "envoy.local_http_ratelimit_prefix";
   // Stats prefix for the Local Ratelimit network filter
   const std::string LOCAL_NETWORK_RATELIMIT_PREFIX = "envoy.local_network_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit listener filter
+  const std::string LOCAL_LISTENER_RATELIMIT_PREFIX = "envoy.local_listener_ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter
@@ -181,6 +183,8 @@ class ServerBuiltInExtensionValues {
 public:
   // Extension point for the default listener.
   const std::string DEFAULT_LISTENER = "envoy.listener_manager_impl.default";
+  // Extension point for the validation listener
+  const std::string VALIDATION_LISTENER = "envoy.listener_manager_impl.validation";
 };
 
 using ServerExtensionValues = ConstSingleton<ServerBuiltInExtensionValues>;

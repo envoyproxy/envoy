@@ -86,6 +86,7 @@ public:
                       injected_resource_filename_1_, injected_resource_filename_2_);
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
+      bootstrap.set_enable_dispatcher_stats(true);
     });
 
     updateResource(file_updater_1_, 0);
@@ -156,10 +157,22 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   updateResource(file_updater_2_, 0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
+  // The call to disable keep alive could take some time to be executed on the worker
+  // even if the stat on the main thread is shows the action is enabled.
+  // Waiting for additional dispatch loops on the worker so that the overload
+  // state will have propagated.
+  auto worker_dispatch_duration_histogram =
+      test_server_->histogram("listener_manager.worker_0.dispatcher.loop_duration_us");
+  const uint64_t num_samples = TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                                            *worker_dispatch_duration_histogram);
+  const uint64_t required_num_samples = num_samples + 2;
+  test_server_->waitForNumHistogramSamplesGe(
+      "listener_manager.worker_0.dispatcher.loop_duration_us", required_num_samples);
+
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
   upstream_request_->encodeData(10, true);
 
-  response2->waitForHeaders();
+  EXPECT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(codec_client_->waitForDisconnect());
 
   codec_client_->close();

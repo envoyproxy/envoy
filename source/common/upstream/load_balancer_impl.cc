@@ -383,19 +383,19 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const absl::optional<LocalityLbConfig> locality_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
-      locality_weighted_balancing_(locality_config.has_value() &&
-                                   locality_config->has_locality_weighted_lb_config()),
-      routing_enabled_(locality_config.has_value()
-                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
-                           : 100),
       min_cluster_size_(locality_config.has_value()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
+      routing_enabled_(locality_config.has_value()
+                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
+                           : 100),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
-                                 : false) {
+                                 : false),
+      locality_weighted_balancing_(locality_config.has_value() &&
+                                   locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
@@ -1000,6 +1000,49 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   }
 }
 
+double LeastRequestLoadBalancer::hostWeight(const Host& host) {
+  // This method is called to calculate the dynamic weight as following when all load balancing
+  // weights are not equal:
+  //
+  // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+  //
+  // `active_request_bias` can be configured via runtime and its value is cached in
+  // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
+  // calculated.
+  //
+  // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+  // host weight without considering the number of active requests at the time we do the pick.
+  //
+  // When `active_request_bias > 0.0` we scale the host weight by the number of active
+  // requests at the time we do the pick. We always add 1 to avoid division by 0.
+  //
+  // It might be possible to do better by picking two hosts off of the schedule, and selecting the
+  // one with fewer active requests at the time of selection.
+
+  double host_weight = static_cast<double>(host.weight());
+
+  // If the value of active requests is the max value, adding +1 will overflow
+  // it and cause a divide by zero. This won't happen in normal cases but stops
+  // failing fuzz tests
+  const uint64_t active_request_value =
+      host.stats().rq_active_.value() != std::numeric_limits<uint64_t>::max()
+          ? host.stats().rq_active_.value() + 1
+          : host.stats().rq_active_.value();
+
+  if (active_request_bias_ == 1.0) {
+    host_weight = static_cast<double>(host.weight()) / active_request_value;
+  } else if (active_request_bias_ != 0.0) {
+    host_weight =
+        static_cast<double>(host.weight()) / std::pow(active_request_value, active_request_bias_);
+  }
+
+  if (!noHostsAreInSlowStart()) {
+    return applySlowStartFactor(host_weight, host);
+  } else {
+    return host_weight;
+  }
+}
+
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
                                                                 const HostsSource&) {
   // LeastRequestLoadBalancer can not do deterministic preconnecting, because
@@ -1014,7 +1057,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 
@@ -1065,9 +1108,9 @@ SubsetSelectorImpl::SubsetSelectorImpl(
         LbSubsetSelectorFallbackPolicy fallback_policy,
     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
     bool single_host_per_subset)
-    : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
+    : selector_keys_(selector_keys.begin(), selector_keys.end()),
       fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
-      single_host_per_subset_(single_host_per_subset) {
+      fallback_policy_(fallback_policy), single_host_per_subset_(single_host_per_subset) {
 
   if (fallback_policy_ !=
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {

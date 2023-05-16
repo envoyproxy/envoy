@@ -583,6 +583,9 @@ public:
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -651,7 +654,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log() {
+  void log(AccessLog::AccessLogType access_log_type) {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
       request_headers = filter_manager_callbacks_.requestHeaders().ptr();
@@ -666,9 +669,12 @@ public:
     }
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, streamInfo());
+      log_handler->log(request_headers, response_headers, response_trailers, streamInfo(),
+                       access_log_type);
     }
   }
+
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
 
   void onStreamComplete() {
     for (auto& filter : decoder_filters_) {
@@ -751,11 +757,6 @@ public:
    */
   virtual void executeLocalReplyIfPrepared() PURE;
 
-  /**
-   * Whether the Filter Manager has a prepared local reply that it has not sent.
-   */
-  virtual bool hasPreparedLocalReply() const PURE;
-
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
 
@@ -818,6 +819,7 @@ public:
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+  bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
 protected:
   struct State {
@@ -1005,22 +1007,24 @@ private:
     struct FilterCallState {
       static constexpr uint32_t DecodeHeaders   = 0x01;
       static constexpr uint32_t DecodeData      = 0x02;
-      static constexpr uint32_t DecodeTrailers  = 0x04;
-      static constexpr uint32_t EncodeHeaders   = 0x08;
-      static constexpr uint32_t EncodeData      = 0x10;
-      static constexpr uint32_t EncodeTrailers  = 0x20;
+      static constexpr uint32_t DecodeMetadata  = 0x04;
+      static constexpr uint32_t DecodeTrailers  = 0x08;
+      static constexpr uint32_t EncodeHeaders   = 0x10;
+      static constexpr uint32_t EncodeData      = 0x20;
+      static constexpr uint32_t EncodeMetadata  = 0x40;
+      static constexpr uint32_t EncodeTrailers  = 0x80;
       // Encode1xxHeaders is a bit of a special state as 1xx
       // headers may be sent during request processing. This state is only used
       // to verify we do not encode1xx headers more than once per
       // filter.
-      static constexpr uint32_t Encode1xxHeaders  = 0x40;
+      static constexpr uint32_t Encode1xxHeaders  = 0x100;
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x80;
+      static constexpr uint32_t LastDataFrame = 0x200;
 
       // Masks for filter call state.
-      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
-      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeMetadata | EncodeTrailers;
     };
   // clang-format on
 
@@ -1108,8 +1112,6 @@ private:
    */
   void executeLocalReplyIfPrepared() override;
 
-  bool hasPreparedLocalReply() const override { return prepared_local_reply_ != nullptr; }
-
   /**
    * Sends a local reply by constructing a response and skipping the encoder filters. The
    * resulting response will be passed out via the FilterManagerCallbacks.
@@ -1119,6 +1121,7 @@ private:
                             bool is_head_request,
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
+private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
   const bool avoid_reentrant_filter_invocation_during_local_reply_;

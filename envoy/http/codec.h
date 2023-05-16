@@ -4,6 +4,7 @@
 #include <limits>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
@@ -43,6 +44,8 @@ const char MaxRequestHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_request_headers_count";
 const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
+const char MaxRequestHeadersSizeOverrideKey[] =
+    "envoy.reloadable_features.max_request_headers_size_kb";
 
 class Stream;
 class RequestDecoder;
@@ -174,6 +177,22 @@ public:
    * @param decoder new request decoder.
    */
   virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
+
+  /**
+   * Set headers, trailers, and stream info for deferred logging. This allows HCM to hand off
+   * stream-level details to the codec for logging after the stream may be destroyed (e.g. on
+   * receiving the final ack packet from the client). Note that headers and trailers are const
+   * as they will not be modified after this point.
+   * @param request_header_map Request headers for this stream.
+   * @param response_header_map Response headers for this stream.
+   * @param response_trailer_map Response trailers for this stream.
+   * @param stream_info Stream info for this stream.
+   */
+  virtual void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapConstSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
+                                       StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 /**
@@ -211,7 +230,7 @@ public:
    * @param headers supplies the decoded headers map.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.
@@ -236,6 +255,11 @@ public:
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return List of shared pointers to access loggers for this stream.
+   */
+  virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
 };
 
 /**
@@ -303,6 +327,25 @@ public:
 };
 
 /**
+ * Codec event callbacks for a given HTTP Stream.
+ * This can be used to tightly couple an entity with a streams low-level events.
+ */
+class CodecEventCallbacks {
+public:
+  virtual ~CodecEventCallbacks() = default;
+  /**
+   * Called when the the underlying codec finishes encoding.
+   */
+  virtual void onCodecEncodeComplete() PURE;
+
+  /**
+   * Called when the underlying codec has a low level reset.
+   * e.g. Envoy serialized the response but it has not been flushed.
+   */
+  virtual void onCodecLowLevelReset() PURE;
+};
+
+/**
  * An HTTP stream (request, response, and push).
  */
 class Stream : public StreamResetHandler {
@@ -318,6 +361,15 @@ public:
    * @param callbacks supplies the callbacks to remove.
    */
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
+
+  /**
+   * Register the codec event callbacks for this stream.
+   * The stream can only have a single registered callback at a time.
+   * @param codec_callbacks the codec callbacks for this stream.
+   * @return CodecEventCallbacks* the prior registered codec callbacks.
+   */
+  virtual CodecEventCallbacks*
+  registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) PURE;
 
   /**
    * Enable/disable further data from this stream.
@@ -470,6 +522,15 @@ struct Http1Settings {
 
   // If true, Envoy will send a fully qualified URL in the firstline of the request.
   bool send_fully_qualified_url_{false};
+
+  // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
+  // used. See issue #21245.
+  bool use_balsa_parser_{false};
+
+  // If true, any non-empty method composed of valid characters is accepted.
+  // If false, only methods from a hard-coded list of known methods are accepted.
+  // Only implemented in BalsaParser. http-parser only accepts known methods.
+  bool allow_custom_methods_{false};
 };
 
 /**

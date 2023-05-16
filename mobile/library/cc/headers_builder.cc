@@ -19,7 +19,7 @@ HeadersBuilder& HeadersBuilder::set(std::string name, std::vector<std::string> v
   return *this;
 }
 
-HeadersBuilder& HeadersBuilder::remove(const std::string& name) {
+HeadersBuilder& HeadersBuilder::remove(absl::string_view name) {
   if (isRestrictedHeader(name)) {
     return *this;
   }

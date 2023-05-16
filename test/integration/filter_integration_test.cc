@@ -12,11 +12,7 @@ public:
     config_helper_.prependFilter(config, testing_downstream_filter_);
   }
 
-  void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters",
-                                      testing_downstream_filter_ ? "false" : "true");
-    UpstreamDownstreamIntegrationTest::initialize();
-  }
+  void initialize() override { UpstreamDownstreamIntegrationTest::initialize(); }
 
   template <class T> void changeHeadersForStopAllTests(T& headers, bool set_buffer_limit) {
     headers.addCopy("content_size", std::to_string(count_ * size_));
@@ -28,7 +24,7 @@ public:
   }
 
   void verifyUpStreamRequestAfterStopAllFilter() {
-    if (downstreamProtocol() >= Http::CodecType::HTTP2) {
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
       // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
       // decodeTrailers. 2 decoded data were added.
       EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
@@ -192,10 +188,39 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
+    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(40, 58, 40, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    } else {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(0, 58, 0, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    }
   }
+}
+
+TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that round trip time was populated
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
 }
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -386,7 +411,7 @@ name: add-trailers-filter
   upstream_request_->encodeData(128, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() >= Http::CodecType::HTTP2) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     EXPECT_EQ("decode", upstream_request_->trailers()
                             ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
@@ -394,7 +419,7 @@ name: add-trailers-filter
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
@@ -479,7 +504,7 @@ TEST_P(FilterIntegrationTest, HittingDecoderFilterLimit) {
   // the 413-and-connection-close may be sent while the body is still being
   // sent, resulting in a write error and the connection being closed before the
   // response is read.
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
   }
   if (response->complete()) {
@@ -1218,5 +1243,74 @@ TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeF
   EXPECT_EQ("AssertNonReentrantFilter local reply during decodeHeaders.", response->body());
 }
 
+TEST_P(FilterIntegrationTest, LocalReplyFromDecodeMetadata) {
+  prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_encode_headers: false
+      crash_in_encode_data: false
+      crash_in_decode_headers: true
+      crash_in_decode_data: true
+      crash_in_decode_metadata: true
+  )EOF");
+  prependFilter(R"EOF(
+    name: metadata-control-filter
+  )EOF");
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send headers. We expect this to pause.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr& decoder = encoder_decoder.second;
+  codec_client_->sendData(encoder, "abc", false);
+  Http::MetadataMap metadata;
+  metadata["local_reply"] = "true";
+  codec_client_->sendMetadata(encoder, metadata);
+
+  ASSERT_TRUE(decoder->waitForEndStream());
+
+  EXPECT_EQ("400", decoder->headers().getStatusValue());
+}
+
+TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  prependFilter(R"EOF(
+  name: metadata-control-filter
+  )EOF");
+  autonomous_upstream_ = false;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Http::MetadataMap metadata_map;
+  metadata_map["local_reply"] = "true";
+  auto metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+
+  upstream_request_->encodeMetadata(metadata_map_vector);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
 } // namespace
 } // namespace Envoy

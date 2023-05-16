@@ -16,7 +16,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -174,11 +174,20 @@ enum class FilterTrailersStatus {
 
 /**
  * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
- * iteration.
+ * iteration except in the case of local replies.
  */
 enum class FilterMetadataStatus {
-  // Continue filter chain iteration.
+  // Continue filter chain iteration for metadata only. Does not unblock returns of StopIteration*
+  // from (decode|encode)(Headers|Data).
   Continue,
+
+  // Continue filter chain iteration. If headers have not yet been sent to the next filter, they
+  // will be sent first via (decode|encode)Headers().
+  ContinueAll,
+
+  // Stops iteration of the entire filter chain. Only to be used in the case of sending a local
+  // reply from (decode|encode)Metadata.
+  StopIterationForLocalReply,
 };
 
 /**
@@ -423,17 +432,39 @@ public:
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 
   /**
-￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
-    * for upstream filters.
-    */
+   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
+   * for upstream filters.
+   */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 };
 
+class DecoderFilterWatermarkCallbacks {
+public:
+  virtual ~DecoderFilterWatermarkCallbacks() = default;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+};
 /**
- * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
- * decoding if they decide to hold data (e.g. for buffering or rate limiting).
+ * Stream decoder filter callbacks add additional callbacks that allow a
+ * decoding filter to restart decoding if they decide to hold data (e.g. for
+ * buffering or rate limiting).
  */
-class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
+class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks,
+                                     public virtual DecoderFilterWatermarkCallbacks {
 public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
@@ -627,22 +658,6 @@ public:
   virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
-   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
-   * their high watermark.
-   *
-   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
-   * the low watermark callbacks an equal number of times as the respective buffers are drained.
-   */
-  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when a decoder filter or any buffers the filter sends data to go from over its high
-   * watermark to under its low watermark.
-   */
-  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
-
-  /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream
    * stream and downstream connection.
    *
@@ -737,12 +752,12 @@ public:
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
  * - All filters receive onStreamComplete()
- * - All log handlers receive log()
+ * - All log handlers receive final log()
  * - All filters receive onDestroy()
  *
  * This means:
- * - onStreamComplete can be used to make state changes that are intended to appear in the access
- * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
+ * - onStreamComplete can be used to make state changes that are intended to appear in the final
+ * access logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
  * - onDestroy is used to cleanup all pending filter resources like pending http requests and
  * timers.
  */
@@ -751,8 +766,8 @@ public:
   virtual ~StreamFilterBase() = default;
 
   /**
-   * This routine is called before the access log handlers' log() is called. Filters can use this
-   * callback to enrich the data passed in to the log handlers.
+   * This routine is called before the access log handlers' final log() is called. Filters can use
+   * this callback to enrich the data passed in to the log handlers.
    */
   virtual void onStreamComplete() {}
 
@@ -1110,6 +1125,7 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
 
   const Network::Address::Instance& localAddress() const {

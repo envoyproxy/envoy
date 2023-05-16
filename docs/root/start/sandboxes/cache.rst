@@ -43,15 +43,15 @@ Change to the ``examples/cache`` directory.
 
     $ pwd
     envoy/examples/cache
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
-           Name                      Command            State           Ports
-    ----------------------------------------------------------------------------------------------
-    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-    cache_service1_1      python3 /code/service.py       Up
-    cache_service2_1      python3 /code/service.py       Up
+           Name                      Command            State                   Ports
+    ---------------------------------------------------------------------------------------------------
+    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8000->8000/tcp
+    cache_service1_1      python3 /code/service.py       Up (healthy)
+    cache_service2_1      python3 /code/service.py       Up (healthy)
 
 Step 2: Test Envoy's HTTP caching capabilities
 **********************************************

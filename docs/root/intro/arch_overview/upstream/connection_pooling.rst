@@ -87,8 +87,7 @@ Happy Eyeballs Support
 ----------------------
 
 Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
-for upstream TCP connections. This behavior is now on by default but can be disabled by the runtime flag
-``envoy.reloadable_features.allow_multiple_dns_addresses``. For clusters which use
+for upstream TCP connections.  For clusters which use
 :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
 this behavior is configured by setting the DNS IP address resolution policy in
 :ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
@@ -115,6 +114,8 @@ connection pools are also allocated for each of the following features:
 * :ref:`Routing priority <arch_overview_http_routing_priority>`
 * :ref:`Socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
 * :ref:`Transport socket (e.g. TLS) options <envoy_v3_api_msg_config.core.v3.TransportSocket>`
+* Downstream :ref:`filter state objects <arch_overview_advanced_filter_state_sharing>` that are hashable
+  and marked as shared with the upstream connection.
 
 Each worker thread maintains its own connection pools for each cluster, so if an Envoy has two
 threads and a cluster with both HTTP/1 and HTTP/2 support, there will be at least 4 connection pools.

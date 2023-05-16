@@ -54,7 +54,9 @@ ActiveTcpListener::~ActiveTcpListener() {
     ASSERT(active_connections != nullptr);
     auto& connections = active_connections->connections_;
     while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      connections.front()->connection_->close(
+          Network::ConnectionCloseType::NoFlush,
+          "purging_socket_that_have_not_progressed_to_connections");
     }
   }
   dispatcher().clearDeferredDeleteList();
@@ -101,6 +103,12 @@ void ActiveTcpListener::onReject(RejectCause cause) {
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool hand_off_restored_destination_connections,
                                        bool rebalanced) {
+  // Get Round Trip Time
+  absl::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
+  if (t.has_value()) {
+    socket->connectionInfoProvider().setRoundTripTime(t.value());
+  }
+
   if (!rebalanced) {
     Network::BalancedConnectionHandler& target_handler =
         connection_balancer_.pickTargetHandler(*this);

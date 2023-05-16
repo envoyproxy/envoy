@@ -28,14 +28,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   auto& factory_context = context.serverFactoryContext();
   // Create the tracer in Thread Local Storage.
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this](Event::Dispatcher& dispatcher) {
-    Grpc::AsyncClientFactoryPtr&& factory =
-        factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            opentelemetry_config.grpc_service(), factory_context.scope(), true);
-    const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
-        factory->createUncachedRawAsyncClient();
+    OpenTelemetryGrpcTraceExporterPtr exporter;
+    if (opentelemetry_config.has_grpc_service()) {
+      Grpc::AsyncClientFactoryPtr&& factory =
+          factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+              opentelemetry_config.grpc_service(), factory_context.scope(), true);
+      const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
+          factory->createUncachedRawAsyncClient();
+      exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
+    }
     TracerPtr tracer = std::make_unique<Tracer>(
-        std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr),
-        factory_context.timeSource(), factory_context.api().randomGenerator(),
+        std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, opentelemetry_config.service_name());
 
     return std::make_shared<TlsTracer>(std::move(tracer));
@@ -44,7 +47,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, SystemTime start_time,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
                                    const Tracing::Decision tracing_decision) {
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
@@ -52,14 +56,15 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
     Tracing::SpanPtr new_open_telemetry_span =
-        tracer.startSpan(config, operation_name, start_time, tracing_decision);
+        tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
     new_open_telemetry_span->setSampled(tracing_decision.traced);
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
     absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
     if (span_context.ok()) {
-      return tracer.startSpan(config, operation_name, start_time, span_context.value());
+      return tracer.startSpan(config, operation_name, stream_info.startTime(),
+                              span_context.value());
     } else {
       ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();

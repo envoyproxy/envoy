@@ -32,9 +32,9 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
 
     $ pwd
     envoy/examples/wasm-cc
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
         Name                     Command                State             Ports
     -----------------------------------------------------------------------------------------------
@@ -100,8 +100,8 @@ Stop the proxy server and compile the Wasm binary with the updated code:
 
 .. code-block:: console
 
-   $ docker-compose stop proxy
-   $ docker-compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
+   $ docker compose stop proxy
+   $ docker compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
 
 The compiled binary should now be in the ``lib`` folder.
 
@@ -134,7 +134,7 @@ Now, rebuild and start the proxy container.
 
 .. code-block:: console
 
-   $ docker-compose up --build -d proxy
+   $ docker compose up --build -d proxy
 
 Step 5: Check the proxy has been updated
 ****************************************

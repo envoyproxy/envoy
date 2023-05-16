@@ -105,13 +105,18 @@ public:
         "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
   }
 
-  void setupDso() { Dso::DsoInstanceManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
+  void setupDso() {
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(PASSTHROUGH, genSoPath(PASSTHROUGH));
+  }
 
   void setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
       envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config) {
     // Setup filter config for Golang filter.
-    config_ = std::make_shared<FilterConfig>(proto_config);
+    config_ = std::make_shared<FilterConfig>(
+        proto_config,
+        Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id()), "",
+        context_);
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -121,8 +126,8 @@ public:
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
-    filter_ =
-        std::make_unique<TestFilter>(config_, Dso::DsoInstanceManager::getDsoInstanceByID(so_id));
+    filter_ = std::make_unique<TestFilter>(
+        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -132,6 +137,7 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -159,6 +165,14 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(0, stats_store_.counter("test.golang.errors").value());
+}
+
+// setHeader at wrong stage
+TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
+  InSequence s;
+  setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+
+  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar", HeaderSet));
 }
 
 } // namespace
