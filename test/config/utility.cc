@@ -30,6 +30,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+envoy::config::bootstrap::v3::Bootstrap&
+basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, std::string& config) {
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+}
+} // namespace
 
 std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
@@ -721,11 +728,13 @@ envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::str
   return endpoint;
 }
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-                           const std::string& config) {
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api&, std::string config)
+    : ConfigHelper(version, basicBootstrap(bootstrap_, config)) {}
+
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
+                           envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   RELEASE_ASSERT(!finalized_, "");
-  std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  TestUtility::loadFromFile(filename, bootstrap_, api);
+  bootstrap_ = bootstrap;
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
