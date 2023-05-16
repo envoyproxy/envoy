@@ -1,9 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_contrib_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -43,4 +41,3 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
     ],
 )
-
