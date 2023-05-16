@@ -60,6 +60,11 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: resource_monitors
+  change: |
+    Changed behavior of the fixed heap monitor to count unused mapped pages as
+    free memory. This change can be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
