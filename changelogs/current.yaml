@@ -80,7 +80,7 @@ bug_fixes:
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
 - area: logging
   change: |
-    GRPC_STATUS_NUMBER will not be showed in access_log, for non-grpc request.
+    Do not display GRPC_STATUS_NUMBER for non gRPC requests.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
 
