@@ -1,4 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:repositories_extra.bzl", "PYTHON_MINOR_VERSION")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
@@ -11,7 +12,7 @@ envoy_package()
 # TODO(phlax): figure a way to keep this updated (eg requirements.txt)
 py_library(
     name = "crcmod",
-    data = ["crcmod/_crcfunext.cpython-310-x86_64-linux-gnu.so"],
+    data = ["crcmod/_crcfunext.cpython-%s-x86_64-linux-gnu.so" % PYTHON_MINOR_VERSION.replace("_", "")],
 )
 
 py_binary(
