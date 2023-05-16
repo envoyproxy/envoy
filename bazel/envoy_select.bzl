@@ -108,6 +108,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if signal trace is enabled in the current build.
+def envoy_select_signal_trace(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_signal_trace": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values depending on the Wasm runtimes enabled in the current build,
 # and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.
 def envoy_select_wasm_cpp_tests(xs):

@@ -487,6 +487,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
+    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -563,6 +564,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     flush_access_log_on_new_request_ =
         config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -653,22 +656,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
-Http::ServerConnectionPtr
-HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
-                                         const Buffer::Instance& data,
-                                         Http::ServerConnectionCallbacks& callbacks) {
+Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -681,7 +683,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        overload_manager);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

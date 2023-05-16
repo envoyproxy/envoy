@@ -49,6 +49,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -528,6 +529,7 @@ private:
   const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
@@ -651,14 +653,25 @@ public:
                const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
-  // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
-  FakeUpstream(uint32_t port, Network::Address::IpVersion version,
-               const FakeUpstreamConfig& config);
+  // Creates a fake upstream bound to INADDR_ANY and the specified `port`.
+  // Set `defer_initialization` to true if you want the FakeUpstream to not immediately listen for
+  // incoming connections, and instead want to control when the FakeUpstream is available for
+  // listening. If `defer_initialization` is set to true, call initializeServer() before invoking
+  // any other functions in this class.
+  FakeUpstream(uint32_t port, Network::Address::IpVersion version, const FakeUpstreamConfig& config,
+               bool defer_initialization = false);
 
   FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                uint32_t port, Network::Address::IpVersion version,
                const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
+
+  // Initializes the FakeUpstream's server.
+  void initializeServer();
+
+  // Returns true if the server has been initialized, i.e. that initializeServer() executed
+  // successfully. Returns false otherwise.
+  bool isInitialized() { return initialized_; }
 
   Http::CodecType httpType() { return http_type_; }
 
@@ -758,7 +771,8 @@ protected:
 
 private:
   FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
-               Network::SocketPtr&& connection, const FakeUpstreamConfig& config);
+               Network::SocketPtr&& connection, const FakeUpstreamConfig& config,
+               bool defer_initialization = false);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -928,6 +942,7 @@ private:
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif
+  bool initialized_ = false;
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

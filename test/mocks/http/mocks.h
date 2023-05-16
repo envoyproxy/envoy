@@ -589,16 +589,19 @@ public:
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
-                                  ServerConnectionCallbacks& callbacks) override {
-    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
+                                  ServerConnectionCallbacks& callbacks,
+                                  Server::OverloadManager& overload_manager) override {
+    return ServerConnectionPtr{createCodec_(connection, instance, callbacks, overload_manager)};
   }
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
+  MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
-              (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
+              (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,
+               Server::OverloadManager&));
   MOCK_METHOD(DateProvider&, dateProvider, ());
   MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());
@@ -617,6 +620,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
   MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
   MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
+  MOCK_METHOD(OptRef<const Router::ScopeKeyBuilder>, scopeKeyBuilder, ());
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
