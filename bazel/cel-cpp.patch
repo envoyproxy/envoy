@@ -72,6 +72,18 @@ index 80ac45c..7dceb93 100644
  #include "absl/status/status.h"
  #include "eval/compiler/flat_expr_builder.h"
  #include "eval/public/cel_options.h"
+diff --git a/eval/public/structs/BUILD b/eval/public/structs/BUILD
+index 9187518..5151bb0 100644
+--- a/eval/public/structs/BUILD
++++ b/eval/public/structs/BUILD
+@@ -192,7 +192,6 @@ cc_library(
+     hdrs = ["legacy_type_provider.h"],
+     deps = [
+         ":legacy_type_adapter",
+-        "//base:type_provider",
+         "@com_google_absl//absl/types:optional",
+     ],
+ )
 diff --git a/eval/public/structs/field_access_impl.cc b/eval/public/structs/field_access_impl.cc
 index 788a476..e4b70b3 100644
 --- a/eval/public/structs/field_access_impl.cc
@@ -85,10 +97,27 @@ index 788a476..e4b70b3 100644
  #include "absl/status/statusor.h"
  #include "absl/strings/str_cat.h"
 diff --git a/eval/public/structs/legacy_type_provider.h b/eval/public/structs/legacy_type_provider.h
-index b1623fc..597b68f 100644
+index b1623fc..5c78971 100644
 --- a/eval/public/structs/legacy_type_provider.h
 +++ b/eval/public/structs/legacy_type_provider.h
-@@ -45,7 +45,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
+@@ -16,7 +16,6 @@
+ #define THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_STRUCTS_TYPE_PROVIDER_H_
+ 
+ #include "absl/types/optional.h"
+-#include "base/type_provider.h"
+ #include "eval/public/structs/legacy_type_adapter.h"
+ 
+ namespace google::api::expr::runtime {
+@@ -25,7 +24,7 @@ namespace google::api::expr::runtime {
+ //
+ // Note: This API is not finalized. Consult the CEL team before introducing new
+ // implementations.
+-class LegacyTypeProvider : public cel::TypeProvider {
++class LegacyTypeProvider {
+  public:
+   // Return LegacyTypeAdapter for the fully qualified type name if available.
+   //
+@@ -45,7 +44,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
    // created ones, the TypeInfoApis returned from this method should be the same
    // as the ones used in value creation.
    virtual absl::optional<const LegacyTypeInfoApis*> ProvideLegacyTypeInfo(
