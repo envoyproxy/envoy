@@ -97,7 +97,7 @@ index 788a476..e4b70b3 100644
  #include "absl/status/statusor.h"
  #include "absl/strings/str_cat.h"
 diff --git a/eval/public/structs/legacy_type_provider.h b/eval/public/structs/legacy_type_provider.h
-index b1623fc..5c78971 100644
+index b1623fc..d3d88d6 100644
 --- a/eval/public/structs/legacy_type_provider.h
 +++ b/eval/public/structs/legacy_type_provider.h
 @@ -16,7 +16,6 @@
@@ -108,16 +108,19 @@ index b1623fc..5c78971 100644
  #include "eval/public/structs/legacy_type_adapter.h"
  
  namespace google::api::expr::runtime {
-@@ -25,7 +24,7 @@ namespace google::api::expr::runtime {
+@@ -25,8 +24,10 @@ namespace google::api::expr::runtime {
  //
  // Note: This API is not finalized. Consult the CEL team before introducing new
  // implementations.
 -class LegacyTypeProvider : public cel::TypeProvider {
 +class LegacyTypeProvider {
   public:
++  virtual ~LegacyTypeProvider() = default;
++
    // Return LegacyTypeAdapter for the fully qualified type name if available.
    //
-@@ -45,7 +44,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
+   // nullopt values are interpreted as not present.
+@@ -45,7 +46,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
    // created ones, the TypeInfoApis returned from this method should be the same
    // as the ones used in value creation.
    virtual absl::optional<const LegacyTypeInfoApis*> ProvideLegacyTypeInfo(
