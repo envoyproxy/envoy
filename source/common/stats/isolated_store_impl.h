@@ -234,13 +234,8 @@ public:
     return constRootScope()->iterate(fn);
   }
 
-  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
-  }
-
-  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {
-    IS_ENVOY_BUG("Unexpected call to a function that is not yet implemented");
-  }
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
 
 protected:
   /**
