@@ -72,6 +72,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
+        # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "0.3.2",
         sha256 = "f85dc70bb9672af0e350686461fe6fdd0d61e10e75645f9e44fedf549b21e369",
         strip_prefix = "rules_fuzzing-{version}",
@@ -1026,6 +1027,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
+        # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "10.7.193.13",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "2170df76ce5d7ecd7fb8d131370d210152f200273cba126f06d8b88fb53c9fbc",
@@ -1099,6 +1101,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
+            "envoy.formatter.cel",
         ],
         release_date = "2022-09-01",
         cpe = "N/A",
@@ -1115,6 +1118,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
+            "envoy.formatter.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",

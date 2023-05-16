@@ -80,6 +80,7 @@ envoy_cc_library(
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/common/config:null_grpc_mux_lib",
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
@@ -101,7 +102,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
-        "//source/common/config:grpc_mux_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",

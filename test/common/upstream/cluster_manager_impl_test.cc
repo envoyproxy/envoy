@@ -1983,6 +1983,65 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
+// Validates that a callback can remove itself from the callbacks list.
+TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration) {
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).WillOnce(Invoke([&cb](ThreadLocalCluster&) {
+    // This call will remove the callback from the list.
+    cb.reset();
+  }));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
+  cluster1->initialize_callback_();
+
+  EXPECT_EQ(cluster1->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
+
+  // Now do it again with a different hash.
+  auto update_cluster = defaultStaticCluster("fake_cluster");
+  update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster2->info_, "tcp://127.0.0.1:80", time_system_)};
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster2, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  // There shouldn't be a call to onClusterAddOrUpdate on the callbacks as the
+  // handler was removed.
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(0);
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
+
+  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
+}
+
 TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
