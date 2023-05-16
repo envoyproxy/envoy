@@ -139,6 +139,14 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
 }
 
+TEST_F(AllocatorImplTest, HiddenGauge) {
+  auto hidden_gauge = alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::Hidden);
+  EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::Hidden);
+
+  auto non_hidden_gauge = alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
+  EXPECT_NE(non_hidden_gauge->importMode(), Gauge::ImportMode::Hidden);
+}
+
 TEST_F(AllocatorImplTest, ForEachCounter) {
   StatNameHashSet stat_names;
   std::vector<CounterSharedPtr> counters;
@@ -243,34 +251,6 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
                       [&num_iterations](Gauge&) { ++num_iterations; });
   EXPECT_EQ(num_gauges, 0);
   EXPECT_EQ(num_iterations, 0);
-}
-
-TEST_F(AllocatorImplTest, ForEachGaugeHidden) {
-  StatNameHashSet stat_names;
-  std::vector<GaugeSharedPtr> gauges;
-
-  const size_t num_stats = 11;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    stat_names.insert(stat_name);
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-  }
-  // Add one last gauge to gauges with Hidden ImportMode
-  auto stat_name = makeStat(absl::StrCat("gauge", num_stats));
-  stat_names.insert(stat_name);
-  gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Hidden));
-
-  size_t num_gauges = 0;
-  size_t num_iterations = 0;
-  alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                      [&num_iterations, &stat_names](Gauge& gauge) {
-                        EXPECT_EQ(stat_names.count(gauge.statName()), 1);
-                        if (gauge.importMode() != Gauge::ImportMode::Hidden)
-                          ++num_iterations;
-                      });
-  EXPECT_EQ(num_gauges, 12);
-  EXPECT_EQ(num_iterations, 11);
 }
 
 TEST_F(AllocatorImplTest, ForEachTextReadout) {

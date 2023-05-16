@@ -1006,16 +1006,6 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
 }
 
-TEST_F(StatsMatcherTLSTest, HiddenGaugeTest) {
-  InSequence s;
-
-  Gauge& hidden_gauge = scope_.gaugeFromString("g1", Gauge::ImportMode::Hidden);
-  EXPECT_EQ(hidden_gauge.importMode(), Gauge::ImportMode::Hidden);
-
-  Gauge& non_hidden_gauge = scope_.gaugeFromString("g2", Gauge::ImportMode::Accumulate);
-  EXPECT_NE(non_hidden_gauge.importMode(), Gauge::ImportMode::Hidden);
-}
-
 // We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
 // test/common/stats:stats_matcher_test.
 TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
