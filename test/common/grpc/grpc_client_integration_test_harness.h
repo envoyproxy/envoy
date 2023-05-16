@@ -423,8 +423,11 @@ public:
           }
         }));
 
-    stream->grpc_stream_ =
-        grpc_client_->start(*method_descriptor_, *stream, Http::AsyncClient::StreamOptions());
+    auto options = Http::AsyncClient::StreamOptions();
+    envoy::config::core::v3::Metadata m;
+    (*m.mutable_filter_metadata())["com.foo.bar"] = {};
+    options.setMetadata(m);
+    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {

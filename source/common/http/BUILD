@@ -27,6 +27,7 @@ envoy_cc_library(
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/router:router_lib",
