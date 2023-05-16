@@ -51,7 +51,7 @@ def envoy_all_http_filters():
     return {_selected_extension_target(v): True for k, v in all_extensions.items() if (k.startswith(_http_filter_prefix) or k.startswith(_upstream_http_filter_prefix))}.keys()
 
 # Return 'selected' network-layer filter extensions to be compiled into network-layer filter generic fuzzer.
-def envoy_network_filters_from_selected(selected):
+def envoy_filters_from_selected(selected):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     return [_selected_extension_target(v) for k, v in all_extensions.items() if (k in selected)]
