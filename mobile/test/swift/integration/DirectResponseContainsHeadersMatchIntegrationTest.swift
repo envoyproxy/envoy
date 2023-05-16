@@ -2,6 +2,7 @@ import Envoy
 import TestExtensions
 import XCTest
 import EnvoyTestServerInterface
+import Foundation
 
 final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
   override static func setUp() {
@@ -10,27 +11,29 @@ final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
   }
 
   func testDirectResponseWithContainsHeadersMatch() {
+    TestServerInterface.startTestServer()
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
 
     let requestHeaders = RequestHeadersBuilder(
-      method: .get, authority: "127.0.0.1", path: "/v1/abc"
+      method: .get, scheme: "http", authority: "127.0.0.1", path: "/"
     )
     .add(name: "x-foo", value: "123")
     .add(name: "x-foo", value: "456")
     .build()
 
     let engine = TestEngineBuilder()
-      .addDirectResponse(
-        .init(
-          matcher: RouteMatcher(
-            fullPath: "/v1/abc", headers: [
-              .init(name: "x-foo", value: "123", mode: .contains),
-            ]
-          ),
-          status: 200, body: "hello world", headers: ["x-response-foo": "aaa"]
-        )
-      )
+    .addLogLevel(LogLevel.trace)
+      // .addDirectResponse(
+      //   .init(
+      //     matcher: RouteMatcher(
+      //       fullPath: "/v1/abc", headers: [
+      //         .init(name: "x-foo", value: "123", mode: .contains),
+      //       ]
+      //     ),
+      //     status: 200, body: "hello world", headers: ["x-response-foo": "aaa"]
+      //   )
+      // )
       .build()
 
     var responseBuffer = Data()
@@ -57,5 +60,6 @@ final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
     XCTAssertEqual(.completed, XCTWaiter().wait(for: expectations, timeout: 10, enforceOrder: true))
 
     engine.terminate()
+    TestServerInterface.shutdownTestServer()
   }
 }

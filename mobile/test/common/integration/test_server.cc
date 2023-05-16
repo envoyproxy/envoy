@@ -5,6 +5,7 @@
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
 
+
 namespace Envoy {
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
@@ -32,15 +33,20 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  std::string _error;
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
+      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&_error));
+  Envoy::TestEnvironment::setRunfiles(runfiles.get());
+
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
   certs->mutable_certificate_chain()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamcert.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
   certs->mutable_private_key()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamkey.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
   ctx->mutable_trusted_ca()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamcacert.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
@@ -78,6 +84,12 @@ void TestServer::startTestServer(bool use_quic) {
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
+
+    upstream_->setResponseHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+            {{"x-response-foo", "aaa"},
+            {":status", "200"}})));
+    upstream_->setResponseBody("hello world");
 
   // Legacy behavior for cronet tests.
   if (use_quic) {

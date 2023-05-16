@@ -28,8 +28,11 @@ envoy_mobile_swift_test(
         "no-remote-exec",
     ],
     visibility = ["//visibility:public"],
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
     deps = [
-        "test/objective-c:envoy_test_server_interface"
+        "//test/objective-c:envoy_test_server_interface",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
     ],

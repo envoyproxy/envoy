@@ -1,4 +1,4 @@
-load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test")
+load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -30,14 +30,16 @@ envoy_mobile_objc_test(
 )
 
 
-envoy_mobile_objc_library(
+envoy_objc_library(
     name = "envoy_test_server_interface",
     srcs = [
         "EnvoyTestServerInterface.mm",
     ],
-    headers = ["EnvoyTestServerInterface.h"]
+    hdrs = ["EnvoyTestServerInterface.h"],
     visibility = ["//visibility:public"],
+    module_name = "EnvoyTestServerInterface",
     deps = [
         "//test/common/integration:test_server_interface_lib"
         ],
+    testonly = True,
 )

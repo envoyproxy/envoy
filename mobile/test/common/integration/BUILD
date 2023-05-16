@@ -155,6 +155,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@bazel_tools//tools/cpp/runfiles",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
