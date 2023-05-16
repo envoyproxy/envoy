@@ -32,7 +32,7 @@ Statistics
 ----------
 
 Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
-*_resp_fast* and *_resp_slow* metrics will only be emitted when enabling the latency threshold metrics.
+*_resp_fast* and *_resp_slow* metrics will only be emitted when ``enable_latency_threshold_metrics`` is set to ``true``.
 The following counters are available:
 
 .. csv-table::

@@ -669,18 +669,18 @@ TEST_F(ZooKeeperFilterTest, DisableErrorBudgetCalculation) {
   initialize(false, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(200)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(202)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(203)),
-            ErrorBudgetResponseType::NONE);
+            ErrorBudgetResponseType::None);
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig) {
@@ -692,18 +692,18 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig
   initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(200)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(202)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(203)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) {
@@ -719,18 +719,18 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) 
   initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(200)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(101)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(102)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
 }
 
 TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresholdConfigs) {
@@ -749,26 +749,26 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresho
   initialize(true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(150)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(50)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Create, std::chrono::milliseconds(200)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::SetWatches2, std::chrono::milliseconds(100)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(150)),
-            ErrorBudgetResponseType::FAST);
+            ErrorBudgetResponseType::Fast);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(151)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Ping, std::chrono::milliseconds(51)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Create, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::GetChildren2, std::chrono::milliseconds(152)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Multi, std::chrono::milliseconds(201)),
-            ErrorBudgetResponseType::SLOW);
+            ErrorBudgetResponseType::Slow);
 }
 
 TEST_F(ZooKeeperFilterTest, Connect) {
