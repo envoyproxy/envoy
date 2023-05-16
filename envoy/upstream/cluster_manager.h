@@ -316,6 +316,11 @@ public:
   virtual void shutdown() PURE;
 
   /**
+   * @return whether the shutdown method has been called.
+   */
+  virtual bool isShutdown() PURE;
+
+  /**
    * @return cluster manager wide bind configuration for new upstream connections.
    */
   virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
