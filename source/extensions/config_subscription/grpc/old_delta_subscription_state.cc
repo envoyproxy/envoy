@@ -1,4 +1,4 @@
-#include "source/common/config/old_delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/old_delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

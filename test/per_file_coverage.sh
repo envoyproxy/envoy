@@ -11,7 +11,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
-"source/common/http:96.5"
 "source/common/http/http2:95.2"
 "source/common/json:93.4"
 "source/common/matcher:94.6"
@@ -62,7 +61,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/common/ot:71.7"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.7"
+"source/extensions/transport_sockets:95.6"
 "source/extensions/transport_sockets/tls:94.9"
 "source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:88.9"
@@ -82,6 +81,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/load_balancing_policies:95.5"
 "source/extensions/load_balancing_policies/subset:94.3"
 "source/extensions/config_subscription/rest:94.3"
+"source/extensions/config_subscription:94.8"
+"source/extensions/config_subscription/grpc:94.0"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

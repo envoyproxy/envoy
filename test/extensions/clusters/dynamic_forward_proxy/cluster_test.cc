@@ -609,8 +609,13 @@ protected:
         true);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
-    std::tie(cluster_, thread_aware_lb_) =
-        cluster_factory->create(cluster_config, cluster_factory_context);
+    auto result = cluster_factory->create(cluster_config, cluster_factory_context);
+    if (result.ok()) {
+      cluster_ = result->first;
+      thread_aware_lb_ = std::move(result->second);
+    } else {
+      throw EnvoyException(std::string(result.status().message()));
+    }
   }
 
 private:
