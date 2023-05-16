@@ -52,6 +52,13 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   auto stream_1 = createStream(empty_metadata_);
   stream_0->sendRequest();
   stream_1->sendRequest();
+  // Access stream info to make sure it is present.
+  if (std::get<1>(GetParam()) == ClientType::EnvoyGrpc) {
+    envoy::config::core::v3::Metadata m;
+    (*m.mutable_filter_metadata())["com.foo.bar"] = {};
+    EXPECT_THAT(stream_0->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+    EXPECT_THAT(stream_1->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+  }
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply();
   stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
