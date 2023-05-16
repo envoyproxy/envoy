@@ -110,8 +110,8 @@ latency_threshold_overrides:
   EXPECT_THROW_WITH_REGEX(
       TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
       "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides[0]: embedded message failed "
-      "validation | caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
+      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
+      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
       "greater than or equal to 1ms\\)");
 }
 
@@ -127,8 +127,8 @@ latency_threshold_overrides:
   EXPECT_THROW_WITH_REGEX(
       TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
       "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides[0]: embedded message failed "
-      "validation | caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
+      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
+      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
       "greater than or equal to 1ms\\)");
 }
 
@@ -143,8 +143,8 @@ latency_threshold_overrides:
   EXPECT_THROW_WITH_REGEX(
       TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
       "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides[0]: embedded message failed "
-      "validation | caused by LatencyThresholdOverrideValidationError.Threshold: value is "
+      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
+      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value is "
       "required\\)");
 }
 
