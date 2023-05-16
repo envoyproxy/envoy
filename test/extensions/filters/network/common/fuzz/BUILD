@@ -7,7 +7,7 @@ load(
 )
 load(
     "//source/extensions:all_extensions.bzl",
-    "envoy_select_network_filters",
+    "envoy_network_filters_from_selected",
 )
 
 licenses(["notice"])  # Apache 2
@@ -36,7 +36,9 @@ envoy_proto_library(
     ],
 )
 
-_readfilter_fuzz_filters = [
+# The filters to be fuzzed by the network_readfilter_fuzz_test. Prefer to add only stable filters,
+# that do not have a dedicated fuzzer to them.
+READFILTER_FUZZ_FILTERS = [
     "envoy.filters.network.client_ssl_auth",
     "envoy.filters.network.ext_authz",
     "envoy.filters.network.envoy_mobile_http_connection_manager",
@@ -104,10 +106,12 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-    ] + envoy_select_network_filters(_readfilter_fuzz_filters),
+    ] + envoy_network_filters_from_selected(READFILTER_FUZZ_FILTERS),
 )
 
-_writefilter_fuzz_filters = [
+# The filters to be fuzzed by the network_writefilter_fuzz_test. Prefer to add only stable filters,
+# that do not have a dedicated fuzzer to them.
+WRITEFILTER_FUZZ_FILTERS = [
     "envoy.filters.network.zookeeper_proxy",
     "envoy.filters.network.kafka_broker",
     "envoy.filters.network.mongo_proxy",
@@ -144,5 +148,5 @@ envoy_cc_fuzz_test(
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
-    ] + envoy_select_network_filters(_writefilter_fuzz_filters),
+    ] + envoy_network_filters_from_selected(WRITEFILTER_FUZZ_FILTERS),
 )

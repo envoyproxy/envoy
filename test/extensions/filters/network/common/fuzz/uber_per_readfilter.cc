@@ -23,6 +23,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   if (filter_names.empty()) {
     // Only use the names of the filters that are compiled into envoy. The build system takes care
     // about reducing these to the allowed set.
+    // See test/extensions/filters/network/common/fuzz/BUILD for more information.
     filter_names = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
   }
