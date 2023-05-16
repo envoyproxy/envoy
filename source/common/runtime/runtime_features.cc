@@ -33,9 +33,9 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
+RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
-RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
@@ -97,7 +97,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(birenroy) flip after a burn-in period
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-// TODO(bencebeky): Finish BalsaParser implementation, then enable by default. See issue #21245.
+// TODO(bencebeky): Flip true after sufficient canarying.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
