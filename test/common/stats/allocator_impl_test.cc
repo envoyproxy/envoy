@@ -140,10 +140,12 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
 }
 
 TEST_F(AllocatorImplTest, HiddenGauge) {
-  auto hidden_gauge = alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::Hidden);
+  auto hidden_gauge =
+      alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::Hidden);
   EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::Hidden);
 
-  auto non_hidden_gauge = alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
+  auto non_hidden_gauge =
+      alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
   EXPECT_NE(non_hidden_gauge->importMode(), Gauge::ImportMode::Hidden);
 }
 
