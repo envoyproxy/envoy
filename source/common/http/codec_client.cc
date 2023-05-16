@@ -197,18 +197,16 @@ Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers
       failure_details = std::string(transformation_result.status.details());
     } else {
       // Validate header map after request encoder transformations
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
-        const ::Envoy::Http::HeaderValidator::ValidationResult validation_result =
-            header_validator_->validateRequestHeaders(
-                transformation_result.new_headers ? *transformation_result.new_headers : headers);
-        if (!validation_result.ok()) {
-          ENVOY_CONN_LOG(debug, "Request header validation failed: {}\n{}", *parent_.connection_,
-                         validation_result.details(),
-                         transformation_result.new_headers ? *transformation_result.new_headers
-                                                           : headers);
-          failure = true;
-          failure_details = std::string(validation_result.details());
-        }
+      const ::Envoy::Http::HeaderValidator::ValidationResult validation_result =
+          header_validator_->validateRequestHeaders(
+              transformation_result.new_headers ? *transformation_result.new_headers : headers);
+      if (!validation_result.ok()) {
+        ENVOY_CONN_LOG(debug, "Request header validation failed: {}\n{}", *parent_.connection_,
+                       validation_result.details(),
+                       transformation_result.new_headers ? *transformation_result.new_headers
+                                                         : headers);
+        failure = true;
+        failure_details = std::string(validation_result.details());
       }
     }
     if (failure) {

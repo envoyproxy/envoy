@@ -2892,6 +2892,12 @@ TEST_P(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
+#ifdef ENVOY_ENABLE_UHV
+  // The check for required headers is done by UHV. When UHV is enabled this test
+  // is superseded by CodecClientTest.ResponseHeaderValidationFails and
+  // DownstreamProtocolIntegrationTest.DownstreamRequestWithFaultyFilter tests.
+  return;
+#endif
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;

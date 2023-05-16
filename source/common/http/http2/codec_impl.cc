@@ -260,10 +260,13 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
+#ifndef ENVOY_ENABLE_UHV
+  // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
+  // when UHV is enabled.
+  //
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
-#ifndef ENVOY_ENABLE_UHV
   // These checks are now part of UHV
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));

@@ -4098,9 +4098,9 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
 
 TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
 #ifdef ENVOY_ENABLE_UHV
-  if (upstreamProtocol() != Http::CodecType::HTTP1) {
-    return;
-  }
+  // UHV always validated headers before sending them upstream. This test is not applicable
+  // when UHV is enabled.
+  return;
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     testing_upstream_intentionally_ = true;
@@ -4417,8 +4417,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-
+  disable_client_header_validation_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4444,8 +4443,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-
+  disable_client_header_validation_ = true;
   // For H/1 this test is equivalent to InvalidRequestHeaderName
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
