@@ -31,8 +31,14 @@ type filterConfigFactoryAndParser struct {
 	configParser  api.StreamFilterConfigParser
 }
 
-func RegisterHttpFilterConfigFactoryAndParser(name string, f api.StreamFilterConfigFactory, parser api.StreamFilterConfigParser) {
-	httpFilterConfigFactoryAndParser.Store(name, &filterConfigFactoryAndParser{f, parser})
+// Register config factory and config parser for the specified plugin.
+// The "factory" parameter is required, should not be nil,
+// and the "parser" parameter is optional, could be nil.
+func RegisterHttpFilterConfigFactoryAndParser(name string, factory api.StreamFilterConfigFactory, parser api.StreamFilterConfigParser) {
+	if factory == nil {
+		panic("config factory should not be nil")
+	}
+	httpFilterConfigFactoryAndParser.Store(name, &filterConfigFactoryAndParser{factory, parser})
 }
 
 func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilterFactory {
