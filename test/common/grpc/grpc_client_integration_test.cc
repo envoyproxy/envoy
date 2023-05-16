@@ -52,13 +52,19 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   auto stream_1 = createStream(empty_metadata_);
   stream_0->sendRequest();
   stream_1->sendRequest();
+  if (std::get<1>(GetParam()) == ClientType::EnvoyGrpc) {
+    EXPECT_EQ(stream_0->grpc_stream_.streamInfo().bytesSent(), 158);
+    EXPECT_EQ(stream_1->grpc_stream_.streamInfo().bytesSent(), 158);
+  }
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply();
   stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
   stream_0->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
-  EXPECT_EQ(stream_0->grpc_stream_.streamInfo().getUpstreamBytesMeter()->wireBytesReceived(), 0UL);
-  EXPECT_EQ(stream_1->grpc_stream_.streamInfo().getUpstreamBytesMeter()->wireBytesSent(), 0UL);
+  if (std::get<1>(GetParam()) == ClientType::EnvoyGrpc) {
+    EXPECT_EQ(stream_0->grpc_stream_.streamInfo().bytesReceived(), 33);
+    EXPECT_EQ(stream_1->grpc_stream_.streamInfo().bytesReceived(), 23);
+  }
 }
 
 // Validate that multiple request-reply unary RPCs works.

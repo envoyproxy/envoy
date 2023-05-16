@@ -123,6 +123,7 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
             *headers);
   ASSERT(!remote_closed_);
   encoded_response_headers_ = true;
+  stream_info_.addBytesReceived(headers->byteSize());
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a
@@ -139,6 +140,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "async http request response data (length={} end_stream={})", data.length(),
             end_stream);
   ASSERT(!remote_closed_);
+  stream_info_.addBytesReceived(data.length());
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
   // Ensure we close locally on receiving a complete response; see comment in encodeHeaders for
@@ -149,6 +151,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   ENVOY_LOG(debug, "async http request response trailers:\n{}", *trailers);
   ASSERT(!remote_closed_);
+  stream_info_.addBytesReceived(trailers->byteSize());
   stream_callbacks_.onTrailers(std::move(trailers));
   closeRemote(true);
   // Ensure we close locally on receiving a complete response; see comment in encodeHeaders for
@@ -166,6 +169,8 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
+
+  stream_info_.addBytesSent(headers.byteSize());
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
 }
@@ -193,6 +198,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     }
   }
 
+  stream_info_.addBytesSent(data.length());
   router_.decodeData(data, end_stream);
   closeLocal(end_stream);
 }
@@ -204,6 +210,7 @@ void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
     return;
   }
 
+  stream_info_.addBytesSent(trailers.byteSize());
   router_.decodeTrailers(trailers);
   closeLocal(true);
 }
@@ -323,7 +330,6 @@ void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
 }
 
 void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) {
-  streamInfo().addBytesReceived(data.length());
   response_->body().move(data);
 }
 
