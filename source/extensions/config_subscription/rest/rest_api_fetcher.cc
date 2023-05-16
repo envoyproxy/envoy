@@ -1,4 +1,4 @@
-#include "source/common/http/rest_api_fetcher.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 
 #include <chrono>
 #include <cstdint>
