@@ -4417,6 +4417,8 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
+  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
+  // for non UHV builds
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
   initialize();
@@ -4444,6 +4446,8 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
+  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
+  // for non UHV builds
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
   // For H/1 this test is equivalent to InvalidRequestHeaderName
