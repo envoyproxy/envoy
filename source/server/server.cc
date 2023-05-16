@@ -957,7 +957,7 @@ void InstanceImpl::terminate() {
   std::vector<std::string> muxes = {
       "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
       "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};
-  for (auto name : muxes) {
+  for (const auto name : muxes) {
     auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
     if (factory) {
       factory->shutdownAll();
