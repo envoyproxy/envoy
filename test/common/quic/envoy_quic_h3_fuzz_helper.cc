@@ -167,14 +167,10 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
               quic::kQuicDefaultConnectionIdLength),
       h3packetizer_(open_h3_streams_) {
   quic::Perspective p = quic::Perspective::IS_CLIENT;
-  framer_.SetEncrypter(quic::ENCRYPTION_INITIAL,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
-  framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
-  framer_.SetEncrypter(quic::ENCRYPTION_ZERO_RTT,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
-  framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
-                       std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter(p)));
+  framer_.SetEncrypter(quic::ENCRYPTION_INITIAL, std::make_unique<FuzzEncrypter>(p));
+  framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE, std::make_unique<FuzzEncrypter>(p));
+  framer_.SetEncrypter(quic::ENCRYPTION_ZERO_RTT, std::make_unique<FuzzEncrypter>(p));
+  framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE, std::make_unique<FuzzEncrypter>(p));
 }
 
 void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
@@ -332,6 +328,11 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   } break;
   case QuicFrame::kRetireConnectionId: {
     // no retire frame in IETF mode
+    const auto& f = frame.retire_connection_id();
+    retire_connection_id_frame = std::make_unique<quic::QuicRetireConnectionIdFrame>(
+        f.control_frame_id(), f.sequence_number());
+    frames.push_back(quic::QuicFrame(retire_connection_id_frame.get()));
+
     return;
   } break;
   case QuicFrame::kMaxStreams: {

@@ -118,15 +118,14 @@ struct Harness {
                                                         54321)),
         cli_addr_(peer_addr_->sockAddr(), peer_addr_->sockAddrLen()),
         srv_addr_(self_addr_->sockAddr(), self_addr_->sockAddrLen()),
-        listener_config_(&mock_listener_config_),
-        quic_stat_names_(listener_config_->listenerScope().symbolTable()),
+        quic_stat_names_(mock_listener_config_.listenerScope().symbolTable()),
         http3_stats_({ALL_HTTP3_CODEC_STATS(
-            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))}),
+            POOL_COUNTER_PREFIX(mock_listener_config_.listenerScope(), "http3."),
+            POOL_GAUGE_PREFIX(mock_listener_config_.listenerScope(), "http3."))}),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         connection_stats_({QUIC_CONNECTION_STATS(
-            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "quic.connection"))}) {
+            POOL_COUNTER_PREFIX(mock_listener_config_.listenerScope(), "quic.connection"))}) {
     SetQuicFlag(quic_allow_chlo_buffering, false);
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
@@ -158,7 +157,7 @@ struct Harness {
         quic_config_, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection), nullptr,
         &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_, *dispatcher_.get(),
         quic::kDefaultFlowControlSendWindow * 1.5, quic_stat_names_,
-        listener_config_->listenerScope(), crypto_stream_factory_, std::move(stream_info),
+        mock_listener_config_.listenerScope(), crypto_stream_factory_, std::move(stream_info),
         connection_stats_);
     session->Initialize();
     session->setHeadersWithUnderscoreAction(envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -200,7 +199,6 @@ struct Harness {
   quic::QuicSocketAddress srv_addr_;
 
   NiceMock<Network::MockListenerConfig> mock_listener_config_;
-  Network::ListenerConfig* listener_config_{};
   QuicStatNames quic_stat_names_;
   Http::Http3::CodecStats http3_stats_;
 

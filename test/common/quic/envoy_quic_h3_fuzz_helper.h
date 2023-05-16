@@ -51,10 +51,12 @@ private:
 };
 
 // The following two classes handle the encryption and decryption in the fuzzer
-// and just pass the plain or cipher text as is.
+// and just pass the plain or cipher text as is. The classes override
+// the `EncryptPacket` method, because the `Null{En,De}crypter` calculates
+// a hash of the data for each packet, which is unnecessary in fuzzing.
 class FuzzEncrypter : public quic::NullEncrypter {
 public:
-  FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective){};
+  explicit FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective){};
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
                      size_t* output_length, size_t max_output_length) {
     ASSERT(plaintext.length() <= max_output_length);
@@ -68,7 +70,7 @@ public:
 
 class FuzzDecrypter : public quic::NullDecrypter {
 public:
-  FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective){};
+  explicit FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective){};
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
                      size_t* output_length, size_t max_output_length) {
     ASSERT(ciphertext.length() <= max_output_length);
