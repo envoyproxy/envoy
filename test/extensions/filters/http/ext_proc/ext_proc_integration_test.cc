@@ -89,7 +89,6 @@ protected:
       // Construct a configuration proto for our filter and then re-write it
       // to JSON so that we can add it to the overall config
       envoy::config::listener::v3::Filter ext_proc_filter;
-      // TODO(tyxia) set filter_config_name
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
