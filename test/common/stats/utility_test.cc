@@ -7,15 +7,11 @@
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/thread_local_store.h"
 
-#include "test/common/stats/stat_test_utility.h"
-
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ElementsAre;
-using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
