@@ -26,7 +26,7 @@ jobs:
       run: |
         mkdir -p vars
         ./mobile/tools/what_to_run.sh
-        ./github/scripts/vars-to-json.sh > vars/vars.json
+        ./.github/scripts/vars-to-json.sh > vars/vars.json
     - uses: actions/upload-artifact@v3
       with:
         name: vars
