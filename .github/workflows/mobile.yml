@@ -27,4 +27,4 @@ jobs:
     - id: check_output
       name: 'Check output'
       run: |
-        echo "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
