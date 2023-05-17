@@ -32,21 +32,20 @@ jobs:
       run: ./mobile/tools/should_run_ci.sh
     - name: 'Run coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      continue-on-error: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && BAZEL_BUILD_OPTION_LIST="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
-            COVERAGE_THRESHOLD=95 \
+            COVERAGE_THRESHOLD=76 \
             ../test/run_envoy_bazel_coverage.sh //test/common/...
     - name: 'Package coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: |
-        cd mobile && tar -czvf coverage.tar.gz generated/coverage
+        cd mobile && tar -czf coverage.tar.gz generated/coverage
     - name: 'Upload report'
       if: steps.should_run.outputs.run_ci_job == 'true'
       uses: actions/upload-artifact@v3
       with:
         name: coverage.tar.gz
-        path: coverage.tar.gz
+        path: mobile/coverage.tar.gz
