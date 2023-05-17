@@ -72,6 +72,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
+        # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "0.3.2",
         sha256 = "f85dc70bb9672af0e350686461fe6fdd0d61e10e75645f9e44fedf549b21e369",
         strip_prefix = "rules_fuzzing-{version}",
@@ -1026,6 +1027,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
+        # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "10.7.193.13",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "2170df76ce5d7ecd7fb8d131370d210152f200273cba126f06d8b88fb53c9fbc",
@@ -1054,12 +1056,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "5569deaa0b1ed0b4d9bbb84bddb5c8dafa3e2720",
-        sha256 = "34b564bcd917f9331a8c52e0e8ae027a478ee6e4a7f28c7643de9611e70d7e47",
+        version = "d687c5fc08dc2d05b4e253237173f99eed06488c",
+        sha256 = "3c704355f9ee4daab15af666b258071d76f1d985c2c725fe65dbe55d643b92cb",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-05-09",
+        release_date = "2023-05-12",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1083,8 +1085,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "11f9d662e71f73b28f4104ef2cf0550d96e677ae",
-        sha256 = "3d00e3fa9def360da18ccd077f261c1dea2f725c046692cc55ecc4d3b15bb390",
+        version = "da0aba702f44a41ec6d2eb4bbf6a9f01efc2746d",
+        sha256 = "d62b93fd07c6151749e83855157f3f2778d62c168318f9c40dfcfe1c336c496f",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1099,8 +1101,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
+            "envoy.formatter.cel",
         ],
-        release_date = "2022-09-01",
+        release_date = "2023-03-08",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
@@ -1115,6 +1118,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
+            "envoy.formatter.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",

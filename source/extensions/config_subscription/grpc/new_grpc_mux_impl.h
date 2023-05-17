@@ -11,12 +11,12 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/delta_subscription_state.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/watch_map.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 
 namespace Envoy {
 namespace Config {

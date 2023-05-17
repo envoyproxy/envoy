@@ -1,28 +1,46 @@
-#include "source/common/config/xds_mux/delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/new_delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
 #include "source/common/config/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
-namespace XdsMux {
 
-DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
-                                               UntypedConfigUpdateCallbacks& watch_map,
-                                               Event::Dispatcher& dispatcher,
-                                               XdsConfigTrackerOptRef xds_config_tracker)
-    : BaseSubscriptionState(std::move(type_url), watch_map, dispatcher, xds_config_tracker),
-      // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
-      // empty resources as updates.
-      supports_heartbeats_(type_url_ != "envoy.config.route.v3.VirtualHost") {}
+NewDeltaSubscriptionState::NewDeltaSubscriptionState(std::string type_url,
+                                                     UntypedConfigUpdateCallbacks& watch_map,
+                                                     const LocalInfo::LocalInfo& local_info,
+                                                     Event::Dispatcher& dispatcher,
+                                                     XdsConfigTrackerOptRef xds_config_tracker)
+    // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
+    // empty resources as updates.
+    : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
+      ttl_(
+          [this](const auto& expired) {
+            Protobuf::RepeatedPtrField<std::string> removed_resources;
+            for (const auto& resource : expired) {
+              if (auto maybe_resource = getRequestedResourceState(resource);
+                  maybe_resource.has_value()) {
+                maybe_resource->setAsWaitingForServer();
+                removed_resources.Add(std::string(resource));
+              } else if (const auto erased_count = wildcard_resource_state_.erase(resource) +
+                                                   ambiguous_resource_state_.erase(resource);
+                         erased_count > 0) {
+                removed_resources.Add(std::string(resource));
+              }
+            }
 
-DeltaSubscriptionState::~DeltaSubscriptionState() = default;
+            watch_map_.onConfigUpdate({}, removed_resources, "");
+          },
+          dispatcher, dispatcher.timeSource()),
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      xds_config_tracker_(xds_config_tracker) {}
 
-void DeltaSubscriptionState::updateSubscriptionInterest(
+void NewDeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
     const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
@@ -83,7 +101,8 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     }
   }
   // If we unsubscribe from wildcard resource, drop all the resources that came from wildcard from
-  // cache.
+  // cache. Also drop the ambiguous resources - we aren't interested in those, but we didn't know if
+  // those came from wildcard subscription or not, but now it's not important any more.
   if (cur_removed.contains(Wildcard)) {
     wildcard_resource_state_.clear();
     ambiguous_resource_state_.clear();
@@ -92,7 +111,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
-bool DeltaSubscriptionState::subscriptionUpdatePending() const {
+bool NewDeltaSubscriptionState::subscriptionUpdatePending() const {
   if (!names_added_.empty() || !names_removed_.empty()) {
     return true;
   }
@@ -117,10 +136,23 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
   // only for the first request in the stream. So sending an empty request at this point should be
   // harmless.
-  return dynamicContextChanged();
+  return must_send_discovery_request_;
 }
 
-bool DeltaSubscriptionState::isHeartbeatResource(
+UpdateAck NewDeltaSubscriptionState::handleResponse(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
+  // We *always* copy the response's nonce into the next request, even if we're going to make that
+  // request a NACK by setting error_detail.
+  UpdateAck ack(message.nonce(), type_url_);
+  TRY_ASSERT_MAIN_THREAD { handleGoodResponse(message); }
+  END_TRY
+  catch (const EnvoyException& e) {
+    handleBadResponse(e, ack);
+  }
+  return ack;
+}
+
+bool NewDeltaSubscriptionState::isHeartbeatResponse(
     const envoy::service::discovery::v3::Resource& resource) const {
   if (!supports_heartbeats_) {
     return false;
@@ -150,7 +182,7 @@ bool DeltaSubscriptionState::isHeartbeatResource(
   return false;
 }
 
-void DeltaSubscriptionState::handleGoodResponse(
+void NewDeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
@@ -159,11 +191,9 @@ void DeltaSubscriptionState::handleGoodResponse(
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
-    if (isHeartbeatResource(resource)) {
+    if (isHeartbeatResponse(resource)) {
       continue;
     }
-    // TODO (dmitri-d) consider changing onConfigUpdate callback interface to avoid copying of
-    // resources
     non_heartbeat_resources.Add()->CopyFrom(resource);
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
@@ -183,27 +213,8 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
-    const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
-      for (const auto& resource : message.resources()) {
-        addResourceStateFromServer(resource);
-      }
-    } else {
-      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
-      // and ignore the others.
-      // NOTE: This is not gonna work for xdstp resources with glob resource matching.
-      for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
-          addResourceStateFromServer(resource);
-        }
-      }
-    }
-  }
-
-  callbacks().onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
-                             message.system_version_info());
+  watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+                            message.system_version_info());
 
   // Processing point when resources are successfully ingested.
   if (xds_config_tracker_.has_value()) {
@@ -211,8 +222,7 @@ void DeltaSubscriptionState::handleGoodResponse(
                                           message.removed_resources());
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+  {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {
@@ -221,7 +231,6 @@ void DeltaSubscriptionState::handleGoodResponse(
     } else {
       // We are not subscribed to wildcard, so we only take resources that we explicitly requested
       // and ignore the others.
-      // NOTE: This is not gonna work for xdstp resources with glob resource matching.
       for (const auto& resource : message.resources()) {
         if (requested_resource_state_.contains(resource.name())) {
           addResourceStateFromServer(resource);
@@ -249,14 +258,27 @@ void DeltaSubscriptionState::handleGoodResponse(
       wildcard_resource_state_.erase(resource_name);
     }
   }
-  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", typeUrl(),
+  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
             message.resources().size(), message.removed_resources().size());
 }
 
-std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
-DeltaSubscriptionState::getNextRequestInternal() {
-  auto request = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
-  request->set_type_url(typeUrl());
+void NewDeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
+  // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
+  ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+  ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+}
+
+void NewDeltaSubscriptionState::handleEstablishmentFailure() {
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                  nullptr);
+}
+
+envoy::service::discovery::v3::DeltaDiscoveryRequest
+NewDeltaSubscriptionState::getNextRequestAckless() {
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();
@@ -268,17 +290,17 @@ DeltaSubscriptionState::getNextRequestInternal() {
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
       if (!resource_state.isWaitingForServer()) {
-        (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // We are going over a list of resources that we are interested in, so add them to
       // resource_names_subscribe.
       names_added_.insert(resource_name);
     }
     for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
     }
     for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
     // empty.
@@ -287,18 +309,19 @@ DeltaSubscriptionState::getNextRequestInternal() {
     }
     names_removed_.clear();
   }
-
   std::copy(names_added_.begin(), names_added_.end(),
-            Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_subscribe()));
+            Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
   std::copy(names_removed_.begin(), names_removed_.end(),
-            Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_unsubscribe()));
+            Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_unsubscribe()));
   names_added_.clear();
   names_removed_.clear();
 
+  request.set_type_url(type_url_);
+  request.mutable_node()->MergeFrom(local_info_.node());
   return request;
 }
 
-bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
+bool NewDeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   if (in_initial_legacy_wildcard_) {
     requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
     ASSERT(requested_resource_state_.contains(Wildcard));
@@ -331,9 +354,25 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
          requested_resource_state_.begin()->first == Wildcard;
 }
 
-void DeltaSubscriptionState::addResourceStateFromServer(
+envoy::service::discovery::v3::DeltaDiscoveryRequest
+NewDeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request = getNextRequestAckless();
+  request.set_response_nonce(ack.nonce_);
+  if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    // Don't needlessly make the field present-but-empty if status is ok.
+    request.mutable_error_detail()->CopyFrom(ack.error_detail_);
+  }
+  return request;
+}
+
+void NewDeltaSubscriptionState::addResourceStateFromServer(
     const envoy::service::discovery::v3::Resource& resource) {
-  setResourceTtl(resource);
+  if (resource.has_ttl()) {
+    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+             resource.name());
+  } else {
+    ttl_.clear(resource.name());
+  }
 
   if (auto maybe_resource = getRequestedResourceState(resource.name());
       maybe_resource.has_value()) {
@@ -354,33 +393,8 @@ void DeltaSubscriptionState::addResourceStateFromServer(
   }
 }
 
-void DeltaSubscriptionState::setResourceTtl(
-    const envoy::service::discovery::v3::Resource& resource) {
-  if (resource.has_ttl()) {
-    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
-             resource.name());
-  } else {
-    ttl_.clear(resource.name());
-  }
-}
-
-void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& expired) {
-  Protobuf::RepeatedPtrField<std::string> removed_resources;
-  for (const auto& resource : expired) {
-    if (auto maybe_resource = getRequestedResourceState(resource); maybe_resource.has_value()) {
-      maybe_resource->setAsWaitingForServer();
-      removed_resources.Add(std::string(resource));
-    } else if (const auto erased_count = wildcard_resource_state_.erase(resource) +
-                                         ambiguous_resource_state_.erase(resource);
-               erased_count > 0) {
-      removed_resources.Add(std::string(resource));
-    }
-  }
-  callbacks().onConfigUpdate({}, removed_resources, "");
-}
-
-OptRef<DeltaSubscriptionState::ResourceState>
-DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
+OptRef<NewDeltaSubscriptionState::ResourceState>
+NewDeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
@@ -388,8 +402,8 @@ DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_nam
   return {itr->second};
 }
 
-OptRef<const DeltaSubscriptionState::ResourceState>
-DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
+OptRef<const NewDeltaSubscriptionState::ResourceState>
+NewDeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
@@ -397,6 +411,5 @@ DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_nam
   return {itr->second};
 }
 
-} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

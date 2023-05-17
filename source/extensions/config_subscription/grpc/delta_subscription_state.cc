@@ -1,4 +1,4 @@
-#include "source/common/config/delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 
 #include "source/common/runtime/runtime_features.h"
 

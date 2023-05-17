@@ -728,6 +728,13 @@ envoy.filters.udp_listener.udp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+envoy.formatter.cel:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.cel.v3.Cel
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -1561,5 +1568,15 @@ envoy.config_subscription.grpc:
 envoy.config_subscription.filesystem_collection:
   categories:
   - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_mux.delta_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable
+envoy.config_mux.sotw_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
   security_posture: unknown
   status: stable

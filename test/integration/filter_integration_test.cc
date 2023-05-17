@@ -441,7 +441,7 @@ TEST_P(FilterIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::MatchesRegex(".*required.*header.*"));
 
   // Missing path for non-CONNECT
   response = codec_client_->makeHeaderOnlyRequest(
@@ -453,7 +453,7 @@ TEST_P(FilterIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::MatchesRegex(".*required.*header.*"));
 }
 
 TEST_P(FilterIntegrationTest, FaultyFilterWithConnect) {
@@ -478,7 +478,7 @@ TEST_P(FilterIntegrationTest, FaultyFilterWithConnect) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::MatchesRegex(".*required.*header.*"));
 }
 
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
