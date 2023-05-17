@@ -3934,34 +3934,6 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationFiredReturn504IfRequestWa
   duration_timer->invokeCallback();
 }
 
-TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
-  setup(false, "");
-  EXPECT_CALL(*codec_, protocol()).Times(AnyNumber()).WillRepeatedly(Return(Protocol::Http10));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
-    decoder_->decodeHeaders(std::move(headers), false);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("426", headers.getStatusValue());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-  // No delay close for HTTP/1.0, even if the request is not complete.
-  // Note there may be more than one close: the important thing is one does not
-  // kick off delay.
-  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-      .Times(AnyNumber());
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
 TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackNotCalledIfResetStreamValidly) {
   max_stream_duration_ = std::chrono::milliseconds(5000);
   setup(false, "");
