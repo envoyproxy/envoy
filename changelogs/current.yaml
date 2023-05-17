@@ -65,6 +65,10 @@ minor_behavior_changes:
     Changed behavior of the fixed heap monitor to count unused mapped pages as
     free memory. This change can be reverted temporarily by setting the runtime guard
     ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
+- area: ext_proc
+  change: |
+    Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
+    to the name of the ext_proc filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -195,9 +199,14 @@ new_features:
     are successfully established.
 - area: fault
   change: |
-    added new field :ref:`metadata
-    <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.metadata>` to aid in logging.
-    This metadata can be accessed from StreamInfo's dynamicMetadata().
+    added new field :ref:`filter_metadata
+    <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.filter_metadata>` to aid in logging. Metadata will be stored in StreamInfo's dynamic metadata
+    under a namespace corresponding to the name of the fault filter.
+- area: ext_proc
+  change: |
+    added new field :ref:`filter_metadata
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata>` to aid in logging. Metadata will be stored in StreamInfo's filter metadata
+    under a namespace corresponding to the name of the ext_proc filter.
 
 deprecated:
 - area: access_log
