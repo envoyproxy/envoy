@@ -49,14 +49,17 @@ var (
 )
 
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
 	buf := utils.BytesToSlice(configPtr, configLen)
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
-	if httpFilterConfigParser != nil {
-		parsedConfig, err := httpFilterConfigParser.Parse(&any)
+
+	name := utils.BytesToString(namePtr, nameLen)
+	configParser := getHttpFilterConfigParser(name)
+	if configParser != nil {
+		parsedConfig, err := configParser.Parse(&any)
 		if err != nil {
 			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 			// TODO: we should reject the config in the Envoy side when Go returning 0.
@@ -77,8 +80,11 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
-func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
-	if httpFilterConfigParser != nil {
+func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint64) uint64 {
+	name := utils.BytesToString(namePtr, nameLen)
+	configParser := getHttpFilterConfigParser(name)
+
+	if configParser != nil {
 		parent, ok := configCache.Load(parentId)
 		if !ok {
 			panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
@@ -88,7 +94,7 @@ func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 
 			panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
 		}
 
-		new := httpFilterConfigParser.Merge(parent, child)
+		new := configParser.Merge(parent, child)
 		configNum := atomic.AddUint64(&configNumGenerator, 1)
 		configCache.Store(configNum, new)
 		return configNum

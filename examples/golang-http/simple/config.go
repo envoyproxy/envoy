@@ -14,8 +14,7 @@ import (
 const Name = "simple"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, &parser{})
 }
 
 type config struct {

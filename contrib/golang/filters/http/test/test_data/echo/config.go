@@ -11,8 +11,7 @@ import (
 const Name = "echo"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, &parser{})
 }
 
 type config struct {

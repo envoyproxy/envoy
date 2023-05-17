@@ -55,8 +55,9 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
 public:
-  RoutePluginConfig(const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
-      : plugin_config_(config.config()) {
+  RoutePluginConfig(const std::string plugin_name,
+                    const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
+      : plugin_name_(plugin_name), plugin_config_(config.config()) {
     ENVOY_LOG(debug, "initilizing golang filter route plugin config, type_url: {}",
               config.config().type_url());
   };
@@ -65,6 +66,7 @@ public:
   uint64_t getMergedConfigId(uint64_t parent_id, std::string so_id);
 
 private:
+  const std::string plugin_name_;
   const ProtobufWkt::Any plugin_config_;
   uint64_t config_id_{0};
   uint64_t merged_config_id_{0};
