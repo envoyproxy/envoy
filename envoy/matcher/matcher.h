@@ -25,8 +25,8 @@ class ServerFactoryContext;
 
 namespace Matcher {
 
-// Abstract interface for custom matching data. Overrides this interface to provide matching specific
-// implementation. `CelMatchData` is an example.
+// Abstract interface for custom matching data. Overrides this interface to provide custom matcher
+// specific implementation. `CelMatchData` is an example.
 struct CustomMatchData {
   CustomMatchData() = default;
 

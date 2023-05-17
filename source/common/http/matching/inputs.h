@@ -229,7 +229,7 @@ class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
-    // TODO(tyxia) Simlar with the case above.
+    // TODO(tyxia) Simlar with the case above. So we probably can remove 3 && cases above.
     if (activation == nullptr) {
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }

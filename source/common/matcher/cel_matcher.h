@@ -32,7 +32,7 @@ struct CelMatchData : public CustomMatchData {
 
 class CelInputMatcher : public Matcher::InputMatcher {
  public:
-  // TODO(tyxia) Changed to google::api::expr::CheckedExpr
+  // TODO(tyxia) Changed to dev::cel
   // Need to change the cel library version
   CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr,
                   Builder& builder)
@@ -74,7 +74,7 @@ class CelInputMatcherFactory : public Matcher::InputMatcherFactory {
 
     // return std::make_unique<CelExprMatcher>(
     //     cel_matcher.expr_match().checked_expr(), *expr_builder_);
-    // TODO(tyxia) Lifetime!!!!
+    // TODO(tyxia) Lifetime!!!! Probably no lifetime issue at all as we don't need to store cel matcher
     return [cel_matcher = std::move(cel_matcher), this] {
       return std::make_unique<CelInputMatcher>(
           cel_matcher.expr_match().checked_expr(), *expr_builder_);
