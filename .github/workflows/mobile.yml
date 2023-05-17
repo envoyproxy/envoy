@@ -23,8 +23,16 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: what_to_run
       name: 'Check what to run'
-      run: ./mobile/tools/what_to_run.sh
-    - id: check_output
-      name: 'Check output'
       run: |
-        cat "$GITHUB_OUTPUT"
+        mkdir -p vars
+        ./mobile/tools/what_to_run.sh
+        TOJSON='''
+        [inputs | select(length>0)
+         | [splits("=*")]
+         | {(.[0]): .[1]} ]
+         | add'''
+        jq -n -R $TOJSON $GITHUB_OUTPUT > vars/vars.json
+    - uses: actions/upload-artifact@v3
+      with:
+        name: vars
+        path: vars/
