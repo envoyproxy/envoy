@@ -855,6 +855,25 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value, he
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::removeTrailer(absl::string_view key) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (trailers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+  trailers_->remove(Http::LowerCaseString(key));
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
