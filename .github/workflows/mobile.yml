@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+    - gh-wf-env--branch
   pull_request:
 
 concurrency:
