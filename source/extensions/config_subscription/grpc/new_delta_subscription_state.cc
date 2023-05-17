@@ -1,4 +1,4 @@
-#include "source/common/config/new_delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/new_delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -213,24 +213,6 @@ void NewDeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
-    const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
-      for (const auto& resource : message.resources()) {
-        addResourceStateFromServer(resource);
-      }
-    } else {
-      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
-      // and ignore the others.
-      for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
-          addResourceStateFromServer(resource);
-        }
-      }
-    }
-  }
-
   watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                             message.system_version_info());
 
@@ -240,8 +222,7 @@ void NewDeltaSubscriptionState::handleGoodResponse(
                                           message.removed_resources());
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+  {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {

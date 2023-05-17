@@ -35,7 +35,8 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
-   * Sets min delivery: data will be buffered in the C++ layer until the min delivery length or end stream is read.
+   * Sets min delivery: data will be buffered in the C++ layer until the min
+   * delivery length or end stream is read.
    *
    * @param value set the minimum delivery size fo for this stream
    * @return This stream, for chaining syntax.

@@ -83,6 +83,9 @@ envoy_cc_test(
     srcs = [
         "integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:config",
