@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -24,6 +26,7 @@ namespace {
 using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
+using envoy::extensions::filters::common::matcher::action::v3::SkipFilter;
 using envoy::extensions::filters::http::composite::v3::ExecuteFilterAction;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
@@ -68,11 +71,14 @@ public:
     return per_route_config;
   }
 
-  void addPerRouteResponseCodeFilter(const std::string& filter_name,
+  void addPerRouteResponseCodeFilter(const bool& add, const std::string& filter_name,
                                      const std::string& route_prefix, const int& code,
-                                     const bool& add) {
+                                     const bool& response_prefix = false) {
     SetResponseCodeFilterConfig set_response_code;
     set_response_code.set_code(code);
+    if (response_prefix) {
+      set_response_code.set_prefix("skipLocalReplyAndContinue");
+    }
     auto per_route_config = createPerRouteConfig([set_response_code](auto* cfg) {
       cfg->set_name("set-response-code-filter");
       cfg->mutable_typed_config()->PackFrom(set_response_code);
@@ -158,7 +164,7 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
 TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
   config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
-  addPerRouteResponseCodeFilter("composite", "/somepath", 401, false);
+  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 401);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -170,8 +176,8 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
 // Verifies function of the per-route config in the ExtensionWithMatcher class with multiple routes.
 TEST_P(CompositeFilterIntegrationTest, TestMultiplePerRoute) {
   config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
-  addPerRouteResponseCodeFilter("composite", "/somepath", 401, false);
-  addPerRouteResponseCodeFilter("composite", "/otherpath", 402, true);
+  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 401);
+  addPerRouteResponseCodeFilter(true, "composite", "/otherpath", 402);
   initialize();
 
   {
@@ -196,31 +202,36 @@ TEST_P(CompositeFilterIntegrationTest, TestMultiplePerRoute) {
   }
 }
 
-// Tests a filter chain with routes.
-TEST_P(CompositeFilterIntegrationTest, TestPerRouteFilterChain) {
+// Test that the specified filters apply per route configs to requests.
+TEST_P(CompositeFilterIntegrationTest, TestPerRouteMultipleFilters) {
   config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite_2"));
   config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
 
-  AddBodyFilterConfig add_body_filter;
-  add_body_filter.set_where_to_add_body(AddBodyFilterConfig::DEFAULT);
-  add_body_filter.set_body_size(1);
-  auto per_route_config = createPerRouteConfig([add_body_filter](auto* cfg) {
-    cfg->set_name("add-body-filter");
-    cfg->mutable_typed_config()->PackFrom(add_body_filter);
-  });
-
-  addPerRouteConfig(per_route_config, "composite", "/somepath", false);
-  addPerRouteResponseCodeFilter("composite_2", "/somepath", 402, true);
-  addPerRouteResponseCodeFilter("composite", "/somepath", 402, true);
+  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 407, true);
+  addPerRouteResponseCodeFilter(false, "composite_2", "/somepath", 402);
 
   initialize();
+  {
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
-  EXPECT_THAT(response->body(), "body");
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
+  }
+
+  cleanupUpstreamAndDownstream();
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    const Http::TestRequestHeaderMapImpl custom_request_headers_ = {{":method", "POST"},
+                                                                    {":path", "/otherpath"},
+                                                                    {":scheme", "http"},
+                                                                    {"match-header", "match"},
+                                                                    {":authority", "blah"}};
+    auto response = codec_client_->makeRequestWithBody(custom_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
 }
-
 } // namespace
 } // namespace Envoy
