@@ -473,6 +473,12 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
+        # Patch removes from CMakeLists.txt instructions to
+        # to create dynamic *.so library target. Linker fails when linking
+        # with boringssl_fips library. Envoy uses only static library
+        # anyways, so created dynamic library would not be used anyways.
+        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
 

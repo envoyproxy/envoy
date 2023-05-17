@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.zookeeper_proxy.v3;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -18,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 
+// [#next-free-field: 7]
 message ZooKeeperProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy";
@@ -39,4 +41,65 @@ message ZooKeeperProxy {
   //
   // if that is set. If it isn't, ZooKeeper's default is also 1Mb.
   google.protobuf.UInt32Value max_packet_bytes = 3;
+
+  // Whether to emit latency threshold metrics. If not set, defaults to false.
+  // If false, setting `default_latency_threshold` and `latency_threshold_overrides` will not have effect.
+  bool enable_latency_threshold_metrics = 4;
+
+  // The default latency threshold to decide the fast/slow responses and emit metrics (used for error budget calculation).
+  //
+  // https://sre.google/workbook/implementing-slos/
+  //
+  // If it is not set, the default value is 100 milliseconds.
+  google.protobuf.Duration default_latency_threshold = 5
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // List of latency threshold overrides for opcodes.
+  // If the threshold override of one opcode is not set, it will fallback to the default latency
+  // threshold.
+  // Specifying latency threshold overrides multiple times for one opcode is not allowed.
+  repeated LatencyThresholdOverride latency_threshold_overrides = 6;
+}
+
+message LatencyThresholdOverride {
+  enum Opcode {
+    Connect = 0;
+    Create = 1;
+    Delete = 2;
+    Exists = 3;
+    GetData = 4;
+    SetData = 5;
+    GetAcl = 6;
+    SetAcl = 7;
+    GetChildren = 8;
+    Sync = 9;
+    Ping = 10;
+    GetChildren2 = 11;
+    Check = 12;
+    Multi = 13;
+    Create2 = 14;
+    Reconfig = 15;
+    CheckWatches = 16;
+    RemoveWatches = 17;
+    CreateContainer = 18;
+    CreateTtl = 19;
+    Close = 20;
+    SetAuth = 21;
+    SetWatches = 22;
+    GetEphemerals = 23;
+    GetAllChildrenNumber = 24;
+    SetWatches2 = 25;
+  }
+
+  // The ZooKeeper opcodes. Can be found as part of the ZooKeeper source code:
+  //
+  // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java
+  //
+  Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The latency threshold override of certain opcode.
+  google.protobuf.Duration threshold = 2 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
 }
