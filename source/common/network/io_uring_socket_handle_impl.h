@@ -97,7 +97,7 @@ protected:
   // TODO(soulxu): This is for debug, it will be deleted after the
   // io_uring implemented.
   std::unique_ptr<IoHandle> shadow_io_handle_;
-  bool enable_server_socket_{true};
+  bool enable_server_socket_{false};
   bool enable_client_socket_{false};
   bool enable_accept_socket_{true};
 
