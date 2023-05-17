@@ -17,7 +17,6 @@
 
 using testing::HasSubstr;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {

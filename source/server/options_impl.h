@@ -205,7 +205,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
-  bool log_format_set_;
+  bool log_format_set_{false};
   bool log_format_escaped_{false};
   std::string log_path_;
   uint64_t restart_epoch_{0};
