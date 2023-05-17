@@ -87,7 +87,8 @@ envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
 }
 
 BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
-    : BaseIntegrationTest(BaseIntegrationTest::defaultAddressFunction(ip_version), ip_version, defaultConfig()) {
+    : BaseIntegrationTest(BaseIntegrationTest::defaultAddressFunction(ip_version), ip_version,
+                          defaultConfig()) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
@@ -204,7 +205,8 @@ void BaseClientIntegrationTest::createEnvoy() {
     finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
+    builder_.setOverrideConfig(
+        std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }

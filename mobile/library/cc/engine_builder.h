@@ -126,7 +126,8 @@ protected:
   //
   // Tests that need access to this method should go through the TestEngineBuilder class, which
   // provides access to this method.
-  EngineBuilder& setOverrideConfigForTests(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config);
+  EngineBuilder&
+  setOverrideConfigForTests(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config);
 
 private:
   struct NativeFilterConfig {

@@ -4,7 +4,8 @@
 
 namespace Envoy {
 
-Platform::EngineSharedPtr TestEngineBuilder::createEngine(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
+Platform::EngineSharedPtr
+TestEngineBuilder::createEngine(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
   absl::Notification engine_running;
   Platform::EngineSharedPtr engine = setOverrideConfigForTests(std::move(config))
                                          .addLogLevel(Platform::LogLevel::debug)
@@ -14,7 +15,8 @@ Platform::EngineSharedPtr TestEngineBuilder::createEngine(std::unique_ptr<envoy:
   return engine;
 }
 
-void TestEngineBuilder::setOverrideConfig(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
+void TestEngineBuilder::setOverrideConfig(
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
   setOverrideConfigForTests(std::move(config));
 }
 

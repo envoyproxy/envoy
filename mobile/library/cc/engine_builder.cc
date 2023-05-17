@@ -292,7 +292,8 @@ EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_re
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setOverrideConfigForTests(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
+EngineBuilder& EngineBuilder::setOverrideConfigForTests(
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
   config_override_for_tests_ = std::move(config);
   return *this;
 }

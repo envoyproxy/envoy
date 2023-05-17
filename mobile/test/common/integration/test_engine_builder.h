@@ -13,7 +13,8 @@ class TestEngineBuilder : public Platform::EngineBuilder {
 public:
   // Creates an Envoy Engine from the provided config and waits until the engine is running before
   // returning the Engine as a shared_ptr.
-  Platform::EngineSharedPtr createEngine(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config);
+  Platform::EngineSharedPtr
+  createEngine(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config);
 
   // Overrides the EngineBuilder's config with the provided string. Calls to the EngineBuilder's
   // bootstrap modifying APIs do not take effect after this function is called.
