@@ -428,6 +428,8 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
   log_file->write("drop data during reopen fail");
   log_file->reopen();
 
+  ENVOY_LOG_MISC(critical, "after reopen before wait");
+
   {
     Thread::LockGuard lock(file_->open_mutex_);
     while (file_->num_opens_ != 2) {
@@ -436,6 +438,7 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
     timer->invokeCallback();
   }
 
+  ENVOY_LOG_MISC(critical, "after num_opens_ == 2");
   {
     Thread::LockGuard lock(file_->open_mutex_);
     while (file_->num_opens_ != 3) {
@@ -443,6 +446,7 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
     }
   }
 
+  ENVOY_LOG_MISC(critical, "after num_opens_ == 3");
   log_file->write("after reopen");
   timer->invokeCallback();
 
@@ -452,6 +456,7 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
+  ENVOY_LOG_MISC(critical, "after num_writes_ == 2");
   waitForCounterEq("filesystem.reopen_failed", 1);
   waitForGaugeEq("filesystem.write_total_buffered", 0);
 }
