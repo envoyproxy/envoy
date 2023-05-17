@@ -270,6 +270,10 @@ void Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
         fmt::format("failed to set log format as JSON string from struct: {}", status.ToString()));
   }
 
+  if (format_as_json.find("%v") != std::string::npos) {
+    throw EnvoyException("Usage of %v is unavailable for JSON log formats");
+  }
+
   setLogFormat(format_as_json);
 }
 

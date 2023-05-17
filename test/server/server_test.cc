@@ -1653,6 +1653,11 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlags) {
+  EXPECT_THROW(initialize("test/server/test_data/server/json_application_log_forbidden_flag.yaml"),
+               EnvoyException);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

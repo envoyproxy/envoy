@@ -107,7 +107,7 @@ message Bootstrap {
 
       // Flush application logs in JSON format. The configured JSON struct can
       // support all the format tags specified in the in :option:`--log-format`
-      // command line option section.
+      // command line option section, except for the ``%v`` flag.
       google.protobuf.Struct json_format = 1;
     }
   }

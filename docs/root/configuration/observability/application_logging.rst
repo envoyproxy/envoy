@@ -28,7 +28,8 @@ Printing logs in JSON format
 ----------------------------
 
 It is possible to use the bootstrap config :ref:`json_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogFormat.json_format>`
-to print the logs in custom JSON format. The json format struct can support all the format flags that are specified in :ref:`command line options <operations_cli>`. Example:
+to print the logs in custom JSON format. The json format struct can support all the format flags that are specified in :ref:`command line options <operations_cli>`,
+except for the ``%v`` flag, as multi-line logs would break the JSON structure log. Instead, use the ``%_`` flag. Example:
 
 .. code-block:: yaml
 

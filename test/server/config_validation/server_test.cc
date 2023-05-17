@@ -98,6 +98,23 @@ public:
   }
 };
 
+class JsonApplicationLogsValidationServerForbiddenFlagsTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
+
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"json_application_logs_forbidden_flag.yaml"};
+  }
+};
+
 TEST_P(ValidationServerTest, Validate) {
   EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
                              component_factory_, Thread::threadFactoryForTest(),
@@ -242,7 +259,7 @@ TEST_P(JsonApplicationLogsValidationServerTest, OptionOverridesJsonApplicationLo
   server.shutdown();
 }
 
-TEST_P(JsonApplicationLogsValidationServerTest, ValidateJsonApplicationLogs) {
+TEST_P(JsonApplicationLogsValidationServerTest, JsonApplicationLogs) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;
@@ -265,6 +282,22 @@ TEST_P(JsonApplicationLogsValidationServerTest, ValidateJsonApplicationLogs) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, JsonApplicationLogsValidationServerTest,
     ::testing::ValuesIn(JsonApplicationLogsValidationServerTest::getAllConfigFiles()));
+
+TEST_P(JsonApplicationLogsValidationServerForbiddenFlagsTest, TestNewlineForbiddenFlag) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_THROW(ValidationInstance server(
+                   options_, time_system.timeSystem(), Network::Address::InstanceConstSharedPtr(),
+                   stats_store, access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                   Filesystem::fileSystemForTest()),
+               EnvoyException);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlagsTest,
+    ::testing::ValuesIn(
+        JsonApplicationLogsValidationServerForbiddenFlagsTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server
