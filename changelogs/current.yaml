@@ -60,6 +60,11 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: resource_monitors
+  change: |
+    Changed behavior of the fixed heap monitor to count unused mapped pages as
+    free memory. This change can be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -83,6 +88,11 @@ bug_fixes:
     Fixed the bug that updating :ref:`scope_key_builder
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
+- area: logging
+  change: |
+    Do not display GRPC_STATUS_NUMBER for non gRPC requests.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -107,6 +117,12 @@ removed_config_or_runtime:
 - area: udp
   change: |
     removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
+- area: header_formatters
+  change: |
+    removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
+- area: config
+  change: |
+    removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -116,6 +132,11 @@ new_features:
 - area: access_log
   change: |
     added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: dynamic_forward_proxy
+  change: |
+    added :ref:`sub_clusters_config
+    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
+    independent sub cluster for each host:port, with STRICT_DNS cluster type.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
