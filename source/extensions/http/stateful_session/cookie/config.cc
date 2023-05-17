@@ -14,7 +14,8 @@ CookieBasedSessionStateFactoryConfig::createSessionStateFactory(
 
   const auto& proto_config = MessageUtil::downcastAndValidate<const CookieBasedSessionStateProto&>(
       config, context.messageValidationVisitor());
-  return std::make_shared<CookieBasedSessionStateFactory>(proto_config);
+  return std::make_shared<CookieBasedSessionStateFactory>(
+      proto_config, context.mainThreadDispatcher().timeSource());
 }
 
 REGISTER_FACTORY(CookieBasedSessionStateFactoryConfig, Envoy::Http::SessionStateFactoryConfig);

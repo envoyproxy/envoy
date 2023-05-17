@@ -55,7 +55,7 @@ CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buff
                                             int length, bufferAction action);
 
 CAPIStatus envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
-CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
+CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value, headerAction action);
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);

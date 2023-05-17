@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -111,6 +112,9 @@ public:
       cc->on_trailers_calls++;
       return nullptr;
     };
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
 
   envoy_headers defaultRequestHeaders() {
@@ -132,7 +136,7 @@ public:
           response_encoder_ = &encoder;
           return *request_decoder_;
         }));
-    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_);
+    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_, 0);
   }
 
   void resumeDataIfExplicitFlowControl(int32_t bytes) {
@@ -155,6 +159,9 @@ public:
   bool explicit_flow_control_{GetParam()};
   Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
   envoy_stream_t stream_ = 1;
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
@@ -421,7 +428,7 @@ TEST_P(ClientTest, MultipleStreams) {
         response_encoder2 = &encoder;
         return request_decoder2;
       }));
-  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_);
+  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_, 0);
 
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -682,7 +689,7 @@ TEST_P(ClientTest, NullAccessors) {
         response_encoder_ = &encoder;
         return *request_decoder_;
       }));
-  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_);
+  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_, 0);
 
   EXPECT_FALSE(response_encoder_->http1StreamEncoderOptions().has_value());
   EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());

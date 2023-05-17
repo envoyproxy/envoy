@@ -360,13 +360,14 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
+  Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
-      .WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
