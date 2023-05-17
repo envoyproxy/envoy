@@ -21,10 +21,10 @@ jobs:
         fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - id: should_run
+    - id: what_to_run
       name: 'Check what to run'
       run: ./mobile/tools/what_to_run.sh
-    - id: should_run
+    - id: check_output
       name: 'Check output'
       run: |
         echo "$GITHUB_OUTPUT"
