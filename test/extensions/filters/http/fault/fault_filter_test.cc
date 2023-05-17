@@ -62,10 +62,8 @@ public:
       numerator: 100
       denominator: HUNDRED
     fixed_delay: 5s
-  metadata:
-    filter_metadata:
-      com.scooby.doo:
-        hello: "world"
+  filter_metadata:
+    hello: "world"
   )EOF";
 
   const std::string fixed_delay_only_disable_stats_yaml = R"EOF(
@@ -96,17 +94,13 @@ public:
       numerator: 100
       denominator: HUNDRED
     http_status: 503
-  metadata:
-    filter_metadata:
-      com.scooby.doo:
-        hello: "world"
+  filter_metadata:
+    hello: "world"
   )EOF";
 
   const std::string header_abort_only_yaml = R"EOF(
-  metadata:
-    filter_metadata:
-      com.scooby.doo:
-        hello: "world"
+  filter_metadata:
+    hello: "world"
   abort:
     header_abort: {}
     percentage:
@@ -295,7 +289,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   envoy::config::core::v3::Metadata dynamic_metadata;
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -617,7 +611,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
 
   // Set the max number of faults to 1.
   EXPECT_CALL(runtime_.snapshot_,
@@ -807,7 +801,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -1396,7 +1390,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   // Set metadata in fault. Ensure that it does not get reflected in stream info.
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   auto& filter_metadata = *fault.mutable_metadata()->mutable_filter_metadata();
-  (*filter_metadata["com.scooby.doo"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
 
   setupRateLimitTest(fault);
 

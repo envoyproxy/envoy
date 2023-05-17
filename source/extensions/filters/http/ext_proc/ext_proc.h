@@ -15,6 +15,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -46,8 +47,8 @@ struct ExtProcFilterStats {
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtProcLoggingInfo(const envoy::config::core::v3::Metadata& metadata)
-      : metadata_(metadata) {}
+  explicit ExtProcLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+      : filter_metadata_(filter_metadata) {}
 
   struct GrpcCall {
     GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
@@ -64,13 +65,13 @@ public:
                       envoy::config::core::v3::TrafficDirection traffic_direction);
 
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
-  const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
+  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
-  const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
 };
 
 class FilterConfig {
@@ -84,7 +85,7 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        metadata_(config.metadata()) {}
+        filter_metadata_(config.filter_metadata()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -104,7 +105,7 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-  const envoy::config::core::v3::Metadata& metadata() const { return metadata_; }
+  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -121,7 +122,7 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

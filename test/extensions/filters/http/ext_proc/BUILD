@@ -36,6 +36,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
+        "//source/common/protobuf:protobuf",
         "//source/common/http:context_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:isolated_store_lib",

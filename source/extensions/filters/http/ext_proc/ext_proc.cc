@@ -105,7 +105,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
       callbacks.streamInfo().filterState();
   if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
     filter_state->setData(callbacks.filterConfigName(),
-                          std::make_shared<ExtProcLoggingInfo>(config_->metadata()),
+                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }

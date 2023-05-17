@@ -51,7 +51,7 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
                                          RuntimeKeys::get().ResponseRateLimitPercentKey)),
       disable_downstream_cluster_stats_(fault.disable_downstream_cluster_stats()),
-      metadata_(fault.metadata()) {
+      filter_metadata_(fault.filterMetadata()) {
   if (fault.has_abort()) {
     request_abort_config_ =
         std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
@@ -170,7 +170,8 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
-    decoder_callbacks_->streamInfo().dynamicMetadata().MergeFrom(fault_settings_->metadata());
+    auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+    dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] = fault_settings_->filterMetadata();
     return true;
   }
   return false;
@@ -469,7 +470,8 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                   absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->streamInfo().dynamicMetadata().MergeFrom(fault_settings_->metadata());
+  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+  dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] = fault_settings_->filterMetadata();
   decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
 }

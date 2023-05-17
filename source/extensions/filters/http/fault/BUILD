@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/protobuf:protobuf",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",

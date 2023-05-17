@@ -26,6 +26,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/protobuf:protobuf",
         "//source/common/buffer:buffer_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",

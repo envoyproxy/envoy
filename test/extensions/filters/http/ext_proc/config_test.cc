@@ -30,10 +30,8 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     response_body_mode: buffered
     request_trailer_mode: skip
     response_trailer_mode: send
-  metadata:
-    filter_metadata:
-      com.scooby.doo:
-        hello: "world"
+  filter_metadata:
+    hello: "world"
   )EOF";
 
   ExternalProcessingFilterConfig factory;

@@ -7,7 +7,6 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
@@ -192,11 +191,6 @@ message ExternalProcessor {
   // will be added to StreamInfo's dynamic metadata under the namespace corresponding to the
   // ext_proc filter name.
   google.protobuf.Struct filter_metadata = 12;
-
-  // Additional typed metadata to be added to the dynamic filter state for logging purposes. The
-  // metadata will be added to StreamInfo's dynamic metadata under the namespace corresponding to the
-  // ext_proc filter name.
-  google.protobuf.Any typed_filter_metadata = 12;
 }
 
 // Extra settings that may be added to per-route configuration for a
