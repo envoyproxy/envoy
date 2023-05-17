@@ -1,0 +1,48 @@
+name: Vars
+
+on:
+  workflow_call:
+    outputs:
+      run1:
+        description: "Run 1st job"
+        value: ${{ jobs.vars.outputs.run1 }}
+      run2:
+        description: "Run 2nd job"
+        value: ${{ jobs.vars.outputs.run2 }}
+
+jobs:
+  vars:
+    runs-on: ubuntu-20.04
+    outputs:
+      run1: ${{ steps.read.outputs.run1 }}
+      run2: ${{ steps.read.outputs.run2 }}
+    steps:
+    - name: 'Download artifact'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+          });
+          let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "vars"
+          })[0];
+          let download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
+          });
+          let fs = require('fs');
+          fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/vars.json.zip`, Buffer.from(download.data));
+
+    - name: 'Unpack'
+      run: |
+        unzip vars.json.zip
+
+    - name: 'Echo vars'
+      id: read
+      run: |
+        jq '.' vars.json

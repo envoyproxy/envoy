@@ -1,9 +1,32 @@
 name: mobile_format
 
 on:
-  workflow_call:
+  workflow_run:
+    workflows:
+    - Mobile
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
+  vars:
+    uses: ./.github/workflows/read-vars.yml
+    secrets: inherit
+
+  run1:
+    name: do_run_1
+    needs: vars
+    # if: ${{ needs.vars.outputs.run1 == 'true' }}
+    runs-on: ubuntu-20.04
+    steps:
+    - name: 'Running 1'
+      run: |
+        echo "running 1"
+
+
   formatall:
     if: github.repository == 'envoyproxy/envoy'
     name: format_all
