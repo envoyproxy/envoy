@@ -89,6 +89,14 @@ bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
 }
 
 bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) const {
+  // Skip slowRejectMatch if we already have a definitive answer from fastRejects.
+  if (fast_result == FastResult::Rejects) {
+    return true;
+  }
+  if (fast_result == FastResult::Matches) {
+    return false;
+  }
+
   bool match = slowRejectMatch(stat_name);
 
   if (is_inclusive_ || match || fast_result != FastResult::Matches) {
