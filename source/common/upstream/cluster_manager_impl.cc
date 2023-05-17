@@ -26,7 +26,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/custom_config_validators_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
@@ -303,7 +303,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       common_lb_config_pool_(
           std::make_shared<SharedPool::ObjectSharedPool<
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
-              main_thread_dispatcher)) {
+              main_thread_dispatcher)),
+      shutdown_(false) {
   if (admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
@@ -412,17 +413,18 @@ ClusterManagerImpl::ClusterManagerImpl(
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
       } else {
-        ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+        auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+            "envoy.config_mux.new_grpc_mux_factory");
+        if (!factory) {
+          throw EnvoyException("envoy.config_mux.new_grpc_mux_factory factory not found");
+        }
+        ads_mux_ = factory->create(
             Config::Utility::factoryForGrpcApiConfigSource(
                 *async_client_manager_, dyn_resources.ads_config(), *stats.rootScope(), false)
                 ->createUncachedRawAsyncClient(),
-            main_thread_dispatcher,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            *stats_.rootScope(),
-            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            std::move(custom_config_validators), std::move(backoff_strategy),
-            makeOptRefFromPtr(xds_config_tracker_.get()));
+            main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
+            local_info, std::move(custom_config_validators), std::move(backoff_strategy),
+            makeOptRefFromPtr(xds_config_tracker_.get()), {});
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -446,20 +448,18 @@ ClusterManagerImpl::ClusterManagerImpl(
             makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref,
             target_xds_authority);
       } else {
-        ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-            local_info,
+        auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+            "envoy.config_mux.grpc_mux_factory");
+        if (!factory) {
+          throw EnvoyException("envoy.config_mux.grpc_mux_factory factory not found");
+        }
+        ads_mux_ = factory->create(
             Config::Utility::factoryForGrpcApiConfigSource(
                 *async_client_manager_, dyn_resources.ads_config(), *stats.rootScope(), false)
                 ->createUncachedRawAsyncClient(),
-            main_thread_dispatcher,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            *stats_.rootScope(),
-            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), std::move(backoff_strategy),
-            makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref,
-            target_xds_authority);
+            main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
+            local_info, std::move(custom_config_validators), std::move(backoff_strategy),
+            makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref);
       }
     }
   } else {
@@ -813,8 +813,13 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
       ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      for (auto& cb : cluster_manager->update_callbacks_) {
-        cb->onClusterRemoval(cluster_name);
+      for (auto cb_it = cluster_manager->update_callbacks_.begin();
+           cb_it != cluster_manager->update_callbacks_.end();) {
+        // The current callback may remove itself from the list, so a handle for
+        // the next item is fetched before calling the callback.
+        auto curr_cb_it = cb_it;
+        ++cb_it;
+        (*curr_cb_it)->onClusterRemoval(cluster_name);
       }
       cluster_manager->thread_local_clusters_.erase(cluster_name);
     });
@@ -1146,8 +1151,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     }
 
     if (new_cluster != nullptr) {
-      for (auto& cb : cluster_manager->update_callbacks_) {
-        cb->onClusterAddOrUpdate(*new_cluster);
+      for (auto cb_it = cluster_manager->update_callbacks_.begin();
+           cb_it != cluster_manager->update_callbacks_.end();) {
+        // The current callback may remove itself from the list, so a handle for
+        // the next item is fetched before calling the callback.
+        auto curr_cb_it = cb_it;
+        ++cb_it;
+        (*curr_cb_it)->onClusterAddOrUpdate(*new_cluster);
       }
     }
   });

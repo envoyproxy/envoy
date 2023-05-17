@@ -29,7 +29,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
@@ -281,6 +280,7 @@ public:
 
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    shutdown_ = true;
     if (resume_cds_ != nullptr) {
       resume_cds_->cancel();
     }
@@ -291,6 +291,8 @@ public:
     warming_clusters_.clear();
     updateClusterCounts();
   }
+
+  bool isShutdown() override { return shutdown_; }
 
   const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const override {
     return bind_config_;
@@ -823,6 +825,8 @@ private:
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
+
+  std::atomic<bool> shutdown_{};
 };
 
 } // namespace Upstream

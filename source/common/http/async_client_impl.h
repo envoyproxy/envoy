@@ -139,6 +139,7 @@ public:
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
 protected:
   bool remoteClosed() { return remote_closed_; }
