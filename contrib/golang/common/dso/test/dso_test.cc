@@ -21,7 +21,7 @@ std::string genSoPath(std::string name) {
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
   HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
 }
 
 TEST(DsoManagerTest, Pub) {
@@ -39,7 +39,7 @@ TEST(DsoManagerTest, Pub) {
   // get after load http filter dso
   dso = DsoManager<HttpFilterDsoImpl>::getDsoByID(id);
   EXPECT_NE(dso, nullptr);
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
 
   // second time load http filter dso
   res = DsoManager<HttpFilterDsoImpl>::load(id, path);

@@ -8,7 +8,7 @@ typedef struct {
 import "C"
 
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
 	return 100
 }
 
@@ -17,7 +17,7 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
-func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
+func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint64) uint64 {
 	return 0
 }
 
