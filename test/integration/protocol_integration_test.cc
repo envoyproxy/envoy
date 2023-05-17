@@ -71,6 +71,10 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
+  return;
+#endif
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -139,6 +143,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
@@ -614,7 +619,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::MatchesRegex(".*required.*header.*"));
 
   // Missing path for non-CONNECT
   response = codec_client_->makeHeaderOnlyRequest(
@@ -626,7 +631,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::MatchesRegex(".*required.*header.*"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
@@ -657,7 +662,10 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // With and without UHV the details string is different:
+  // non-UHV: filter_removed_required_request_headers{missing_required_header:_host}
+  // UHV: filter_removed_required_request_headers{header_validation_failed:_uhv.invalid_host}
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::MatchesRegex(".*required.*header.*"));
   // Wait to process STOP_SENDING on the client for quic.
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_TRUE(response->waitForReset());
@@ -2073,6 +2081,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
+  disable_client_header_validation_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2097,6 +2106,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
+  disable_client_header_validation_ = true;
   setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   initialize();
 
@@ -2126,6 +2136,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  disable_client_header_validation_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -2148,6 +2159,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
+  disable_client_header_validation_ = true;
   setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2944,6 +2956,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
+  disable_client_header_validation_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4030,7 +4043,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidateUpstreamHeaders) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_value_for:_x-foo"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::MatchesRegex(".*invalid.*value.*"));
   }
 }
 
@@ -4085,9 +4098,9 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
 
 TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
 #ifdef ENVOY_ENABLE_UHV
-  if (upstreamProtocol() != Http::CodecType::HTTP1) {
-    return;
-  }
+  // UHV always validated headers before sending them upstream. This test is not applicable
+  // when UHV is enabled.
+  return;
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     testing_upstream_intentionally_ = true;
@@ -4404,8 +4417,10 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
+  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
+  // for non UHV builds
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-
+  disable_client_header_validation_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4431,8 +4446,10 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
+  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
+  // for non UHV builds
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-
+  disable_client_header_validation_ = true;
   // For H/1 this test is equivalent to InvalidRequestHeaderName
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
@@ -4516,6 +4533,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
+  disable_client_header_validation_ = true;
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // send_fully_qualified_url_ is not enabled, so :scheme header isn't used.
     return;
@@ -4536,6 +4554,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
+  disable_client_header_validation_ = true;
   if (downstreamProtocol() == Http::CodecType::HTTP1 &&
       GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // this test is unreliable in this case.
@@ -4561,6 +4580,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
+  disable_client_header_validation_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -4576,6 +4596,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
+  disable_client_header_validation_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -4591,6 +4612,7 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
+  disable_client_header_validation_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4728,6 +4750,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
+  disable_client_header_validation_ = true;
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }

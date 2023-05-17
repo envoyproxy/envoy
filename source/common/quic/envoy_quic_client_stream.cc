@@ -35,11 +35,16 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
+#ifndef ENVOY_ENABLE_UHV
+  // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
+  // when UHV is enabled.
+  //
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
+#endif
 
   if (write_side_closed()) {
     return absl::CancelledError("encodeHeaders is called on write-closed stream.");

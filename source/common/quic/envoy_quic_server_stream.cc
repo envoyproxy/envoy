@@ -236,6 +236,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
+#ifndef ENVOY_ENABLE_UHV
+  // These checks are now part of UHV
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
       Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
@@ -244,12 +246,18 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
-#ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isH3UpgradeRequest(*headers)) {
     // Transform Request from H3 to H1
     Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
+  }
+#else
+  if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+    onStreamError(absl::nullopt);
+    return;
   }
 #endif
 
