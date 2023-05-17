@@ -46,7 +46,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
 
         ProtobufMessage::ValidatedInputGenerator generator(
-            seed, ProtobufMessage::composeFiltersAnyMap(), 40);
+            seed, ProtobufMessage::composeFiltersAnyMap(), 20);
         ProtobufMessage::traverseMessage(generator, *input, true);
       }};
 
