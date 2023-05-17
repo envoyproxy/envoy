@@ -23,8 +23,7 @@ JQ_VERSION = "1.6"
 YQ_VERSION = "4.24.4"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):
-    # TODO: allow building of tools for easier onboarding
-    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     envoy_download_go_sdks(go_version)
@@ -57,7 +56,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps()
+    emscripten_deps(emscripten_version = "3.1.7")
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
@@ -126,14 +125,14 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
-        importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
-        version = "v0.6.0",
+        importpath = "github.com/lyft/protoc-gen-star/v2",
+        sum = "h1:keaAo8hRuAT0O3DfJ/wM3rufbAjGeJ1lAtWZHDjKGB0=",
+        version = "v2.0.1",
         build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2022-03-04"
+        # last_update = "2023-01-06"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.10.1/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",

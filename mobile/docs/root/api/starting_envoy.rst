@@ -225,27 +225,6 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~
-``addVirtualCluster``
-~~~~~~~~~~~~~~~~~~~~~
-
-Add a virtual cluster config for Envoy Mobile's configuration.
-The configuration is expected as a JSON object.
-This functionality is used for stat segmentation.
-
-.. attention::
-
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this project.
-    :issue:`#770 <770>` tracks enhancing this API.
-
-**Example**::
-
-  // Kotlin
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
-
-  // Swift
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableAdminInterface``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -346,20 +325,6 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
 
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
-
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``
@@ -526,6 +491,104 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 
   // Swift
   builder.setRuntimeGuard("feature", true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addRtdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds an RTDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
+
+**Example**::
+
+  // Kotlin
+  builder.addRtdsLayer(layerName = "rtds_layer_name", timeoutSeconds = 10)
+
+  // Swift
+  builder.addRTDSLayer(layerName: "rtds_layer_name", timeoutSeconds: 10)
+
+  // C++
+  builder.addRtdsLayer("rtds_layer_name", 10)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addCdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a CDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds
+
+**Example**::
+
+  // Kotlin
+  builder.addCdsLayer(resourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
+
+  // Swift
+  builder.addCDSLayer(resourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
+
+  // C++
+  builder.addCdsLayer("xdstp://td-location.com/cluster_location", 10)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setAggregatedDiscoveryService``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS layers.
+Optional params allow configuring a JWT token and SSL. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
+
+Parameters:
+address, port, (optional) jwt_token, (optional) jwt_token_lifetime_seconds, (optional) ssl_root_certs
+
+**Example**::
+
+  // Kotlin
+  builder.setAggregatedDiscoveryService(address = "192.168.1.1", port = 0)
+
+  // Swift
+  builder.setAggregatedDiscoveryService(address: "192.168.1.1", port: 0)
+
+  // C++
+  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeId``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.id field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeId(nodeId = "my_test_node")
+
+  // Swift
+  builder.setNodeID("my_test_node")
+
+  // C++
+  builder.setNodeId("my_test_node")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeLocality``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.locality field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
+
+  // Swift
+  builder.setNodeLocality(region: "us-west-1", zone: "some_zone", subZone: "some_sub_zone")
+
+  // C++
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
 
 ----------------------
 Advanced configuration

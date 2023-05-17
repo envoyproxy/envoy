@@ -19,7 +19,7 @@ curl -s http://localhost:19000/config_dump \
     | grep '"address": "service1"'
 
 run_log "Set upstream to service2"
-"$DOCKER_COMPOSE" exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
+"${DOCKER_COMPOSE[@]}" exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
 wait_for 10 bash -c "responds_with 'Request served by service2' http://localhost:10000"
 
 run_log "Check for response comes from service2 upstream"

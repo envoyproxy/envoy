@@ -154,6 +154,7 @@ configure_make(
         "--disable-draft",
         "--disable-dyload",
         "--disable-extras",
+        "--disable-icuio",
         "--disable-plugins",
         "--disable-samples",
         "--disable-shared",
@@ -162,7 +163,7 @@ configure_make(
     ],
     data = ["@com_github_unicode_org_icu//:all"],
     env = {
-        "CXXFLAGS": "-fPIC",
+        "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
@@ -177,20 +178,6 @@ configure_make(
 
 cc_library(
     name = "unicode_icu",
-    defines = [
-        "UCONFIG_ONLY_HTML_CONVERSION=1",
-        "U_CHARSET_IS_UTF8=1",
-        "U_USING_ICU_NAMESPACE=0",
-        "UNISTR_FROM_STRING_EXPLICIT=",
-        "UNISTR_FROM_CHAR_EXPLICIT=",
-    ] + select({
-        "//bazel:windows_x86_64": [
-            "U_STATIC_IMPLEMENTATION",
-            "UNICODE",
-            "_UNICODE",
-        ],
-        "//conditions:default": [],
-    }),
     tags = ["skip_on_windows"],
     # Can not be used for the core dataplane due to security concerns
     visibility = ["//contrib/language/filters/http/source:__pkg__"],
@@ -211,7 +198,8 @@ envoy_cmake(
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
-    deps = ["@boringssl//:ssl"],
+    # Use boringssl alias to select fips vs non-fips version.
+    deps = ["//bazel:boringssl"],
 )
 
 envoy_cmake(

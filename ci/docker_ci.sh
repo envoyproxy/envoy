@@ -20,6 +20,9 @@ set -e
 # AZP_BRANCH=refs/tags/v1.77.3
 ##
 
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
+DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-400}"
+
 
 function is_windows() {
     [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
@@ -55,14 +58,18 @@ else
 fi
 
 # Only push images for main builds, and non-dev release branch builds
-if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-    echo "Pushing images for main."
-    PUSH_IMAGES_TO_REGISTRY=1
-elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
-    echo "Pushing images for release branch ${AZP_BRANCH}."
-    PUSH_IMAGES_TO_REGISTRY=1
+if [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]]; then
+    if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+        echo "Pushing images for main."
+        PUSH_IMAGES_TO_REGISTRY=1
+    elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
+        echo "Pushing images for release branch ${AZP_BRANCH}."
+        PUSH_IMAGES_TO_REGISTRY=1
+    else
+        echo 'Ignoring non-release branch for docker push.'
+    fi
 else
-    echo 'Ignoring non-release branch for docker push.'
+    echo 'No credentials for docker push.'
 fi
 
 ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
@@ -228,7 +235,16 @@ build_and_maybe_push_image () {
 
     if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
         echo "..."
-        docker "${docker_build_args[@]}"
+        timeout "$DOCKER_BUILD_TIMEOUT" docker "${docker_build_args[@]}" || {
+            if [[ "$?" == 124 ]]; then
+                echo "Docker build timed out ..." >&2
+            else
+                echo "Docker build errored ..." >&2
+            fi
+            sleep 5
+            echo "trying again ..." >&2
+            docker "${docker_build_args[@]}"
+        }
     fi
     if [[ -z "$PUSH_IMAGES_TO_REGISTRY" ]]; then
         return
@@ -275,7 +291,11 @@ tag_image () {
 
     if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
         echo "..."
-        docker "${docker_tag_args[@]}"
+        docker "${docker_tag_args[@]}" || {
+            echo "Retry Docker tag in 5s ..." >&2
+            sleep 5
+            docker "${docker_tag_args[@]}"
+        }
     fi
 }
 

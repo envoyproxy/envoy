@@ -12,6 +12,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test(
+    name = "admin_html_util_test",
+    srcs = ["admin_html_util_test.cc"],
+    deps = [
+        "//source/server/admin:admin_html_util",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "admin_instance_lib",
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
@@ -159,6 +168,8 @@ envoy_cc_test(
     name = "prometheus_stats_test",
     srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
     deps = [
+        "//source/common/stats:tag_producer_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:prometheus_stats_lib",
         "//test/test_common:utility_lib",
     ],

@@ -95,6 +95,9 @@ void initializeUpstreamTlsContextConfig(
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
   }
+  for (const std::string& algorithm : options.sigalgs_) {
+    common_context->mutable_tls_params()->add_signature_algorithms(algorithm);
+  }
   if (!options.sni_.empty()) {
     tls_context.set_sni(options.sni_);
   }
@@ -114,9 +117,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   initializeUpstreamTlsContextConfig(options, tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      tls_context, options.sigalgs_, mock_factory_ctx);
+      tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
@@ -129,7 +132,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, mock_factory_ctx);
 

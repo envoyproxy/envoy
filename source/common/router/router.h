@@ -62,7 +62,7 @@ public:
   };
 
   struct HedgingParams {
-    bool hedge_on_per_try_timeout_;
+    bool hedge_on_per_try_timeout_ : 1;
   };
 
   class StrictHeaderChecker {
@@ -206,6 +206,7 @@ public:
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
+               bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -216,6 +217,7 @@ public:
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
+        flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
@@ -229,16 +231,27 @@ public:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(
-            stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-            context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
-            config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
-            config.suppress_grpc_request_failure_code_stats(), config.strict_check_headers(),
-            context.api().timeSource(), context.httpContext(), context.routerContext()) {
+      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
+                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
+                     config.start_child_span(), config.suppress_envoy_headers(),
+                     config.respect_expected_rq_timeout(),
+                     config.suppress_grpc_request_failure_code_stats(),
+                     config.has_upstream_log_options()
+                         ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
+                         : false,
+                     config.strict_check_headers(), context.api().timeSource(),
+                     context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
+
+    if (config.has_upstream_log_options() &&
+        config.upstream_log_options().has_upstream_log_flush_interval()) {
+      upstream_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.upstream_log_options().upstream_log_flush_interval()));
+    }
+
     if (config.upstream_http_filters_size() > 0) {
       auto& server_factory_ctx = context.getServerFactoryContext();
       const Http::FilterChainUtility::FiltersList& upstream_http_filters =
@@ -297,6 +310,8 @@ public:
   const bool suppress_grpc_request_failure_code_stats_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
+  const bool flush_upstream_log_on_upstream_stream_;
+  absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatName zone_name_;
@@ -364,10 +379,11 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
-      : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
-        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+      : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
+        downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
+        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
+        streaming_shadows_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -625,19 +641,14 @@ private:
   RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
-  FilterUtility::HedgingParams hedging_params_;
-  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   std::list<UpstreamRequestPtr> upstream_requests_;
   FilterStats stats_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_ = nullptr;
-  bool grpc_request_{};
-  bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
   Http::RequestTrailerMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
@@ -648,6 +659,19 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
+  // Set of ongoing shadow streams which have not yet received end stream.
+  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t attempt_count_{1};
+  uint32_t pending_retries_{0};
+  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
+  FilterUtility::HedgingParams hedging_params_;
+  bool grpc_request_ : 1;
+  bool exclude_http_code_stats_ : 1;
   bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
@@ -655,14 +679,7 @@ private:
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
-  uint32_t attempt_count_{1};
-  uint32_t pending_retries_{0};
-
-  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
-  Network::Socket::OptionsSharedPtr upstream_options_;
-  // Set of ongoing shadow streams which have not yet received end stream.
-  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
-  const bool streaming_shadows_;
+  const bool streaming_shadows_ : 1;
 };
 
 class ProdFilter : public Filter {

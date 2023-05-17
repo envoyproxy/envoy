@@ -12,9 +12,10 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -128,7 +129,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
 Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
     [[maybe_unused]] const envoy::extensions::filters::network::http_connection_manager::v3::
         HttpConnectionManager& config,
-    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
@@ -170,7 +171,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   }
 
   header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), validation_visitor);
+      factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
     throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                      header_validator_config.name()));
@@ -325,7 +326,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
+          config, max_request_headers_kb,
+          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersSizeOverrideKey,
+                                                  Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
@@ -377,7 +380,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                      config.proxy_status_config())
                                : nullptr),
       header_validator_factory_(
-          createHeaderValidatorFactory(config, context.messageValidationVisitor())),
+          createHeaderValidatorFactory(config, context.getServerFactoryContext())),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
@@ -484,6 +487,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
+    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -536,7 +540,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_tracing()) {
-    http_tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
+    tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
     tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
                                                                              config.tracing());
   }
@@ -545,6 +549,35 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, context_);
     access_logs_.push_back(current_access_log);
+  }
+
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval()) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_new_request_ =
+        config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval()));
+    }
+  } else {
+    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
+
+    if (config.has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    }
   }
 
   server_transformation_ = config.server_header_transformation();
@@ -623,22 +656,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
-Http::ServerConnectionPtr
-HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
-                                         const Buffer::Instance& data,
-                                         Http::ServerConnectionCallbacks& callbacks) {
+Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -651,7 +683,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        overload_manager);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

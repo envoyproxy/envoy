@@ -30,7 +30,7 @@ struct InboundRecord {
 
   // Estimates how many bytes this record would take.
   uint32_t dataLengthEstimate() const {
-    uint32_t result = 15; // Max key length, value lenght, header count.
+    uint32_t result = 15; // Max key length, value length, header count.
     result += key_ ? key_->size() : 0;
     result += value_ ? value_->size() : 0;
     return result;

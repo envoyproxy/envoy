@@ -37,8 +37,8 @@ public:
               const Http::ResponseTrailerMap& response_trailers,
               const StreamInfo::StreamInfo& stream_info, std::string& body,
               absl::string_view& content_type) const {
-    body =
-        formatter_->format(request_headers, response_headers, response_trailers, stream_info, body);
+    body = formatter_->format(request_headers, response_headers, response_trailers, stream_info,
+                              body, AccessLog::AccessLogType::NotSet);
     content_type = content_type_;
   }
 
@@ -80,7 +80,8 @@ public:
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (filter_ == nullptr ||
-        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
+        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers,
+                           AccessLog::AccessLogType::NotSet)) {
       return false;
     }
 

@@ -16,6 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -489,6 +490,26 @@ TEST(HttpUtility, updateAuthority) {
     EXPECT_EQ("dns.name", headers.get_(":authority"));
     EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
   }
+
+  // Test that we only append to x-forwarded-host if it is not already present.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "true"}});
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "false"}});
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name,dns.name", headers.get_("x-forwarded-host"));
+  }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {
@@ -582,7 +603,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .override_stream_error_on_invalid_http_message()
@@ -602,7 +623,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
@@ -632,6 +653,59 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   hcm_value.set_value(false);
   EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
+}
+
+TEST(HttpUtility, UseBalsaParser) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ProtobufWkt::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+
+  // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the
+  // runtime flag.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(true);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(false);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+}
+
+TEST(HttpUtility, AllowCustomMethods) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ProtobufWkt::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+
+  EXPECT_FALSE(http1_options.allow_custom_methods());
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .allow_custom_methods_);
+
+  http1_options.set_allow_custom_methods(true);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .allow_custom_methods_);
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
@@ -1083,8 +1157,12 @@ TEST(HttpUtility, QueryParamsToString) {
 }
 
 TEST(HttpUtility, ResetReasonToString) {
-  EXPECT_EQ("connection failure",
-            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("local connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalConnectionFailure));
+  EXPECT_EQ("remote connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteConnectionFailure));
+  EXPECT_EQ("connection timeout",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTimeout));
   EXPECT_EQ("connection termination",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
   EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
@@ -1797,6 +1875,20 @@ TEST(Utility, isSafeRequest) {
 
   request_headers.removeMethod();
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+};
+
+TEST(Utility, isValidRefererValue) {
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://www.example.com")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/foo?bar=xyz")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("/resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("foo/bar/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("mal  formed/path/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("htp:/www.malformed.com")));
+  EXPECT_FALSE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
 };
 
 } // namespace Http

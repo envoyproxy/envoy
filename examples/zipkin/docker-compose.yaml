@@ -1,10 +1,8 @@
-version: "3.8"
 services:
 
   envoy-front-proxy:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
     depends_on:
@@ -19,8 +17,7 @@ services:
 
   envoy-1:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-1.yaml
     depends_on:
@@ -33,8 +30,7 @@ services:
 
   envoy-2:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-2.yaml
     depends_on:
@@ -45,23 +41,20 @@ services:
 
   service-1:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=1
 
   service-2:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=2
 
   zipkin:
     build:
-      context: .
       dockerfile: Dockerfile-zipkin
     ports:
     - "${PORT_UI:-9411}:9411"

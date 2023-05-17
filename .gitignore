@@ -53,3 +53,5 @@ bazel.output.txt
 **/.DS_Store
 **/*.iml
 tools/dev/src
+distribution/custom
+examples/websocket/certs

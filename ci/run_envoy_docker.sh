@@ -35,19 +35,34 @@ else
   # in useradd below, which is need for correct Python execution in the Docker
   # environment.
   ENVOY_DOCKER_OPTIONS+=(-u root:root)
-  ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
-  ENVOY_DOCKER_OPTIONS+=(--cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN)
+  DOCKER_USER_ARGS=()
+  DOCKER_GROUP_ARGS=()
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+  USER_UID="$(id -u)"
+  USER_GID="$(id -g)"
+  if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+      ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
+      DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
+      DOCKER_USER_ARGS=(--gid "${DOCKER_GID}")
+      DOCKER_GROUP_ARGS=(--gid "${DOCKER_GID}")
+  else
+      DOCKER_GROUP_ARGS+=(--gid "${USER_GID}")
+      DOCKER_USER_ARGS+=(--gid "${USER_GID}")
+  fi
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
-  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid ${DOCKER_GID} -f envoygroup \
-    && useradd -o --uid $(id -u) --gid ${DOCKER_GID} --no-create-home --home-dir /build envoybuild \
-    && usermod -a -G pcap envoybuild \
-    && chown envoybuild:envoygroup /build \
-    && chown envoybuild /proc/self/fd/2 \
-    && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+  START_COMMAND=(
+      "/bin/bash"
+      "-lc"
+      "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup \
+          && useradd -o --uid ${USER_UID} ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
+          && usermod -a -G pcap envoybuild \
+          && chown envoybuild:envoygroup /build \
+          && chown envoybuild /proc/self/fd/2 \
+          && rm -rf /usr/bin/cmake \
+          && cmake &> /dev/null || echo 'No cmake here!' \
+          && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
@@ -68,7 +83,7 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
-if ! is_windows; then
+if ! is_windows && [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
     # at the same path.
@@ -99,10 +114,13 @@ docker run --rm \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
+       -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
+       -e BAZEL_NO_CACHE_TEST_RESULTS \
        -e BAZEL_REMOTE_INSTANCE \
+       -e BAZEL_REMOTE_INSTANCE_BRANCH \
        -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
@@ -111,6 +129,7 @@ docker run --rm \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
        -e ENVOY_BUILD_DEBUG_INFORMATION \
+       -e ENVOY_BUILD_FILTER_EXAMPLE \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_TOKEN \

@@ -1394,6 +1394,41 @@ virtual_hosts:
       "cannot set both matcher and routes on virtual host");
 }
 
+TEST_F(RouteMatcherTest, TestMatchTreeDynamicCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster_header: x-cluster-header
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo", "GET");
+    headers.addCopy("x-cluster-header", "www2");
+    EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 // Validates using RouteList as the mapper action.
 TEST_F(RouteMatcherTest, TestRouteList) {
   const std::string yaml = R"EOF(
@@ -1490,7 +1525,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("lyft.com", "/new_endpoint/foo/match_header", "GET");
-    headers.setByKey("x-match-header", "matched");
+    headers.setCopy(Http::LowerCaseString("x-match-header"), "matched");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("match_tree_1_3", headers.get_("x-route-header"));
@@ -1509,6 +1544,42 @@ virtual_hosts:
   }
   Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
   EXPECT_EQ(nullptr, config.route(headers, 0));
+}
+
+TEST_F(RouteMatcherTest, TestRouteListDynamicCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                routes:
+                - match:
+                    prefix: /new_endpoint/foo/1
+                  route:
+                    cluster_header: x-cluster-header
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo/1", "GET");
+    headers.addCopy("x-cluster-header", "www2");
+    EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
+  }
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
@@ -6220,7 +6291,9 @@ protected:
     TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
-    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+    RouteConstSharedPtr owned_route = config.route(req_headers, 0);
+    const RouteEntry* route = owned_route->routeEntry();
+
     auto transforms = run_request_header_test ? route->requestHeaderTransforms(stream_info)
                                               : route->responseHeaderTransforms(stream_info);
     EXPECT_THAT(transforms.headers_to_append_or_add,
@@ -6452,7 +6525,8 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Http::TestResponseHeaderMapImpl resp_headers({{"x-remove-cluster1", "value"}});
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    RouteConstSharedPtr cached_route = config.route(headers, 0);
+    const RouteEntry* route = cached_route->routeEntry();
     EXPECT_EQ("cluster1", route->clusterName());
 
     route->finalizeRequestHeaders(headers, stream_info, true);
@@ -6467,7 +6541,8 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Http::TestResponseHeaderMapImpl resp_headers({{"x-remove-cluster2", "value"}});
-    const RouteEntry* route = config.route(headers, 55)->routeEntry();
+    RouteConstSharedPtr cached_route = config.route(headers, 55);
+    const RouteEntry* route = cached_route->routeEntry();
     EXPECT_EQ("cluster2", route->clusterName());
 
     route->finalizeRequestHeaders(headers, stream_info, true);
@@ -7163,17 +7238,8 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException,
-        "Invalid header configuration. Un-terminated variable expression "
-        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
-  } else {
-    EXPECT_THROW(
-        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException);
-  }
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
@@ -7354,7 +7420,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/both", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www1", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7368,7 +7435,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www2", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7381,7 +7449,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/route-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www3", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7394,7 +7463,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-passthrough", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www4", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -10213,7 +10283,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
+      "The filter test.default.filter doesn't support virtual host or route specific "
+      "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
@@ -10254,7 +10325,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
+      "The filter test.default.filter doesn't support virtual host or route specific "
+      "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
@@ -10617,6 +10689,98 @@ virtual_hosts:
   EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
 }
 
+TEST_F(RouteMatchOverrideTest, MatchTreeVerifyRouteOverrideStops) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: bar
+  domains: ["*"]
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match: { prefix: "/foo" }
+                route:
+                  cluster: foo
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  RouteConstSharedPtr route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(nullptr, route);
+}
+
+TEST_F(RouteMatchOverrideTest, RouteListVerifyRouteOverrideStops) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: bar
+  domains: ["*"]
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                routes:
+                - match: { prefix: "/foo/bar/baz" }
+                  route:
+                    cluster: foo_bar_baz
+                - match: { prefix: "/foo/bar" }
+                  route:
+                    cluster: foo_bar
+                - match: { prefix: "/foo" }
+                  route:
+                    cluster: foo
+                - match: { prefix: "/foo/default" }
+                  route:
+                    cluster: default
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "foo", "default"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  std::vector<std::string> clusters{"foo", "foo_bar"};
+
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
+        EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
+        clusters.pop_back();
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+
+        if (clusters.empty()) {
+          return RouteMatchStatus::Accept; // Do not match default route
+        }
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
+}
+
 TEST_F(RouteMatchOverrideTest, StopWhenNoMoreRoutes) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10809,6 +10973,44 @@ virtual_hosts:
       },
       genHeaders("bat.com", "/", "GET"));
   EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
+}
+
+class CommonConfigImplTest : public testing::Test, public ConfigImplTestBase {};
+
+TEST_F(CommonConfigImplTest, TestCommonConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto& shared_config =
+      dynamic_cast<const CommonConfigImpl&>(config.route(genHeaders("bat.com", "/", "GET"), 0)
+                                                ->routeEntry()
+                                                ->virtualHost()
+                                                .routeConfig());
+
+  EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),
+            shared_config.mostSpecificHeaderMutationsWins());
+  EXPECT_EQ(config.maxDirectResponseBodySizeBytes(),
+            shared_config.maxDirectResponseBodySizeBytes());
+  EXPECT_EQ(&config.name(), &shared_config.name());
+  EXPECT_EQ(&config.shadowPolicies(), &shared_config.shadowPolicies());
+  EXPECT_EQ(config.ignorePathParametersInPathMatching(),
+            shared_config.ignorePathParametersInPathMatching());
 }
 
 } // namespace

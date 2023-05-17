@@ -65,8 +65,15 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
       response.add("HTML output was disabled by building with --define=admin_html=disabled");
       return Http::Code::BadRequest;
 #endif
+    } else if (format_value.value() == "active-html") {
+#ifdef ENVOY_ADMIN_HTML
+      format_ = StatsFormat::ActiveHtml;
+#else
+      response.add("Active HTML output was disabled by building with --define=admin_html=disabled");
+      return Http::Code::BadRequest;
+#endif
     } else {
-      response.add("usage: /stats?format=(html|json|prometheus|text)\n\n");
+      response.add("usage: /stats?format=(html|active-html|json|prometheus|text)\n\n");
       return Http::Code::BadRequest;
     }
   }

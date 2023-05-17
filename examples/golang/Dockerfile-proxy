@@ -1,6 +1,0 @@
-FROM envoyproxy/envoy-contrib-dev:latest
-COPY ./lib/simple.so /lib/simple.so
-COPY ./envoy.yaml /etc/envoy.yaml
-RUN chmod go+r /etc/envoy.yaml /lib/simple.so
-ENV GODEBUG=cgocheck=0
-CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "--service-cluster", "proxy"]

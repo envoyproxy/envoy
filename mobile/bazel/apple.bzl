@@ -1,6 +1,6 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
 def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = []):
@@ -8,7 +8,8 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_mobile_copts("@envoy") + ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
+        copts = ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
+        defines = envoy_mobile_defines("@envoy"),
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,
@@ -75,3 +76,15 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibili
         visibility = visibility,
         flaky = flaky,
     )
+
+def envoy_mobile_swift_copts(enable_cxx_interop):
+    if enable_cxx_interop:
+        return [
+            "-enable-experimental-cxx-interop",
+            "-Xcc",
+            "-std=c++17",
+            "-Xcc",
+            "-Wno-deprecated-declarations",
+        ]
+    else:
+        return []

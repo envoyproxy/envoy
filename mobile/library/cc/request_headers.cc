@@ -21,14 +21,6 @@ absl::optional<RetryPolicy> RequestHeaders::retryPolicy() const {
   }
 }
 
-absl::optional<UpstreamHttpProtocol> RequestHeaders::upstreamHttpProtocol() const {
-  const auto header_name = "x-envoy-mobile-upstream-protocol";
-  if (!contains(header_name)) {
-    return absl::optional<UpstreamHttpProtocol>();
-  }
-  return upstreamHttpProtocolFromString((*this)[header_name][0]);
-}
-
 RequestHeadersBuilder RequestHeaders::toRequestHeadersBuilder() const {
   RequestHeadersBuilder builder(requestMethod(), scheme(), authority(), path());
   for (const auto& pair : allHeaders()) {

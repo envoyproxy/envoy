@@ -58,16 +58,17 @@ public:
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
+    Http::Matching::HttpMatchingDataImpl data(info);
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
-    if (result.data_) {
-      if (!result.data_.value().empty()) {
-        descriptor_entry = {descriptor_key_, result.data_.value()};
-      }
-      return true;
+    if (absl::holds_alternative<absl::monostate>(result.data_)) {
+      return false;
     }
-    return false;
+    const std::string& str = absl::get<std::string>(result.data_);
+    if (!str.empty()) {
+      descriptor_entry = {descriptor_key_, str};
+    }
+    return true;
   }
 
 private:

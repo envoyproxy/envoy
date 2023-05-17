@@ -1,6 +1,7 @@
 #include "source/common/common/assert.h"
 
 #include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
 
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
@@ -13,6 +14,8 @@
 
 using testing::_;
 using testing::HasSubstr;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 
@@ -26,6 +29,10 @@ typedef struct {
 
 // This config is the minimal envoy mobile config that allows for running the engine.
 const std::string MINIMAL_TEST_CONFIG = R"(
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -60,6 +67,10 @@ layered_runtime:
 )";
 
 const std::string BUFFERED_TEST_CONFIG = R"(
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -123,7 +134,19 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   return transformed_headers;
 }
 
-TEST(MainInterfaceTest, BasicStream) {
+class MainInterfaceTest : public testing::Test {
+public:
+  void SetUp() override {
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
+  }
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
+};
+
+TEST_F(MainInterfaceTest, BasicStream) {
   const std::string level = "debug";
   engine_test_context engine_cbs_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
@@ -174,7 +197,7 @@ TEST(MainInterfaceTest, BasicStream) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   send_headers(engine_handle, stream, c_headers, false);
   send_data(engine_handle, stream, c_data, false);
@@ -187,7 +210,7 @@ TEST(MainInterfaceTest, BasicStream) {
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
-TEST(MainInterfaceTest, SendMetadata) {
+TEST_F(MainInterfaceTest, SendMetadata) {
   engine_test_context engine_cbs_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =
@@ -218,7 +241,7 @@ TEST(MainInterfaceTest, SendMetadata) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   EXPECT_EQ(ENVOY_FAILURE, send_metadata(engine_handle, stream, {}));
 
@@ -227,7 +250,7 @@ TEST(MainInterfaceTest, SendMetadata) {
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
-TEST(MainInterfaceTest, ResetStream) {
+TEST_F(MainInterfaceTest, ResetStream) {
   engine_test_context engine_cbs_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =
@@ -266,7 +289,7 @@ TEST(MainInterfaceTest, ResetStream) {
 
   envoy_stream_t stream = init_stream(engine_handle);
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  start_stream(engine_handle, stream, stream_cbs, false, 0);
 
   reset_stream(engine_handle, stream);
 
@@ -277,7 +300,7 @@ TEST(MainInterfaceTest, ResetStream) {
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
-TEST(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
+TEST_F(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
@@ -299,7 +322,7 @@ TEST(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
   release_envoy_headers(c_trailers);
 }
 
-TEST(MainInterfaceTest, RegisterPlatformApi) {
+TEST_F(MainInterfaceTest, RegisterPlatformApi) {
   engine_test_context engine_cbs_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =
@@ -327,7 +350,7 @@ TEST(MainInterfaceTest, RegisterPlatformApi) {
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
-TEST(MainInterfaceTest, PreferredNetwork) {
+TEST_F(MainInterfaceTest, PreferredNetwork) {
   EXPECT_EQ(ENVOY_SUCCESS, set_preferred_network(0, ENVOY_NET_WLAN));
 }
 
@@ -549,7 +572,7 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-TEST(MainInterfaceTest, ResetConnectivityState) {
+TEST_F(MainInterfaceTest, ResetConnectivityState) {
   engine_test_context test_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =

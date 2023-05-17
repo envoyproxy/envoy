@@ -136,7 +136,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
@@ -149,9 +149,6 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
       std::string(default_request_headers_.Scheme()->value().getStringView()),
       std::string(default_request_headers_.Host()->value().getStringView()),
       std::string(default_request_headers_.Path()->value().getStringView()));
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    builder.addUpstreamHttpProtocol(Platform::UpstreamHttpProtocol::HTTP2);
-  }
 
   request_headers.iterate(
       [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {

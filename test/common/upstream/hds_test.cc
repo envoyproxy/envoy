@@ -9,6 +9,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -582,7 +583,7 @@ TEST_F(HdsTest, TestSocketContext) {
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
@@ -1071,7 +1072,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.

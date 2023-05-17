@@ -29,15 +29,15 @@ Terminal 1 ::
 
     $ pwd
     envoy/examples/load-reporting-service
-    $ docker-compose pull
-    $ docker-compose up --scale http_service=2
+    $ docker compose pull
+    $ docker compose up --scale http_service=2
 
 
 Terminal 2 ::
 
     $ pwd
     envoy/examples/load_reporting_service
-    $ docker-compose ps
+    $ docker compose ps
 
                   Name                               Command               State                Ports
     -----------------------------------------------------------------------------------------------------------------

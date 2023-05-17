@@ -207,14 +207,13 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
-  Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
-  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
@@ -787,12 +786,14 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue_oauth_header_passthrough_fix) 
 
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
-  expectValidCookies(CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+  expectValidCookies(
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
 }
 
 // Validates the behavior of the cookie validator with custom cookie names.
 TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
-  expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires"});
+  expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires",
+                                 "CustomIdToken", "CustomRefreshToken"});
 }
 
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
@@ -810,7 +811,8 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+      test_time_,
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -1202,6 +1204,73 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
   filter_->finishGetAccessTokenFlow();
+}
+
+/**
+ * Testing oauth response after tokens are set.
+ *
+ * Expected behavior: cookies are set.
+ */
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "MjI2YmI5YTRiZjJlNTFlNDUzZWVjOWUzYmU1MThlNGQyNDgyNzA0ZTBkMGQyY2M3M2QyMzg3NTRkZTY0YmU5YQ==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
+  });
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "OTBhMzEwNjk4YzJiNjIxMTcwMTE0ZDE2NjUyNjIyNmI1YmE0Y2NhNTQ3ZWYwZGYzZTNhYjEwNzhmZmQyZGY4Zg==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {

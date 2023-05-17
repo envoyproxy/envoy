@@ -61,8 +61,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
@@ -208,7 +208,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       resource->PackFrom(listener);
     }
     TestEnvironment::writeStringToFileForTest(
-        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
+        lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
@@ -515,7 +515,8 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
 
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
-  for (int i = 0; i < 1000; ++i) {
+  const int num_iterations = TSAN_TIMEOUT_FACTOR * 1000;
+  for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
     if (entries.size() >= entry + 1) {

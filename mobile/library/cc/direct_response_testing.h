@@ -9,7 +9,7 @@ namespace Envoy {
 namespace DirectResponseTesting {
 
 // The match operation to perform.
-enum MatchMode { contains, exact, prefix, suffix };
+enum class MatchMode { Contains, Exact, Prefix, Suffix };
 
 // A configuration for when a header should be matched.
 struct HeaderMatcher {

@@ -8,6 +8,7 @@ Contrib extensions
   :maxdepth: 2
 
   sip/sip
+  cluster_specifier/cluster_specifier
   cryptomb/cryptomb
   hyperscan/matcher
   hyperscan/regex_engine

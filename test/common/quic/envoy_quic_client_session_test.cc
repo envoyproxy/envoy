@@ -304,7 +304,7 @@ TEST_P(EnvoyQuicClientSessionTest, HandshakeTimesOutWithActiveStream) {
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_HANDSHAKE_FAILED, _, "fake handshake time out"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
   envoy_quic_session_.OnStreamError(quic::QUIC_HANDSHAKE_FAILED, "fake handshake time out");
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());

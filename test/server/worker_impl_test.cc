@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-Event::PostCb emptyCallback = []() {};
+std::function<void()> emptyCallback = []() {};
 
 class WorkerImplTest : public testing::Test {
 public:

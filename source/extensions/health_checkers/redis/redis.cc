@@ -20,6 +20,7 @@ RedisHealthChecker::RedisHealthChecker(
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
+      redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
@@ -42,6 +43,11 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   ASSERT(current_request_ == nullptr);
   ASSERT(client_ == nullptr);
+}
+
+RedisHealthCheckerStats RedisHealthChecker::generateRedisStats(Stats::Scope& scope) {
+  std::string prefix("health_check.redis.");
+  return {ALL_REDIS_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
@@ -95,6 +101,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
+      parent_.redis_stats_.exists_failure_.inc();
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;

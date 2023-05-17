@@ -51,8 +51,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tap_filter_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/tap:config",
         "//test/extensions/common/tap:common",

@@ -108,11 +108,27 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationTcpClient::waitForHalfClose() {
+void IntegrationTcpClient::waitForHalfClose(bool ignore_spurious_events) {
+  waitForHalfClose(TestUtility::DefaultTimeout, ignore_spurious_events);
+}
+
+void IntegrationTcpClient::waitForHalfClose(std::chrono::milliseconds timeout,
+                                            bool ignore_spurious_events) {
   if (payload_reader_->readLastByte()) {
     return;
   }
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  if (ignore_spurious_events) {
+    while (!payload_reader_->readLastByte() && timeout_timer->enabled()) {
+      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    }
+  } else {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
+
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
 
