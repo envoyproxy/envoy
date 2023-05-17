@@ -18,9 +18,6 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: quic
-  change: |
-    Corrected function name ``adjustNewConnectionIdForRoutine`` to ``adjustNewConnectionIdForRouting``.
 - area: connection pool
   change: |
     Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
