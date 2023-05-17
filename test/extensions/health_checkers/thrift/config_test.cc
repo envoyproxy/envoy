@@ -8,6 +8,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/test_runtime.h"
@@ -190,12 +191,13 @@ TEST(HealthCheckerFactoryTest, CreateThriftViaUpstreamHealthCheckerFactory) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_NE(nullptr,
             dynamic_cast<CustomThriftHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
                     Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
-                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api, server_context)
                     .get()));
 }
 
