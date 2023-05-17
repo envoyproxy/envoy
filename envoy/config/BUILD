@@ -68,10 +68,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "custom_config_validators_interface",
+    hdrs = ["custom_config_validators.h"],
+    deps = [
+        ":subscription_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_factory_interface",
     hdrs = ["subscription_factory.h"],
     deps = [
+        ":custom_config_validators_interface",
         ":subscription_interface",
+        "//envoy/common:backoff_strategy_interface",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

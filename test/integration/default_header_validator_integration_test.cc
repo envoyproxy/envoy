@@ -13,6 +13,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamUhvIntegrationTest,
 // Without the `uhv_translate_backslash_to_slash` override UHV rejects requests with backslash in
 // the path.
 TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride) {
+  disable_client_header_validation_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.uhv_translate_backslash_to_slash",
                                     "false");
   config_helper_.addConfigModifier(
