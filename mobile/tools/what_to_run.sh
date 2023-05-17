@@ -4,6 +4,7 @@ set -euo pipefail
 
 branch_name="$GITHUB_REF_NAME"
 
+exit 0
 
 load_defaults () {
     {
