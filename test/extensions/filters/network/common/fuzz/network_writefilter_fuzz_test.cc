@@ -39,8 +39,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         input->mutable_config()->mutable_typed_config()->set_type_url(
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
-        ProtobufMessage::ValidatedInputGenerator generator(seed,
-                                                           ProtobufMessage::composeFiltersAnyMap());
+        ProtobufMessage::ValidatedInputGenerator generator(
+            seed, ProtobufMessage::composeFiltersAnyMap(), 20);
         ProtobufMessage::traverseMessage(generator, *input, true);
       }};
   try {
