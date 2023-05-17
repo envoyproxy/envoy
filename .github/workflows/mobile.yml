@@ -26,12 +26,7 @@ jobs:
       run: |
         mkdir -p vars
         ./mobile/tools/what_to_run.sh
-        TOJSON='''
-        [inputs | select(length>0)
-         | [splits("=*")]
-         | {(.[0]): .[1]} ]
-         | add'''
-        jq -n -R $TOJSON $GITHUB_OUTPUT > vars/vars.json
+        ./github/scripts/vars-to-json.sh > vars/vars.json
     - uses: actions/upload-artifact@v3
       with:
         name: vars
