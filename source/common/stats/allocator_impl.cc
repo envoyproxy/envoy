@@ -251,9 +251,12 @@ public:
       flags_ |= Flags::NeverImport;
       break;
     case ImportMode::Hidden:
+      ASSERT(current == ImportMode::Uninitialized);
       flags_ |= Flags::Hidden;
       break;
     }
+    ASSERT(flags_ & Flags::NeverImport + flags_ & Flags::LogicAccumulate + flags_ &
+           Flags::Hidden <= 1);
   }
 
   void setParentValue(uint64_t value) override { parent_value_ = value; }
