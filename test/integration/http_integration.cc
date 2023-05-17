@@ -284,14 +284,16 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 
-  static constexpr absl::string_view empty_header_validator_config = R"EOF(
-    name: envoy.http.header_validators.envoy_default
-    typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-)EOF";
+  if (!disable_client_header_validation_) {
+    static constexpr absl::string_view empty_header_validator_config = R"EOF(
+      name: envoy.http.header_validators.envoy_default
+      typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+  )EOF";
 
-  cluster->header_validator_factory_ =
-      IntegrationUtil::makeHeaderValidationFactory(empty_header_validator_config);
+    cluster->header_validator_factory_ =
+        IntegrationUtil::makeHeaderValidationFactory(empty_header_validator_config);
+  }
 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
