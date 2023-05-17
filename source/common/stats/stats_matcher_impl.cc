@@ -99,7 +99,7 @@ bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) c
 
   bool match = slowRejectMatch(stat_name);
 
-  if (is_inclusive_ || match || fast_result != FastResult::Matches) {
+  if (is_inclusive_ || match) {
     //  is_inclusive_ | match | return
     // ---------------+-------+--------
     //        T       |   T   |   T   Default-inclusive and matching an (exclusion) matcher, deny.
