@@ -6,7 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
 #include "source/common/config/decoded_resource_impl.h"
-#include "source/common/config/xds_mux/subscription_state.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
 
 #include "absl/types/optional.h"
 

@@ -114,6 +114,9 @@ that it is interested in. It then fetches the ``RouteConfiguration`` resources r
 by the ``Cluster`` resources. In effect, the original ``Listener`` resources are the roots to
 the client's configuration tree.
 
+.. _extension_envoy.config_mux.delta_grpc_mux_factory:
+.. _extension_envoy.config_mux.sotw_grpc_mux_factory:
+
 Variants of the xDS Transport Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1,4 +1,4 @@
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -41,8 +41,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
     const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-    CustomConfigValidatorsPtr&& config_validators,
-    JitteredExponentialBackOffStrategyPtr backoff_strategy,
+    CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
     XdsConfigTrackerOptRef xds_config_tracker, XdsResourcesDelegateOptRef xds_resources_delegate,
     const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
@@ -367,7 +366,7 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                            CustomConfigValidatorsPtr&& config_validators,
-                           JitteredExponentialBackOffStrategyPtr backoff_strategy,
+                           BackOffStrategyPtr backoff_strategy,
                            XdsConfigTrackerOptRef xds_config_tracker)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, scope,
@@ -390,7 +389,7 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         JitteredExponentialBackOffStrategyPtr backoff_strategy,
+                         BackOffStrategyPtr backoff_strategy,
                          XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
@@ -406,6 +405,53 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
+
+class DeltaGrpcMuxFactory : public MuxFactory {
+public:
+  std::string name() const override { return "envoy.config_mux.delta_grpc_mux_factory"; }
+  void shutdownAll() override { return GrpcMuxDelta::shutdownAll(); }
+  std::shared_ptr<GrpcMux>
+  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
+         const envoy::config::core::v3::ApiConfigSource& ads_config,
+         const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
+         BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
+         XdsResourcesDelegateOptRef) override {
+    return std::make_shared<GrpcMuxDelta>(
+        std::move(async_client), dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService."
+            "DeltaAggregatedResources"),
+        scope, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
+        ads_config.set_node_on_first_message_only(), std::move(config_validators),
+        std::move(backoff_strategy), xds_config_tracker);
+  }
+};
+
+class SotwGrpcMuxFactory : public MuxFactory {
+public:
+  std::string name() const override { return "envoy.config_mux.sotw_grpc_mux_factory"; }
+  void shutdownAll() override { return GrpcMuxSotw::shutdownAll(); }
+  std::shared_ptr<GrpcMux>
+  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
+         const envoy::config::core::v3::ApiConfigSource& ads_config,
+         const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
+         BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
+         XdsResourcesDelegateOptRef) override {
+    return std::make_shared<GrpcMuxSotw>(
+        std::move(async_client), dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService."
+            "StreamAggregatedResources"),
+        scope, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
+        ads_config.set_node_on_first_message_only(), std::move(config_validators),
+        std::move(backoff_strategy), xds_config_tracker);
+  }
+};
+
+REGISTER_FACTORY(DeltaGrpcMuxFactory, MuxFactory);
+REGISTER_FACTORY(SotwGrpcMuxFactory, MuxFactory);
 
 } // namespace XdsMux
 } // namespace Config

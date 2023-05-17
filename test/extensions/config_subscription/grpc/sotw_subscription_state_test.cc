@@ -3,8 +3,8 @@
 
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/xds_mux/sotw_subscription_state.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

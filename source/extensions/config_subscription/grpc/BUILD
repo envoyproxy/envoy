@@ -71,7 +71,7 @@ envoy_cc_library(
         "//source/common/config:custom_config_validators_lib",
         "//source/common/config:type_to_endpoint_lib",
         "//source/common/config:xds_resource_lib",
-        "//source/common/config/xds_mux:grpc_mux_lib",
+        "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
     ],
 )
 

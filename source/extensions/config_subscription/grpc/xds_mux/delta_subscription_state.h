@@ -5,7 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/xds_mux/subscription_state.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
