@@ -51,7 +51,7 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
                                          RuntimeKeys::get().ResponseRateLimitPercentKey)),
       disable_downstream_cluster_stats_(fault.disable_downstream_cluster_stats()),
-      filter_metadata_(fault.filterMetadata()) {
+      filter_metadata_(fault.filter_metadata()) {
   if (fault.has_abort()) {
     request_abort_config_ =
         std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
@@ -171,7 +171,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-    dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] =
+    (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
         fault_settings_->filterMetadata();
     return true;
   }
@@ -472,7 +472,7 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-  dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] =
+  (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
       fault_settings_->filterMetadata();
   decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
