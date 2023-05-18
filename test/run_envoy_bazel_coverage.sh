@@ -138,21 +138,24 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   fi
 fi
 
-# We want to allow per_file_coverage to fail without exiting this script.
-set +e
-if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
-  echo "Checking per-extension coverage"
-  output=$(./test/per_file_coverage.sh)
-  response=$?
+if [[ -e ./test/per_file_coverage.sh ]]; then
+    # We want to allow per_file_coverage to fail without exiting this script.
+    set +e
+    if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
+        echo "Checking per-extension coverage"
+        output=$(./test/per_file_coverage.sh)
+        response=$?
 
-  if [ $response -ne 0 ]; then
-    echo Per-extension coverage failed:
-    echo "$output"
-    COVERAGE_FAILED=1
-    echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-    exit 1
-  fi
-  echo Per-extension coverage passed.
+        if [ $response -ne 0 ]; then
+            echo Per-extension coverage failed:
+            echo "$output"
+            COVERAGE_FAILED=1
+            echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
+            exit 1
+        fi
+        echo Per-extension coverage passed.
+    fi
+else
+    echo "No per-file-coverage file found"
 fi
-
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
