@@ -230,6 +230,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: filter.unknown
+  is_optional: true
     )EOF";
 
   RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
@@ -473,6 +474,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: filter.unknown
+  is_optional: true
     )EOF";
 
   setup(config_yaml);
