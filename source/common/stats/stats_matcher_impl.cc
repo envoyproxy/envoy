@@ -94,7 +94,7 @@ bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) c
     return fast_result == FastResult::Rejects;
   }
 
-  bool match = slowRejectMatch(stat_name);
+  const bool match = slowRejectMatch(stat_name);
 
   //  is_inclusive_ | match | return
   // ---------------+-------+--------
