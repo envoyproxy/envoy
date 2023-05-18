@@ -18,6 +18,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -93,7 +94,10 @@ TEST_F(TcpConnPoolTest, TestNoConnPool) {
 
 TEST_F(TcpConnPoolTest, Http2Config) {
   auto info = std::make_shared<Upstream::MockClusterInfo>();
+  const std::string fake_cluster_name = "fake_cluster";
+
   EXPECT_CALL(*info, features()).WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
+  EXPECT_CALL(*info, name()).WillOnce(ReturnRef(fake_cluster_name));
   EXPECT_CALL(thread_local_cluster_, info).Times(2).WillRepeatedly(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
@@ -107,9 +111,11 @@ TEST_F(TcpConnPoolTest, Http2Config) {
 
 TEST_F(TcpConnPoolTest, Http3Config) {
   auto info = std::make_shared<Upstream::MockClusterInfo>();
+  const std::string fake_cluster_name = "fake_cluster";
   EXPECT_CALL(*info, features())
       .Times(AnyNumber())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
+  EXPECT_CALL(*info, name()).WillOnce(ReturnRef(fake_cluster_name));
   EXPECT_CALL(thread_local_cluster_, info).Times(AnyNumber()).WillRepeatedly(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");

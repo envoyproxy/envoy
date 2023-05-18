@@ -180,7 +180,7 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
-  Stats::StatNameManagedStorage prefix_;
+  Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   uint64_t stream_id_;
 };
