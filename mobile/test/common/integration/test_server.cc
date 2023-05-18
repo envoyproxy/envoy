@@ -83,12 +83,6 @@ void TestServer::startTestServer(bool use_quic, bool disable_https) {
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
-  // Optionally add headers and data if setHeadersAndData() was called.
-  if (!data_.empty()) {
-    upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-        Http::TestResponseHeaderMapImpl({{header_key_, header_value_}})));
-    upstream_->setResponseBody(data_);
-  }
 
   // Legacy behavior for cronet tests.
   if (use_quic) {
@@ -116,8 +110,8 @@ int TestServer::getServerPort() {
 
 void TestServer::setHeadersAndData(std::string header_key, std::string header_value,
                                    std::string data) {
-  header_key_ = header_key;
-  header_value_ = header_value;
-  data_ = data;
+  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{header_key, header_value}, {":status", "200"}})));
+  upstream_->setResponseBody(data);
 }
 } // namespace Envoy

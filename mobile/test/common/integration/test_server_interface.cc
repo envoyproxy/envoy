@@ -34,8 +34,8 @@ int get_server_port() {
   return -1; // failure
 }
 
-void set_headers_and_data(std::string header_key, std::string header_value, std::string data) {
+void set_headers_and_data(const std::string& header_key, const std::string& header_value, const std::string& data) {
   if (auto e = test_server()) {
-    return e->setHeadersAndData(header_key, header_value, data);
+    e->setHeadersAndData(header_key, header_value, data);
   }
 }

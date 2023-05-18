@@ -58,6 +58,7 @@ public:
 
   /**
    * Sets headers and data for the test server to return on all future requests.
+   * Can only be called once the server has been started.
    */
   void setHeadersAndData(std::string header_key, std::string header_value, std::string data);
 };
