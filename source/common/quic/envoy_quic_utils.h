@@ -190,7 +190,7 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 
 // Modify new_connection_id according to given old_connection_id to make sure packets with the new
 // one can be routed to the same listener.
-void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id);
 
 } // namespace Quic
