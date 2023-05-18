@@ -41,16 +41,6 @@ public final class TestJni {
     nativeShutdownTestServer();
   }
 
-  /**
-   * Shutdowns the server. No-op if the server is already shutdown.
-   */
-  public static void shutdownQuicTestServer() {
-    if (!sServerRunning.compareAndSet(true, false)) {
-      return;
-    }
-    nativeShutdownQuicTestServer();
-  }
-
   public static String getServerURL() {
     return "https://" + getServerHost() + ":" + getServerPort();
   }
@@ -72,8 +62,6 @@ public final class TestJni {
   }
 
   private static native void nativeStartQuicTestServer();
-
-  private static native void nativeShutdownQuicTestServer();
 
   private static native void nativeStartTestServer();
 

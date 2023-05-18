@@ -1,5 +1,5 @@
 import Envoy
-import EnvoyTestServerInterface
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -11,10 +11,11 @@ final class EndToEndNetworkingTest: XCTestCase {
   }
 
   func testNetworkRequestReturnsHeadersAndData() {
-    TestServerInterface.startHttpTestServer()
+    EnvoyTestServer.startHttpTestServer()
+    EnvoyTestServer.setHeadersAndData("x-response-foo", "aaa", "hello world")
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
-    let port = String(TestServerInterface.getServerPort())
+    let port = String(EnvoyTestServer.getServerPort())
     let requestHeaders = RequestHeadersBuilder(
       method: .get, scheme: "http", authority: "localhost:" + port, path: "/"
     )
@@ -47,6 +48,6 @@ final class EndToEndNetworkingTest: XCTestCase {
     XCTAssertEqual(.completed, XCTWaiter().wait(for: expectations, timeout: 10, enforceOrder: true))
 
     engine.terminate()
-    TestServerInterface.shutdownTestServer()
+    EnvoyTestServer.shutdownTestServer()
   }
 }

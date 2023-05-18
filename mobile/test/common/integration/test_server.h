@@ -23,6 +23,9 @@ private:
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
+  std::string header_key_;
+  std::string header_value_;
+  std::string data_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
 
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
@@ -37,6 +40,8 @@ public:
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
+   * use_quic: If true, use http3 with TLS
+   * disable_https: If true: use http1 without TLS.  If false, use http2 with TLS
    */
   void startTestServer(bool use_quic, bool disable_https);
 
@@ -50,6 +55,11 @@ public:
    * Returns the port that got attributed. Can only be called once the server has been started.
    */
   int getServerPort();
+
+  /**
+   * Sets headers and data for the test server to return on all future requests.
+   */
+  void setHeadersAndData(std::string header_key, std::string header_value, std::string data);
 };
 
 } // namespace Envoy

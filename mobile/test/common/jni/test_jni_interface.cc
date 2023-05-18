@@ -24,13 +24,6 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetServerPort(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownQuicTestServer(JNIEnv* env,
-                                                                                   jclass clazz) {
-  jni_log("[QTS]", "shutting down server");
-  shutdown_server();
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartTestServer(JNIEnv* env,
                                                                             jclass clazz) {
   jni_log("[QTS]", "starting server");

@@ -33,7 +33,6 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
   certs->mutable_certificate_chain()->set_filename(
@@ -84,10 +83,13 @@ void TestServer::startTestServer(bool use_quic, bool disable_https) {
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
-
-  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestResponseHeaderMapImpl({{"x-response-foo", "aaa"}, {":status", "200"}})));
-  upstream_->setResponseBody("hello world");
+  // Optionally add headers and data if setHeadersAndData() was called.
+  // maybe: , {":status", "200"}
+  if (!data_.empty()) {
+    upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+        Http::TestResponseHeaderMapImpl({{header_key_, header_data_}})));
+    upstream_->setResponseBody(data_);
+  }
 
   // Legacy behavior for cronet tests.
   if (use_quic) {
@@ -111,5 +113,11 @@ void TestServer::shutdownTestServer() {
 int TestServer::getServerPort() {
   ASSERT(upstream_);
   return upstream_->localAddress()->ip()->port();
+}
+
+void TestServer::setHeadersAndData(std::string header_key, std::string header_value, std::string data) {
+  header_key_ = header_key;
+  header_value_ = header_value;
+  data_ = data;
 }
 } // namespace Envoy

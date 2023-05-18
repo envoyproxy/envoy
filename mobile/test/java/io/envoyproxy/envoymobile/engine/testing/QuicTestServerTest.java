@@ -127,7 +127,7 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    TestJni.shutdownQuicTestServer();
+    TestJni.shutdownTestServer();
   }
 
   @Test
