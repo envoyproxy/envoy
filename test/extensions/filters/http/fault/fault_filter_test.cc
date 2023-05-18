@@ -142,7 +142,8 @@ public:
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
-    ON_CALL(decoder_filter_callbacks_, filterConfigName).WillByDefault(Return("envoy.filters.http.fault"));
+    ON_CALL(decoder_filter_callbacks_, filterConfigName)
+        .WillByDefault(Return("envoy.filters.http.fault"));
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
@@ -1393,8 +1394,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   // Set metadata in fault. Ensure that it does not get reflected in stream info.
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
-  (*fault.mutable_filter_metadata()->mutable_fields())["hello"].set_string_value(
-      "world");
+  (*fault.mutable_filter_metadata()->mutable_fields())["hello"].set_string_value("world");
 
   setupRateLimitTest(fault);
 
