@@ -171,7 +171,8 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-    dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] = fault_settings_->filterMetadata();
+    dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] =
+        fault_settings_->filterMetadata();
     return true;
   }
   return false;
@@ -471,7 +472,8 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-  dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] = fault_settings_->filterMetadata();
+  dynamic_metadata.mutable_filter_metadata()[decoder_callbacks_->filterConfigName()] =
+      fault_settings_->filterMetadata();
   decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
 }

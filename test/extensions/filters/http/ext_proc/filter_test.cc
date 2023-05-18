@@ -7,10 +7,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 

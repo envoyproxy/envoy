@@ -289,7 +289,8 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   envoy::config::core::v3::Metadata dynamic_metadata;
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
+      "world");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -611,7 +612,8 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
+      "world");
 
   // Set the max number of faults to 1.
   EXPECT_CALL(runtime_.snapshot_,
@@ -801,7 +803,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
+      "world");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -1390,7 +1393,8 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   // Set metadata in fault. Ensure that it does not get reflected in stream info.
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   auto& filter_metadata = *fault.mutable_metadata()->mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value("world");
+  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
+      "world");
 
   setupRateLimitTest(fault);
 
