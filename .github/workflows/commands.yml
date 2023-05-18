@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       pull-requests: write
-      contents: write
+      actions: write
     steps:
     - uses: envoyproxy/toolshed/gh-actions/retest@56d5781416445ed530e075b71546dedee94cf054
       with:
