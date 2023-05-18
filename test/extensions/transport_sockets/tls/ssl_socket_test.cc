@@ -5683,29 +5683,28 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  EXPECT_CALL(factory_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(factory_context.server_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
   ContextManagerImpl manager(time_system_);
-  ServerSslSocketFactory server_ssl_socket_factory(
-      std::move(server_cfg), manager, *factory_context.server_context_.store_.rootScope(),
-      std::vector<std::string>{});
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
+                                                   *factory_context_.store_.rootScope(),
+                                                   std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createDownstreamTransportSocket();
   EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
   transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
@@ -5724,12 +5723,11 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 // NotReadySslSocket object to handle upstream connection.
 TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context.server_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -5737,13 +5735,13 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   EXPECT_TRUE(client_cfg->tlsCertificates().empty());
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(
-      std::move(client_cfg), manager, *factory_context.server_context_.store_.rootScope());
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                   *factory_context_.store_.rootScope());
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr, nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
@@ -5763,16 +5761,15 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
 
   // Make SslSocket.
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  ON_CALL(factory_context.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
+  ON_CALL(factory_context_.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(
-      std::move(client_cfg), manager, *factory_context.server_context_.store_.rootScope());
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                   *factory_context_.store_.rootScope());
 
   Network::TransportSocketPtr transport_socket =
       client_ssl_socket_factory.createTransportSocket(nullptr, nullptr);

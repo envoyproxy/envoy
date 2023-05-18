@@ -372,6 +372,11 @@ message HttpConnectionManager {
     // This log record, if enabled, does not depend on periodic log records or request completion log.
     // Details related to upstream cluster, such as upstream host, will not be available for this log.
     bool flush_access_log_on_new_request = 2;
+
+    // If true, the HCM will flush an access log when a tunnel is successfully established. For example,
+    // this could be when an upstream has successfully returned 101 Switching Protocols, or when the proxy
+    // has returned 200 to a CONNECT request.
+    bool flush_log_on_tunnel_successfully_established = 3;
   }
 
   reserved 27, 11;

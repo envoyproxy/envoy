@@ -70,128 +70,17 @@ index 8415c28fb..a017d9fc6 100755
 +
  import ply.lex as lex
  import ply.yacc as yacc
- 
-diff --git src/vat/CMakeLists.txt src/vat/CMakeLists.txt
-index e5945b20d..3d76f3d88 100644
---- src/vat/CMakeLists.txt
-+++ src/vat/CMakeLists.txt
-@@ -19,39 +19,6 @@ add_vpp_library(vatplugin
-   LINK_LIBRARIES vppinfra
+
+diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
+index e6d8f98ff..600ef4d5f 100644
+--- src/vcl/CMakeLists.txt
++++ src/vcl/CMakeLists.txt
+@@ -30,6 +30,8 @@ add_vpp_library(vppcom
+   api_headers
  )
- 
--##############################################################################
--# vpp_api_test
--##############################################################################
--add_vpp_executable(vpp_api_test ENABLE_EXPORTS
--  SOURCES
--  api_format.c
--  main.c
--  plugin.c
--  json_format.c
--  types.c
--  ip_types_api.c
--  ip_types.c
--  protocols.def
--
--  DEPENDS api_headers
--
--  LINK_LIBRARIES
--  vlibmemoryclient
--  svm
--  vatplugin
--  vppinfra
--  Threads::Threads
--  dl
--)
--
--##############################################################################
--#  vpp_json_test
--##############################################################################
--add_vpp_executable(vpp_json_test ENABLE_EXPORTS NO_INSTALL
--  SOURCES json_format.c json_test.c
--  LINK_LIBRARIES vppinfra m
--)
--
- ##############################################################################
- # vat headers
- ##############################################################################
-diff --git src/vat2/CMakeLists.txt src/vat2/CMakeLists.txt
-index 108e184b5..a90107617 100644
---- src/vat2/CMakeLists.txt
-+++ src/vat2/CMakeLists.txt
-@@ -14,21 +14,6 @@
- ##############################################################################
- # vat2
- ##############################################################################
--add_vpp_executable(vat2 ENABLE_EXPORTS
--  SOURCES
--  main.c
--  plugin.c
--
--  DEPENDS api_headers
--
--  LINK_LIBRARIES
--  vlibmemoryclient
--  svm
--  vppinfra
--  vppapiclient
--  Threads::Threads
--  dl
--)
- 
- #
- # Unit test code. Call generator directly to avoid it being installed
-@@ -37,20 +22,6 @@ add_vpp_executable(vat2 ENABLE_EXPORTS
- #)
- 
- vpp_generate_api_c_header (test/vat2_test.api)
--add_vpp_executable(test_vat2 ENABLE_EXPORTS NO_INSTALL
--  SOURCES
--  test/vat2_test.c
--
--  DEPENDS api_headers
--
--  LINK_LIBRARIES
--  vlibmemoryclient
--  svm
--  vppinfra
--  vppapiclient
--  Threads::Threads
--  dl
--)
- #target_link_options(test_vat2 PUBLIC "LINKER:-fsanitize=address")
- if(VPP_BUILD_TESTS_WITH_COVERAGE)
-   set(TARGET_NAME test_vat2)
-diff --git src/vpp-api/CMakeLists.txt src/vpp-api/CMakeLists.txt
-index 72cc1b29c..0f2510d51 100644
---- src/vpp-api/CMakeLists.txt
-+++ src/vpp-api/CMakeLists.txt
-@@ -29,10 +29,5 @@ add_vpp_headers(vpp-api
-   client/stat_client.h
- )
- 
--add_vpp_executable(test_vppapiclient NO_INSTALL
--  SOURCES client/test.c
--  LINK_LIBRARIES vppinfra pthread vppapiclient
--)
--
- add_subdirectory(vapi)
- add_subdirectory(python)
-diff --git src/vpp/CMakeLists.txt src/vpp/CMakeLists.txt
-index 1b43b1299..361b981d9 100644
---- src/vpp/CMakeLists.txt
-+++ src/vpp/CMakeLists.txt
-@@ -83,13 +83,6 @@ if(VPP_API_TEST_BUILTIN)
-   add_definitions(-DVPP_API_TEST_BUILTIN=1)
- endif()
- 
--add_vpp_executable(vpp
--  ENABLE_EXPORTS
--  SOURCES ${VPP_SOURCES}
--  LINK_LIBRARIES svm vlib vppinfra vlibmemory vnet Threads::Threads ${CMAKE_DL_LIBS}
--  DEPENDS vpp_version_h api_headers
--)
--
- add_vpp_headers(vpp
-   stats/stat_segment.h
-   stats/stat_segment_shared.h
+
++file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
++
+ add_vpp_library(vcl_ldpreload
+   SOURCES
+   ldp_socket_wrapper.c
