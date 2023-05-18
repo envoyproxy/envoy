@@ -267,6 +267,7 @@ public:
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
 
   // Http::StreamDecoderFilterCallbacks
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -315,7 +316,6 @@ public:
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setUpstreamOverrideHost, (absl::string_view host));
   MOCK_METHOD(absl::optional<absl::string_view>, upstreamOverrideHost, (), (const));
-  MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -359,6 +359,7 @@ public:
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));

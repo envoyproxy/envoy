@@ -104,6 +104,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
+  absl::string_view filterConfigName() const override { return filter_context_.config_name; }
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -239,7 +240,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(absl::string_view host) override;
   absl::optional<absl::string_view> upstreamOverrideHost() const override;
-  absl::string_view filterConfigName() const override { return filter_context_.config_name; }
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()

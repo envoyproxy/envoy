@@ -142,6 +142,7 @@ public:
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+    ON_CALL(decoder_filter_callbacks_, filterConfigName).WillByDefault(Return("envoy.filters.http.fault"));
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
@@ -608,8 +609,8 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
 // Verifies that 2 consecutive delay faults be allowed with the max number of faults set to 1.
 TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   setUpTest(fixed_delay_only_yaml);
-  envoy::config::core::v3::Metadata dynamic_metadata;
 
+  envoy::config::core::v3::Metadata dynamic_metadata;
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
   (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
@@ -688,7 +689,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
 
   // Have the fault delay of request 2 kick in, which should be delayed with success.
   timer_->invokeCallback();
-  EXPECT_THAT(dynamic_metadata, ProtoEq(config_->settings()->metadata()));
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
   filter_->onDestroy();
 
   EXPECT_EQ(2UL, config_->stats().delays_injected_.value());
@@ -1392,8 +1393,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   // Set metadata in fault. Ensure that it does not get reflected in stream info.
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
-  auto& filter_metadata = *fault.mutable_metadata()->mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
+  (*fault.mutable_filter_metadata()->mutable_fields())["hello"].set_string_value(
       "world");
 
   setupRateLimitTest(fault);
