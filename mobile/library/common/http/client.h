@@ -51,9 +51,9 @@ struct HttpClientStats {
  */
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
-  Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
-         Random::RandomGenerator& random)
-      : api_listener_(api_listener), dispatcher_(dispatcher),
+  Client(ApiListenerPtr&& api_listener, Event::ProvisionalDispatcher& dispatcher,
+         Stats::Scope& scope, Random::RandomGenerator& random)
+      : api_listener_(std::move(api_listener)), dispatcher_(dispatcher),
         stats_(
             HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."),
                                                   POOL_HISTOGRAM_PREFIX(scope, "http.client."))}),
@@ -128,6 +128,8 @@ public:
   const std::string& getCancelDetails() {
     CONSTRUCT_ON_FIRST_USE(std::string, "client_cancelled_stream");
   }
+
+  void shutdownApiListener() { api_listener_.reset(); }
 
 private:
   class DirectStream;
@@ -377,7 +379,7 @@ private:
   void removeStream(envoy_stream_t stream_handle);
   void setDestinationCluster(RequestHeaderMap& headers);
 
-  ApiListener& api_listener_;
+  ApiListenerPtr api_listener_;
   Event::ProvisionalDispatcher& dispatcher_;
   Event::SchedulableCallbackPtr scheduled_callback_;
   HttpClientStats stats_;

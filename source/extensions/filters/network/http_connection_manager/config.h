@@ -366,11 +366,11 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
+  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-      bool clear_hop_by_hop_headers);
+      Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 };
 
 /**
