@@ -49,8 +49,6 @@ public:
       const histogram_t* histogram_ptr, Histogram::Unit unit = Histogram::Unit::Unspecified,
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
-  static ConstSupportedBuckets& defaultSupportedBuckets();
-
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
