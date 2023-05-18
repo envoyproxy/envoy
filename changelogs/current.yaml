@@ -202,14 +202,12 @@ new_features:
     Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
 - area: fault
   change: |
-    added new field
-    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.filter_metadata>` to aid in logging.
-    Metadata will be stored in StreamInfo's dynamic metadata under a namespace corresponding to the name of the fault filter.
+    added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
+    Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
 - area: ext_proc
   change: |
-    added new field
-    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata>` to aid in logging.
-    Metadata will be stored in StreamInfo's filter metadata under a namespace corresponding to the name of the ext_proc filter.
+    added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
+    Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
 
 deprecated:
 - area: access_log
