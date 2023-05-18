@@ -1,10 +1,8 @@
-version: '3.8'
 services:
 
   envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
     ports:
     - "${PORT_PROXY0:-80}-${PORT_PROXY1:-81}:80"
     - "${PORT_ADMIN:-8081}:8081"
@@ -21,7 +19,6 @@ services:
 
   lrs_server:
     build:
-      context: .
       dockerfile: ../shared/golang/Dockerfile
       target: golang-lrs
     volumes:

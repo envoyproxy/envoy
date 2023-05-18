@@ -30,17 +30,18 @@ cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
-        "jni_version.cc",
     ],
     hdrs = [
         "jni_utility.h",
-        "jni_version.h",
     ],
     deps = [
         ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_env_lib",
+        "//library/common/jni/types:jni_exception_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
+        "//library/common/types:matcher_data_lib",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -64,6 +65,8 @@ cc_library(
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
+        "//library/common/jni/types:jni_exception_lib",
+        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -85,6 +88,8 @@ cc_library(
         "//library/common/data:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_exception_lib",
+        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
     ],
@@ -166,8 +171,8 @@ cc_library(
         "android_jni_utility.h",
     ],
     deps = [
-        "@envoy//source/common/common:assert_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//source/common/common:assert_lib",
     ] + select({
         "@envoy//bazel:android": [
             ":jni_support_lib",

@@ -25,6 +25,9 @@ public:
 
     // Also use HTTP/2 for upstream so that we can fully test trailers.
     setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+    sink_ptr->setShouldEscape(false);
   }
 
   void initializeFilter(const std::string& filter_config) {
@@ -113,13 +116,16 @@ public:
   }
 
   void startAdminRequest(const std::string& admin_request_yaml) {
-    admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
     const Http::TestRequestHeaderMapImpl admin_request_headers{
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
-    admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
-    admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
-    EXPECT_FALSE(admin_response_->complete());
+    WAIT_FOR_LOG_CONTAINS("debug", "New tap installed on all workers.", {
+      admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
+      admin_response_ =
+          admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
+      admin_response_->waitForHeaders();
+      EXPECT_EQ("200", admin_response_->headers().getStatusValue());
+      EXPECT_FALSE(admin_response_->complete());
+    });
   }
 
   std::string getTempPathPrefix() {
@@ -423,7 +429,7 @@ tap_config:
   startAdminRequest(admin_request_yaml);
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.prependFilter(admin_filter_config_);
   new_config_helper.renameListener("foo");
   new_config_helper.setLds("1");

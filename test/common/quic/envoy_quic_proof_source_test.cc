@@ -37,8 +37,7 @@ public:
     ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn));
     const std::string empty_string;
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
-    ON_CALL(client_context_config_, signingAlgorithmsForTest())
-        .WillByDefault(ReturnRef(empty_string));
+    ON_CALL(client_context_config_, signatureAlgorithms()).WillByDefault(ReturnRef(empty_string));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
 

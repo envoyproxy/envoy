@@ -78,7 +78,6 @@
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
-                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
@@ -86,6 +85,7 @@
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -95,7 +95,6 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
                              typedDirectResponses:
@@ -122,6 +121,9 @@
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
                                       nodeSubZone:(NSString *)nodeSubZone
+                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds
 
 {
   self = [super init];
@@ -140,7 +142,6 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
-  self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
@@ -148,6 +149,7 @@
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
+  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -157,7 +159,6 @@
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
-  self.virtualClusters = virtualClusters;
   self.runtimeGuards = runtimeGuards;
   self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
@@ -176,6 +177,10 @@
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.cdsResourcesLocator = cdsResourcesLocator;
+  self.cdsTimeoutSeconds = cdsTimeoutSeconds;
+  self.enableCds = enableCds;
+  self.bootstrapPointer = 0;
 
   return self;
 }
@@ -225,7 +230,6 @@
     }
     builder.addDnsPreresolveHostnames(hostnames);
   }
-  builder.enableHappyEyeballs(self.enableHappyEyeballs);
   builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
@@ -240,13 +244,10 @@
   builder.setAppVersion([self.appVersion toCXXString]);
   builder.setAppId([self.appId toCXXString]);
   builder.setDeviceOs("iOS");
-  for (NSString *cluster in self.virtualClusters) {
-    builder.addVirtualCluster([cluster toCXXString]);
-  }
-  builder.addStatsFlushSeconds(self.statsFlushSeconds);
-  builder.enablePlatformCertificatesValidation(true);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
-  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   if (self.statsSinks.count > 0) {
     std::vector<std::string> sinks;
     sinks.reserve(self.statsSinks.count);
@@ -255,6 +256,11 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
+  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+#endif
+
+#ifdef ENVOY_GOOGLE_GRPC
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -270,6 +276,10 @@
         [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
         self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
   }
+  if (self.enableCds) {
+    builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
+  }
+#endif
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif

@@ -17,6 +17,32 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Generic Proxy Route Configuration]
 
+message VirtualHost {
+  // The name of the virtual host.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A list of hosts that will be matched to this virtual host. Wildcard hosts are supported in
+  // the suffix or prefix form.
+  //
+  // Host search order:
+  //  1. Exact names: ``www.foo.com``.
+  //  2. Suffix wildcards: ``*.foo.com`` or ``*-bar.foo.com``.
+  //  3. Prefix wildcards: ``foo.*`` or ``foo-*``.
+  //  4. Special wildcard ``*`` matching any host and will be the default virtual host.
+  //
+  // .. note::
+  //
+  //   The wildcard will not match the empty string.
+  //   e.g. ``*-bar.foo.com`` will match ``baz-bar.foo.com`` but not ``-bar.foo.com``.
+  //   The longest wildcards match first.
+  //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
+  //   must be unique across all virtual hosts or the config will fail to load.
+  repeated string hosts = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // The match tree to use when resolving route actions for incoming requests.
+  xds.type.matcher.v3.Matcher routes = 3 [(validate.rules).message = {required: true}];
+}
+
 // The generic proxy makes use of the `xds matching API` for routing configurations.
 //
 // In the below example, we combine a top level tree matcher with a linear matcher to match
@@ -68,5 +94,12 @@ message RouteConfiguration {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The match tree to use when resolving route actions for incoming requests.
-  xds.type.matcher.v3.Matcher routes = 2 [(validate.rules).message = {required: true}];
+  // If no any virtual host is configured in the ``virtual_hosts`` field or no special wildcard
+  // virtual host is configured, the ``routes`` field will be used as the default route table.
+  // If both the wildcard virtual host and ``routes`` are configured, the configuration will fail
+  // to load.
+  xds.type.matcher.v3.Matcher routes = 2;
+
+  // An array of virtual hosts that make up the route table.
+  repeated VirtualHost virtual_hosts = 3;
 }

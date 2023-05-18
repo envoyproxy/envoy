@@ -79,24 +79,29 @@ public:
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
         listener_filter_matcher_(listener_filter_matcher), stat_prefix_(stat_prefix),
-        main_config_(std::make_shared<MainConfig>()),
-        default_configuration_(std::move(default_config)), tls_(tls) {
-    tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
-  };
+        main_config_(std::make_shared<MainConfig>(tls)),
+        default_configuration_(std::move(default_config)){};
 
   ~DynamicFilterConfigProviderImpl() override {
-    // Issuing an empty update to guarantee that the shared current config is
-    // deleted on the main thread last. This is required if the current config
-    // holds its own TLS.
-    if (!tls_.isShutdown()) {
-      update(absl::nullopt, nullptr);
+    auto& tls = main_config_->tls_;
+    if (!tls->isShutdown()) {
+      tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
+                           // Extend the lifetime of TLS by capturing main_config_, because
+                           // otherwise, the callback to clear TLS worker content is not executed.
+                           [main_config = main_config_]() {
+                             // Explicitly delete TLS on the main thread.
+                             main_config->tls_.reset();
+                             // Explicitly clear the last config instance here in case it has its
+                             // own TLS.
+                             main_config->current_config_ = {};
+                           });
     }
   }
 
   // Config::ExtensionConfigProvider
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
   OptRef<FactoryCb> config() override {
-    if (auto& optional_config = tls_->config_; optional_config.has_value()) {
+    if (auto& optional_config = (*main_config_->tls_)->config_; optional_config.has_value()) {
       return optional_config.value();
     }
     return {};
@@ -135,16 +140,17 @@ private:
 
   void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
-    tls_.runOnAllThreads([config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
-                         [main_config = main_config_, config, applied_on_all_threads]() {
-                           // This happens after all workers have discarded the previous config so
-                           // it can be safely deleted on the main thread by an update with the new
-                           // config.
-                           main_config->current_config_ = config;
-                           if (applied_on_all_threads) {
-                             applied_on_all_threads();
-                           }
-                         });
+    main_config_->tls_->runOnAllThreads(
+        [config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+        [main_config = main_config_, config, applied_on_all_threads]() {
+          // This happens after all workers have discarded the previous config so
+          // it can be safely deleted on the main thread by an update with the new
+          // config.
+          main_config->current_config_ = config;
+          if (applied_on_all_threads) {
+            applied_on_all_threads();
+          }
+        });
   }
 
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -156,13 +162,16 @@ private:
   // it. Filter factories may hold their own thread local storage which is required to be deleted
   // on the main thread.
   struct MainConfig {
+    MainConfig(ThreadLocal::SlotAllocator& tls)
+        : tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalConfig>>(tls)) {
+      tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
+    }
     absl::optional<FactoryCb> current_config_{absl::nullopt};
+    ThreadLocal::TypedSlotPtr<ThreadLocalConfig> tls_;
   };
-
   const std::string stat_prefix_;
   std::shared_ptr<MainConfig> main_config_;
   const ProtobufTypes::MessagePtr default_configuration_;
-  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 };
 
 // Struct of canonical filter name and HTTP stream filter factory callback.
@@ -292,7 +301,8 @@ struct ExtensionConfigDiscoveryStats {
  */
 class FilterConfigSubscription
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter> {
+      Logger::Loggable<Logger::Id::filter>,
+      public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
@@ -305,15 +315,29 @@ public:
 
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
-  const Protobuf::Message* lastConfig() { return last_config_.get(); }
-  const std::string& lastTypeUrl() { return last_type_url_; }
-  const std::string& lastVersionInfo() { return last_version_info_; }
-  const std::string& lastFactoryName() { return last_factory_name_; }
-  const SystemTime& lastUpdated() { return last_updated_; }
+  const Protobuf::Message* lastConfig() { return last_->config_.get(); }
+  const std::string& lastTypeUrl() { return last_->type_url_; }
+  const std::string& lastVersionInfo() { return last_->version_info_; }
+  const std::string& lastFactoryName() { return last_->factory_name_; }
+  const SystemTime& lastUpdated() { return last_->updated_; }
 
   void incrementConflictCounter();
 
 private:
+  struct ConfigVersion {
+    ConfigVersion(const std::string& version_info, SystemTime updated)
+        : version_info_(version_info), updated_(updated) {}
+    ProtobufTypes::MessagePtr config_;
+    std::string type_url_;
+    const std::string version_info_;
+    std::string factory_name_;
+    uint64_t config_hash_{0ul};
+    const SystemTime updated_;
+  };
+  // Using a heap allocated record because updates are completed by all workers asynchronously.
+  using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
+  using ConfigVersionConstSharedPtr = std::shared_ptr<const ConfigVersion>;
+
   void start();
 
   // Config::SubscriptionCallbacks
@@ -324,14 +348,10 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
+  void updateComplete();
 
   const std::string filter_config_name_;
-  uint64_t last_config_hash_{0ul};
-  ProtobufTypes::MessagePtr last_config_;
-  std::string last_type_url_;
-  std::string last_version_info_;
-  std::string last_factory_name_;
-  SystemTime last_updated_;
+  ConfigVersionConstSharedPtr last_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;

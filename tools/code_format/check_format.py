@@ -329,8 +329,8 @@ class FormatChecker:
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
-
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
+        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) \
+            or (file_path.endswith('.cc') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/") and not file_path in self.config.paths["exception"]["include"]) \
             or self.is_in_subdir(file_path, 'tools/testdata')
 
     def allow_listed_for_build_urls(self, file_path):
@@ -1062,7 +1062,7 @@ if __name__ == "__main__":
             if output:
                 error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
-                    "approval to add an exemption to check_visibility tools/code_format/check_format.py"
+                    "approval to add an exemption to visibility_excludes in tools/code_format/config.yaml"
                 )
             output = subprocess.check_output(
                 "grep -r --include BUILD envoy_package source/extensions/*",

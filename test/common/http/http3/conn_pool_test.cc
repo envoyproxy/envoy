@@ -94,7 +94,7 @@ public:
   MockQuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context)
-      : Quic::QuicClientTransportSocketFactory(move(config), factory_context) {}
+      : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context) {}
 
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
 };
@@ -122,6 +122,9 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
 }
 
 TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
+  testing::NiceMock<Stats::MockStore> mock_store;
+  ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(*mock_store.rootScope()));
+
   MockQuicClientTransportSocketFactory factory{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
       context_};
@@ -144,7 +147,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
-  EXPECT_CALL(context_.store_.counter_, inc());
+  EXPECT_CALL(mock_store.counter_, inc());
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(pool->newStream(decoder, callbacks,
                             {/*can_send_early_data_=*/false,

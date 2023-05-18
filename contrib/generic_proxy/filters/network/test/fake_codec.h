@@ -92,8 +92,17 @@ public:
         auto pair = absl::StrSplit(pair_str, absl::MaxSplits(':', 1));
         request->data_.emplace(pair);
       }
+      absl::optional<uint64_t> stream_id;
+      bool wait_response = true;
+      if (auto it = request->data_.find("stream_id"); it != request->data_.end()) {
+        stream_id = std::stoull(it->second);
+      }
+      if (auto it = request->data_.find("wait_response"); it != request->data_.end()) {
+        wait_response = it->second == "true";
+      }
+      ExtendedOptions request_options{stream_id, wait_response, false, false};
 
-      callback_->onDecodingSuccess(std::move(request));
+      callback_->onDecodingSuccess(std::move(request), request_options);
       return true;
     }
 
@@ -153,7 +162,17 @@ public:
         response->data_.emplace(pair);
       }
 
-      callback_->onDecodingSuccess(std::move(response));
+      absl::optional<uint64_t> stream_id;
+      bool close_connection = false;
+      if (auto it = response->data_.find("stream_id"); it != response->data_.end()) {
+        stream_id = std::stoull(it->second);
+      }
+      if (auto it = response->data_.find("close_connection"); it != response->data_.end()) {
+        close_connection = it->second == "true";
+      }
+      ExtendedOptions response_options{stream_id, false, close_connection, false};
+
+      callback_->onDecodingSuccess(std::move(response), response_options);
       return true;
     }
 
@@ -209,7 +228,7 @@ public:
       buffer_.writeBEInt<uint32_t>(body.size());
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_, true);
+      callback.onEncodingSuccess(buffer_);
     }
 
     Buffer::OwnedImpl buffer_;
@@ -232,7 +251,7 @@ public:
       buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.raw_code()));
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_, false);
+      callback.onEncodingSuccess(buffer_);
     }
 
     Buffer::OwnedImpl buffer_;
@@ -253,6 +272,9 @@ public:
   RequestEncoderPtr requestEncoder() const override;
   ResponseEncoderPtr responseEncoder() const override;
   MessageCreatorPtr messageCreator() const override;
+  ProtocolOptions protocolOptions() const override;
+
+  ProtocolOptions protocol_options_;
 };
 
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -266,6 +288,8 @@ public:
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
+
+  ProtocolOptions protocol_options_;
 };
 
 } // namespace GenericProxy

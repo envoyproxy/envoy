@@ -20,7 +20,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/http/rest_api_fetcher.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
@@ -102,14 +101,17 @@ struct CookieNames {
   CookieNames(const envoy::extensions::filters::http::oauth2::v3::OAuth2Credentials::CookieNames&
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
-                    cookie_names.oauth_expires()) {}
+                    cookie_names.oauth_expires(), cookie_names.id_token(),
+                    cookie_names.refresh_token()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
-              const std::string& oauth_expires)
+              const std::string& oauth_expires, const std::string& id_token,
+              const std::string& refresh_token)
       : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
-        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires), id_token_(IdToken),
-        refresh_token_(RefreshToken) {}
+        oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
+        id_token_(id_token.empty() ? IdToken : id_token),
+        refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
@@ -117,6 +119,7 @@ struct CookieNames {
   const std::string id_token_;
   const std::string refresh_token_;
 
+  static constexpr absl::string_view OauthExpires = "OauthExpires";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
 };
@@ -257,6 +260,7 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
+  std::string expires_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;

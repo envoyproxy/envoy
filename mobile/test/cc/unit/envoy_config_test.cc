@@ -28,7 +28,11 @@ using namespace Platform;
 
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
-  engine_builder.addGrpcStatsDomain("asdf.fake.website")
+  engine_builder
+#ifdef ENVOY_MOBILE_STATS_REPORTING
+      .addGrpcStatsDomain("asdf.fake.website")
+      .addStatsFlushSeconds(654)
+#endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
@@ -36,7 +40,6 @@ TEST(TestConfig, ConfigIsApplied) {
       .addDnsQueryTimeoutSeconds(321)
       .addH2ConnectionKeepaliveIdleIntervalMilliseconds(222)
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
-      .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
       .setRuntimeGuard("test_feature_false", true)
@@ -46,14 +49,15 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableAdminInterface(true)
 #endif
       .setForceAlwaysUsev6(true)
+#ifdef ENVOY_GOOGLE_GRPC
       .setNodeId("my_test_node")
+#endif
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   const std::string config_str = bootstrap->ShortDebugString();
 
   std::vector<std::string> must_contain = {
-      "asdf.fake.website",
       "connect_timeout { seconds: 123 }",
       "dns_refresh_rate { seconds: 456 }",
       "dns_min_refresh_rate { seconds: 567 }",
@@ -61,7 +65,10 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
+#ifdef ENVOY_MOBILE_STATS_REPORTING
+      "asdf.fake.website",
       "stats_flush_interval { seconds: 654 }",
+#endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
@@ -205,21 +212,6 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
-TEST(TestConfig, EnableHappyEyeballs) {
-  EngineBuilder engine_builder;
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  std::string bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, Not(HasSubstr("dns_lookup_family: V4_PREFERRED")));
-  EXPECT_THAT(bootstrap_str, HasSubstr("dns_lookup_family: ALL"));
-
-  engine_builder.enableHappyEyeballs(false);
-  bootstrap = engine_builder.generateBootstrap();
-  bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("dns_lookup_family: V4_PREFERRED"));
-  EXPECT_THAT(bootstrap_str, Not(HasSubstr("dns_lookup_family: ALL")));
-}
-
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 
@@ -243,6 +235,7 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("max_connections { value: 16 }"));
 }
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
 std::string statsdSinkConfig(int port) {
   std::string config = R"({ name: envoy.stat_sinks.statsd,
       typed_config: {
@@ -262,6 +255,7 @@ TEST(TestConfig, AddStatsSinks) {
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_EQ(bootstrap->stats_sinks_size(), 2);
 }
+#endif
 
 TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
@@ -285,7 +279,7 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 #endif
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, RtdsWithoutAds) {
   EngineBuilder engine_builder;
   engine_builder.addRtdsLayer("some rtds layer");
@@ -346,6 +340,7 @@ TEST(TestConfig, AdsConfig) {
                 .token_lifetime_seconds(),
             500);
 }
+#endif
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
@@ -436,19 +431,7 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   release_envoy_data(data);
 }
 
-TEST(TestConfig, AddVirtualCluster) {
-  EngineBuilder engine_builder;
-  engine_builder.addVirtualCluster(
-      "{headers: [{name: ':method', string_match: {exact: POST}}], name: cluster1}");
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
-
-  engine_builder.addVirtualCluster(
-      "{headers: [{name: ':method', string_match: {exact: GET}}], name: cluster2}");
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
-}
-
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, SetNodeId) {
   EngineBuilder engine_builder;
   const std::string default_node_id = "envoy-mobile";
@@ -494,6 +477,7 @@ TEST(TestConfig, AddCdsLayer) {
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
             envoy::config::core::v3::ApiVersion::V3);
 }
+#endif
 
 } // namespace
 } // namespace Envoy

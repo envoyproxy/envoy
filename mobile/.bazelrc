@@ -11,14 +11,15 @@ build --define=admin_functionality=disabled
 build --define envoy_mobile_listener=disabled
 build --define=library_autolink=disabled
 build --define=envoy_mobile_swift_cxx_interop=enabled
+build --define=envoy_enable_http_datagrams=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
-build --macos_minimum_os=10.14
-build --ios_minimum_os=12.0
+build --macos_minimum_os=10.15
+build --ios_minimum_os=13.0
 build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
@@ -39,10 +40,8 @@ build --copt -Wno-deprecated-declarations
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
-
-# The defaults are JDK 11 on newer versions of Bazel
-build --java_runtime_version=remotejdk_11
-build --java_language_version=8
+# Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
+build:rules_xcodeproj --features=-swift.use_global_index_store
 
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
@@ -57,6 +56,7 @@ build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
+build:ios --test_timeout=390,750,1500,5700
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
@@ -139,22 +139,20 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 # to add platform-specific options. Avoid using this config directly and
 # instead use a platform-specific config
 #############################################################################
-# --config=remote sets --auth_enabled=true to enable GCP authentication,
-# however, the remote execution cluster doesn't use GCP auth (it uses
-# GITHUB_TOKEN auth) so we have to override it to 'false' here.
+build:remote-ci-common --config=ci
 build:remote-ci-common --config=remote
-build:remote-ci-common --auth_enabled=false
+build:remote-ci-common --google_default_credentials=false
+build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:remote-ci-common --bes_lifecycle_events
-build:remote-ci-common --bes_upload_mode=fully_async
+build:remote-ci-common --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:remote-ci-common --jobs=40
 build:remote-ci-common --verbose_failures
 build:remote-ci-common --spawn_strategy=remote,sandboxed,local
-# Avoid hanging if the remote side closes the connection without a TCP RST. Only
-# sends a keepalive if we don't receive any messages (server updates every 60s).
-build:remote-ci-common --grpc_keepalive_time=61s
+build:remote-ci-common --grpc_keepalive_time=30s
+build:remote-ci-common --remote_timeout=3600s
+build:remote-ci-common --bes_timeout=3600s
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################
@@ -162,7 +160,6 @@ build:remote-ci-common --grpc_keepalive_time=61s
 build:remote-ci-linux --define=EXECUTOR=remote
 build:remote-ci-linux --disk_cache=
 build:remote-ci-linux --incompatible_strict_action_env=true
-build:remote-ci-linux --remote_timeout=600
 # GCC toolchain options
 build:remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain
@@ -231,8 +228,6 @@ build:remote-ci-linux-coverage --extra_execution_platforms=//third_party/rbe_con
 build:remote-ci-linux-coverage --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
 build:remote-ci-linux-coverage --host_platform=//third_party/rbe_configs/config:platform
 build:remote-ci-linux-coverage --platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-coverage --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
-build:remote-ci-linux-coverage --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
 # Flags to run tests locally which are necessary since Bazel C++ LLVM coverage isn't fully supported for remote builds
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote test execution and LLVM coverage.
 build:remote-ci-linux-coverage --remote_download_outputs=all
@@ -242,6 +237,11 @@ build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
 build:remote-ci-linux-coverage --noremote_accept_cached
 build:remote-ci-linux-coverage --config=remote-ci-common
+build:remote-ci-linux-coverage --build_runfile_links
+build:remote-ci-linux-coverage --legacy_important_outputs=false
+build:remote-ci-linux-coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+build:remote-ci-linux-coverage --nocache_test_results
+
 # IPv6 tests fail on CI
 build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################

@@ -41,6 +41,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "header_mutation_integration_test",
+    size = "large",
     srcs = [
         "header_mutation_integration_test.cc",
     ],

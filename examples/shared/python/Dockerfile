@@ -1,27 +1,27 @@
-FROM python:3.10.7-slim-bullseye@sha256:f2ee145f3bc4e061f8dfe7e6ebd427a410121495a0bd26e7622136db060c59e0 as python-base
+FROM python:3.11.3-slim-bullseye@sha256:551c9529e77896518ac5693d7e98ee5e12051d625de450ac2a68da1eae15ec87 as python-base
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+    && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
+ARG PYTHON_REQUIREMENTS_FILE=aiohttp/requirements.txt
+ADD "$PYTHON_REQUIREMENTS_FILE" /tmp/requirements.txt
 
 
 FROM python-base as python-grpc-client
 WORKDIR /client
-COPY requirements.txt /client/requirements.txt
-RUN pip install --require-hashes -qr /client/requirements.txt
+RUN pip install --require-hashes -qr /tmp/requirements.txt
 # Copy the sources, including the stubs
-COPY client.py /client/grpc-kv-client.py
+COPY --chmod=777 client.py /client/grpc-kv-client.py
 COPY kv /client/kv
-RUN chmod a+x /client/grpc-kv-client.py
 CMD tail -f /dev/null
 
 
 FROM python-base as aiohttp-service
 ENV DEBIAN_FRONTEND=noninteractive
-ADD requirements.txt /tmp/requirements.txt
-RUN pip3 install -qr /tmp/requirements.txt \
+ADD "$PYTHON_REQUIREMENTS_FILE" /tmp/requirements.txt
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    pip3 install --require-hashes -qr /tmp/requirements.txt \
     && apt-get -qq update \
     && apt-get -qq install -y --no-install-recommends netcat \
-    && apt-get -qq autoremove -y \
-    && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/* \
     && mkdir /code
 HEALTHCHECK \
     --interval=1s \
@@ -42,14 +42,16 @@ ADD tracing/service2.py /code/service.py
 
 FROM aiohttp-service as aiohttp-tracing-service3
 COPY --from=envoyproxy/envoy:dev /usr/local/bin/envoy /usr/local/bin/envoy
+COPY --chmod=777 tracing/start_service.sh /usr/local/bin/start_service.sh
 ADD tracing/service2.py /code/service.py
-ADD tracing/start_service.sh /usr/local/bin/start_service.sh
-RUN chmod u+x /usr/local/bin/start_service.sh
 ENTRYPOINT ["/usr/local/bin/start_service.sh"]
 
 
 FROM aiohttp-tracing-service3 as aiohttp-jaeger-service
-RUN apt-get -qq update && apt-get -qq install --no-install-recommends -y curl
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y curl
 #
 # for discussion on jaeger binary compatibility, and the source of the file, see here:
 #  https://github.com/envoyproxy/envoy/issues/11382#issuecomment-638012072

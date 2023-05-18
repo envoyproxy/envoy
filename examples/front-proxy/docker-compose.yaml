@@ -1,11 +1,9 @@
-version: "3.8"
 services:
 
   # front-proxy
   front-envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service1:
         condition: service_healthy

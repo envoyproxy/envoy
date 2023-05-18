@@ -299,7 +299,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      OpCodes opcode) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (4 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
 
@@ -375,7 +375,7 @@ std::string DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offse
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, (2 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
   const int32_t version = helper_.peekInt32(data, offset);
@@ -406,6 +406,9 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
       break;
     case OpCodes::Check:
       parseCheckRequest(data, offset, len);
+      break;
+    case OpCodes::Delete:
+      parseDeleteRequest(data, offset, len);
       break;
     default:
       throw EnvoyException(fmt::format("Unknown opcode within a transaction: {}", opcode));
@@ -554,7 +557,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   }
 
   if (offset == data_len) {
-    decode(data, dtype);
+    decode(data, dtype, offset);
     return;
   }
 
@@ -563,13 +566,10 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
 
   if (has_full_packets) {
     offset -= INT_LENGTH + len;
+    ASSERT(offset < data_len);
     // Decode full packets.
-    // TODO(Winbobob): use BufferFragment to avoid copying the full packets.
-    temp_data.resize(offset);
-    data.copyOut(0, offset, temp_data.data());
-    Buffer::OwnedImpl full_packets;
-    full_packets.add(temp_data.data(), temp_data.length());
-    decode(full_packets, dtype);
+    // offset here represents the length of all full packets.
+    decode(data, dtype, offset);
 
     // Copy out the rest of the data to the ZooKeeper filter buffer.
     temp_data.resize(data_len - offset);
@@ -584,11 +584,11 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   }
 }
 
-void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
+void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len) {
   uint64_t offset = 0;
 
   try {
-    while (offset < data.length()) {
+    while (offset < full_packets_len) {
       // Reset the helper's cursor, to ensure the current message stays within the
       // allowed max length, even when it's different than the declared length
       // by the message.

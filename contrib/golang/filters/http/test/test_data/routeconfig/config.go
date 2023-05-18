@@ -10,8 +10,7 @@ import (
 const Name = "routeconfig"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, configFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, configFactory, &parser{})
 }
 
 func configFactory(c interface{}) api.StreamFilterFactory {
@@ -35,10 +34,10 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) interface{} {
+func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	v := configStruct.Value
@@ -49,7 +48,7 @@ func (p *parser) Parse(any *anypb.Any) interface{} {
 	if set, ok := v.AsMap()["set"].(string); ok {
 		conf.setHeader = set
 	}
-	return conf
+	return conf, nil
 }
 
 func (p *parser) Merge(parent interface{}, child interface{}) interface{} {

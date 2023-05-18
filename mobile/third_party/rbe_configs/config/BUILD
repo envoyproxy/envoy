@@ -43,8 +43,8 @@ platform(
     ],
     exec_properties = {
         # Please update both the commented tag and the sha256
-        # mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
-        "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:c5916ba42fa49a621557d44fa500b14a890946f84145f7aa1a5f85d8e986a33c",
+        # mobile-818d28832abf2a7c0cb2bff00435be231729a0bf
+        "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:20034a0e6afa28e33125760b2dbb069ba9bf0ba717727fbb2d200a4b633297fe",
         "OSFamily": "Linux",
         "Pool": "linux",
     },
@@ -60,8 +60,8 @@ platform(
     ],
     exec_properties = {
         # Please update both the commented tag and the sha256
-        # mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
-        "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:c5916ba42fa49a621557d44fa500b14a890946f84145f7aa1a5f85d8e986a33c",
+        # mobile-818d28832abf2a7c0cb2bff00435be231729a0bf
+        "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:20034a0e6afa28e33125760b2dbb069ba9bf0ba717727fbb2d200a4b633297fe",
         "OSFamily": "Linux",
         "Pool": "linux",
         # Necessary to workaround https://github.com/google/sanitizers/issues/916, otherwise, dangling threads in the

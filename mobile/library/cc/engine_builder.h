@@ -13,6 +13,7 @@
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
+#include "library/common/types/matcher_data.h"
 #include "log_level.h"
 #include "string_accessor.h"
 
@@ -39,7 +40,6 @@ public:
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
-  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -51,7 +51,6 @@ public:
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
-  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
   EngineBuilder& setAppVersion(std::string app_version);
@@ -62,7 +61,6 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
 #endif
@@ -70,6 +68,7 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+#ifdef ENVOY_GOOGLE_GRPC
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
@@ -87,17 +86,22 @@ public:
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
   EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
+#endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
-  EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
 #endif
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
+  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
+  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
+#endif
   EngineBuilder& addPlatformFilter(std::string name);
-  EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // Add a direct response. For testing purposes only.
@@ -174,7 +178,6 @@ private:
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
   bool admin_interface_enabled_ = false;
-  bool enable_happy_eyeballs_ = true;
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
@@ -186,12 +189,10 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
-  std::vector<std::string> virtual_clusters_;
   std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

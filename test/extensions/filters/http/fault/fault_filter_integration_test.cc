@@ -83,9 +83,12 @@ typed_config:
 // Fault integration tests that should run with all protocols, useful for testing various
 // end_stream permutations when rate limiting.
 class FaultIntegrationTestAllProtocols : public FaultIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestAllProtocols,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, FaultIntegrationTestAllProtocols,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // No fault injected.
 TEST_P(FaultIntegrationTestAllProtocols, NoFault) {

@@ -76,11 +76,15 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "custom_response_integration_test",
+    size = "large",
     srcs = [
         "custom_response_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.custom_response"],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/config:well_known_names",

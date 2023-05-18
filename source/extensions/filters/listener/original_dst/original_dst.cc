@@ -17,7 +17,7 @@ Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Netwo
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "original_dst: new connection accepted");
+  ENVOY_LOG(trace, "original_dst: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
 
   if (socket.addressType() == Network::Address::Type::Ip) {
@@ -63,7 +63,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
         }
       }
 #endif
-      ENVOY_LOG(trace, "original_dst: set destination to {}", original_local_address->asString());
+      ENVOY_LOG(debug, "original_dst: set destination to {}", original_local_address->asString());
 
       // Restore the local address to the original one.
       socket.connectionInfoProvider().restoreLocalAddress(original_local_address);

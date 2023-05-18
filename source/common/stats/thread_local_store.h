@@ -105,6 +105,12 @@ public:
   }
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
+  std::vector<Bucket> detailedTotalBuckets() const override {
+    return detailedlBucketsHelper(*cumulative_histogram_);
+  }
+  std::vector<Bucket> detailedIntervalBuckets() const override {
+    return detailedlBucketsHelper(*interval_histogram_);
+  }
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -121,6 +127,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  static std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram);
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& thread_local_store_;
@@ -211,6 +219,9 @@ public:
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
   const TagProducer& tagProducer() const { return *tag_producer_; }
+  void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
+  void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                            StatNameTagVector& tags) override;
 
 private:
   friend class ThreadLocalStoreTestingPeer;

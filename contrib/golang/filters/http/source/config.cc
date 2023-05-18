@@ -4,7 +4,7 @@
 
 #include "source/common/common/fmt.h"
 
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
 namespace Envoy {
@@ -14,7 +14,7 @@ namespace Golang {
 
 Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", proto_config.library_id(),
                  proto_config.library_path());
@@ -22,14 +22,16 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
   // unloaded.
   // TODO: unload DSO when filter updated.
-  auto res = Envoy::Dso::DsoManager::load(proto_config.library_id(), proto_config.library_path());
+  auto res = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(proto_config.library_id(),
+                                                           proto_config.library_path());
   if (!res) {
     throw EnvoyException(fmt::format("golang_filter: load library failed: {} {}",
                                      proto_config.library_id(), proto_config.library_path()));
   }
 
-  auto dso_lib = Dso::DsoManager::getDsoByID(proto_config.library_id());
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
+  auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id());
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+      proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
 
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(config, dso_lib);

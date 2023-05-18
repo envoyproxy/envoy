@@ -302,7 +302,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
-  MOCK_METHOD(const Config&, routeConfig, (), (const));
+  MOCK_METHOD(const CommonConfig&, routeConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
               (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
@@ -580,7 +580,7 @@ public:
   MockScopedConfig();
   ~MockScopedConfig() override;
 
-  MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const Http::HeaderMap& headers), (const));
+  MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const ScopeKeyPtr& scope_key), (const));
 
   std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
 };
@@ -598,6 +598,14 @@ public:
   MOCK_METHOD(ApiType, apiType, (), (const));
 
   std::shared_ptr<MockScopedConfig> config_;
+};
+
+class MockScopeKeyBuilder : public ScopeKeyBuilder {
+public:
+  MockScopeKeyBuilder();
+  ~MockScopeKeyBuilder() override;
+
+  MOCK_METHOD(ScopeKeyPtr, computeScopeKey, (const Http::HeaderMap&), (const));
 };
 
 class MockGenericConnPool : public GenericConnPool {
@@ -653,7 +661,7 @@ public:
   MockClusterSpecifierPlugin();
 
   MOCK_METHOD(RouteConstSharedPtr, route,
-              (const RouteEntry& parent, const Http::RequestHeaderMap& header), (const));
+              (RouteConstSharedPtr parent, const Http::RequestHeaderMap& header), (const));
 };
 
 class MockClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {

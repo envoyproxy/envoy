@@ -49,6 +49,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "wasm_integration_test",
+    size = "large",
     srcs = ["wasm_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",

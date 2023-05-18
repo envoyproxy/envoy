@@ -4,7 +4,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/main_interface.h"
-#include "library/common/network/apple_platform_cert_verifier.h"
 #include "library/common/stats/utility.h"
 
 // This file exists in order to expose headers for Envoy's C++ libraries
@@ -40,6 +39,16 @@ inline void raw_header_map_set(Platform::RawHeaderMap& map, std::string key,
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
 inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {
   return reinterpret_cast<BootstrapPtr>(builder.generateBootstrap().release());
+}
+
+inline std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+bootstrapFromPtr(BootstrapPtr bootstrap_ptr) {
+  return absl::WrapUnique(
+      reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
+}
+
+inline std::string bootstrapDebugDescription(BootstrapPtr bootstrap_ptr) {
+  return bootstrapFromPtr(bootstrap_ptr)->ShortDebugString();
 }
 
 /**

@@ -33,7 +33,6 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
-#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -58,6 +57,7 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
 EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
   stats_sinks_ = std::move(stats_sinks);
   return *this;
@@ -67,6 +67,12 @@ EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
   stats_domain_ = std::move(stats_domain);
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
+  stats_flush_seconds_ = stats_flush_seconds;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
@@ -119,16 +125,6 @@ EngineBuilder& EngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
 EngineBuilder&
 EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds) {
   h2_connection_keepalive_timeout_seconds_ = h2_connection_keepalive_timeout_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
-  virtual_clusters_.push_back(std::move(virtual_cluster));
   return *this;
 }
 
@@ -185,11 +181,6 @@ EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
 }
 #endif
 
-EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
-  enable_happy_eyeballs_ = happy_eyeballs_on;
-  return *this;
-}
-
 #ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
@@ -199,11 +190,6 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
-  skip_dns_lookups_for_proxied_requests_ = value;
   return *this;
 }
 
@@ -221,7 +207,7 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
@@ -237,9 +223,6 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
-#ifndef ENVOY_GOOGLE_GRPC
-  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
-#endif
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
@@ -262,6 +245,7 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
   cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
+#endif
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
@@ -385,11 +369,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
-  // Virtual clusters
-  for (auto& cluster : virtual_clusters_) {
-    MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
-                              ProtobufMessage::getStrictValidationVisitor());
-  }
 
   for (auto& direct_response_in : direct_responses_) {
     auto* this_route = api_service->add_routes();
@@ -438,10 +417,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
+#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name((*filter).name_);
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
+#else
+    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
+#endif
   }
 
   // Set up the optional filters
@@ -558,10 +541,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   if (!direct_responses_.empty()) {
-    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
     auto* cache_reset_filter = hcm->add_http_filters();
     cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
-    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
+    cache_reset_filter->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
   }
 
   // Set up the always-present filters
@@ -581,11 +565,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
   auto* dns_cache_config = dfp_config.mutable_dns_cache_config();
   dns_cache_config->set_name("base_dns_cache");
-  if (enable_happy_eyeballs_) {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
-  } else {
-    dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_PREFERRED);
-  }
+  dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   dns_cache_config->mutable_host_ttl()->set_seconds(86400);
   dns_cache_config->mutable_dns_min_refresh_rate()->set_seconds(dns_min_refresh_seconds_);
   dns_cache_config->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
@@ -919,8 +899,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
   }
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
-      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -932,8 +910,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
   for (const std::string& sink_yaml : stats_sinks_) {
+#ifdef ENVOY_ENABLE_YAML
     auto* sink = bootstrap->add_stats_sinks();
     MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+#else
+    UNREFERENCED_PARAMETER(sink_yaml);
+    IS_ENVOY_BUG("stats sinks can not be added when YAML is compiled out.");
+#endif
   }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;

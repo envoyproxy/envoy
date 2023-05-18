@@ -26,11 +26,15 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_integration_test",
+    size = "large",
     srcs = ["filter_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//source/extensions/key_value/file_based:config_lib",
