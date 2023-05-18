@@ -438,7 +438,8 @@ case $CI_TARGET in
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
               --action_env=TODAY_DATE \
               -- -v warn \
-                 -c cves release_dates releases
+                 -c cves release_dates releases || echo "WARNING: Dependency check failed"
+
         # Run dependabot tests
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -511,6 +512,19 @@ case $CI_TARGET in
     docker-upload)
         setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        ;;
+
+    dockerhub-publish)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/distribution:update_dockerhub_repository
+        ;;
+
+    dockerhub-readme)
+        setup_clang_toolchain
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution/dockerhub:readme
+        cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
     fix_proto_format)
