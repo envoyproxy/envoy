@@ -5,6 +5,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/stats/stats_matcher_impl.h"
+
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -44,12 +45,18 @@ static void BM_Inclusion(benchmark::State& state) {
   context.inclusionList()->set_suffix("1");
   context.inclusionList()->set_prefix("2.");
   context.initMatcher();
+  std::vector<Envoy::Stats::StatName> stat_names;
+  stat_names.reserve(10);
+  for (auto idx = 0; idx < 10; ++idx) {
+    stat_names.push_back(context.pool_.add(absl::StrCat("2.", idx)));
+  }
 
   for (auto _ : state) {
     for (auto idx = 0; idx < 1000; ++idx) {
-      Envoy::Stats::StatName stat_name = context.pool_.add(absl::StrCat("2.", idx % 10));
-      const auto fast_result = context.stats_matcher_impl_->fastRejects(stat_name);
-      (void)context.stats_matcher_impl_->slowRejects(fast_result, stat_name);
+      const Envoy::Stats::StatName stat_name = stat_names[idx % 10];
+      const Envoy::Stats::StatsMatcher::FastResult fast_result =
+          context.stats_matcher_impl_->fastRejects(stat_name);
+      context.stats_matcher_impl_->slowRejects(fast_result, stat_name);
     }
   }
 }
@@ -61,12 +68,18 @@ static void BM_Exclusion(benchmark::State& state) {
   context.exclusionList()->set_suffix("1");
   context.exclusionList()->set_prefix("2.");
   context.initMatcher();
+  std::vector<Envoy::Stats::StatName> stat_names;
+  stat_names.reserve(10);
+  for (auto idx = 0; idx < 10; ++idx) {
+    stat_names.push_back(context.pool_.add(absl::StrCat("2.", idx)));
+  }
 
   for (auto _ : state) {
     for (auto idx = 0; idx < 1000; ++idx) {
-      Envoy::Stats::StatName stat_name = context.pool_.add(absl::StrCat("2.", idx % 10));
-      const auto fast_result = context.stats_matcher_impl_->fastRejects(stat_name);
-      (void)context.stats_matcher_impl_->slowRejects(fast_result, stat_name);
+      const Envoy::Stats::StatName stat_name = stat_names[idx % 10];
+      const Envoy::Stats::StatsMatcher::FastResult fast_result =
+          context.stats_matcher_impl_->fastRejects(stat_name);
+      context.stats_matcher_impl_->slowRejects(fast_result, stat_name);
     }
   }
 }
