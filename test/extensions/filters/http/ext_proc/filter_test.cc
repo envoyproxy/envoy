@@ -384,7 +384,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
 
   Envoy::ProtobufWkt::Struct filter_metadata;
-  filter_metadata.mutable_fields()["scooby"].set_string_value("doo");
+  (*filter_metadata.mutable_fields())["scooby"].set_string_value("doo");
   expectMetadataInFilterState(filter_metadata);
 }
 
