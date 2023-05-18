@@ -226,7 +226,18 @@ jobs:
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             //examples/swift/async_await:app &> /tmp/envoy.log &
-    - run: sed '/\[2\] Uploaded 7 MB of data/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: |
+        checklogs () {
+            sed '/\[2\] Uploaded 7 MB of data/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+        }
+        # TODO(phlax): figure if this needs this long
+        timeout 5m checklogs || {
+            if grep -q "Upload failed" /tmp/envoy.log; then
+                echo "Upload failed" >&2
+            else
+                echo "Upload timed out" >&2
+            fi
+        }
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check upload succeeded'
     - run: cat /tmp/envoy.log
