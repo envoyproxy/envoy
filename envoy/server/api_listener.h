@@ -30,6 +30,9 @@ public:
    * Create an Http::ApiListener capable of starting synthetic HTTP streams. The returned listener
    * must only be deleted in the dispatcher's thread.
    *
+   * While Envoy Mobile only uses this from the main thread, taking a dispatcher as a parameter
+   * allows other users to use this from worker threads as well.
+   *
    * @return valid pointer IFF type() == Type::HttpApiListener, otherwise nullptr.
    */
   virtual Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) PURE;
