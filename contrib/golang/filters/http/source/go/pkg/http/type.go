@@ -226,7 +226,9 @@ func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Del(key string) {
-	panic("unsupported yet")
+	h.initTrailers()
+	delete(h.headers, key)
+	cAPI.HttpRemoveTrailer(unsafe.Pointer(h.request.req), &key)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {

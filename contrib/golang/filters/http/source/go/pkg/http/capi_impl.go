@@ -210,6 +210,11 @@ func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *stri
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
+	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(key))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	var value string
 	// TODO: add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
