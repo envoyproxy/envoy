@@ -87,7 +87,7 @@ void TestServer::startTestServer(bool use_quic, bool disable_https) {
   // maybe: , {":status", "200"}
   if (!data_.empty()) {
     upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-        Http::TestResponseHeaderMapImpl({{header_key_, header_data_}})));
+        Http::TestResponseHeaderMapImpl({{header_key_, header_value_}})));
     upstream_->setResponseBody(data_);
   }
 
