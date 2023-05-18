@@ -60,9 +60,11 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
 void UpstreamConn::connect() {
   ENVOY_LOG(debug, "do connect addr: {}", addr_);
 
+  // TODO(antJack): add support for upstream TLS cluster.
+  static const std::string upstream_cluster = "plainText";
   ClusterManagerContainer& cluster_manager_container = clusterManagerContainer();
   Upstream::ThreadLocalCluster* cluster =
-      cluster_manager_container.cluster_manager_->getThreadLocalCluster("plainText");
+      cluster_manager_container.cluster_manager_->getThreadLocalCluster(upstream_cluster);
   if (!cluster) {
     ENVOY_LOG(error, "cluster not found");
     onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,

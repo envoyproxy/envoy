@@ -104,22 +104,34 @@ type DynamicMetadata interface {
 }
 
 type DownstreamFilter interface {
+	// Called when a connection is first established.
 	OnNewConnection() FilterStatus
+	// Called when data is read on the connection.
 	OnData(buffer []byte, endOfStream bool) FilterStatus
+	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
+	// Called when data is to be written on the connection.
 	OnWrite(buffer []byte, endOfStream bool) FilterStatus
 }
 
 type UpstreamFilter interface {
+	// Called when a connection is available to process a request/response.
 	OnPoolReady(cb ConnectionCallback)
+	// Called when a pool error occurred and no connection could be acquired for making the request.
 	OnPoolFailure(poolFailureReason PoolFailureReason, transportFailureReason string)
+	// Invoked when data is delivered from the upstream connection.
 	OnData(buffer []byte, endOfStream bool)
+	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
 }
 
 type ConnectionCallback interface {
+	// Return the local address of the connection.
 	LocalAddr() string
+	// Return the remote address of the connection.
 	RemoteAddr() string
+	// Write data to the connection.
 	Write(buffer []byte, endStream bool)
+	// Close the connection.
 	Close(closeType ConnectionCloseType)
 }
