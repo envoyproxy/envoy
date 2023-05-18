@@ -84,7 +84,6 @@ void TestServer::startTestServer(bool use_quic, bool disable_https) {
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
   // Optionally add headers and data if setHeadersAndData() was called.
-  // maybe: , {":status", "200"}
   if (!data_.empty()) {
     upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
         Http::TestResponseHeaderMapImpl({{header_key_, header_value_}})));
