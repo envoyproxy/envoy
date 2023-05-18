@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build-ubuntu:818d28832abf2a7c0cb2bff00435be231729a0bf
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
       env:
         CLANG_FORMAT: /opt/llvm/bin/clang-format
         BUILDIFIER_BIN: /usr/local/bin/buildifier
