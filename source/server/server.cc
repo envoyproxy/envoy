@@ -712,9 +712,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
       access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
 
-  // Now that we are initialized, notify the bootstrap extensions.
+  // Now that the worker thread are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->onServerInitialized();
+    bootstrap_extension->onWorkerThreadInitialized();
   }
 
   // Now the configuration gets parsed. The configuration may start setting
@@ -753,6 +753,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are

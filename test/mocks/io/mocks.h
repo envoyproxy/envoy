@@ -34,7 +34,7 @@ public:
 class MockIoUringFactory : public IoUringFactory {
 public:
   MOCK_METHOD(OptRef<IoUringWorker>, getIoUringWorker, ());
-  MOCK_METHOD(void, onServerInitialized, ());
+  MOCK_METHOD(void, onWorkerThreadInitialized, ());
   MOCK_METHOD(bool, currentThreadRegistered, ());
 };
 

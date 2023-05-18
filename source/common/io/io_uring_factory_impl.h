@@ -14,7 +14,7 @@ public:
 
   OptRef<IoUringWorker> getIoUringWorker() override;
 
-  void onServerInitialized() override;
+  void onWorkerThreadInitialized() override;
   bool currentThreadRegistered() override;
 
 private:

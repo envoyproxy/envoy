@@ -20,7 +20,7 @@ OptRef<IoUringWorker> IoUringFactoryImpl::getIoUringWorker() {
   return ret;
 }
 
-void IoUringFactoryImpl::onServerInitialized() {
+void IoUringFactoryImpl::onWorkerThreadInitialized() {
   tls_.set([io_uring_size = io_uring_size_,
             use_submission_queue_polling = use_submission_queue_polling_,
             accept_size = accept_size_, read_buffer_size = read_buffer_size_,

@@ -57,6 +57,7 @@ public:
     return *wasm_service_;
   }
   void onServerInitialized() override;
+  void onWorkerThreadInitialized() override {}
 
 private:
   void createWasm(Server::Configuration::ServerFactoryContext& context);

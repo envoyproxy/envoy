@@ -435,7 +435,7 @@ public:
    * Initializes a factory upon server readiness. For example this method can be
    * used to set TLS.
    */
-  virtual void onServerInitialized() PURE;
+  virtual void onWorkerThreadInitialized() PURE;
 
   /**
    * Indicates whether the current thread has IoUringWorker

@@ -19,9 +19,9 @@
 namespace Envoy {
 namespace Network {
 
-void DefaultSocketInterfaceExtension::onServerInitialized() {
+void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
   if (io_uring_factory_ != nullptr) {
-    io_uring_factory_->onServerInitialized();
+    io_uring_factory_->onWorkerThreadInitialized();
   }
 }
 

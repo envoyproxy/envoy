@@ -15,7 +15,7 @@ public:
       : Network::SocketInterfaceExtension(sock_interface), io_uring_factory_(io_uring_factory) {}
 
   // Server::BootstrapExtension
-  void onServerInitialized() override;
+  void onWorkerThreadInitialized() override;
 
 protected:
   std::shared_ptr<Io::IoUringFactory> io_uring_factory_;

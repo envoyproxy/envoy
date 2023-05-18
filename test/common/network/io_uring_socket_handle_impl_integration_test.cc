@@ -47,7 +47,7 @@ public:
 
     io_uring_factory_ =
         std::make_unique<Io::IoUringFactoryImpl>(10, false, 5, 8192, 1000, instance_);
-    io_uring_factory_->onServerInitialized();
+    io_uring_factory_->onWorkerThreadInitialized();
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
     io_handle_ = std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory_, fd_);
