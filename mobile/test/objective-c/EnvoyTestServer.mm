@@ -1,7 +1,6 @@
 #import "test/objective-c/EnvoyTestServer.h"
 #import "test/common/integration/test_server_interface.h"
 
-
 @implementation EnvoyTestServer
 
 // Starts a server with HTTP3 and TLS.
@@ -31,7 +30,7 @@
 
 // Add response data to the upstream.
 + (void)setHeadersAndData:(NSString *)header_key
-              header_value:(NSString *)header_value
+             header_value:(NSString *)header_value
                      data:(NSString *)data {
   set_headers_and_data([header_key UTF8String], [header_value UTF8String], [data UTF8String]);
 }
