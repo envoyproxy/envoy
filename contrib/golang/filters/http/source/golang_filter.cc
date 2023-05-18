@@ -840,17 +840,47 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value, he
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  switch (act) {
-  case HeaderAdd:
-    trailers_->addCopy(Http::LowerCaseString(key), value);
-    break;
+  if (state.isThreadSafe()) {
+    switch (act) {
+    case HeaderAdd:
+      trailers_->addCopy(Http::LowerCaseString(key), value);
+      break;
 
-  case HeaderSet:
-    trailers_->setCopy(Http::LowerCaseString(key), value);
-    break;
+    case HeaderSet:
+      trailers_->setCopy(Http::LowerCaseString(key), value);
+      break;
 
-  default:
-    RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+    default:
+      RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+    }
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+    auto value_str = std::string(value);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and
+    // writing in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
+        switch (act) {
+        case HeaderAdd:
+          trailers_->addCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        case HeaderSet:
+          trailers_->setCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        default:
+          RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+        }
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setTrailer");
+      }
+    });
   }
   return CAPIStatus::CAPIOK;
 }
@@ -870,7 +900,25 @@ CAPIStatus Filter::removeTrailer(absl::string_view key) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  trailers_->remove(Http::LowerCaseString(key));
+  if (state.isThreadSafe()) {
+    trailers_->remove(Http::LowerCaseString(key));
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
+        trailers_->remove(Http::LowerCaseString(key_str));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in removeTrailer");
+      }
+    });
+  }
   return CAPIStatus::CAPIOK;
 }
 
