@@ -60,14 +60,27 @@ parameters:
   displayName: "Run Packaging"
   type: string
   default: true
-- name: publishNetlify
-  displayName: "Publish Netlify"
+
+- name: publishDockerhub
+  displayName: "Publish Dockerhub"
   type: string
-  default: true
+  default: false
+- name: publishDocs
+  displayName: "Publish Docs"
+  type: string
+  default: false
+- name: publishDocsLatest
+  displayName: "Publish Docs to Netlify"
+  type: string
+  default: false
+- name: publishDocsRelease
+  displayName: "Publish Docs to website"
+  type: string
+  default: false
 - name: publishGithubRelease
   displayName: "Publish Github release"
   type: string
-  default: true
+  default: false
 
 
 jobs:
@@ -237,7 +250,7 @@ jobs:
   dependsOn: ["success"]
   condition: |
     and(not(canceled()),
-        eq(${{ parameters.publishNetlify }}, 'true'))
+        eq(${{ parameters.publishDocs }}, 'true'))
   pool:
     vmImage: "ubuntu-20.04"
   steps:
@@ -261,6 +274,9 @@ jobs:
 
   - script: |
       ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDockerhub }}, 'true'))
     displayName: "Publish Dockerhub description and README"
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -272,7 +288,6 @@ jobs:
       GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
-    condition: and(eq(variables['isMain'], 'true'), eq(variables['PostSubmit'], true))
 
   - script: |
       ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
@@ -287,19 +302,32 @@ jobs:
       GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
     condition: eq(variables['isMain'], 'true')
 
+  # Trigger Netlify rebuild of latest docs
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsLatest }}, 'true'))
+    displayName: "Publish latest docs"
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
+
+  # Publish docs to the website
   - task: InstallSSHKey@0
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsRelease }}, 'true'))
     inputs:
       hostName: $(authGithubSSHKeyPublic)
       sshPublicKey: "${{ parameters.authSSHDocsKeyPublic }}"
       sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
       sshKeySecureFile: "${{ parameters.authSSHDocsKey }}"
-
   - script: docs/publish.sh
-    displayName: "Publish to GitHub"
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsRelease }}, 'true'))
+    displayName: "Publish to Website"
     workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
 
 - job: github
   displayName: Publish release tag
