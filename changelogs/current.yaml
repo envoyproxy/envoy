@@ -98,7 +98,7 @@ bug_fixes:
     can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`` to false.
     You can also use
-    :ref:`route/virtual host optional flag <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>`
+    :ref:`route/virtual host optional flag <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>`
     as a replacement of the feature.
 - area: logging
   change: |
@@ -211,7 +211,7 @@ new_features:
 - area: http
   change: |
     Add support to the route/virtual host level
-    :ref:`is_optional <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>` field.
+    :ref:`is_optional <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>` field.
     A route/virtual host level per filter config can be marked as optional, which means that if
     the filter fails to load, the configuration will no be rejected.
 
