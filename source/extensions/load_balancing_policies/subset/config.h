@@ -23,6 +23,22 @@ public:
                                    TimeSource& time_source) override;
 };
 
+class SubsetLbFactory
+    : public Upstream::TypedLoadBalancerFactoryBase<Upstream::SubsetLoadbalancingPolicyProto> {
+public:
+  SubsetLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.subset") {}
+
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                              const Upstream::ClusterInfo& cluster_info,
+                                              const Upstream::PrioritySet& priority_set,
+                                              Runtime::Loader& runtime,
+                                              Random::RandomGenerator& random,
+                                              TimeSource& time_source) override;
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override;
+};
+
 } // namespace Subset
 } // namespace LoadBalancingPolices
 } // namespace Extensions

@@ -103,6 +103,63 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
+template <class ProtoType>
+class LoadBalancerSubsetInfoImplBase : public Upstream::LoadBalancerSubsetInfo {
+public:
+  // TODO(wbpcode): use legacy enum for backward compatibility for now.
+  using FallbackPolicy =
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy;
+  using MetadataFallbackPolicy =
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy;
+  using SubsetFallbackPolicy = envoy::config::cluster::v3::Cluster::LbSubsetConfig::
+      LbSubsetSelector::LbSubsetSelectorFallbackPolicy;
+
+  LoadBalancerSubsetInfoImplBase(const ProtoType& subset_config)
+      : default_subset_(subset_config.default_subset()),
+        fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
+        metadata_fallback_policy_(
+            static_cast<MetadataFallbackPolicy>(subset_config.metadata_fallback_policy())),
+        enabled_(!subset_config.subset_selectors().empty()),
+        locality_weight_aware_(subset_config.locality_weight_aware()),
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
+    for (const auto& subset : subset_config.subset_selectors()) {
+      if (!subset.keys().empty()) {
+        subset_selectors_.emplace_back(std::make_shared<Upstream::SubsetSelectorImpl>(
+            subset.keys(), static_cast<SubsetFallbackPolicy>(subset.fallback_policy()),
+            subset.fallback_keys_subset(), subset.single_host_per_subset()));
+      }
+    }
+  }
+
+  // Upstream::LoadBalancerSubsetInfo
+  bool isEnabled() const override { return enabled_; }
+  FallbackPolicy fallbackPolicy() const override { return fallback_policy_; }
+  MetadataFallbackPolicy metadataFallbackPolicy() const override {
+    return metadata_fallback_policy_;
+  }
+  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
+  const std::vector<Upstream::SubsetSelectorPtr>& subsetSelectors() const override {
+    return subset_selectors_;
+  }
+  bool localityWeightAware() const override { return locality_weight_aware_; }
+  bool scaleLocalityWeight() const override { return scale_locality_weight_; }
+  bool panicModeAny() const override { return panic_mode_any_; }
+  bool listAsAny() const override { return list_as_any_; }
+
+private:
+  const ProtobufWkt::Struct default_subset_;
+  std::vector<Upstream::SubsetSelectorPtr> subset_selectors_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const FallbackPolicy fallback_policy_;
+  const MetadataFallbackPolicy metadata_fallback_policy_;
+  const bool enabled_ : 1;
+  const bool locality_weight_aware_ : 1;
+  const bool scale_locality_weight_ : 1;
+  const bool panic_mode_any_ : 1;
+  const bool list_as_any_ : 1;
+};
+
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
   SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets, ChildLoadBalancerCreatorPtr child_lb,
