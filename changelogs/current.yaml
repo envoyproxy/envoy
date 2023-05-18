@@ -93,6 +93,9 @@ bug_fixes:
     Do not display GRPC_STATUS_NUMBER for non gRPC requests.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
+- area: boringssl
+  change: |
+    Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
