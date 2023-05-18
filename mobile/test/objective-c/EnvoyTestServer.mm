@@ -29,7 +29,9 @@
 }
 
 // Add response data to the upstream.
-+ (void)setHeadersAndData:(NSString *)header_key headerValue:(NSString *)header_value data:(NSString *)data  {
++ (void)setHeadersAndData:(NSString *)header_key
+              headerValue:(NSString *)header_value
+                     data:(NSString *)data {
   set_headers_and_data(header_key, header_value, data);
 }
 

@@ -40,8 +40,8 @@ public:
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
-   * use_quic: If true, use http3 with TLS
-   * disable_https: If true: use http1 without TLS.  If false, use http2 with TLS
+   * use_quic: If true, use http3 with TLS.
+   * disable_https: If true: use http1 without TLS. If false, use http2 with TLS.
    */
   void startTestServer(bool use_quic, bool disable_https);
 

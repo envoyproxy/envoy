@@ -115,7 +115,8 @@ int TestServer::getServerPort() {
   return upstream_->localAddress()->ip()->port();
 }
 
-void TestServer::setHeadersAndData(std::string header_key, std::string header_value, std::string data) {
+void TestServer::setHeadersAndData(std::string header_key, std::string header_value,
+                                   std::string data) {
   header_key_ = header_key;
   header_value_ = header_value;
   data_ = data;
