@@ -12,3 +12,6 @@ echo ')EOF";'
 echo 'constexpr absl::string_view AdminActiveParamsHtml = R"EOF('
 cat "$4"
 echo ')EOF";'
+echo 'constexpr absl::string_view HistogramsJs = R"EOF('
+cat "$5"
+echo ')EOF";'

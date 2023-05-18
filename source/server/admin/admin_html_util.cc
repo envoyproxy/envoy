@@ -58,6 +58,7 @@ public:
     map_["admin_head_start.html"] = AdminHtmlStart;
     map_["admin.css"] = AdminCss;
     map_["active_stats.js"] = AdminActiveStatsJs;
+    map_["histograms.js"] = HistogramsJs;
     map_["active_params.html"] = AdminActiveParamsHtml;
   }
 

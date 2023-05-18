@@ -10,11 +10,17 @@
 // Follow-ups:
 //   * top-n algorithm to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.
-//   * render histograms
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
-//   * json flavor to send hierarchical names to save serialization/deserialization costs
-
+//   * json variant to send hierarchical names to save serialization/deserialization costs
+//   * pause auto-refresh for at least 5 seconds when editing fields.
+//   * don't auto-refresh when there is error -- provide a button to re-retry.
+//   * consider removing histogram mode during active display, and overlay summary graphics
+//   * rename bucket mode "none" to "summary"
+//   * integrate interval view.
+//   * incremental histogram update
+//   * stretchable height -- resize histograms
+//   * fix navigation and probably test it somehow.
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -22,11 +28,18 @@
  */
 const nameStatsMap = new Map();
 
+const nameHistogramsMap = new Map();
+
 /**
  * The first time this script loads, it will write PRE element at the end of body.
  * This is hooked to the `DOMContentLoaded` event.
  */
 let activeStatsPreElement = null;
+
+/**
+ * A div into which we render histograms.
+ */
+let activeStatsHistogramsDiv = null;
 
 /**
  * A small div for displaying status and error messages.
@@ -42,6 +55,10 @@ let statusDiv = null;
 const paramIdPrefix = 'param-1-stats-';
 
 let postRenderTestHook = null;
+let currentValues = null;
+let initialValues = null;
+let reloadTimer = null;
+let controls = null;
 
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
@@ -56,6 +73,22 @@ function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
   postRenderTestHook = hook;
 }
 
+function getParamValues() {
+  let values = {};
+  for (key of Object.keys(controls)) {
+    values[key] = controls[key].value;
+  }
+  return values;
+/*
+  return {
+    filter: paramValue('filter'),
+    type: paramValue('type'),
+    max_display_count: loadSettingOrUseDefault('active-max-display-count', 50),
+    update_interval_sec: loadSettingOrUseDefault('active-update-interval', 5)
+  };
+*/
+}
+
 /**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
  * PRE right now) and kick off the periodic JSON updates.
@@ -65,41 +98,169 @@ function initHook() {
   statusDiv.className = 'error-status-line';
   activeStatsPreElement = document.createElement('pre');
   activeStatsPreElement.id = 'active-content-pre';
+  const table = document.createElement('table');
+  table.classList.add('histogram-body', 'histogram-column');
+  activeStatsHistogramsDiv = document.createElement('div');
+  //activeStatsHistogramsTable.id = 'active-content-histograms-table';
   document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
+  document.body.appendChild(activeStatsHistogramsDiv);
+  controls = {
+    filter: document.getElementById(paramIdPrefix + 'filter'),
+    type: document.getElementById(paramIdPrefix + 'type'),
+    max_display_count: document.getElementById('active-max-display-count'),
+    update_interval_sec: document.getElementById('active-update-interval')
+  };
+  initialValues = currentValues = {
+    filter: '',
+    type: 'All',
+    max_display_count: '50',
+    update_interval_sec: '5',
+  };
+  setControls();
+
+  // The type widget activates immediately on any change, recording history.
+  controls['type'].addEventListener('change', onSubmit);
+
+  // The three text controls reset the auto-refresh timer when there's a change,
+  // and auto-submit on form submit, which gets run when user hits Return when
+  // focus in a text widget. They also auto-submit when the focus shifts out
+  // of them.
+  for (name of ['filter', 'max_display_count', 'update_interval_sec']) {
+    const control = controls[name];
+    control.addEventListener('change', updateParams);
+    control.addEventListener('blur', onSubmit);
+  }
   loadStats();
+}
+
+// Called when anyone edits a type-in field. This doesn't re-execute the stats
+// query from the incremental edit immediately, but it resets the timer. If
+// the timer expires before the user hits return then it auto-confirms the
+// new setting.
+function updateParams() {
+  clearTimer();
+  setTimer();
+}
+
+function allValuesEqual(a, b) {
+  if (a == b) {
+    return true;
+  } else if (a == null || b == null) {
+    return false;
+  }
+
+  const a_keys = Object.keys(a);
+  const b_keys = Object.keys(b);
+  if (a_keys.length != b_keys.length) {
+    return false;
+  }
+  for (key of a_keys) {
+    if (!b.hasOwnProperty(key)) {
+      return false;
+    }
+    const a_value = a[key];
+    const b_value = b[key];
+    const a_type = typeof a_value;
+    if (a_type != typeof b_value) {
+      return false;
+    }
+    if (a_type == 'object') {
+      if (!allValuesEqual(a_value, b_value)) {
+        return false;
+      }
+    } else if (a_value != b_value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Called when user hits return in any type-in field, or when someone changes the Type field.
+function onSubmit() {
+  saveState();
+  loadStats();
+  return false;
+}
+
+function saveState() {
+  const newValues = getParamValues();
+  if (allValuesEqual(newValues, currentValues)) {
+    return;
+  }
+  currentValues = newValues;
+  history.pushState(currentValues, null,
+                    'html-active?filter=' + encodeURIComponent(currentValues.filter) +
+                    '&type=' + encodeURIComponent(currentValues.type));
+}
+
+function setControls() {
+  // Set the widgets to the new values.
+  for (key of Object.keys(controls)) {
+    console.log('setting control ' + key + ' to ' + currentValues[key]);
+    controls[key].value = currentValues[key];
+  }
+}
+
+// Called when someone presses the back/forward button.
+function navigateHook(event) {
+  if (event.state) {
+    currentValues = event.state;
+  } else {
+    currentValues = initialValues;
+  }
+
+  setControls();
+  loadStats();
+}
+
+function clearTimer() {
+  if (reloadTimer != null) {
+    window.clearTimeout(reloadTimer);
+    reloadTimer = null;
+  }
+}
+
+function setTimer() {
+  reloadTimer = window.setTimeout(() => {
+    reloadTimer = null;
+    loadStats();
+  }, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
  * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
-  const makeQueryParam = (name) => name + '=' + encodeURIComponent(
-      document.getElementById(paramIdPrefix + name).value);
-  const params = ['filter', 'type', 'histogram_buckets'];
+  clearTimer();
+
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(currentValues[name]);
+  const params = ['filter', 'type'];
   const href = window.location.href;
 
   // Compute the fetch URL prefix based on the current URL, so that the admin
   // site can be hosted underneath a site-specific URL structure.
-  const stats_pos = href.indexOf('/stats?');
-  if (stats_pos == -1) {
-    statusDiv.textContent = 'Cannot find /stats? in ' + href;
+  const statsPos = href.indexOf('/stats/html-active');
+  if (statsPos == -1) {
+    statusDiv.textContent = 'Cannot find /stats/html-active in ' + href;
     return;
   }
-  const prefix = href.substring(0, stats_pos);
-  const url = prefix + '/stats?format=json&usedonly&' +
+  const prefix = href.substring(0, statsPos);
+  const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
         params.map(makeQueryParam).join('&');
 
   try {
     const response = await fetch(url);
     const data = await response.json();
-    renderStats(data);
+    renderStats(activeStatsHistogramsDiv, data);
   } catch (e) {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
 
-  // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
+  // Update stats with a minimum of 5 second interval between completing the
+  // previous update and the start of the new one. So if it takes 1 second
+  // to refresh the stats we'll do it every 6 seconds, by default.
+  setTimer();
 }
 
 /**
@@ -132,6 +293,23 @@ function compareStatRecords(a, b) {
   return 0;
 }
 
+function compareHistogramRecords(a, b) {
+  // Sort higher change-counts first.
+  if (a.change_count != b.change_count) {
+    return b.change_count - a.change_count;
+  }
+
+  // Unlike scalar stats, we do not value-sort histograms. For identical change-counts
+  // we just fall back to forward alphabetic sort.
+  if (a.histogram.name < b.histogram.name) {
+    return -1;
+  }
+  if (a.histogram.name > b.histogram.name) {
+    return 1;
+  }
+  return 0;
+}
+
 /**
  * The active display has additional settings for tweaking it -- this helper extracts numeric
  * values from text widgets
@@ -155,13 +333,38 @@ function loadSettingOrUseDefault(id, defaultValue) {
  * the most-frequently-used map, reverse-sorts by use-count, and serializes the
  * top ordered stats into the PRE element created in initHook.
  *
+ * @param {!Element} histogramDiv
  * @param {!Object} data
  */
-function renderStats(data) {
-  sortedStats = [];
+function renderStats(histogramDiv, data) {
+  let sortedStats = [];
+  let sortedHistograms = [];
+
+  let supportedPercentiles;
   for (stat of data.stats) {
     if (!stat.name) {
-      continue; // Skip histograms for now.
+      const histograms = stat.histograms;
+      if (histograms && histograms.details) {
+        for (histogram of histograms.details) {
+          if (!histogram.name || !histogram.percentiles || !histogram.totals) {
+            continue;
+          }
+          supportedPercentiles = histograms.supported_percentiles;
+          let histogramRecord = nameHistogramsMap.get(histogram.name);
+          if (histogramRecord) {
+            if (!allValuesEqual(histogramRecord.histogram.detail, histogram.detail) ||
+                !allValuesEqual(histogramRecord.histogram.percentiles, histogram.percentiles)) {
+              ++histogramRecord.change_count;
+              histogramRecord.histogram = histogram;
+            }
+          } else {
+            histogramRecord = {histogram: histogram, change_count: 0};
+            nameHistogramsMap.set(histogram.name, histogramRecord);
+          }
+          sortedHistograms.push(histogramRecord);
+        }
+      }
+      continue;
     }
     let statRecord = nameStatsMap.get(stat.name);
     if (statRecord) {
@@ -182,6 +385,7 @@ function renderStats(data) {
   // of those can be found, but that would bloat this relatively modest amount
   // of code, and compel us to do a better job writing tests.
   sortedStats.sort(compareStatRecords);
+  sortedHistograms.sort(compareHistogramRecords);
 
   const max = loadSettingOrUseDefault('active-max-display-count', 50);
   let index = 0;
@@ -193,6 +397,17 @@ function renderStats(data) {
     text += `${statRecord.name}: ${statRecord.value} (${statRecord.change_count})\n`;
   }
   activeStatsPreElement.textContent = text;
+
+  histogramDiv.replaceChildren();
+  index = 0;
+  for (histogramRecord of sortedHistograms) {
+    if (++index > max) {
+      break;
+    }
+    renderHistogram(histogramDiv, supportedPercentiles, histogramRecord.histogram,
+                    histogramRecord.change_count);
+  }
+
 
   // If a post-render test-hook has been established, call it, but clear
   // the hook first, so that the callee can set a new hook if it wants to.
@@ -207,3 +422,4 @@ function renderStats(data) {
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
 addEventListener('DOMContentLoaded', initHook);
+addEventListener('popstate', navigateHook);
