@@ -90,13 +90,16 @@ bug_fixes:
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
 - area: http
   change: |
-    The :ref:`is_optional <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>` field of
-    HTTP filter can only be used for configuration loading of
-    :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>` and will be ignored for
-    loading of route or virtual host level filter config.
-    This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`` to false. You can also use
-    :ref:`route/virtual host optional flag <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>` as a replacement of the feature.
+    The :ref:`is_optional
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`
+    field of HTTP filter can only be used for configuration loading of
+    :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>`
+    and will be ignored for loading of route or virtual host level filter config. This behavioral change
+    can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`` to false.
+    You can also use
+    :ref:`route/virtual host optional flag <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>`
+    as a replacement of the feature.
 - area: logging
   change: |
     Do not display GRPC_STATUS_NUMBER for non gRPC requests.
@@ -207,8 +210,10 @@ new_features:
     Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
 - area: http
   change: |
-    Add support to the route/virtual host level :ref:`is_optional <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>` field. A route/virtual host level
-    per filter config can be marked as optional, which means that if the filter fails to load, the configuration will no be rejected.
+    Add support to the route/virtual host level
+    :ref:`is_optional <envoy_v3_api_field_config.router.v3.FilterConfig.is_optional>` field.
+    A route/virtual host level per filter config can be marked as optional, which means that if
+    the filter fails to load, the configuration will no be rejected.
 
 
 deprecated:
