@@ -434,17 +434,17 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  switch (openStream()) {
-  case StreamOpenState::Error:
-    return FilterTrailersStatus::StopIteration;
-  case StreamOpenState::IgnoreError:
-    return FilterTrailersStatus::Continue;
-  case StreamOpenState::Ok:
-    // Fall through
-    break;
-  }
-
   if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+    // If no gRPC stream yet, opens it before sending data.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
@@ -456,6 +456,16 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   if (!state.sendTrailers()) {
     ENVOY_LOG(trace, "Skipped trailer processing");
     return FilterTrailersStatus::Continue;
+  }
+
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterTrailersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterTrailersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
   }
 
   sendTrailers(state, trailers);
