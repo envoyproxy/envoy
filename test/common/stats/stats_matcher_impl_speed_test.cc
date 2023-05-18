@@ -39,7 +39,7 @@ private:
 } // namespace Stats
 } // namespace Envoy
 
-static void BM_Inclusion(benchmark::State& state) {
+static void bmInclusion(benchmark::State& state) {
   // Create matcher.
   Envoy::Stats::StatsMatcherPerf context;
   context.inclusionList()->set_suffix("1");
@@ -60,9 +60,9 @@ static void BM_Inclusion(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(BM_Inclusion);
+BENCHMARK(bmInclusion);
 
-static void BM_Exclusion(benchmark::State& state) {
+static void bmExclusion(benchmark::State& state) {
   // Create matcher.
   Envoy::Stats::StatsMatcherPerf context;
   context.exclusionList()->set_suffix("1");
@@ -83,4 +83,4 @@ static void BM_Exclusion(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(BM_Exclusion);
+BENCHMARK(bmExclusion);
