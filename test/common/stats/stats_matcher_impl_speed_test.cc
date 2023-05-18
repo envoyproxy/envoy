@@ -39,7 +39,8 @@ private:
 } // namespace Stats
 } // namespace Envoy
 
-static void bmInclusion(benchmark::State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_Inclusion(benchmark::State& state) {
   // Create matcher.
   Envoy::Stats::StatsMatcherPerf context;
   context.inclusionList()->set_suffix("1");
@@ -60,9 +61,10 @@ static void bmInclusion(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(bmInclusion);
+BENCHMARK(BM_Inclusion);
 
-static void bmExclusion(benchmark::State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_Exclusion(benchmark::State& state) {
   // Create matcher.
   Envoy::Stats::StatsMatcherPerf context;
   context.exclusionList()->set_suffix("1");
@@ -83,4 +85,4 @@ static void bmExclusion(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(bmExclusion);
+BENCHMARK(BM_Exclusion);
