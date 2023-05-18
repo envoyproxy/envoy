@@ -260,9 +260,16 @@ jobs:
     displayName: "Generate docs"
 
   - script: |
-      bazel run //tools/distribution:update_dockerhub_repository
+      ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
     displayName: "Publish Dockerhub description and README"
     env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
     condition: and(eq(variables['isMain'], 'true'), eq(variables['PostSubmit'], true))
