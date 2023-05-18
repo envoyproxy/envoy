@@ -1,3 +1,5 @@
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 
@@ -47,7 +49,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
                "'google.protobuf.Struct'");
 }
 
-TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
+TEST_F(HTTPTypedPerFilterConfigTest, HcmIgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
 
@@ -61,6 +63,28 @@ TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFi
         auto* filter = hcm.mutable_http_filters()->Add();
         filter->set_name("filter.unknown");
         filter->set_is_optional(true);
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+  initialize();
+}
+
+TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* config = virtual_host->mutable_typed_per_filter_config();
+
+        envoy::config::route::v3::FilterConfig filter_config;
+        filter_config.set_is_optional(true);
+        filter_config.mutable_config()->PackFrom(Envoy::ProtobufWkt::Struct());
+        (*config)["filter.unknown"].PackFrom(filter_config);
+
+        auto* filter = hcm.mutable_http_filters()->Add();
+        filter->set_name("filter.unknown");
+
         // keep router the last
         auto size = hcm.http_filters_size();
         hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);

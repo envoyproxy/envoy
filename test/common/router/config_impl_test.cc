@@ -10466,6 +10466,70 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
+TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAny) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.default.filter:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        seconds: 123
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.default.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                seconds: 123
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  filter.unknown:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
   const std::string yaml = R"EOF(
 typed_per_filter_config:

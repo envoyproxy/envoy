@@ -181,7 +181,7 @@ http_filters:
       "'google.protobuf.Struct'");
 }
 
-TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+TEST_F(RdsImplTest, RdsAndStaticWithHcmOptionalUnknownFilterPerVirtualHostConfig) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -203,6 +203,33 @@ stat_prefix: foo
 http_filters:
 - name: filter.unknown
   is_optional: true
+    )EOF";
+
+  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
+                                  server_factory_context_, validation_visitor_, outer_init_manager_,
+                                  "foo.", *route_config_provider_manager_);
+}
+
+TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+  const std::string config_yaml = R"EOF(
+route_config:
+  virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
     )EOF";
 
   RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
@@ -363,7 +390,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
-TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+TEST_F(RdsImplTest, HcmOptionalUnknownFacotryForPerVirtualHostTypedConfig) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -413,6 +440,73 @@ http_filters:
           "typed_per_filter_config": {
             "filter.unknown": {
               "@type": "type.googleapis.com/google.protobuf.Struct"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+}
+
+// Validate the optional unknown factory will be ignored for per virtualhost typed config.
+TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  InSequence s;
+  const std::string config_yaml = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
+    )EOF";
+
+  setup(config_yaml);
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "integration",
+          "domains": [
+            "*"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster_header": ":authority"
+              }
+            }
+          ],
+          "typed_per_filter_config": {
+            "filter.unknown": {
+              "@type": "type.googleapis.com/envoy.config.route.v3.FilterConfig",
+              "is_optional": true,
+              "config": {
+                "@type": "type.googleapis.com/google.protobuf.Struct"
+              }
             }
           }
         }

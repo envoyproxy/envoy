@@ -2104,15 +2104,10 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 }
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config,
-    const OptionalHttpFilters& optional_http_filters,
+    const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
 
-  // Ignore the optional_http_filters if the ignore_optional_option_from_hcm_for_route_config_ is
-  // set to true by the runtime feature.
-  bool is_optional = !ignore_optional_option_from_hcm_for_route_config_ &&
-                     (optional_http_filters.find(name) != optional_http_filters.end());
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -2155,12 +2150,38 @@ PerFilterConfigs::PerFilterConfigs(
     : ignore_optional_option_from_hcm_for_route_config_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config")) {
 
-  for (const auto& it : typed_configs) {
-    const auto& name = it.first;
-    auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
-                                                  factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
+  static const std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+
+  for (const auto& per_filter_config : typed_configs) {
+    const std::string& name = per_filter_config.first;
+    RouteSpecificFilterConfigConstSharedPtr config;
+
+    // Ignore the optional_http_filters if the ignore_optional_option_from_hcm_for_route_config_
+    // is set to true by the runtime feature.
+    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config_ &&
+                              (optional_http_filters.find(name) != optional_http_filters.end());
+
+    if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
+        filter_config_type) {
+      envoy::config::route::v3::FilterConfig filter_config;
+      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
+                                                    filter_config);
+
+      if (!filter_config.has_config()) {
+        continue;
+      }
+
+      config = createRouteSpecificFilterConfig(name, filter_config.config(),
+                                               is_optional_by_hcm || filter_config.is_optional(),
+                                               factory_context, validator);
+    } else {
+      config = createRouteSpecificFilterConfig(name, per_filter_config.second, is_optional_by_hcm,
+                                               factory_context, validator);
+    }
+
+    if (config != nullptr) {
+      configs_.emplace(name, config);
     }
   }
 }
