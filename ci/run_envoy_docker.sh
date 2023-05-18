@@ -114,6 +114,8 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
+       -e DOCKERHUB_USERNAME \
+       -e DOCKERHUB_PASSWORD \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_NO_CACHE_TEST_RESULTS \
