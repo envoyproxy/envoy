@@ -99,7 +99,8 @@
   border-style: solid;
   /* width: 16px; */
   width: 2%;
-  margin-left: -0.5%;
+  /* margin-left: -0.5%; */
+  margin-left: -0.75%;
 }
 
 .histogram-percentile {
@@ -150,4 +151,7 @@
   bottom: 0;
   font-family: sans-serif;
   font-size: 12px;
+  text-align: center;
+  margin-left: -0.75%;
+  overflow-x: visible;
 }

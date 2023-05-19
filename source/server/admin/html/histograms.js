@@ -37,6 +37,8 @@ function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
   }
 }
 
+let layout_evenly = true;
+
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = document.createElement('div');
   const label = document.createElement('span');
@@ -56,21 +58,21 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
   let i = 0;
   const percentile_values = histogram.percentiles;
-  let minValue = null;
-  let maxValue = null;
-  const updateMinMaxValue = (value) => {
-    if (minValue == null) {
-      minValue = value;
-      maxValue = value;
-    } else if (value < minValue) {
-      minValue = value;
-    } else if (value > minValue) {
-      maxValue = value;
+  let minXValue = null;
+  let maxXValue = null;
+  const updateMinMaxValue = (min, max) => {
+    if (minXValue == null) {
+      minXValue = min;
+      maxXValue = max;
+    } else if (min < minXValue) {
+      minXValue = min;
+    } else if (max > maxXValue) {
+      maxXValue = max;
     }
   };
 
   for (i = 0; i < supported_percentiles.length; ++i) {
-    updateMinMaxValue(percentile_values[i].cumulative);
+    updateMinMaxValue(percentile_values[i].cumulative, percentile_values[i].cumulative);
   }
   const graphics = document.createElement('div');
   const labels = document.createElement('div');
@@ -93,7 +95,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
   for (bucket of histogram.totals) {
     maxCount = Math.max(maxCount, bucket.count);
-    updateMinMaxValue(bucket.lower_bound);
+    const upper_bound = bucket.lower_bound + bucket.width;
+    updateMinMaxValue(bucket.lower_bound, upper_bound);
 
     // Attach percentile records with values between the previous bucket and
     // this one. We will drop percentiles before the first bucket. Thus each
@@ -104,7 +107,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucket.annotations = [];
       for (; percentileIndex < percentile_values.length; ++percentileIndex) {
         const percentileValue = percentile_values[percentileIndex].cumulative;
-        if (percentileValue > bucket.lower_bound) {
+        if (percentileValue > upper_bound) {
           break; // do not increment index; re-consider percentile for next bucket.
         }
         bucket.annotations.push(
@@ -113,10 +116,11 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
       for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
         const interval = histogram.intervals[intervalIndex];
-        if (interval.lower_bound > bucket.lower_bound) {
+        const interval_upper_bound = interval.lower_bound + interval.width;
+        if (interval_upper_bound > upper_bound) {
           break; // do not increment index; re-consider interval for next bucket.
         }
-        bucket.annotations.push([interval.lower_bound, interval.count, INTERVAL]);
+        bucket.annotations.push([interval.lower_bound, interval.width, interval.count, INTERVAL]);
       }
 
       if (bucket.annotations.length > 0) {
@@ -137,9 +141,12 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     maxCount = Math.max(maxCount, bucket.count);
   }
 
-  const height = maxValue - minValue;
-  const scaledValue = value => 9*((value - minValue) / height) + 1; // between 1 and 10;
-  const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
+  const histogramTotalWidth = maxXValue - minXValue;
+  const scaledXValue = xvalue => 9999*(xvalue / histogramTotalWidth) + 1; // between 1 and 10000;
+  const xvalueToPercent = xvalue => {
+    const log = log10(scaledXValue(xvalue)); // Between 0 and 4
+    return 25*log;
+  };
 
   // Lay out the buckets evenly, independent of the bucket values. It's up
   // to the `circlhist` library to space out the buckets in a shape tuned to
@@ -154,12 +161,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // computation in JS and converting them to percentages for writing element
   // style.
   const bucketWidthVpx = 20;
+
   const marginWidthVpx = 40;
+
   const percentileWidthAndMarginVpx = 20;
   const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
 
   const toPercent = vpx => formatPercent(vpx / widthVpx);
-
   let leftVpx = marginWidthVpx / 2;
   let prevVpx = 0;
   for (i = 0; i < histogram.totals.length; ++i) {
@@ -189,7 +197,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         // We always put the marker proportionally between this bucket and
         // the next one.
         const span = document.createElement('span');
-        span.className = (annotation[2] == PERCENTILE) ? 'histogram-percentile' :
+        span.className = (annotation[3] == PERCENTILE) ? 'histogram-percentile' :
             'histogram-interval';
         let percentilePercent = toPercent(percentileVpx);
         span.style.left = percentilePercent;
@@ -204,10 +212,10 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         const percentilePLabel = document.createElement('span');
         percentilePLabel.className = 'percentile-label';
         percentilePLabel.style.bottom = 0;
-        if (annotation[2] == PERCENTILE) {
+        if (annotation[3] == PERCENTILE) {
           percentilePLabel.textContent = 'P' + annotation[1];
         } else {
-          percentilePLabel.textContent = 'i:' + annotation[1];
+          percentilePLabel.textContent = 'i:' + annotation[2];
         }
         percentilePLabel.style.left = percentilePercent; // percentileLeft;
 
@@ -229,10 +237,28 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     const heightPercent = maxCount == 0 ? 0 : formatPercent(bucket.count / maxCount);
     bucketSpan.style.height = heightPercent;
     const left = toPercent(leftVpx);
-    bucketSpan.style.left = left;
-    const label = document.createElement('span');
-    label.textContent = format(bucket.lower_bound);
-    label.style.left = left;
+    const upper_bound = bucket.lower_bound + bucket.width;
+    if (layout_evenly) {
+      bucketSpan.style.left = left;
+    } else {
+      const leftPercent = xvalueToPercent(bucket.lower_bound - minXValue);
+      bucketSpan.style.left = leftPercent + '%';
+      const rightPercent = xvalueToPercent(upper_bound - minXValue);
+      bucketSpan.style.width = (rightPercent - leftPercent) + '%';
+    }
+    console.log('lower_bound=' + bucket.lower_bound + ' width=' + bucket.width +
+                ' left=' + bucketSpan.style.left + ' width=' + bucketSpan.style.width);
+    const lower_label = document.createElement('span');
+    //lower_label.textContent = format(bucket.lower_bound) + '[' + format(bucket.width) + ']';
+    lower_label.textContent = format(bucket.lower_bound) + ',' + format(bucket.width);
+    //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
+    lower_label.style.left = left;
+    lower_label.style.width = toPercent(bucketWidthVpx);
+/*
+    const upper_label = document.createElement('span');
+    upper_label.textContent = format(upper_bound);
+    upper_label.style.left = toPercent(leftVpx + bucketWidthVpx/2);
+*/
 
     const bucketLabel = document.createElement('span');
     bucketLabel.className = 'bucket-label';
@@ -242,7 +268,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
     graphics.appendChild(bucketSpan);
     graphics.appendChild(bucketLabel);
-    labels.appendChild(label);
+    labels.appendChild(lower_label);
+    //labels.appendChild(upper_label);
     prevVpx = leftVpx;
     leftVpx += bucketWidthVpx + marginWidthVpx;;
   }
