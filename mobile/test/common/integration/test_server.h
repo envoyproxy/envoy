@@ -40,6 +40,7 @@ public:
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
+   * use_quic and disable_https should not both be set to true.
    * use_quic: If true, use http3 with TLS.
    * disable_https: If true: use http1 without TLS. If false, use http2 with TLS.
    */
@@ -60,7 +61,7 @@ public:
    * Sets headers and data for the test server to return on all future requests.
    * Can only be called once the server has been started.
    */
-  void setHeadersAndData(std::string header_key, std::string header_value, std::string data);
+  void setHeadersAndData(absl::string_view header_key, absl::string_view header_value, absl::string_view response_body);
 };
 
 } // namespace Envoy

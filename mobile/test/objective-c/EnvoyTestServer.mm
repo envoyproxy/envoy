@@ -31,8 +31,8 @@
 // Add response data to the upstream.
 + (void)setHeadersAndData:(NSString *)header_key
              header_value:(NSString *)header_value
-                     data:(NSString *)data {
-  set_headers_and_data([header_key UTF8String], [header_value UTF8String], [data UTF8String]);
+                     response_body:(NSString *)response_body {
+  set_headers_and_data([header_key UTF8String], [header_value UTF8String], [response_body UTF8String]);
 }
 
 @end

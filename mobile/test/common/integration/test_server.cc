@@ -108,10 +108,11 @@ int TestServer::getServerPort() {
   return upstream_->localAddress()->ip()->port();
 }
 
-void TestServer::setHeadersAndData(std::string header_key, std::string header_value,
-                                   std::string data) {
-  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestResponseHeaderMapImpl({{header_key, header_value}, {":status", "200"}})));
-  upstream_->setResponseBody(data);
+void TestServer::setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
+                                   absl::string_view response_body) {
+  upstream_->setResponseHeaders(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+          {{std::string(header_key), std::string(header_value)}, {":status", "200"}})));
+  upstream_->setResponseBody(std::string(response_body));
 }
 } // namespace Envoy

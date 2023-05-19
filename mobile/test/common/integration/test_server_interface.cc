@@ -14,9 +14,8 @@ void start_server(bool use_quic, bool disable_https) {
   strong_test_server_ = std::make_shared<Envoy::TestServer>();
   weak_test_server_ = strong_test_server_;
 
-  if (auto e = test_server()) {
-    e->startTestServer(use_quic, disable_https);
-  }
+  auto e = test_server();
+  e->startTestServer(use_quic, disable_https);
 }
 
 void shutdown_server() {
@@ -28,15 +27,13 @@ void shutdown_server() {
 }
 
 int get_server_port() {
-  if (auto e = test_server()) {
-    return e->getServerPort();
-  }
+  auto e = test_server();
+  return e->getServerPort();
   return -1; // failure
 }
 
-void set_headers_and_data(const std::string& header_key, const std::string& header_value,
-                          const std::string& data) {
-  if (auto e = test_server()) {
-    e->setHeadersAndData(header_key, header_value, data);
-  }
+void set_headers_and_data(absl::string_view header_key, absl::string_view header_value,
+                          absl::string_view response_body) {
+  auto e = test_server();
+  e->setHeadersAndData(header_key, header_value, response_body);
 }

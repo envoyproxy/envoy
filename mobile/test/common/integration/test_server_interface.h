@@ -28,8 +28,8 @@ int get_server_port();
 /**
  * Set dummy response data for server. Can only be called once the server has been started.
  */
-void set_headers_and_data(const std::string& header_key, const std::string& header_value,
-                          const std::string& data);
+void set_headers_and_data(absl::string_view header_key, absl::string_view header_value,
+                          absl::string_view response_body);
 
 #ifdef __cplusplus
 } // functions

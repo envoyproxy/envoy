@@ -10,6 +10,6 @@
 + (void)shutdownTestServer;
 + (void)setHeadersAndData:(NSString *)header_key
              header_value:(NSString *)header_value
-                     data:(NSString *)data;
+                     response_body:(NSString *)response_body;
 
 @end
