@@ -28,7 +28,7 @@ public final class TestJni {
     if (!sServerRunning.compareAndSet(false, true)) {
       throw new IllegalStateException("Server is already running");
     }
-    nativeStartTestServer();
+    nativeStartHttp2TestServer();
   }
 
   /**
