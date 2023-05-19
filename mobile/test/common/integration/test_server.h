@@ -10,6 +10,13 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 
 namespace Envoy {
+
+enum TestServerType {
+  HTTP1_HTTP,
+  HTTP2_HTTPS,
+  HTTP3_HTTPS,
+};
+
 class TestServer {
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -23,9 +30,6 @@ private:
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
-  std::string header_key_;
-  std::string header_value_;
-  std::string data_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
 
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
@@ -40,11 +44,9 @@ public:
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
-   * use_quic and disable_https should not both be set to true.
-   * use_quic: If true, use http3 with TLS.
-   * disable_https: If true: use http1 without TLS. If false, use http2 with TLS.
+   * test_server_type: selects between HTTP3, HTTP2, or HTTP1 without TLS
    */
-  void startTestServer(bool use_quic, bool disable_https);
+  void startTestServer(TestServerType test_server_type);
 
   /**
    * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all

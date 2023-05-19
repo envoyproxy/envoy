@@ -14,17 +14,17 @@ public final class TestJni {
   /*
    * Starts the server. Throws an {@link IllegalStateException} if already started.
    */
-  public static void startQuicTestServer() {
+  public static void startHttp3TestServer() {
     if (!sServerRunning.compareAndSet(false, true)) {
-      throw new IllegalStateException("Quic server is already running");
+      throw new IllegalStateException("Http3 server is already running");
     }
-    nativeStartQuicTestServer();
+    nativeStartHttp3TestServer();
   }
 
   /*
    * Starts the server. Throws an {@link IllegalStateException} if already started.
    */
-  public static void startTestServer() {
+  public static void startHttp2TestServer() {
     if (!sServerRunning.compareAndSet(false, true)) {
       throw new IllegalStateException("Server is already running");
     }
@@ -61,9 +61,9 @@ public final class TestJni {
     return nativeCreateYaml(envoyConfiguration.createBootstrap());
   }
 
-  private static native void nativeStartQuicTestServer();
+  private static native void nativeStartHttp3TestServer();
 
-  private static native void nativeStartTestServer();
+  private static native void nativeStartHttp2TestServer();
 
   private static native void nativeShutdownTestServer();
 

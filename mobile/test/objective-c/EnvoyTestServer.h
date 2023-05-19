@@ -4,13 +4,13 @@
 @interface EnvoyTestServer : NSObject
 
 // Starts a server with HTTP3 and TLS.
-+ (void)startQuicTestServer;
++ (void)startHttp3Server;
 // Get the port of the upstream server.
 + (NSInteger)getEnvoyPort;
 // Starts a server with HTTP2 and TLS.
-+ (void)startTestServer;
++ (void)startHttp2Server;
 // Starts a server with HTTP1 and no TLS.
-+ (void)startHttpTestServer;
++ (void)startHttp1PlaintextServer;
 // Shut down and clean up server.
 + (void)shutdownTestServer;
 // Add response data to the upstream.

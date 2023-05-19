@@ -10,10 +10,10 @@
 // Quic Test ServerJniLibrary
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartQuicTestServer(JNIEnv* env,
-                                                                                jclass clazz) {
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp3TestServer(JNIEnv* env,
+                                                                                 jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(true, false);
+  start_server(Envoy::TestServerType::HTTP3_HTTPS);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -24,10 +24,10 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetServerPort(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartTestServer(JNIEnv* env,
-                                                                            jclass clazz) {
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp2TestServer(JNIEnv* env,
+                                                                                 jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(false, false);
+  start_server(Envoy::TestServerType::HTTP2_HTTPS);
 }
 
 extern "C" JNIEXPORT void JNICALL

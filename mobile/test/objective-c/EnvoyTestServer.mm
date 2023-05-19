@@ -3,32 +3,26 @@
 
 @implementation EnvoyTestServer
 
-// Starts a server with HTTP3 and TLS.
-+ (void)startQuicTestServer {
-  start_server(true, false);
++ (void)startHttp3Server {
+  start_server(Envoy::TestServerType::HTTP3_HTTPS);
 }
 
-// Get the port of the upstream server.
 + (NSInteger)getEnvoyPort {
   return get_server_port();
 }
 
-// Starts a server with HTTP2 and TLS.
-+ (void)startTestServer {
-  start_server(false, false);
++ (void)startHttp2Server {
+  start_server(Envoy::TestServerType::HTTP2_HTTPS);
 }
 
-// Starts a server with HTTP1 and no TLS.
-+ (void)startHttpTestServer {
-  start_server(false, true);
++ (void)startHttp1PlaintextServer {
+  start_server(Envoy::TestServerType::HTTP1_HTTP);
 }
 
-// Shut down and clean up server.
 + (void)shutdownTestServer {
   shutdown_server();
 }
 
-// Add response data to the upstream.
 + (void)setHeadersAndData:(NSString *)header_key
              header_value:(NSString *)header_value
             response_body:(NSString *)response_body {

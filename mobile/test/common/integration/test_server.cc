@@ -59,33 +59,35 @@ TestServer::TestServer()
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
 }
 
-void TestServer::startTestServer(bool use_quic, bool disable_https) {
+void TestServer::startTestServer(TestServerType test_server_type) {
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock, false, false);
   // end pre-setup
-  ASSERT(!(use_quic && disable_https), "test_server doesn't support QUIC without https");
   Network::DownstreamTransportSocketFactoryPtr factory;
-  if (use_quic) {
+
+  switch (test_server_type) {
+  case TestServerType::HTTP3_HTTPS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
     factory = createQuicUpstreamTlsContext(factory_context_);
-  } else {
-    if (disable_https) {
-      upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
-      factory = Network::Test::createRawBufferDownstreamSocketFactory();
-    } else {
-      upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-      factory = createUpstreamTlsContext(factory_context_);
-    }
+    break;
+  case TestServerType::HTTP2_HTTPS:
+    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+    factory = createUpstreamTlsContext(factory_context_);
+    break;
+  case TestServerType::HTTP1_HTTP:
+    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
+    factory = Network::Test::createRawBufferDownstreamSocketFactory();
+    break;
   }
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
 
   // Legacy behavior for cronet tests.
-  if (use_quic) {
+  if (test_server_type == TestServerType::HTTP3_HTTPS) {
     upstream_->setResponseHeaders(
         std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
             {{":status", "200"},
