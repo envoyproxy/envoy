@@ -26,16 +26,15 @@ using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 
 struct CelMatchData : public CustomMatchData {
-  // explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
-  // StreamActivation data_;
+  explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
+  StreamActivation data_;
 };
 
 class CelInputMatcher : public Matcher::InputMatcher {
  public:
   // TODO(tyxia) Changed to dev::cel
   // Need to change the cel library version
-  CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr,
-                  Builder& builder)
+  CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr, Builder& builder)
       : checked_expr_(input_expr) {
     // TODO(tyxia) Move to .cc filter
     auto cel_expression_status = builder.CreateExpression(&checked_expr_);

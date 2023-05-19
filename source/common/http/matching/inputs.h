@@ -236,15 +236,15 @@ class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData
     std::unique_ptr<StreamActivation> stream_activation =
         absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
 
-    // static_assert(std::is_move_constructible<StreamActivation>::value, "not move constructible");
-    // static_assert(std::is_move_assignable<StreamActivation>::value, "not move assignable");
+    static_assert(std::is_move_constructible<StreamActivation>::value, "not move constructible");
+    static_assert(std::is_move_assignable<StreamActivation>::value, "not move assignable");
 
-    // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-    //         std::make_unique<Matcher::CelMatchData>(std::move(*stream_activation))};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::make_unique<Matcher::CelMatchData>(std::move(*stream_activation))};
 
-     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            // TODO(tyxia) make unique
-            std::make_shared<Matcher::CelMatchData>()};
+    //  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+    //         // TODO(tyxia) make unique
+    //         std::make_shared<Matcher::CelMatchData>()};
 
     // absl::optional<StreamActivation> opt_ret;
     // opt_ret.emplace(std::move(*stream_activation));

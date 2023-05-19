@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Matcher {
 
 bool CelInputMatcher::match(const Matcher::MatchingDataType& input) {
-  return false;
+  std::cout << "tyxia is calling" << std::endl;
   Protobuf::Arena arena;
   // TODO(tyxia) think about unique_ptr
   // if (auto* ptr = absl::get_if<std::unique_ptr<Matcher::CustomMatchData>>(&input); ptr !=
@@ -14,11 +14,11 @@ bool CelInputMatcher::match(const Matcher::MatchingDataType& input) {
     if (cel_data != nullptr) {
       std::cout << "tyxia_called_haha" << std::endl;
 
-      // auto eval_result = compiled_expr_->Evaluate(cel_data->data_, &arena);
-      // if (!eval_result.ok() || !eval_result.value().IsBool()) {
-      //   return false;
-      // }
-      // return eval_result.value().BoolOrDie();
+      auto eval_result = compiled_expr_->Evaluate(cel_data->data_, &arena);
+      if (!eval_result.ok() || !eval_result.value().IsBool()) {
+        return false;
+      }
+      return eval_result.value().BoolOrDie();
     }
     return false;
   }

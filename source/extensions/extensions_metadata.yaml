@@ -1341,6 +1341,13 @@ envoy.matching.inputs.query_params:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.cel_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.type.matcher.v3.HttpAttributesCelMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

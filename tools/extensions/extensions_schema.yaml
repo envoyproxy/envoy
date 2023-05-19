@@ -11,6 +11,7 @@ builtin:
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
 - envoy.matching.inputs.query_params
+- envoy.matching.inputs.cel_data_input
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
 - envoy.matching.inputs.source_ip
