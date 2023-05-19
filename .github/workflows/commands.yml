@@ -22,6 +22,6 @@ jobs:
       pull-requests: write
       actions: write
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/retest@56d5781416445ed530e075b71546dedee94cf054
+    - uses: envoyproxy/toolshed/gh-actions/retest@833bf8dc5d9df8a3d2771ac7654a870a39b3ba61
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
