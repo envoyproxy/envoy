@@ -7,6 +7,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator_errors.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
@@ -38,6 +39,7 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StartsWith;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -120,9 +122,14 @@ public:
         }
         failure_details = transformation_result.details();
       }
-      sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                     nullptr, absl::nullopt, failure_details);
-      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
+                               ? Code::NotImplemented
+                               : Code::BadRequest;
+      sendLocalReply(response_code, Http::CodeUtility::toString(response_code), nullptr,
+                     absl::nullopt, failure_details);
+      if (response_encoder_) {
+        response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      }
       connection_.state_ = Network::Connection::State::Closing;
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
@@ -500,33 +507,67 @@ TEST_P(Http1ServerConnectionImplTest, EmptyHeader) {
 // We support the identity encoding, but because it does not end in chunked encoding we reject it
 // per RFC 7230 Section 3.3.3
 TEST_P(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27377): http-parser will not be used together with UHV and triggers an internal
+  // transfer-encoding check preventing UHV to be called.
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+#endif
   initialize();
 
   InSequence sequence;
 
-  MockRequestDecoder decoder;
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: identity\r\n\r\n");
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
+                                      "http1.invalid_transfer_encoding"));
   auto status = codec_->dispatch(buffer);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_TRUE(status.ok());
+#else
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
+#endif
 }
 
 TEST_P(Http1ServerConnectionImplTest, UnsupportedEncoding) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27377): http-parser will not be used together with UHV and triggers an internal
+  // transfer-encoding check preventing UHV to be called.
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+#endif
   initialize();
 
   InSequence sequence;
 
-  MockRequestDecoder decoder;
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: gzip\r\n\r\n");
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
+                                      "http1.invalid_transfer_encoding"));
+#else
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
+                                        "http1.invalid_transfer_encoding"));
+  } else {
+    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, "http1.codec_error"));
+  }
+#endif
   auto status = codec_->dispatch(buffer);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_TRUE(status.ok());
+#else
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
+#endif
 }
 
 // Verify that the optimization which moves large slices of body instead of copying them is working.
@@ -738,6 +779,13 @@ TEST_P(Http1ServerConnectionImplTest, InvalidChunkHeader) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27377): http-parser will not be used together with UHV and triggers an internal
+  // transfer-encoding check preventing UHV to be called.
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+#endif
   initialize();
 
   InSequence sequence;
@@ -745,13 +793,19 @@ TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                            "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
 
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
+                                        "http1.invalid_transfer_encoding"));
+  } else {
+    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, "http1.codec_error"));
+  }
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
+  EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
 }
 
 TEST_P(Http1ServerConnectionImplTest, HostWithLWS) {
@@ -865,6 +919,7 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   InSequence sequence;
@@ -882,7 +937,29 @@ TEST_P(Http1ServerConnectionImplTest, Http10) {
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
 
+TEST_P(Http1ServerConnectionImplTest, Http10HostAdded) {
+  codec_settings_.accept_http_10_ = true;
+  codec_settings_.default_host_for_http_10_ = "example.com";
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "example.com"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http10, codec_->protocol());
+}
+
 TEST_P(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -891,6 +968,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10Absolute) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
@@ -902,6 +980,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10Absolute) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   MockRequestDecoder decoder;
@@ -924,7 +1003,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+    EXPECT_EQ("HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n", output);
     EXPECT_EQ(Protocol::Http10, codec_->protocol());
   }
 
@@ -941,6 +1020,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
+  codec_settings_.accept_http_10_ = true;
   // SPELLCHECKER(off)
   HTTPStringTestCase kRequestHTTPStringTestCases[] = {
       {"", {}, {}}, // HTTP/0.9 has no HTTP-version.
@@ -2232,17 +2312,30 @@ TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   initialize();
 
   InSequence sequence;
-  NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        decoder.setResponseEncoder(&encoder);
+        return decoder;
+      }));
 
   // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 CONNECT with body has no defined
   // semantics: Envoy will reject chunked CONNECT requests.
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+#else
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
+                                      "http1.invalid_transfer_encoding"));
+#endif
   Buffer::OwnedImpl buffer(
       "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   auto status = codec_->dispatch(buffer);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_TRUE(status.ok());
+#else
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
+#endif
 }
 
 TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithNonZeroContentLength) {
@@ -2892,6 +2985,12 @@ TEST_P(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
+#ifdef ENVOY_ENABLE_UHV
+  // The check for required headers is done by UHV. When UHV is enabled this test
+  // is superseded by CodecClientTest.ResponseHeaderValidationFails and
+  // DownstreamProtocolIntegrationTest.DownstreamRequestWithFaultyFilter tests.
+  return;
+#endif
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -4435,13 +4534,18 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
   initialize();
   InSequence s;
 
-  StrictMock<MockRequestDecoder> decoder;
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
+        decoder.setResponseEncoder(&encoder);
         return decoder;
       }));
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
+                                      "http1.invalid_transfer_encoding"));
+#else
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     EXPECT_CALL(decoder,
                 sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
@@ -4449,14 +4553,17 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
     EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
                                         "http1.invalid_transfer_encoding"));
   }
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
+#endif
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: foo.bar\r\n"
                            "Transfer-Encoding: chunked\r\n"
                            "Transfer-Encoding: chunked\r\n"
                            "\r\n");
 
   auto status = codec_->dispatch(buffer);
 
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_TRUE(status.ok());
+#else
   EXPECT_TRUE(isCodecProtocolError(status));
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -4466,6 +4573,30 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
     EXPECT_EQ("http1.invalid_transfer_encoding", response_encoder->getStream().responseDetails());
     EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
   }
+#endif
+}
+
+TEST_P(Http1ServerConnectionImplTest, Http10Rejected) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::UpgradeRequired, _, _, _, "low_version"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ("low_version", response_encoder->getStream().responseDetails());
+
+  EXPECT_THAT(status.message(), StartsWith("Upgrade required"));
 }
 
 } // namespace Http

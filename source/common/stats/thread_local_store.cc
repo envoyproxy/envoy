@@ -963,6 +963,20 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+  const uint32_t num_buckets = hist_num_buckets(&histogram);
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
+  hist_bucket_t hist_bucket;
+  for (uint32_t i = 0; i < num_buckets; ++i) {
+    ParentHistogram::Bucket& bucket = buckets[i];
+    hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
+    bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
+    bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
+  }
+  return buckets;
+}
+
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
