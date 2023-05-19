@@ -44,6 +44,8 @@ public:
   }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
 
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
+
 private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
@@ -51,6 +53,7 @@ private:
   std::string cluster_name_;
 
   const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };
