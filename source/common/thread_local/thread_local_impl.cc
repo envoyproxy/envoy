@@ -26,7 +26,7 @@ SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
-    SlotPtr slot = std::make_unique<SlotImpl>(*this, slots_.size());
+    SlotPtr slot = std::make_unique<SlotImpl>(*this, uint32_t(slots_.size()));
     slots_.push_back(slot.get());
     return slot;
   }

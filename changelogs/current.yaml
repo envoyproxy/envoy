@@ -10,6 +10,11 @@ behavior_changes:
   change: |
     Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
     need to include the new config_subscriptions explicitly.
+- area: http
+  change: |
+    When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
+    value in the list. This resolves issues where a retry caused the same value to be appended multiple times. This
+    behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -55,6 +60,11 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: resource_monitors
+  change: |
+    Changed behavior of the fixed heap monitor to count unused mapped pages as
+    free memory. This change can be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -78,6 +88,14 @@ bug_fixes:
     Fixed the bug that updating :ref:`scope_key_builder
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
+- area: logging
+  change: |
+    Do not display GRPC_STATUS_NUMBER for non gRPC requests.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
+- area: boringssl
+  change: |
+    Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -102,6 +120,12 @@ removed_config_or_runtime:
 - area: udp
   change: |
     removed runtime key ``envoy.reloadable_features.udp_proxy_connect`` and legacy code paths.
+- area: header_formatters
+  change: |
+    removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
+- area: config
+  change: |
+    removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
 
 new_features:
 - area: tcp_proxy
@@ -113,6 +137,14 @@ new_features:
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
     recorded. Please refer to the access log configuration documentation for more information.
+- area: access_log
+  change: |
+    added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: dynamic_forward_proxy
+  change: |
+    added :ref:`sub_clusters_config
+    <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
+    independent sub cluster for each host:port, with STRICT_DNS cluster type.
 - area: http
   change: |
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
@@ -148,6 +180,10 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: access_log
+  change: |
+    added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
+    to filter access log records based on the type of the record.
 - area: ext_proc
   change: |
     added new configuration field
@@ -159,6 +195,15 @@ new_features:
     added new field :ref:`connection_rate_limit
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>`
     to limit reconnection rate to redis server to avoid reconnection storm.
+- area: access_log
+  change: |
+    added additional HCM access log option :ref:`flush_log_on_tunnel_successfully_established
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_log_on_tunnel_successfully_established>`.
+    Enabling this option will write a log to all access loggers when HTTP tunnels (e.g. Websocket and CONNECT)
+    are successfully established.
+- area: admin
+  change: |
+    Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
 
 deprecated:
 - area: access_log
