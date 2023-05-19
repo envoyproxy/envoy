@@ -16,6 +16,6 @@
 // Add response data to the upstream.
 + (void)setHeadersAndData:(NSString *)header_key
              header_value:(NSString *)header_value
-                     response_body:(NSString *)response_body;
+            response_body:(NSString *)response_body;
 
 @end

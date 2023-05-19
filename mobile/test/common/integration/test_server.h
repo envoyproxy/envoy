@@ -61,7 +61,8 @@ public:
    * Sets headers and data for the test server to return on all future requests.
    * Can only be called once the server has been started.
    */
-  void setHeadersAndData(absl::string_view header_key, absl::string_view header_value, absl::string_view response_body);
+  void setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
+                         absl::string_view response_body);
 };
 
 } // namespace Envoy
