@@ -5,7 +5,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"
@@ -1091,32 +1090,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
   }
-
-  {
-    StreamInfoFormatter upstream_format("HEALTH_CHECK_EVENT");
-    envoy::data::core::v3::HealthCheckEvent event;
-    event.set_health_checker_type(envoy::data::core::v3::HealthCheckerType::TCP);
-    stream_info.setHealthCheckEvent(
-        std::make_shared<envoy::data::core::v3::HealthCheckEvent>(event));
-    EXPECT_EQ("{\"health_checker_type\":\"TCP\",\"cluster_name\":\"\"}",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(
-        upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet),
-        ProtoEq(ValueUtil::stringValue("{\"health_checker_type\":\"TCP\",\"cluster_name\":\"\"}")));
-  }
-  {
-    StreamInfoFormatter upstream_format("HEALTH_CHECK_EVENT");
-    stream_info.setHealthCheckEvent(nullptr);
-    EXPECT_EQ(absl::nullopt,
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-}
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);

@@ -26,7 +26,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 

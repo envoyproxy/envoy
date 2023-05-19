@@ -17,7 +17,6 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
-        "//envoy/server:health_checker_config_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",

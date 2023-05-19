@@ -1594,26 +1594,6 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     }
                                     return absl::make_optional<std::string>(id.value());
                                   });
-                            }}},
-                          {"HEALTH_CHECK_EVENT",
-                           {CommandSyntaxChecker::COMMAND_ONLY,
-                            [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoStringFieldExtractor>(
-                                  [](const StreamInfo::StreamInfo& stream_info)
-                                      -> absl::optional<std::string> {
-                                    auto event = stream_info.healthCheckEvent();
-                                    if (event == nullptr) {
-                                      return {};
-                                    }
-#ifdef ENVOY_ENABLE_YAML
-                                    // Make sure the type enums make it into the JSON
-                                    const auto json = MessageUtil::getJsonStringFromMessageOrError(
-                                        *event, /* pretty_print */ false,
-                                        /* always_print_primitive_fields */ true);
-                                    return absl::make_optional<std::string>(json);
-#endif
-                                    return {};
-                                  });
                             }}}});
 }
 

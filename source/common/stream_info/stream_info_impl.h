@@ -5,7 +5,6 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
@@ -458,7 +457,6 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
-  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> health_check_event_;
 };
 
 } // namespace StreamInfo

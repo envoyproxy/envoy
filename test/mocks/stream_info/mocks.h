@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
