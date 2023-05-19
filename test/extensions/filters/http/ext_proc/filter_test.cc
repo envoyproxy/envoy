@@ -27,6 +27,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -81,6 +82,12 @@ protected:
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    EXPECT_CALL(stream_info_, bytesSent()).Times(1).WillOnce(Return(100));
+    EXPECT_CALL(stream_info, bytesReceived()).Times(1).WillOnce(Return(200));
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).Times(1);
+    EXPECT_CALL(stream_info, upstreamInfo()).Times(1);
+    EXPECT_CALL(stream_info_.upstream_info_, upstreamHost()).Times(1);
+
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](Unused) {
@@ -287,14 +294,16 @@ protected:
   }
 
   // The metadata configured as part of ext_proc filter should be in the filter state.
-  void expectMetadataInFilterState(const Envoy::ProtobufWkt::Struct& expected_metadata) {
-    const Envoy::ProtobufWkt::Struct& loggedMetadata =
-        stream_info_.filterState()
+  // In addition, bytes sent/received should also be stored.
+  void expectFilterState(const Envoy::ProtobufWkt::Struct& expected_metadata) {
+    const auto* filterState = stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                filter_config_name)
-            ->filterMetadata();
+                    filter_config_name);
+    const Envoy::ProtobufWkt::Struct& loggedMetadata = filterState->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
+    EXPECT_EQ(filterState->bytesSent(), 100);
+    EXPECT_EQ(filterState->bytesReceived(), 200);
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
@@ -310,6 +319,7 @@ protected:
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  testing::NiceMock<Upstream::MockClusterInfo> cluster_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -374,6 +384,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   Buffer::OwnedImpl empty_data;
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_CALL
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
@@ -385,7 +396,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
 
   Envoy::ProtobufWkt::Struct filter_metadata;
   (*filter_metadata.mutable_fields())["scooby"].set_string_value("doo");
-  expectMetadataInFilterState(filter_metadata);
+  expectFilterState(filter_metadata);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -531,7 +542,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
-  expectMetadataInFilterState(Envoy::ProtobufWkt::Struct());
+  expectFilterState(Envoy::ProtobufWkt::Struct());
 }
 
 // Using the default configuration, test the filter with a processor that

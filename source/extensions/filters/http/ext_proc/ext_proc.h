@@ -76,6 +76,10 @@ public:
     upstream_host_ = host;
   }
 
+  uint64_t bytesSent(uint64_t bytes_sent) const { return bytes_sent_; }
+  uint64_t bytesReceived(uint64_t bytes_received) const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
