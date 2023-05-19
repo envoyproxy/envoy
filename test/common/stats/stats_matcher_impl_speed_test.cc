@@ -52,7 +52,7 @@ static void BM_Inclusion(benchmark::State& state) {
     stat_names.push_back(context.pool_.add(absl::StrCat("2.", idx)));
   }
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (auto idx = 0; idx < 1000; ++idx) {
       const Envoy::Stats::StatName stat_name = stat_names[idx % 10];
       const Envoy::Stats::StatsMatcher::FastResult fast_result =
@@ -76,7 +76,7 @@ static void BM_Exclusion(benchmark::State& state) {
     stat_names.push_back(context.pool_.add(absl::StrCat("2.", idx)));
   }
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (auto idx = 0; idx < 1000; ++idx) {
       const Envoy::Stats::StatName stat_name = stat_names[idx % 10];
       const Envoy::Stats::StatsMatcher::FastResult fast_result =
