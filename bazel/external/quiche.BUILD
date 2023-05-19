@@ -4523,11 +4523,14 @@ envoy_cc_library(
     name = "quic_core_udp_socket_lib",
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/quic_udp_socket_posix.cc"],
+        "//conditions:default": ["quiche/quic/core/quic_udp_socket.cc"],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/quic_udp_socket.h"],
+        "//conditions:default": [
+            "quiche/quic/core/quic_udp_socket.h",
+            "quiche/quic/core/quic_udp_socket_posix.inc",
+        ],
     }),
     copts = quiche_copts + select({
         # On OSX/iOS, constants from RFC 3542 (e.g. IPV6_RECVPKTINFO) are not usable
