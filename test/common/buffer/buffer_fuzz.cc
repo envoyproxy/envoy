@@ -158,8 +158,7 @@ public:
 
   void move(Buffer::Instance& rhs, uint64_t length) override { move(rhs, length, false); }
 
-  void move(Buffer::Instance& rhs, uint64_t length,
-            bool reset_drain_trackers_and_accounting) override {
+  void move(Buffer::Instance& rhs, uint64_t length, bool) override {
     StringBuffer& src = dynamic_cast<StringBuffer&>(rhs);
     add(src.start(), length);
     src.start_ += length;
