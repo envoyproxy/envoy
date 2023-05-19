@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_benchmark_binary", "envoy_cc_test", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,18 +12,15 @@ envoy_cc_test(
         "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "@envoy_build_config//:extension_registry",
+        "@envoy_build_config//:test_extensions",
     ],
 )
 
-envoy_cc_benchmark_binary(
-    name = "envoy_config_benchmark",
-    srcs = ["envoy_config_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
+envoy_cc_test(
+    name = "request_headers_builder_test",
+    srcs = ["request_headers_builder_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "@envoy_build_config//:extension_registry",
     ],

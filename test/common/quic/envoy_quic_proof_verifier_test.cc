@@ -51,7 +51,7 @@ public:
             ReturnRef(Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CURVES));
     ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn_));
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string_));
-    ON_CALL(client_context_config_, signingAlgorithmsForTest()).WillByDefault(ReturnRef(sig_algs_));
+    ON_CALL(client_context_config_, signatureAlgorithms()).WillByDefault(ReturnRef(sig_algs_));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));

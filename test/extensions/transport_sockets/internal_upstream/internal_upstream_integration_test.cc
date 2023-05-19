@@ -60,8 +60,8 @@ public:
                                    static_resources->mutable_clusters()->Add());
 
       // Emit metadata to access logs.
-      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-      access_log2_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename("1"));
+      access_log2_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename("2"));
 
       // Insert internal listeners.
       TestUtility::loadFromYaml(
@@ -86,6 +86,14 @@ public:
                                     envoy::config::cluster::v3::Cluster* cluster) {
     cluster->set_name(listener_name);
     cluster->clear_load_assignment();
+
+    if (upstream_bind_config_) {
+      // Set upstream binding config in the internal_upstream cluster.
+      auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+      source_address->set_address("1.2.3.4");
+      source_address->set_port_value(0);
+    }
+
     auto* load_assignment = cluster->mutable_load_assignment();
     load_assignment->set_cluster_name(cluster->name());
     auto* endpoints = load_assignment->add_endpoints();
@@ -179,6 +187,7 @@ public:
   bool buffer_size_specified_{false};
   uint32_t buffer_size_{0};
   std::string access_log2_name_;
+  bool upstream_bind_config_{false};
 };
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
@@ -196,6 +205,23 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
               ::testing::HasSubstr("internal_listener,internal_listener,FOO,BAZ"));
   EXPECT_THAT(waitForAccessLog(access_log2_name_),
               ::testing::HasSubstr("internal_listener2,internal_listener2,FOO,-"));
+}
+
+// To verify that with the upstream binding configured in the internal_upstream cluster,
+// the socket address type of internal client connection is not overridden to be
+// Type::Ip. It stays as Type::EnvoyInternal, and with that traffic goes through.
+TEST_F(InternalUpstreamIntegrationTest, BasicFlowLookbackClusterHasUpstreamBindConfig) {
+  upstream_bind_config_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlowMissing) {

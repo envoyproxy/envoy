@@ -36,6 +36,17 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
           content_type[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
+bool Common::hasConnectProtocolVersionHeader(const Http::RequestOrResponseHeaderMap& headers) {
+  return !headers.get(Http::CustomHeaders::get().ConnectProtocolVersion).empty();
+}
+
+bool Common::hasConnectStreamingContentType(const Http::RequestOrResponseHeaderMap& headers) {
+  // Consider the request a connect request if the content type starts with "application/connect+".
+  static constexpr absl::string_view connect_prefix{"application/connect+"};
+  const absl::string_view content_type = headers.getContentTypeValue();
+  return absl::StartsWith(content_type, connect_prefix);
+}
+
 bool Common::hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers) {
   return headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Protobuf;
 }
@@ -45,6 +56,20 @@ bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
     return false;
   }
   return hasGrpcContentType(headers);
+}
+
+bool Common::isConnectRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasConnectProtocolVersionHeader(headers);
+}
+
+bool Common::isConnectStreamingRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasConnectStreamingContentType(headers);
 }
 
 bool Common::isProtobufRequestHeaders(const Http::RequestHeaderMap& headers) {
@@ -63,6 +88,13 @@ bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool 
     return false;
   }
   return hasGrpcContentType(headers);
+}
+
+bool Common::isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& headers) {
+  if (Http::Utility::getResponseStatus(headers) != enumToInt(Http::Code::OK)) {
+    return false;
+  }
+  return hasConnectStreamingContentType(headers);
 }
 
 absl::optional<Status::GrpcStatus>

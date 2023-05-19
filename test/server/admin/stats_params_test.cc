@@ -1,8 +1,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/stats_params.h"
 
-#include "test/test_common/test_runtime.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -42,8 +40,11 @@ TEST(StatsParamsTest, ParseParamsFormat) {
 #ifdef ENVOY_ADMIN_HTML
   ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
   EXPECT_EQ(StatsFormat::Html, params.format_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=active-html", response));
+  EXPECT_EQ(StatsFormat::ActiveHtml, params.format_);
 #else
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=html", response));
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=active-html", response));
 #endif
   ASSERT_EQ(Http::Code::OK, params.parse("?format=json", response));
   EXPECT_EQ(StatsFormat::Json, params.format_);
@@ -56,19 +57,8 @@ TEST(StatsParamsTest, ParseParamsFilter) {
   Buffer::OwnedImpl response;
 
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.admin_stats_filter_use_re2", "false"}});
-
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_NE(nullptr, params.filter_);
-    EXPECT_EQ(nullptr, params.re2_filter_);
-  }
-
-  {
-    StatsParams params;
-    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_EQ(nullptr, params.filter_);
     EXPECT_NE(nullptr, params.re2_filter_);
   }
 }

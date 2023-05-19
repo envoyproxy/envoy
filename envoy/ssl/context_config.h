@@ -43,6 +43,12 @@ public:
   virtual const std::string& ecdhCurves() const PURE;
 
   /**
+   * The ':' delimited list of supported signature algorithms.
+   * See https://www.rfc-editor.org/rfc/rfc8446#page-41 for the names.
+   */
+  virtual const std::string& signatureAlgorithms() const PURE;
+
+  /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
    * certificate configs.
    */

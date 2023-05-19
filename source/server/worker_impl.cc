@@ -14,23 +14,27 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
-std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher, uint32_t index) {
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher, uint32_t index,
+                                              OverloadManager& overload_manager) {
 
   auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
       "envoy.connection_handler.default");
   if (factory) {
-    return factory->createConnectionHandler(dispatcher, index);
+    return factory->createConnectionHandler(dispatcher, index, overload_manager);
   }
   ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
   return nullptr;
 }
 
+} // namespace
+
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
   Event::DispatcherPtr dispatcher(
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
-  auto conn_handler = getHandler(*dispatcher, index);
+  auto conn_handler = getHandler(*dispatcher, index, overload_manager);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
                                       overload_manager, api_, stat_names_);
 }
@@ -93,7 +97,7 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
       });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::start(GuardDog& guard_dog, const std::function<void()>& cb) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make
@@ -132,7 +136,7 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<v
   });
 }
 
-void WorkerImpl::threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::threadRoutine(GuardDog& guard_dog, const std::function<void()>& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.

@@ -1,0 +1,369 @@
+
+parameters:
+
+- name: bucketGCP
+  type: string
+  default: ""
+
+## Timeouts
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
+- name: timeoutDockerPublish
+  displayName: "Timout Docker publish"
+  type: number
+  # in seconds
+  default: 15
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
+
+# Auth
+- name: authGCP
+  type: string
+  default: ""
+- name: authGithub
+  type: string
+  default: ""
+- name: authGPGPassphrase
+  type: string
+  default: ""
+- name: authGPGPath
+  type: string
+  default: ""
+- name: authGPGKey
+  type: string
+  default: ""
+- name: authNetlifyURL
+  type: string
+  default: ""
+- name: authDockerUser
+  type: string
+  default: ""
+- name: authDockerPassword
+  type: string
+  default: ""
+- name: authSSHDocsKey
+  type: string
+  default: ""
+- name: authSSHDocsKeyPublic
+  type: string
+  default: ""
+- name: authSSHKeyPassphrase
+  type: string
+  default: ""
+
+- name: runDocker
+  displayName: "Run Docker"
+  type: string
+  default: true
+- name: runPackaging
+  displayName: "Run Packaging"
+  type: string
+  default: true
+
+- name: publishDockerhub
+  displayName: "Publish Dockerhub"
+  type: string
+  default: false
+- name: publishDocs
+  displayName: "Publish Docs"
+  type: string
+  default: false
+- name: publishDocsLatest
+  displayName: "Publish latest docs"
+  type: string
+  default: false
+- name: publishDocsRelease
+  displayName: "Publish release docs"
+  type: string
+  default: false
+- name: publishGithubRelease
+  displayName: "Publish Github release"
+  type: string
+  default: false
+
+
+jobs:
+- job: docker
+  displayName: "Docker (Linux multi arch)"
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runDocker }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - template: ../cached.yml
+    parameters:
+      name: publish_docker
+      # VERSION.txt is included to refresh Docker images for release
+      key: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
+      version: "$(cacheKeyDockerBuild)"
+      path: ""
+  - bash: |
+      echo "disk space at beginning of build:"
+      df -h
+    displayName: "Check disk space at beginning"
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/**/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - bash: |
+      set -e
+
+      mkdir -p linux/amd64 linux/arm64
+
+      # x64
+      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
+      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
+
+      # arm64
+      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
+      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
+
+      # Debug what files appear to have been downloaded
+      find linux -type f -name "*" | xargs ls -l
+
+      ci/docker_ci.sh
+    timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      AZP_BRANCH: $(Build.SourceBranch)
+      AZP_SHA1: $(Build.SourceVersion)
+      DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+      DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+      DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
+
+  - bash: |
+      echo "disk space at end of build:"
+      df -h
+    displayName: "Check disk space at end"
+    condition: not(canceled())
+
+  # Publish docker
+  - script: |
+      ci/run_envoy_docker.sh 'ci/do_ci.sh docker-upload'
+    displayName: "Upload Docker to GCS"
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+
+  - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
+    displayName: "Cache/save (publish_docker)"
+
+- job: package_x64
+  displayName: Linux debs (x64)
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/x64/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: bazel.distribution
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
+
+- job: package_arm64
+  displayName: Linux debs (arm64)
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool: "envoy-arm-large"
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/arm64/bin/*"
+      targetPath: $(Build.StagingDirectory)
+
+  - template: ../bazel.yml
+    parameters:
+      managedAgent: false
+      ciTarget: bazel.distribution
+      rbe: false
+      artifactSuffix: ".arm64"
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
+
+- job: success
+  dependsOn: ["docker", "package_x64", "package_arm64"]
+  displayName: Success (linux artefacts)
+  pool:
+    vmImage: "ubuntu-20.04"
+  # This condition ensures that this (required) check passes if all of
+  # the preceding checks either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: |
+    and(
+      in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "building publishable assets complete"
+
+- job: docs
+  displayName: Publish docs
+  dependsOn: ["success"]
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.publishDocs }}, 'true'))
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - task: Cache@2
+    inputs:
+      key: 'docs | $(cacheKeyBazelFiles)'
+      path: $(Build.StagingDirectory)/repository_cache
+    continueOnError: true
+
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_RBE: "true"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      AZP_BRANCH: $(Build.SourceBranch)
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+    displayName: "Generate docs"
+
+  - script: |
+      ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDockerhub }}, 'true'))
+    displayName: "Publish Dockerhub description and README"
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+      DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+
+  - script: |
+      ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+    displayName: "Upload Docs to GCS"
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+    condition: eq(variables['isMain'], 'true')
+
+  # Trigger Netlify rebuild of latest docs
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsLatest }}, 'true'))
+    displayName: "Publish latest docs"
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
+
+  # Publish docs to the website
+  - task: InstallSSHKey@0
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsRelease }}, 'true'))
+    inputs:
+      hostName: $(authGithubSSHKeyPublic)
+      sshPublicKey: "${{ parameters.authSSHDocsKeyPublic }}"
+      sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
+      sshKeySecureFile: "${{ parameters.authSSHDocsKey }}"
+  - script: docs/publish.sh
+    condition: |
+      and(not(canceled()),
+          eq(${{ parameters.publishDocsRelease }}, 'true'))
+    displayName: "Publish release docs"
+    workingDirectory: $(Build.SourcesDirectory)
+
+- job: github
+  displayName: Publish release tag
+  dependsOn: ["docs"]
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.publishGithubRelease }}, 'true'))
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release.arm64"
+      itemPattern: "bazel.release.arm64/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../gpg.yml
+    parameters:
+      authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+      authGPGPath: ${{ parameters.authGPGPath }}
+      authGPGKey: ${{ parameters.authGPGKey }}
+      pathGPGConfiguredHome: /build/.gnupg
+      pathGPGHome: $(Build.StagingDirectory)/.gnupg
+  - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+    displayName: "Publish release to Github"
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      AZP_BRANCH: $(Build.SourceBranch)
+      GITHUB_TOKEN: ${{ parameters.authGithub }}
+  - bash: |
+      set -e
+      rm -rf $(Build.StagingDirectory)/.gnupg

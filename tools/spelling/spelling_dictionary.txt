@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -16,6 +17,7 @@ ARN
 ASAN
 ASCII
 ASM
+ASN
 ASSERTed
 ASSERTs
 AST
@@ -28,11 +30,14 @@ BSON
 BPF
 Bdecoded
 Bencoded
+DFP
+DOM
 GiB
 IPTOS
 Repick
 SION
 TRA
+Websockets
 abc
 abcd
 abd
@@ -61,6 +66,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -158,6 +164,8 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+eslint
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -165,6 +173,7 @@ dereferencing
 differentially
 dnsresolvers
 endpos
+eps
 fo
 ghi
 golang
@@ -201,6 +210,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -235,6 +245,8 @@ LEV
 LF
 LHS
 hls
+iframe
+ingressed
 integrations
 jkl
 lang
@@ -282,6 +294,7 @@ OCSP
 OD
 ODCDS
 middlewildcard
+monostate
 mpd
 oghttp
 OID
@@ -429,10 +442,12 @@ UUIDs
 VC
 VCHAR
 VCL
+VFS
 VH
 VHDS
 VLOG
 VM
+VPN
 WAITFORONE
 WASM
 WAVM
@@ -465,6 +480,7 @@ acks
 acls
 addr
 agg
+AggregationTemporality
 alice
 alignas
 alignof
@@ -478,6 +494,8 @@ alls
 alphanumerics
 amongst
 anno
+anonymization
+anonymizing
 anys
 appmesh
 arg
@@ -583,6 +601,7 @@ codebase
 codec
 codecs
 codepath
+codepoints
 codings
 combinatorial
 comparator
@@ -744,6 +763,9 @@ gRPC
 gateway
 gcov
 genrule
+geolocation
+geoip
+Geoip
 getaddrinfo
 getaffinity
 gethostname
@@ -940,6 +962,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -1139,6 +1164,7 @@ retransmitted
 retransmitting
 retriable
 retriggers
+retryable
 revalidated
 revalidation
 reverify
@@ -1340,6 +1366,7 @@ upcasts
 upstreams
 uptime
 upvalue
+urlencoded
 urls
 userdata
 userinfo
@@ -1368,6 +1395,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
@@ -1383,6 +1411,7 @@ winsock
 workspace
 writev
 wrsq
+www
 xDS
 xDSes
 xdstp

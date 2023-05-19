@@ -8,6 +8,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
@@ -70,6 +71,12 @@ public:
    * Return if half-close semantics are enabled on the underlying connection.
    */
   bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
+
+  /**
+   * Initialize all of the installed read filters on the underlying connection.
+   * This effectively calls onNewConnection() on each of them.
+   */
+  void initializeReadFilters() { connection_->initializeReadFilters(); }
 
   /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
@@ -223,7 +230,9 @@ private:
                          public ResponseDecoderWrapper,
                          public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
+          header_validator_(
+              parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
       switch (parent.protocol()) {
       case Protocol::Http10:
       case Protocol::Http11:
@@ -232,11 +241,12 @@ private:
         break;
       case Protocol::Http2:
       case Protocol::Http3:
-        wait_encode_complete_ =
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_response_half_close");
+        wait_encode_complete_ = true;
         break;
       }
     }
+
+    void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -252,6 +262,9 @@ private:
     // RequestEncoderWrapper
     void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
 
+    // RequestEncoder
+    Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+
     void setEncoder(RequestEncoder& encoder) {
       inner_encoder_ = &encoder;
       inner_encoder_->getStream().addCallbacks(*this);
@@ -260,6 +273,7 @@ private:
     void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
 
     CodecClient& parent_;
+    Http::ClientHeaderValidatorPtr header_validator_;
     bool wait_encode_complete_{true};
     bool encode_complete_{false};
     bool decode_complete_{false};

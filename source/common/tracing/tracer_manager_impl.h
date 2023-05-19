@@ -5,11 +5,16 @@
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/tracing/tracer_config_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 
 namespace Envoy {
 namespace Tracing {
 
+/**
+ * TracerManager implementation that manages the tracers. This should be used as a singleton except
+ * in tests.
+ */
 class TracerManagerImpl : public TracerManager,
                           public Singleton::Instance,
                           Logger::Loggable<Logger::Id::tracing> {
@@ -23,6 +28,8 @@ public:
   const absl::flat_hash_map<std::size_t, std::weak_ptr<Tracer>>& peekCachedTracersForTest() const {
     return tracers_;
   }
+
+  static std::shared_ptr<TracerManager> singleton(Server::Configuration::FactoryContext& context);
 
 private:
   void removeExpiredCacheEntries();

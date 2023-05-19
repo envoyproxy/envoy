@@ -9,6 +9,9 @@ REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<H
 REGISTER_FACTORY(HttpResponseHeadersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(HttpRequestTrailersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(HttpResponseTrailersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
+REGISTER_FACTORY(HttpRequestQueryParamsDataInputFactory,
+                 Matcher::DataInputFactory<HttpMatchingData>);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

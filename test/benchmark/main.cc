@@ -92,8 +92,8 @@ int main(int argc, char** argv) {
                      runtime_feature_arg);
       return 1;
     }
-    const auto feature_name = runtime_feature_split[0];
-    const auto feature_val = runtime_feature_split[1];
+    const auto& feature_name = runtime_feature_split[0];
+    const auto& feature_val = runtime_feature_split[1];
     runtime.mergeValues({{feature_name, feature_val}});
   }
 

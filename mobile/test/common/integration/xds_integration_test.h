@@ -21,10 +21,10 @@ public:
   XdsIntegrationTest();
   virtual ~XdsIntegrationTest() = default;
   void initialize() override;
+  void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
 protected:
   void SetUp() override;
-  void TearDown() override;
 
   void createEnvoy() override;
 

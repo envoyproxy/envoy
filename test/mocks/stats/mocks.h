@@ -200,12 +200,13 @@ public:
   void merge() override {}
   std::string quantileSummary() const override { return ""; };
   std::string bucketSummary() const override { return ""; };
-
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
   MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
   MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedTotalBuckets, (), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedIntervalBuckets, (), (const));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -244,8 +245,7 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
-
-  SystemTime snapshotTime() const override { return snapshot_time_; }
+  MOCK_METHOD(SystemTime, snapshotTime, (), (const));
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;

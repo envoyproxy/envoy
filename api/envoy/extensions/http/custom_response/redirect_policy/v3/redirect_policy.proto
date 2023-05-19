@@ -4,6 +4,7 @@ package envoy.extensions.http.custom_response.redirect_policy.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -26,28 +27,30 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
-  // [#comment: TODO(pradeepcrao): Add the ability to specify the full uri, or just host or
-  // path rewrite for the redirection in the same vein as
-  // config.route.v3.RedirectAction]
-  // The host that will serve the custom response.
-  //
-  // Example:
-  //
-  // .. code-block:: yaml
-  //
-  //    uri: https://www.mydomain.com
-  //
-  string host = 1 [(validate.rules).string = {min_len: 1}];
+  oneof redirect_action_specifier {
+    option (validate.required) = true;
 
-  // The path for the custom response.
-  //
-  // Example:
-  //
-  //  .. code-block:: yaml
-  //
-  //    path: /path/to/503_response.txt
-  //
-  string path = 2 [(validate.rules).string = {min_len: 1}];
+    // The Http URI to redirect the original request to, to get the custom
+    // response.
+    // It should be a full FQDN with protocol, host and path.
+    //
+    // Example:
+    //
+    // .. code-block:: yaml
+    //
+    //    uri: https://www.mydomain.com/path/to/404.txt
+    //
+    string uri = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Specify elements of the redirect url individually.
+    // Note: Do not specify the `response_code` field in `redirect_action`, use
+    // `status_code` instead.
+    // The following fields in `redirect_action` are currently not supported,
+    // and specifying them will cause the config to be rejected:
+    // - `prefix_rewrite`
+    // - `regex_rewrite`
+    config.route.v3.RedirectAction redirect_action = 2;
+  }
 
   // The new response status code if specified. This is used to override the
   // status code of the response from the new upstream if it is not an error status.

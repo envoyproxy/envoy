@@ -68,7 +68,9 @@ The ``server`` header will be set during encoding to the value in the :ref:`serv
 referer
 -------
 
-The ``referer`` header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed.
+The ``referer`` header will be sanitized during decoding. Multiple URLs, invalid relative URLs
+containing a fragment component, and valid absolute URLs containing userinfo or a fragment component
+will be removed.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 

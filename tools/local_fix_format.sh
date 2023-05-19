@@ -22,6 +22,19 @@
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
 
+# The following optional argument is added to be able to run this script using Docker,
+# due to a problem to locate clang using WSL on Windows. https://learn.microsoft.com/en-us/windows/wsl/about
+# Call with -docker as the first arument.
+if [[ $# -gt 0 && "$1" == "-docker" ]]; then
+  shift
+  exec ./ci/run_envoy_docker.sh "$0" -run-build-setup "$@"
+fi
+
+if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
+  shift
+  . ci/build_setup.sh
+fi
+
 if [[ $# -gt 0 && "$1" == "-verbose" ]]; then
   verbose=1
   shift
@@ -31,7 +44,7 @@ fi
 
 # Runs the formatting functions on the specified args, echoing commands
 # if -vergbose was supplied to the script.
-function format() {
+function format_one() {
   (
     if [[ "$verbose" == "1" ]]; then
       set -x
@@ -41,9 +54,19 @@ function format() {
   )
 }
 
+function format_all() {
+  (
+    if [[ "$verbose" == "1" ]]; then
+      set -x
+    fi
+    ./tools/code_format/check_format.py fix
+    ./tools/spelling/check_spelling_pedantic.py fix
+  )
+}
+
 if [[ $# -gt 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
-  format
+  format_all
 else
   if [[ $# -gt 0 && "$1" == "-main" ]]; then
     shift
@@ -61,6 +84,6 @@ else
     exit 0
   fi
   for arg in $args; do
-    format "$arg"
+    format_one "$arg"
   done
 fi

@@ -216,7 +216,7 @@ DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& h
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
-  return *(primary_host_it->second.get());
+  return *(primary_host_it->second);
 }
 
 void DnsCacheImpl::onResolveTimeout(const std::string& host) {

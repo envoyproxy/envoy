@@ -183,7 +183,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   ENVOY_LOG(error, "GrpcClientImpl Failure {} {}", message, status);
-  // callbacks_->complete(ResponseType::FailureResp, status);
+  // callbacks_->complete(ResponseType::FailureResp, "", absl::any());
   // callbacks_ = nullptr;
 }
 

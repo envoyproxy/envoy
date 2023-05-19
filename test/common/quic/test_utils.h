@@ -58,7 +58,27 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+};
+
+class MockEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
+public:
+  MockEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                                quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter* writer, bool owns_writer,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Event::Dispatcher& dispatcher,
+                                Network::ConnectionSocketPtr&& connection_socket,
+                                quic::ConnectionIdGeneratorInterface& generator)
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  generator) {}
+
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
@@ -119,6 +139,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;
@@ -208,6 +231,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;
@@ -222,7 +248,7 @@ Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
                                            quic::QuicConnectionId connection_id) {
   std::unique_ptr<quic::QuicReceivedPacket> packet =
       std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-  return Buffer::OwnedImpl(packet->data(), packet->length());
+  return {packet->data(), packet->length()};
 }
 
 void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {

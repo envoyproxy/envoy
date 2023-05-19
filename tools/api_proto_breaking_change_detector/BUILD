@@ -60,8 +60,6 @@ py_test(
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
     ],
     main = "detector_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["manual"],
     deps = [
         ":detector",

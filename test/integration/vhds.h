@@ -96,7 +96,7 @@ static_resources:
                                                   Platform::null_device_path));
 }
 
-const char VhostTemplate[] = R"EOF(
+constexpr absl::string_view VhostTemplate = R"EOF(
 name: {}
 domains: [{}]
 routes:

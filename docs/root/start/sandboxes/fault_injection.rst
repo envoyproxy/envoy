@@ -24,9 +24,9 @@ Terminal 1
 
   $ pwd
   envoy/examples/fault-injection
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                         Command               State               Ports
   ------------------------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ Terminal 2
 
   $ pwd
   envoy/examples/fault-injection
-  $ docker-compose exec envoy bash
+  $ docker compose exec envoy bash
   $ bash send_request.sh
 
 The script above (:download:`send_request.sh <_include/fault-injection/send_request.sh>`) sends a continuous stream
@@ -61,7 +61,7 @@ Terminal 3
 
 .. code-block:: console
 
-  $ docker-compose exec envoy bash
+  $ docker compose exec envoy bash
   $ bash enable_abort_fault_injection.sh
 
 The script above enables ``HTTP`` aborts for 100% of requests.
@@ -85,7 +85,7 @@ Terminal 3
 
 .. code-block:: console
 
-  $ docker-compose exec envoy bash
+  $ docker compose exec envoy bash
   $ bash enable_delay_fault_injection.sh
 
 The script above will add a 3-second delay to 50% of ``HTTP`` requests.

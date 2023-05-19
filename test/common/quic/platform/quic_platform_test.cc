@@ -50,7 +50,6 @@
 using quiche::GetLogger;
 using quiche::getVerbosityLogThreshold;
 using quiche::setVerbosityLogThreshold;
-using testing::_;
 using testing::HasSubstr;
 
 namespace quic {
@@ -165,7 +164,8 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicThread) {
+// https://github.com/envoyproxy/envoy/issues/26711
+TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
   class AdderThread : public QuicThread {
   public:
     AdderThread(int* value, int increment)

@@ -472,7 +472,7 @@ public:
 
   // Set CDS contents on filesystem.
   void setCds(const std::vector<envoy::config::cluster::v3::Cluster>& cluster);
-  const std::string& cds_path() const { return cds_path_; }
+  const std::string& cdsPath() const { return cds_path_; }
 
 private:
   const std::string cds_path_;
@@ -490,7 +490,7 @@ public:
   void setEdsAndWait(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&
                          cluster_load_assignments,
                      IntegrationTestServerStats& server_stats);
-  const std::string& eds_path() const { return eds_path_; }
+  const std::string& edsPath() const { return eds_path_; }
 
 private:
   const std::string eds_path_;

@@ -54,9 +54,9 @@ To build this sandbox example, and start the example services run the following 
 
     $ pwd
     envoy/examples/skywalking
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
     Name                           Command                  State                          Ports
     ---------------------------------------------------------------------------------------------------------------------------
     skywalking_elasticsearch_1       /bin/tini -- /usr/local/bi ... Up (healthy)   9200/tcp, 9300/tcp

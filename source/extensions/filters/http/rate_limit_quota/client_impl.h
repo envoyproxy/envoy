@@ -17,6 +17,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
+using BucketQuotaUsage =
+    ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 using GrpcAsyncClient =
     Grpc::AsyncClient<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports,
                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
@@ -51,14 +54,13 @@ public:
 private:
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
-  Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_{};
+  Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
   RateLimitQuotaCallbacks* callbacks_{};
   // TODO(tyxia) Further look at the use of this flag later.
   bool stream_closed_ = false;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
-
 /**
  * Create the rate limit client. It is uniquely owned by each worker thread.
  */

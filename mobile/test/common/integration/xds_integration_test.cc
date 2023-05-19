@@ -3,6 +3,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/test_common/environment.h"
@@ -17,8 +23,18 @@ using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
 
 XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
-  override_builder_config_ = true; // The builder does not yet have RTDS support.
-  expect_dns_ = false;             // TODO(alyssawilk) debug.
+  Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
+  Config::forceRegisterDeltaGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
+  Config::forceRegisterNewGrpcMuxFactory();
+
+  override_builder_config_ = false;
+  expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 
@@ -26,21 +42,6 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
   }
-
-  // Set up the basic bootstrap config for xDS.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // The default stats config has overenthusiastic filters.
-    bootstrap.clear_stats_config();
-
-    // Add two clusters by default:
-    //  - base_h2: An HTTP2 cluster with one fake upstream endpoint, for accepting requests from EM.
-    //  - xds_cluster.lyft.com: An xDS management server cluster, with one fake upstream endpoint.
-    bootstrap.mutable_static_resources()->clear_clusters();
-    bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
-        createSingleEndpointClusterConfig("base_h2"));
-    bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
-        createSingleEndpointClusterConfig(std::string(XDS_CLUSTER)));
-  });
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);
@@ -62,11 +63,6 @@ Grpc::SotwOrDelta XdsIntegrationTest::sotwOrDelta() const { return std::get<2>(G
 void XdsIntegrationTest::SetUp() {
   // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
   setUpstreamProtocol(Http::CodecType::HTTP2);
-}
-
-void XdsIntegrationTest::TearDown() {
-  cleanup();
-  BaseClientIntegrationTest::TearDown();
 }
 
 void XdsIntegrationTest::createEnvoy() {

@@ -34,6 +34,7 @@ envoy_cc_library(
     deps = [
         ":c_types_lib",
         ":platform_bridge_cc_proto",
+        "//library/common/common:system_helper_lib",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )

@@ -15,7 +15,7 @@ namespace Upstream {
 /**
  * Type of load balancing to perform.
  */
-enum class LoadBalancerType {
+enum class LoadBalancerType : uint8_t {
   RoundRobin,
   LeastRequest,
   Random,

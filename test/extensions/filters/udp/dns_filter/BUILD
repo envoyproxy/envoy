@@ -51,6 +51,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "dns_filter_integration_test",
+    size = "large",
     srcs = ["dns_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     deps = [

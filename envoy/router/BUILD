@@ -78,7 +78,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
         "//envoy/tcp:conn_pool_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
         "//source/common/protobuf",

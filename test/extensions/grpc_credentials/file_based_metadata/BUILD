@@ -11,6 +11,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     deps = [

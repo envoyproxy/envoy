@@ -81,7 +81,7 @@ to be correlated.
 
 The tracing providers also require additional context, to enable the parent/child relationships
 between the spans (logical units of work) to be understood. This can be achieved by using the
-LightStep (via OpenTracing API) or Zipkin tracer directly within the service itself, to extract the
+LightStep (via OpenTelemetry API) or Zipkin tracer directly within the service itself, to extract the
 trace context from the inbound request and inject it into any subsequent outbound requests. This
 approach would also enable the service to create additional spans, describing work being done
 internally within the service, that may be useful when examining the end-to-end trace.
@@ -156,10 +156,10 @@ Baggage provides a mechanism for data to be available throughout the entirety of
 While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
 request context and available to applications during the duration of the request. This enables metadata to transparently
 travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
-propagation. See `OpenTracing's documentation <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ for more information about baggage.
+propagation. See `OpenTelemetry's documentation <https://opentelemetry.io/docs/concepts/signals/baggage/>`_ for more information about baggage.
 
 Tracing providers have varying level of support for getting and setting baggage:
 
-* Lightstep (and any OpenTracing-compliant tracer) can read/write baggage
+* Lightstep (and any OpenTelemetry-compliant tracer) can read/write baggage
 * Zipkin support is not yet implemented
 * X-Ray and OpenCensus don't support baggage

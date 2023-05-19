@@ -63,7 +63,6 @@ public:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
   MockRateLimitQuotaCallbacks callbacks_;
-
   bool grpc_closed_ = false;
 };
 

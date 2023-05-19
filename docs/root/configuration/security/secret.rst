@@ -26,6 +26,16 @@ SDS server
 A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/secret/v3/sds.proto>`.
 It follows the same protocol as other :ref:`xDS <xds_protocol>`.
 
+.. note::
+
+    `SPIRE <https://spiffe.io/docs/latest/spire-about/>`_,
+    an open-source reference implementation of the
+    `SPIFFE specification for production identity <https://spiffe.io/>`_,
+    can act as an SDS server for Envoy. See the
+    `SPIRE documentation <https://spiffe.io/docs/latest/microservices/envoy/>`_
+    for how to configure Envoy with SPIFFE and SPIRE.
+
+
 SDS Configuration
 -----------------
 

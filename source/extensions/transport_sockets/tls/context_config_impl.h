@@ -26,6 +26,7 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
+  const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -45,7 +46,7 @@ public:
   const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   AccessLog::AccessLogManager& accessLogManager() const override {
-    return factory_context_.accessLogManager();
+    return factory_context_.serverFactoryContext().accessLogManager();
   }
 
   bool isReady() const override {
@@ -85,6 +86,7 @@ private:
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
+  const std::string signature_algorithms_;
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
@@ -120,12 +122,7 @@ public:
 
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  ClientContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
-      : ClientContextConfigImpl(config, "", secret_provider_context) {}
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -142,7 +139,6 @@ private:
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
-  const std::string sigalgs_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {

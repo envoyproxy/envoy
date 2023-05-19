@@ -237,6 +237,16 @@ using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
 
 struct UpstreamTiming {
   /**
+   * Records the latency from when the upstream request was created to when the
+   * connection pool callbacks (either success of failure were triggered).
+   */
+  void recordConnectionPoolCallbackLatency(MonotonicTime start, TimeSource& time_source) {
+    ASSERT(!connection_pool_callback_latency_);
+    connection_pool_callback_latency_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(time_source.monotonicTime() - start);
+  }
+
+  /**
    * Sets the time when the first byte of the request was sent upstream.
    */
   void onFirstUpstreamTxByteSent(TimeSource& time_source) {
@@ -245,7 +255,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the first byte of the response is received from upstream.
+   * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamTxByteSent(TimeSource& time_source) {
     ASSERT(!last_upstream_tx_byte_sent_);
@@ -253,7 +263,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the response is received from upstream.
+   * Sets the time when the first byte of the response is received from upstream.
    */
   void onFirstUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!first_upstream_rx_byte_received_);
@@ -261,7 +271,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the request was sent upstream.
+   * Sets the time when the last byte of the response is received from upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_upstream_rx_byte_received_);
@@ -281,6 +291,15 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
+  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
+    return upstream_handshake_complete_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
+    return connection_pool_callback_latency_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency_;
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
@@ -609,6 +628,11 @@ public:
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
 
   /**
+   * @return the current duration of the request, or the total duration of the request, if ended.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> currentDuration() const PURE;
+
+  /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
@@ -796,6 +820,17 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return absl::string_view the downstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

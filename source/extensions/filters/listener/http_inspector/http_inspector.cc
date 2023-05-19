@@ -50,7 +50,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "http inspector: new connection accepted");
+  ENVOY_LOG(trace, "http inspector: new connection accepted");
 
   const Network::ConnectionSocket& socket = cb.socket();
 
@@ -136,7 +136,7 @@ void Filter::done(bool success) {
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
       protocol = Http::Utility::AlpnNames::get().Http2c;
     }
-    ENVOY_LOG(trace, "http inspector: set application protocol to {}", protocol);
+    ENVOY_LOG(debug, "http inspector: set application protocol to {}", protocol);
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
   } else {

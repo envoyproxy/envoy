@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
-#include "envoy/registry/registry.h"
 
 #include "source/common/config/datasource.h"
 

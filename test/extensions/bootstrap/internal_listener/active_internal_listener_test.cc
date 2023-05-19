@@ -227,6 +227,11 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
+  EXPECT_CALL(*connection, close(_, _))
+      .WillOnce(Invoke([&connection](Network::ConnectionCloseType, absl::string_view details) {
+        EXPECT_EQ(details, "Active Internal Listener destructor");
+        connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
   internal_listener_.reset();
 }
 
@@ -448,7 +453,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
   EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
   internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 

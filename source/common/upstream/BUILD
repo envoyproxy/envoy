@@ -80,13 +80,12 @@ envoy_cc_library(
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/common/config:null_grpc_mux_lib",
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":od_cds_api_lib",
-        ":ring_hash_lb_lib",
-        ":subset_lb_lib",
         ":host_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -103,8 +102,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
-        "//source/common/config:grpc_mux_lib",
-        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
@@ -121,6 +118,7 @@ envoy_cc_library(
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:conn_pool_lib",
+        "//source/common/tcp:async_tcp_client_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -207,12 +205,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "health_checker_base_lib",
-    srcs = ["health_checker_base_impl.cc"],
-    hdrs = ["health_checker_base_impl.h"],
+    name = "health_checker_event_logger_lib",
+    srcs = ["health_checker_event_logger.cc"],
+    hdrs = ["health_checker_event_logger.h"],
     deps = [
         "//envoy/upstream:health_checker_interface",
-        "//source/common/router:router_lib",
+        "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
@@ -227,13 +225,14 @@ envoy_cc_library(
         "grpc_health_proto",
     ],
     deps = [
-        ":health_checker_base_lib",
+        ":health_checker_event_logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         # TODO(dio): Remove dependency to server.
         "//envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
+        "//source/common/router:router_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
     ],
@@ -383,54 +382,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "maglev_lb_lib",
-    srcs = ["maglev_lb.cc"],
-    hdrs = ["maglev_lb.h"],
-    deps = [
-        ":thread_aware_lb_lib",
-        ":upstream_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "ring_hash_lb_lib",
-    srcs = ["ring_hash_lb.cc"],
-    hdrs = ["ring_hash_lb.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
-    deps = [
-        ":thread_aware_lb_lib",
-        "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "subset_lb_lib",
-    srcs = ["subset_lb.cc"],
-    hdrs = ["subset_lb.h"],
-    deps = [
-        ":load_balancer_lib",
-        ":maglev_lb_lib",
-        ":ring_hash_lb_lib",
-        ":upstream_lib",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/upstream:load_balancer_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     deps = [
@@ -494,6 +445,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         ":resource_manager_lib",
+        ":upstream_http_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
@@ -502,6 +454,7 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:health_checker_interface",
         "//envoy/upstream:load_balancer_interface",
@@ -511,6 +464,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:packed_struct_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/http/http1:codec_stats_lib",

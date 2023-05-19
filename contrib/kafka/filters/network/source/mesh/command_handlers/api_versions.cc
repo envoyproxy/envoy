@@ -44,12 +44,13 @@ AbstractResponseSharedPtr ApiVersionsRequestHolder::computeAnswer() const {
   const int16_t error_code = 0;
   const ApiVersion produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,
                                     MAX_PRODUCE_SUPPORTED};
+  const ApiVersion fetch_entry = {FETCH_REQUEST_API_KEY, 0, FETCH_REQUEST_MAX_VERSION};
   const ApiVersion list_offsets_entry = {LIST_OFFSETS_REQUEST_API_KEY, MIN_LIST_OFFSETS_SUPPORTED,
                                          MAX_LIST_OFFSETS_SUPPORTED};
   const ApiVersion metadata_entry = {METADATA_REQUEST_API_KEY, MIN_METADATA_SUPPORTED,
                                      MAX_METADATA_SUPPORTED};
-  const ApiVersionsResponse real_response = {error_code,
-                                             {produce_entry, list_offsets_entry, metadata_entry}};
+  const ApiVersionsResponse real_response = {
+      error_code, {produce_entry, fetch_entry, list_offsets_entry, metadata_entry}};
 
   return std::make_shared<Response<ApiVersionsResponse>>(metadata, real_response);
 }

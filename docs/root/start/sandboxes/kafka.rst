@@ -30,9 +30,9 @@ Change to the ``examples/kafka`` directory.
 
   $ pwd
   envoy/examples/kafka
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
            Name                      Command                State                            Ports
   -----------------------------------------------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ Start by creating a Kafka topic with the name ``envoy-kafka-broker``:
 .. code-block:: console
 
   $ export TOPIC="envoy-kafka-broker"
-  $ docker-compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --create --topic $TOPIC
+  $ docker compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --create --topic $TOPIC
 
 
 Step 3: Check the Kafka topic
@@ -61,7 +61,7 @@ Check that the topic you created exists:
 
 .. code-block:: console
 
-  $ docker-compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --list | grep $TOPIC
+  $ docker compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --list | grep $TOPIC
 
 
 Step 4: Send a message using the Kafka producer
@@ -72,7 +72,7 @@ Next, send a message for the topic you have created using the ``kafka-console-pr
 .. code-block:: console
 
   $ export MESSAGE="Welcome to Envoy and Kafka broker filter!"
-  $ docker-compose run --rm kafka-client /bin/bash -c " \
+  $ docker compose run --rm kafka-client /bin/bash -c " \
       echo $MESSAGE \
       | kafka-console-producer --request-required-acks 1 --broker-list proxy:10000 --topic $TOPIC"
 
@@ -84,7 +84,7 @@ Now you can receive the message using the ``kafka-console-consumer`` :
 
 .. code-block:: console
 
-  $ docker-compose run --rm kafka-client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPIC --from-beginning --max-messages 1 | grep "$MESSAGE"
+  $ docker compose run --rm kafka-client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPIC --from-beginning --max-messages 1 | grep "$MESSAGE"
 
 
 Step 6: Check admin ``kafka_broker`` stats
