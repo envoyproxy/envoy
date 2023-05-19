@@ -200,6 +200,19 @@ CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
   });
 }
 
+CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
+                                                 int life_span, int stream_sharing) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value, state_type, life_span, stream_sharing](
+                                         std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = copyGoString(key);
+                                       auto value_str = copyGoString(value);
+                                       return filter->setStringFilterState(key_str, value_str,
+                                                                           state_type, life_span,
+                                                                           stream_sharing);
+                                     });
+}
+
 #ifdef __cplusplus
 }
 #endif
