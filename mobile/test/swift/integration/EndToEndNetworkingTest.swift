@@ -12,7 +12,8 @@ final class EndToEndNetworkingTest: XCTestCase {
 
   func testNetworkRequestReturnsHeadersAndData() {
     EnvoyTestServer.startHttpTestServer()
-    EnvoyTestServer.setHeadersAndData("x-response-foo", header_value: "aaa", response_body: "hello world")
+    EnvoyTestServer.setHeadersAndData(
+      "x-response-foo", header_value: "aaa", response_body: "hello world")
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
     let port = String(EnvoyTestServer.getEnvoyPort())
