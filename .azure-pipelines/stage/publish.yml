@@ -70,11 +70,11 @@ parameters:
   type: string
   default: false
 - name: publishDocsLatest
-  displayName: "Publish Docs to Netlify"
+  displayName: "Publish latest docs"
   type: string
   default: false
 - name: publishDocsRelease
-  displayName: "Publish Docs to website"
+  displayName: "Publish release docs"
   type: string
   default: false
 - name: publishGithubRelease
@@ -246,7 +246,7 @@ jobs:
       echo "building publishable assets complete"
 
 - job: docs
-  displayName: Publish docs to netlify
+  displayName: Publish docs
   dependsOn: ["success"]
   condition: |
     and(not(canceled()),
@@ -326,7 +326,7 @@ jobs:
     condition: |
       and(not(canceled()),
           eq(${{ parameters.publishDocsRelease }}, 'true'))
-    displayName: "Publish to Website"
+    displayName: "Publish release docs"
     workingDirectory: $(Build.SourcesDirectory)
 
 - job: github
