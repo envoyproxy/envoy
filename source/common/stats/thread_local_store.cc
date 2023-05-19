@@ -585,7 +585,7 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll()) {
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::Hidden) {
     return parent_.null_gauge_;
   }
 

@@ -1147,6 +1147,33 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
   EXPECT_MEMORY_LE(mem_consumed, 3500000);
 }
 
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenRegex) {
+  InSequence s;
+
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*[A-Z].*"));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& lowercase_hidden_gauge = scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
+  EXPECT_EQ(lowercase_hidden_gauge.name(), "lowercase_hidden_gauge");
+  Gauge& uppercase_hidden_gauge = scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
+  EXPECT_EQ(uppercase_hidden_gauge.name(), "lowercase_HIDDEN_gauge");
+
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
+  InSequence s;
+
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& lowercase_hidden_gauge = scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
+  EXPECT_EQ(lowercase_hidden_gauge.name(), "lowercase_hidden_gauge");
+  Gauge& uppercase_hidden_gauge = scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
+  EXPECT_EQ(uppercase_hidden_gauge.name(), "lowercase_HIDDEN_gauge");
+}
+
 // Tests the logic for caching the stats-matcher results, and in particular the
 // private impl method checkAndRememberRejection(). That method behaves
 // differently depending on whether TLS is enabled or not, so we parameterize
