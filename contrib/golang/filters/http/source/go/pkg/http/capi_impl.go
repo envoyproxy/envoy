@@ -199,8 +199,19 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
+	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(key))
 	handleCApiStatus(res)
 }
 

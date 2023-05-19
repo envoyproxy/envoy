@@ -13,7 +13,8 @@ namespace Envoy {
 namespace Http {
 
 HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
-    : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+    : fake_stats_(*symbol_table_), http_context_(fake_stats_.symbolTable()),
+      access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
