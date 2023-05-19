@@ -394,15 +394,6 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_transport_failure_reason_;
   }
 
-  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> healthCheckEvent() const override {
-    return health_check_event_;
-  };
-
-  void
-  setHealthCheckEvent(std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event) override {
-    health_check_event_ = event;
-  }
-
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

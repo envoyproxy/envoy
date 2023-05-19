@@ -138,10 +138,6 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
-  MOCK_METHOD(std::shared_ptr<envoy::data::core::v3::HealthCheckEvent>, healthCheckEvent, (),
-              (const));
-  MOCK_METHOD(void, setHealthCheckEvent,
-              (std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> event));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
@@ -167,7 +163,6 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
-  std::shared_ptr<envoy::data::core::v3::HealthCheckEvent> health_check_event_;
 };
 
 } // namespace StreamInfo

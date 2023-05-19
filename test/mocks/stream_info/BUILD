@@ -20,6 +20,5 @@ envoy_cc_mock(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )

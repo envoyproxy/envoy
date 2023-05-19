@@ -1090,6 +1090,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::nullValue()));
   }
+}
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
