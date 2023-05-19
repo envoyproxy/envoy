@@ -60,8 +60,6 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && rm -rf /usr/bin/cmake \
-          && cmake &> /dev/null || echo 'No cmake here!' \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
