@@ -126,6 +126,8 @@ Filter::StreamOpenState Filter::openStream() {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+    logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
   }
   return StreamOpenState::Ok;
 }
@@ -136,6 +138,8 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
+    logging_info_->addBytesSent(stream_->streamInfo().bytesSent());
+    logging_info_->addBytesReceived(stream_->streamInfo().bytesReceived());
     stream_.reset();
   } else {
     ENVOY_LOG(debug, "Stream already closed");
