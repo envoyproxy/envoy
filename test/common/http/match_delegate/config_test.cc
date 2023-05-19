@@ -332,7 +332,7 @@ createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) 
 
 TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {
   // The filter is added, but the `on_no_match` action will be invoked since it is not matched on
-  // request header, . The skip action is provided to `on_no_match` so we skip this filter.
+  // request header. The skip action is provided to `on_no_match` so we skip this filter.
   std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
       new Envoy::Http::MockStreamDecoderFilter());
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
