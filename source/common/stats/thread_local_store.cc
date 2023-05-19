@@ -958,6 +958,20 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+  const uint32_t num_buckets = hist_num_buckets(&histogram);
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
+  hist_bucket_t hist_bucket;
+  for (uint32_t i = 0; i < num_buckets; ++i) {
+    ParentHistogram::Bucket& bucket = buckets[i];
+    hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
+    bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
+    bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
+  }
+  return buckets;
+}
+
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
@@ -1072,6 +1086,20 @@ void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& s
         sinked_histograms_.insert(histogram);
       }
     }
+  }
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  extractAndAppendTags(symbolTable().toString(name), pool, stat_tags);
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  TagVector tags;
+  tagProducer().produceTags(name, tags);
+  for (const auto& tag : tags) {
+    stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }
 }
 

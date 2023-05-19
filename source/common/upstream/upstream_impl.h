@@ -795,7 +795,7 @@ public:
   }
   TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
-    return common_lb_config_;
+    return *common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
 
@@ -991,7 +991,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+  Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -1059,7 +1059,8 @@ private:
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
+  const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+      common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
@@ -1148,10 +1149,8 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                  bool added_via_api, TimeSource& time_source);
+  ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,

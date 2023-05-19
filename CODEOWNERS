@@ -23,8 +23,8 @@ extensions/filters/common/original_src @snowp @klarose
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @stevenzzzz
-/*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/http/ext_proc @gbrail @snowp @stevenzzzz @tyxia
+/*/extensions/filters/common/mutation_rules @gbrail @snowp @chaoqin-li1123 @tyxia
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -125,6 +125,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @mathetake @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
@@ -164,6 +165,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
+# runtime fraction input matcher
+/*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @UNOWNED
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
 # format string matching
@@ -190,6 +193,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/set_metadata @aguinet @snowp
 # Formatters
 /*/extensions/formatter/metadata @cpakulski @lizan
+/*/extensions/formatter/cel @kyessenov @zirain
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
@@ -254,9 +258,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @pradeepcrao @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @pradeepcrao @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @pradeepcrao @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @lizan
 # mongo proxy
@@ -293,6 +297,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/subset @wbpcode @zuercher
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
@@ -303,6 +308,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/health_checkers/grpc @snowp @zuercher
 /*/extensions/health_checkers/http @snowp @zuercher
 /*/extensions/health_checkers/tcp @snowp @zuercher
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @ravenblackx
+
 /*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
@@ -318,13 +326,14 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
+/*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # mobile
-/mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

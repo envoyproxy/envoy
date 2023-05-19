@@ -74,10 +74,13 @@ envoy_cc_library(
         "@envoy//bazel:apple": ["apple_platform_cert_verifier.h"],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        "@envoy//bazel:apple": ["-framework Security"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
-            "//library/common:envoy_main_interface_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
             "@envoy//bazel:boringssl",
         ],

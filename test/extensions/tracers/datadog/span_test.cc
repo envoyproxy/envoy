@@ -22,6 +22,7 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_data.h"
 #include "datadog/tags.h"
+#include "datadog/trace_segment.h"
 #include "datadog/tracer.h"
 #include "gtest/gtest.h"
 
@@ -209,6 +210,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledTrue) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
@@ -235,6 +241,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be kept (until we override it by calling
+    // `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_KEEP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());

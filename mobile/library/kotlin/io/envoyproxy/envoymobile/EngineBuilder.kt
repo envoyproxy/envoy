@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerificatio
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
-import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -39,7 +38,6 @@ open class EngineBuilder(
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   private var runtimeGuards = mutableMapOf<String, Boolean>()
-  private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
@@ -57,7 +55,6 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
-  private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -71,8 +68,6 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClustersLegacy = mutableListOf<String>()
-  private var virtualClusters = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -244,19 +239,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-   * true.
-   *
-   * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
-   *
-   * @return This builder.
-   */
-  fun enableHappyEyeballs(enableHappyEyeballs: Boolean): EngineBuilder {
-    this.enableHappyEyeballs = enableHappyEyeballs
-    return this
-  }
-
-  /**
    * Specify whether to do gzip response decompression or not.  Defaults to true.
    *
    * @param enableGzipDecompression whether or not to gunzip responses.
@@ -320,22 +302,6 @@ open class EngineBuilder(
    */
   fun enableProxying(enableProxying: Boolean): EngineBuilder {
     this.enableProxying = enableProxying
-    return this
-  }
-
-  /**
-   * Allows Envoy to avoid having to wait on DNS response in the dynamic forward proxy filter
-   * for requests that are proxied i.e., a proxied request that goes to example.com will
-   * not have to wait for the DNS resolution for example.com domain if skipping of the DNS lookup
-   * is enabled. Defaults to false.
-   *
-   * @param enableSkipDNSLookup whether to ship waiting for DNS responses in the
-   *                            dynamic forward proxy filter for proxied requests.
-   *
-   * @return This builder.
-   */
-  fun enableSkipDNSLookupForProxiedRequests(enableSkipDNSLookup: Boolean): EngineBuilder {
-    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookup
     return this
   }
 
@@ -553,30 +519,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Add virtual cluster configuration.
-   *
-   * @param cluster the JSON configuration string for a virtual cluster.
-   *
-   * @return this builder.
-   */
-  fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClustersLegacy.add(cluster)
-    return this
-  }
-
-  /**
-   * Add virtual cluster configurations.
-   *
-   * @param configs structured configurations of virtual clusters.
-   *
-   * @return this builder.
-   */
-  fun addVirtualClusters(configs: List<VirtualClusterConfig>): EngineBuilder {
-    this.virtualClusters + configs;
-    return this
-  }
-
-  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -711,7 +653,6 @@ open class EngineBuilder(
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -722,15 +663,12 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
-      virtualClustersLegacy,
-      virtualClusters,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,
       keyValueStores,
       statsSinks,
       runtimeGuards,
-      enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,

@@ -20,17 +20,16 @@ namespace EnvoyDefault {
  * Base class for all HTTP codec header validations. This class has several methods to validate
  * headers that are shared across multiple codec versions where the RFC guidance did not change.
  */
-class HeaderValidator : public ::Envoy::Http::HeaderValidator {
+class HeaderValidator {
 public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+  virtual ~HeaderValidator() = default;
 
-  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
-
-  using HeaderEntryValidationResult = Result<RejectOrDropHeaderAction>;
-  using HeaderValueValidationResult = RejectResult;
+  using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
+  using HeaderValueValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
@@ -90,6 +89,7 @@ protected:
    */
   class HostHeaderValidationResult {
   public:
+    using RejectAction = ::Envoy::Http::HeaderValidator::RejectAction;
     HostHeaderValidationResult(RejectAction action, absl::string_view details,
                                absl::string_view address, absl::string_view port)
         : result_(action, details, address, port) {
@@ -152,7 +152,16 @@ protected:
   /*
    * Common method for validating request or response trailers.
    */
-  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+  ::Envoy::Http::HeaderValidator::ValidationResult
+  validateTrailers(const ::Envoy::Http::HeaderMap& trailers);
+
+  /**
+   * Removes headers with underscores in their names iff the headers_with_underscores_action
+   * config value is DROP. Noop otherwise.
+   * The REJECT config option for header names with underscores is handled in the
+   * validateRequestHeaders or validateRequestTrailers methods.
+   */
+  void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

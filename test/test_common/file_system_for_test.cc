@@ -121,6 +121,11 @@ Api::IoCallResult<FileInfo> MemfileInstanceImpl::stat(absl::string_view path) {
   return file_system_->stat(path);
 }
 
+Api::IoCallBoolResult MemfileInstanceImpl::createPath(absl::string_view) {
+  // Creating an imaginary path is always successful.
+  return resultSuccess(true);
+}
+
 MemfileInstanceImpl::MemfileInstanceImpl()
     : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 

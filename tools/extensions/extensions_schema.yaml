@@ -66,11 +66,13 @@ categories:
 - envoy.compression.decompressor
 - envoy.config.validators
 - envoy.config_subscription
+- envoy.config_mux
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
 - envoy.formatter
+- envoy.geoip_providers
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers

@@ -69,7 +69,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+    client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
                    callbacks_->streamInfo());
     initiating_call_ = false;
   }
@@ -291,6 +291,15 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     }
   }
   return vh_rate_limits_;
+}
+
+std::string Filter::getDomain() {
+  const auto* specific_per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
+  if (specific_per_route_config != nullptr && !specific_per_route_config->domain().empty()) {
+    return specific_per_route_config->domain();
+  }
+  return config_->domain();
 }
 
 } // namespace RateLimitFilter
