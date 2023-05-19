@@ -1156,11 +1156,12 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenRegex) {
       TestUtility::createRegexMatcher(".*[A-Z].*"));
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
-  Gauge& lowercase_hidden_gauge = scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
+  Gauge& lowercase_hidden_gauge =
+      scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
   EXPECT_EQ(lowercase_hidden_gauge.name(), "lowercase_hidden_gauge");
-  Gauge& uppercase_hidden_gauge = scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
+  Gauge& uppercase_hidden_gauge =
+      scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
   EXPECT_EQ(uppercase_hidden_gauge.name(), "lowercase_HIDDEN_gauge");
-
 }
 
 TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
@@ -1170,9 +1171,11 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
   stats_config_.mutable_stats_matcher()->set_reject_all(true);
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
-  Gauge& lowercase_hidden_gauge = scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
+  Gauge& lowercase_hidden_gauge =
+      scope_.gaugeFromString("lowercase_hidden_gauge", Gauge::ImportMode::Hidden);
   EXPECT_EQ(lowercase_hidden_gauge.name(), "lowercase_hidden_gauge");
-  Gauge& uppercase_hidden_gauge = scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
+  Gauge& uppercase_hidden_gauge =
+      scope_.gaugeFromString("lowercase_HIDDEN_gauge", Gauge::ImportMode::Hidden);
   EXPECT_EQ(uppercase_hidden_gauge.name(), "lowercase_HIDDEN_gauge");
 }
 
