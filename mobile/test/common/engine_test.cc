@@ -21,7 +21,7 @@ struct TestEngineHandle {
     run_engine(handle_, yaml.c_str(), level.c_str(), "");
   }
 
-  void terminate() { terminate_engine(handle_, /* release */ false); }
+  envoy_status_t terminate() { return terminate_engine(handle_, /* release */ false); }
 
   ~TestEngineHandle() { terminate_engine(handle_, /* release */ true); }
 };
@@ -53,12 +53,12 @@ TEST_F(EngineTest, EarlyExit) {
 
   engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
   envoy_engine_t handle = engine_->handle_;
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  engine_->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false);
+  start_stream(handle, 0, {}, false, 0);
 
   engine_.reset();
 }
@@ -76,7 +76,7 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
 
   engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
   envoy_engine_t handle = engine_->handle_;
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
   // Scheduling on the dispatcher should work, the engine is running.

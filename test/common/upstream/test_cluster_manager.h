@@ -21,7 +21,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/common/upstream/subset_lb.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -63,6 +63,7 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
+
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
@@ -70,11 +71,14 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  server_context_, cluster, cm, stats_,
+                  cluster, server_context_, cm,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api, validation_visitor_);
+                  ssl_context_manager_, outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
-              return std::make_pair(result.first, result.second.release());
+              if (!result.ok()) {
+                throw EnvoyException(std::string(result.status().message()));
+              }
+              return std::make_pair(result->first, result->second.release());
             }));
     ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
   }
@@ -101,7 +105,7 @@ public:
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
@@ -137,7 +141,7 @@ public:
   MOCK_METHOD(CdsApi*, createCds_, ());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<ThreadLocal::MockInstance>& tls_ = server_context_.thread_local_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};

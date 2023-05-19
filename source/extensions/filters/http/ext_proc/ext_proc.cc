@@ -527,12 +527,20 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
+void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
+  const auto result = DurationUtil::durationToMillisecondsNoThrow(override_message_timeout);
+  if (!result.ok()) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of duration range. "
+                    "Ignoring the message.");
+    stats_.override_message_timeout_ignored_.inc();
+    return;
+  }
+  const auto message_timeout_ms = result.value();
   // The new timeout has to be >=1ms and <= max_message_timeout configured in filter.
-  const uint32_t min_timeout_ms = 1;
-  const uint32_t max_timeout_ms = config_->maxMessageTimeout();
+  const uint64_t min_timeout_ms = 1;
+  const uint64_t max_timeout_ms = config_->maxMessageTimeout();
   if (message_timeout_ms < min_timeout_ms || message_timeout_ms > max_timeout_ms) {
-    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of range. "
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of config range. "
                     "Ignoring the message.");
     stats_.override_message_timeout_ignored_.inc();
     return;
@@ -559,7 +567,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Check whether the server is asking to extend the timer.
   if (response->has_override_message_timeout()) {
-    onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
+    onNewTimeout(response->override_message_timeout());
     return;
   }
 

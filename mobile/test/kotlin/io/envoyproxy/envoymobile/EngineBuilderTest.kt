@@ -35,16 +35,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `enabling happy eyeballs overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.enableHappyEyeballs(true)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.enableHappyEyeballs).isTrue()
-  }
-
-  @Test
   fun `enabling interface binding overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -202,16 +192,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.appId).isEqualTo("com.envoymobile.android")
-  }
-
-  @Test
-  fun `specifying virtual clusters overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addVirtualCluster("[test]")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.legacyVirtualClusters.size).isEqualTo(1)
   }
 
   @Test

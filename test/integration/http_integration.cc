@@ -283,6 +283,18 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   }
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
+
+  if (!disable_client_header_validation_) {
+    static constexpr absl::string_view empty_header_validator_config = R"EOF(
+      name: envoy.http.header_validators.envoy_default
+      typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+  )EOF";
+
+    cluster->header_validator_factory_ =
+        IntegrationUtil::makeHeaderValidationFactory(empty_header_validator_config);
+  }
+
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
       timeSystem())};
@@ -368,8 +380,15 @@ void HttpIntegrationTest::initialize() {
   // Config Google QUIC flow control window.
   quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
       Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+  // Adjust timeouts.
+  quic::QuicTime::Delta connect_timeout =
+      quic::QuicTime::Delta::FromSeconds(5 * TSAN_TIMEOUT_FACTOR);
+  quic_connection_persistent_info->quic_config_.set_max_time_before_crypto_handshake(
+      connect_timeout);
+  quic_connection_persistent_info->quic_config_.set_max_idle_time_before_crypto_handshake(
+      connect_timeout);
 
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

@@ -124,12 +124,14 @@ public:
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return null_access_log_flush_interval_;
   }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -154,6 +156,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return scope_key_builder_; }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -177,7 +180,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::HttpTracerSharedPtr tracer() override { return nullptr; }
+  Tracing::TracerSharedPtr tracer() override { return nullptr; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
@@ -217,7 +220,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
@@ -301,6 +304,16 @@ private:
 
     Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;
+  };
+
+  /**
+   * Implementation of ScopeKeyBuilder that returns a null scope key.
+   */
+  struct NullScopeKeyBuilder : public Router::ScopeKeyBuilder {
+    NullScopeKeyBuilder() = default;
+    ~NullScopeKeyBuilder() override = default;
+
+    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
   };
 
   /**
@@ -471,6 +484,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  NullScopeKeyBuilder scope_key_builder_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
   Server::InitDumpHandler init_dump_handler_;

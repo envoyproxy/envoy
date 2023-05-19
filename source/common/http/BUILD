@@ -27,6 +27,7 @@ envoy_cc_library(
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/router:router_lib",
@@ -45,6 +46,11 @@ envoy_cc_library(
     deps = [
         "//envoy/http:async_client_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "character_set_validation_lib",
+    hdrs = ["character_set_validation.h"],
 )
 
 envoy_cc_library(
@@ -247,6 +253,7 @@ envoy_cc_library(
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
+        "//envoy/router:scopes_interface",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
@@ -443,21 +450,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rest_api_fetcher_lib",
-    srcs = ["rest_api_fetcher.cc"],
-    hdrs = ["rest_api_fetcher.h"],
-    deps = [
-        ":message_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:enum_to_int",
-        "//source/common/config:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "user_agent_lib",
     srcs = ["user_agent.cc"],
     hdrs = ["user_agent.h"],
@@ -484,6 +476,7 @@ envoy_cc_library(
         "quiche_http2_protocol",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
@@ -516,6 +509,7 @@ envoy_cc_library(
         "quiche_http2_adapter",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",

@@ -78,7 +78,6 @@
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
-                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
@@ -96,7 +95,6 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
                              typedDirectResponses:
@@ -144,7 +142,6 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
-  self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
@@ -162,7 +159,6 @@
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
-  self.virtualClusters = virtualClusters;
   self.runtimeGuards = runtimeGuards;
   self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
@@ -234,7 +230,6 @@
     }
     builder.addDnsPreresolveHostnames(hostnames);
   }
-  builder.enableHappyEyeballs(self.enableHappyEyeballs);
   builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
@@ -249,9 +244,6 @@
   builder.setAppVersion([self.appVersion toCXXString]);
   builder.setAppId([self.appId toCXXString]);
   builder.setDeviceOs("iOS");
-  for (NSString *cluster in self.virtualClusters) {
-    builder.addVirtualCluster([cluster toCXXString]);
-  }
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 
