@@ -1,3 +1,25 @@
+diff --git a/base/memory_manager.cc b/base/memory_manager.cc
+index 1b7b355..4c7810c 100644
+--- a/base/memory_manager.cc
++++ b/base/memory_manager.cc
+@@ -234,7 +234,7 @@ class GlobalMemoryManager final : public MemoryManager {
+   void* Allocate(size_t size, size_t align) override {
+     static_cast<void>(size);
+     static_cast<void>(align);
+-    ABSL_INTERNAL_UNREACHABLE;
++    ABSL_UNREACHABLE();
+     return nullptr;
+   }
+ 
+@@ -242,7 +242,7 @@ class GlobalMemoryManager final : public MemoryManager {
+   void OwnDestructor(void* pointer, void (*destructor)(void*)) override {
+     static_cast<void>(pointer);
+     static_cast<void>(destructor);
+-    ABSL_INTERNAL_UNREACHABLE;
++    ABSL_UNREACHABLE();
+   }
+ };
+ 
 diff --git a/eval/eval/evaluator_stack.h b/eval/eval/evaluator_stack.h
 index 1ecab27..9df65d7 100644
 --- a/eval/eval/evaluator_stack.h
