@@ -17,10 +17,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "protoc plugin to generate polyglot message validators",
         project_url = "https://github.com/bufbuild/protoc-gen-validate",
         use_category = ["api"],
-        sha256 = "f1ec013cfdfffa7a17d75b55d41265dad47d24e0e9d86c02311562e15be52da9",
+        sha256 = "e611913ce9576b66a9521c0154ce50854319483af8f55ce376e68d8e31fe6149",
         version = "1.0.1",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
-        strip_prefix = "protoc-gen-validate-{version}",
+        strip_prefix = "protovalidate-{version}",
         release_date = "2023-05-09",
         implied_untracked_deps = [
             "com_github_iancoleman_strcase",
