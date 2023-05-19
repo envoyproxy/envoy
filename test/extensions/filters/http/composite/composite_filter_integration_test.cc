@@ -89,7 +89,7 @@ public:
   void addPerRouteConfig(const ExtensionWithMatcherPerRoute& config, const std::string& filter_name,
                          const std::string& route_prefix, const bool& add) {
     config_helper_.addConfigModifier(
-        [this, config, filter_name, route_prefix, add](ConfigHelper::HttpConnectionManager& cm) {
+        [config, filter_name, route_prefix, add](ConfigHelper::HttpConnectionManager& cm) {
           auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
           auto* route = getMutableRoute(vh, add);
           route->mutable_match()->set_prefix(route_prefix);
