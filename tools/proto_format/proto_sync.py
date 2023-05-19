@@ -35,11 +35,14 @@ class Git(object):
             nread += len(data)
             hasher.update(data)
         if nread != size:
+            # TODO(phlax): move this to pytooling asap.
+            #     This would not pass type checking `BytesIO` has no `stream.name`
             raise ValueError('%s: expected %u bytes, found %u bytes' % (stream.name, size, nread))
         return hasher.hexdigest()[:10]
 
     def string_hash(self, text):
-        return self.blob_hash(io.BytesIO(text.encode("utf-8")), len(text))
+        chars = text.encode("utf-8")
+        return self.blob_hash(io.BytesIO(chars), len(chars))
 
     def diff(self, t1, t2, path, mode, remove=False):
         fhash = self.string_hash(t1)

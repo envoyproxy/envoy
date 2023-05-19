@@ -15,16 +15,16 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  ::Envoy::Http::HeaderValidator::ValidationResult
   validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
 
 protected:
@@ -34,10 +34,24 @@ protected:
    * config options is true.
    * If the http1_protocol_options.allow_chunked_length is false a request with both
    * Transfer-Encoding and Content-Length headers is rejected in the validateRequestHeaders method.
-   * Additionally if request is CONNECT and Content-Length is 0, the Content-Length header is
-   * removed.
    */
-  void sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map);
+  void sanitizeContentLength(::Envoy::Http::RequestOrResponseHeaderMap& header_map);
+
+  /**
+   * Validate Transfer-Encoding and Content-Length headers.
+   * HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
+   * https://www.rfc-editor.org/rfc/rfc9112.html#section-6.2:
+   *
+   * A sender MUST NOT send a Content-Length header field in any message that
+   * contains a Transfer-Encoding header field.
+   *
+   * The http1_protocol_options.allow_chunked_length config setting can
+   * override the RFC compliance to allow a Transfer-Encoding of "chunked" with
+   * a Content-Length set. In this exception case, we remove the Content-Length
+   * header in the transform[Request/Response]Headers() method.
+   */
+  ::Envoy::Http::HeaderValidator::ValidationResult validateContentLengthAndTransferEncoding(
+      const ::Envoy::Http::RequestOrResponseHeaderMap& header_map);
 
 private:
   /*
@@ -56,7 +70,7 @@ private:
 };
 
 class ServerHttp1HeaderValidator : public Http1HeaderValidator,
-                                   public ::Envoy::Http::HeaderValidator {
+                                   public ::Envoy::Http::ServerHeaderValidator {
 public:
   ServerHttp1HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
@@ -94,6 +108,13 @@ public:
   transformResponseHeaders(const ::Envoy::Http::ResponseHeaderMap&) override {
     return ResponseHeadersTransformationResult::success();
   }
+
+private:
+  /**
+   * If request is CONNECT and Content-Length is 0, the Content-Length header is removed.
+   * Otherwise calls Http1HeaderValidator::sanitizeContentLength()
+   */
+  void sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map);
 };
 
 class ClientHttp1HeaderValidator : public Http1HeaderValidator,
@@ -130,9 +151,7 @@ public:
     return RequestHeadersTransformationResult::success();
   }
 
-  TransformationResult transformResponseHeaders(::Envoy::Http::ResponseHeaderMap&) override {
-    return TransformationResult::success();
-  }
+  TransformationResult transformResponseHeaders(::Envoy::Http::ResponseHeaderMap&) override;
 };
 
 using ServerHttp1HeaderValidatorPtr = std::unique_ptr<ServerHttp1HeaderValidator>;

@@ -13,7 +13,8 @@ namespace Envoy {
 namespace Http {
 
 HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
-    : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+    : fake_stats_(*symbol_table_), http_context_(fake_stats_.symbolTable()),
+      access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
@@ -311,10 +312,10 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
 
 void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
     HeaderValidator::ValidationResult validation_result,
-    HeaderValidator::RequestHeadersTransformationResult transformation_result) {
+    ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaders(_))
             .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
 
@@ -322,7 +323,7 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
           EXPECT_CALL(*header_validator, transformRequestHeaders(_))
               .WillOnce(Invoke([transformation_result](RequestHeaderMap& headers) {
                 if (transformation_result.action() ==
-                    HeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
+                    ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
                   headers.setPath("/some/new/path");
                 }
                 return transformation_result;
@@ -330,8 +331,9 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
         }
 
         EXPECT_CALL(*header_validator, transformResponseHeaders(_))
-            .WillOnce(InvokeWithoutArgs(
-                []() { return HeaderValidator::ResponseHeadersTransformationResult::success(); }));
+            .WillOnce(InvokeWithoutArgs([]() {
+              return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
+            }));
 
         return header_validator;
       }));
@@ -342,13 +344,13 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
     HeaderValidator::TransformationResult transformation_result, bool expect_response) {
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
           return HeaderValidator::ValidationResult::success();
         }));
 
         EXPECT_CALL(*header_validator, transformRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
-          return HeaderValidator::RequestHeadersTransformationResult::success();
+          return ServerHeaderValidator::RequestHeadersTransformationResult::success();
         }));
 
         EXPECT_CALL(*header_validator, validateRequestTrailers(_))
@@ -361,7 +363,7 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
         if (expect_response) {
           EXPECT_CALL(*header_validator, transformResponseHeaders(_))
               .WillOnce(InvokeWithoutArgs([]() {
-                return HeaderValidator::ResponseHeadersTransformationResult::success();
+                return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
               }));
         }
         return header_validator;

@@ -38,7 +38,6 @@ open class EngineBuilder(
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   private var runtimeGuards = mutableMapOf<String, Boolean>()
-  private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
@@ -56,7 +55,6 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
-  private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -241,19 +239,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-   * true.
-   *
-   * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
-   *
-   * @return This builder.
-   */
-  fun enableHappyEyeballs(enableHappyEyeballs: Boolean): EngineBuilder {
-    this.enableHappyEyeballs = enableHappyEyeballs
-    return this
-  }
-
-  /**
    * Specify whether to do gzip response decompression or not.  Defaults to true.
    *
    * @param enableGzipDecompression whether or not to gunzip responses.
@@ -317,22 +302,6 @@ open class EngineBuilder(
    */
   fun enableProxying(enableProxying: Boolean): EngineBuilder {
     this.enableProxying = enableProxying
-    return this
-  }
-
-  /**
-   * Allows Envoy to avoid having to wait on DNS response in the dynamic forward proxy filter
-   * for requests that are proxied i.e., a proxied request that goes to example.com will
-   * not have to wait for the DNS resolution for example.com domain if skipping of the DNS lookup
-   * is enabled. Defaults to false.
-   *
-   * @param enableSkipDNSLookup whether to ship waiting for DNS responses in the
-   *                            dynamic forward proxy filter for proxied requests.
-   *
-   * @return This builder.
-   */
-  fun enableSkipDNSLookupForProxiedRequests(enableSkipDNSLookup: Boolean): EngineBuilder {
-    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookup
     return this
   }
 
@@ -684,7 +653,6 @@ open class EngineBuilder(
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -701,7 +669,6 @@ open class EngineBuilder(
       keyValueStores,
       statsSinks,
       runtimeGuards,
-      enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,

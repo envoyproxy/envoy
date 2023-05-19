@@ -3,30 +3,28 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.0"
-"source/common/api:82.4"
+"source/common:96.2"
+"source/common/api:82.6"
 "source/common/api/posix:81.3"
 "source/common/common/posix:92.7"
-"source/common/config:96.2"
+"source/common/config:95.6"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
-"source/common/filesystem/posix:96.5" # FileReadToEndNotReadable keeps failing
-"source/common/http:96.3"
-"source/common/http/http2:95.0"
+"source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
+"source/common/http/http2:95.2"
 "source/common/json:93.4"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.6"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:96.3"
-"source/common/quic:93.4"
-"source/common/router:96.1"
+"source/common/quic:93.5"
+"source/common/router:96.2"
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/singleton:95.7"
 "source/common/tcp:93.0"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/tracing:97.1"
-"source/common/upstream:96.4"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.5"
 "source/extensions/access_loggers/wasm:93.5"
@@ -38,20 +36,20 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common:96.5"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
-"source/extensions/filters/http/cache:93.3"
+"source/extensions/filters/http/cache:93.4"
 "source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.9"
-"source/extensions/filters/http/rate_limit_quota:94" # TODO(tyxia) WIP. Improve coverage as development continues
+"source/extensions/filters/http/rate_limit_quota:94.8" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
 "source/extensions/filters/listener/original_src:92.1"
-"source/extensions/filters/network/common:96.1"
+"source/extensions/filters/network/common:96.2"
 "source/extensions/filters/network/common/redis:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/thrift_proxy/router:96.5"
-"source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.2"
+"source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.3"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/rate_limit_descriptors:95.5"
@@ -64,24 +62,27 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:95.6"
-"source/extensions/transport_sockets/tls:94.8"
+"source/extensions/transport_sockets/tls:94.9"
 "source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
-"source/extensions/listener_managers/validation_listener_manager:69.6"
+"source/extensions/listener_managers/validation_listener_manager:70.0"
 "source/extensions/watchdog/profile_action:83.3"
-"source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
+"source/server:93.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:profiler-lib:83"
 "source/extensions/load_balancing_policies/common:94" # Death tests don't report LCOV
-"source/server/config_validation:83.8"
-"source/extensions/health_checkers:95.5"
+"source/server/config_validation:88.2"
+"source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/http:93.8"
 "source/extensions/health_checkers/grpc:92.0"
-"source/extensions/load_balancing_policies:94.7"
+"source/extensions/load_balancing_policies:95.5"
 "source/extensions/load_balancing_policies/subset:94.3"
+"source/extensions/config_subscription/rest:94.3"
+"source/extensions/config_subscription:94.8"
+"source/extensions/config_subscription/grpc:94.0"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

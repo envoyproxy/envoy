@@ -728,6 +728,13 @@ envoy.filters.udp_listener.udp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+envoy.formatter.cel:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.cel.v3.Cel
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -1523,19 +1530,53 @@ envoy.config_subscription.rest:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.RestSubscription
 envoy.config_subscription.filesystem:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemSubscription
+envoy.config_subscription.ads_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_delta_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.ads:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.delta_grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
 envoy.config_subscription.filesystem_collection:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemCollectionSubscription
+envoy.config_mux.delta_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable
+envoy.config_mux.sotw_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable

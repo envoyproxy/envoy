@@ -62,11 +62,14 @@ public:
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_log_on_tunnel_successfully_established_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -103,6 +106,12 @@ public:
       return &scoped_route_config_provider_;
     }
     return nullptr;
+  }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    if (use_srds_) {
+      return scope_key_builder_;
+    }
+    return {};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -159,7 +168,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  HeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
+  ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
     return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
@@ -186,9 +195,9 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void
-  expectUhvHeaderCheck(HeaderValidatorBase::ValidationResult validation_result,
-                       HeaderValidator::RequestHeadersTransformationResult transformation_result);
+  void expectUhvHeaderCheck(
+      HeaderValidator::ValidationResult validation_result,
+      ServerHeaderValidator::RequestHeadersTransformationResult transformation_result);
   void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
                              HeaderValidator::TransformationResult transformation_result,
                              bool expect_response = true);
@@ -197,6 +206,8 @@ public:
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -204,6 +215,7 @@ public:
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   bool flush_access_log_on_new_request_ = false;
+  bool flush_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;

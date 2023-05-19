@@ -82,9 +82,9 @@ public:
   const std::string operation_name_{"test"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  SystemTime start_time_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -173,8 +173,8 @@ TEST_F(DatadogConfigTest, CollectorHostname) {
             return &request;
           }));
 
-  Tracing::SpanPtr span = tracer_->startSpan(config_, request_headers_, operation_name_,
-                                             start_time_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = tracer_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
   // Timer should be re-enabled.

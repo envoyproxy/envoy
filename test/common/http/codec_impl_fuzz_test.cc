@@ -23,6 +23,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -554,6 +555,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   NiceMock<MockConnectionManagerConfig> conn_manager_config;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
@@ -601,13 +603,13 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     server = std::make_unique<Http2::ServerConnectionImpl>(
         server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, server_http2_options, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, overload_manager_);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, Http1::CodecStats::atomicGet(http1_stats, scope), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, overload_manager_);
   }
 
   // We track whether the connection should be closed for HTTP/1, since stream resets imply

@@ -64,7 +64,6 @@ class MainActivity : Activity() {
       .enableInterfaceBinding(true)
       .enableSocketTagging(true)
       .enableProxying(true)
-      .enableSkipDNSLookupForProxiedRequests(true)
       // TODO: uncomment once platform cert validation is fixed.
       // .enablePlatformCertificatesValidation(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")

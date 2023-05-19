@@ -199,6 +199,11 @@ public:
      * limits
      */
     virtual bool isAboveWriteBufferHighWatermark() const PURE;
+
+    /***
+     * @returns the stream info object associated with the stream.
+     */
+    virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   };
 
   /***

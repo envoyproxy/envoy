@@ -8,6 +8,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -221,6 +222,8 @@ public:
   // headers have been evaluated, and before attempting to establish a connection with the upstream.
   virtual bool flushAccessLogOnNewRequest() PURE;
 
+  virtual bool flushAccessLogOnTunnelSuccessfullyEstablished() const PURE;
+
   /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol
@@ -228,11 +231,14 @@ public:
    * @param connection supplies the owning connection.
    * @param data supplies the currently available read data.
    * @param callbacks supplies the callbacks to install into the codec.
+   * @param overload_manager supplies overload manager that the codec can
+   * integrate with.
    * @return a codec or nullptr if no codec can be created.
    */
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
-                                          ServerConnectionCallbacks& callbacks) PURE;
+                                          ServerConnectionCallbacks& callbacks,
+                                          Server::OverloadManager& overload_manager) PURE;
 
   /**
    * @return DateProvider& the date provider to use for
@@ -335,6 +341,12 @@ public:
    * this function. This will return nullptr when scoped routing is not enabled.
    */
   virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
+
+  /**
+   * @return OptRef<Router::ScopeKeyBuilder> the scope key builder to calculate the scope key.
+   * This will return nullptr when scoped routing is not enabled.
+   */
+  virtual OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.
@@ -513,7 +525,7 @@ public:
    * @return pointer to the header validator.
    *         If nullptr, header validation will not be done.
    */
-  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
+  virtual ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
 
   /**
    * @return whether to append the x-forwarded-port header.

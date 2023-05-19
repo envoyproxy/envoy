@@ -136,7 +136,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
@@ -206,7 +206,7 @@ void BaseClientIntegrationTest::createEnvoy() {
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
     builder_.setOverrideConfig(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
-    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers.");
+    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
 
   absl::Notification engine_running;
