@@ -139,8 +139,8 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    logging_info_->addBytesSent(stream_->streamInfo().bytesSent());
-    logging_info_->addBytesReceived(stream_->streamInfo().bytesReceived());
+    logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+    logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
     stream_.reset();
   } else {
     ENVOY_LOG(debug, "Stream already closed");

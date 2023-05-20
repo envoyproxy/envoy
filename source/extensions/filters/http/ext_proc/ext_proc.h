@@ -67,8 +67,8 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
-  void addBytesSent(uint64_t bytes_sent) { bytes_sent_ += bytes_sent; }
-  void addBytesReceived(uint64_t bytes_received) { bytes_received_ += bytes_received; }
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
     cluster_info_ = cluster_info;
   }
@@ -78,9 +78,7 @@ public:
 
   uint64_t bytesSent() const { return bytes_sent_; }
   uint64_t bytesReceived() const { return bytes_received_; }
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> clusterInfo() const {
-    return cluster_info_;
-  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> clusterInfo() const { return cluster_info_; }
   absl::optional<Upstream::HostDescriptionConstSharedPtr> upstreamHost() const {
     return upstream_host_;
   }
@@ -89,7 +87,7 @@ public:
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
-  uint64_t bytes_sent_, bytes_received_;
+  uint64_t bytes_sent_{0}, bytes_received_{0};
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info_;
   absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host_;
   GrpcCalls decoding_processor_grpc_calls_;
