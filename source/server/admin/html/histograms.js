@@ -39,7 +39,6 @@ function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
 
 let layout_evenly = true;
 
-
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = document.createElement('div');
   const label = document.createElement('span');
@@ -80,6 +79,10 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   div.appendChild(label);
   div.appendChild(graphics);
   div.appendChild(labels);
+
+  const detailPopup = document.createElement('div');
+  detailPopup.className = 'histogram-popup';
+  graphics.appendChild(detailPopup);
 
   graphics.className = 'histogram-graphics';
   labels.className = 'histogram-labels';
@@ -289,26 +292,36 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
                                           histogram.totals[i + 1].lower_bound, bucketSpan);
     }*/
 
-    const magLeft = formatPercent((leftVpx - widthVpx/20) / widthVpx);
+    const magLeft = formatPercent((leftVpx - widthVpx/30) / widthVpx);
     bucketSpan.addEventListener('mouseover', (event) => {
+      detailPopup.style.left = magLeft;
+      detailPopup.style.visibility = 'visible';
+      bucketSpan.style.backgroundColor = 'yellow';
+
+/*
       bucketSpan.style.zIndex = 3;
       bucketSpan.style.width = '10%';
       bucketSpan.style.height = '60px';
       console.log('setting left position to ' + magLeft + ' from ' + left);
       bucketSpan.style.left = magLeft;
       bucketSpan.style.backgroundColor = 'cyan';
-      bucketSpan.textContent =
-          '[' + bucket.lower_bound + ', ' + (bucket.lower_bound + bucket.width) + ') ' +
+*/
+      detailPopup.textContent =
+          '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') ' +
           'count=' + bucket.count;
     });
 
     bucketSpan.addEventListener('mouseout', (event) => {
+      detailPopup.style.visibility = 'hidden';
+      bucketSpan.style.backgroundColor = '#e6d7ff';
+
+/*
       bucketSpan.style.zIndex = 1;
       bucketSpan.style.width = '2%';
       bucketSpan.style.left = left;
-      bucketSpan.style.backgroundColor = '#e6d7ff';
       bucketSpan.style.height = heightPercent;
       bucketSpan.textContent = '';
+*/
     });
 
     //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
