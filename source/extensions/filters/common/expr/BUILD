@@ -16,7 +16,7 @@ envoy_cc_library(
     # visibility = ["//visibility:public"],
     visibility = [
         "//source/common/http/matching:__subpackages__",
-        "//source/common/matcher:__subpackages__"
+        "//source/common/matcher:__subpackages__",
     ],
     deps = [
         ":context_lib",
