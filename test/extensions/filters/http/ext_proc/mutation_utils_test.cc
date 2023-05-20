@@ -34,7 +34,8 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  MutationUtils::headersToProto(headers, proto_headers);
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -242,6 +243,55 @@ TEST(MutationUtils, TestBodyMutationNothing) {
   BodyMutation mut;
   MutationUtils::applyBodyMutations(mut, buf);
   EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
+
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+  envoy::config::core::v3::HeaderMap proto_headers;
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  string_matcher.set_ignore_case(true);
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
 } // namespace

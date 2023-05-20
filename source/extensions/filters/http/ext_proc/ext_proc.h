@@ -112,9 +112,7 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const {
-    return header_matchers_;
-  }
+  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 

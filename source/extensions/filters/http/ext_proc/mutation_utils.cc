@@ -24,8 +24,8 @@ using Stats::Counter;
 using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::HeaderMutation;
 
-bool MutationUtils::headerInAllowList(absl::string_view key,
-                            const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
+bool MutationUtils::headerInAllowList(
+    absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
   return std::any_of(header_matchers.begin(), header_matchers.end(),
                      [&key](auto& matcher) { return matcher->match(key); });
 }
@@ -33,7 +33,8 @@ bool MutationUtils::headerInAllowList(absl::string_view key,
 void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
                                    envoy::config::core::v3::HeaderMap& proto_out,
                                    const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
-  headers_in.iterate([&proto_out, &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+  headers_in.iterate([&proto_out,
+                      &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));

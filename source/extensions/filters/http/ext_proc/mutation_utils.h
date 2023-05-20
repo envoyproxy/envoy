@@ -18,8 +18,8 @@ namespace ExternalProcessing {
 class MutationUtils : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // Check whether header:key is in header_matchers.
-  bool MutationUtils::headerInAllowList(absl::string_view key,
-                                        const std::vector<Matchers::StringMatcherPtr>& header_matchers) ;
+  static bool headerInAllowList(absl::string_view key,
+                                const std::vector<Matchers::StringMatcherPtr>& header_matchers);
   // Convert a header map until a protobuf
   static void headersToProto(const Http::HeaderMap& headers_in,
                              envoy::config::core::v3::HeaderMap& proto_out,
