@@ -12,12 +12,7 @@ envoy_cc_library(
     name = "evaluator_lib",
     srcs = ["evaluator.cc"],
     hdrs = ["evaluator.h"],
-    # TODO(tyxia) Think about visibility check
-    # visibility = ["//visibility:public"],
-    visibility = [
-        "//source/common/http/matching:__subpackages__",
-        "//source/common/matcher:__subpackages__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         ":context_lib",
         "//source/common/http:utility_lib",
