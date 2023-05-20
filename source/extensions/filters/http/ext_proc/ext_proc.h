@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -79,7 +80,12 @@ public:
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
+        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {
+    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+      header_matchers_.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+  }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -99,6 +105,10 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
+  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const {
+    return header_matchers_;
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -114,6 +124,8 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
+  // Empty header_matchers_ means allow all.
+  std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
