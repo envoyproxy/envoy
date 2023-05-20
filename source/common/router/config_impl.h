@@ -94,8 +94,6 @@ private:
                                   bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
-
-  const bool ignore_optional_option_from_hcm_for_route_config_{};
   absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 

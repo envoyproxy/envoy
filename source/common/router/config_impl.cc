@@ -2146,20 +2146,30 @@ PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : ignore_optional_option_from_hcm_for_route_config_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config")) {
+    ProtobufMessage::ValidationVisitor& validator) {
 
-  static const std::string filter_config_type =
+  const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
+
+  absl::string_view filter_config_type =
       envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
     RouteSpecificFilterConfigConstSharedPtr config;
 
-    // Ignore the optional_http_filters if the ignore_optional_option_from_hcm_for_route_config_
-    // is set to true by the runtime feature.
-    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config_ &&
+    // There are two ways to mark a route/virtual host per filter configuration as optional:
+    // 1. Mark it as optional in the HTTP filter of HCM. This way is deprecated but still works
+    //    when the runtime flag
+    //    `envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`
+    //    is explicitly set to false.
+    // 2. Mark it as optional in the route/virtual host per filter configuration. This way is
+    //    recommended.
+    //
+    // We check the first way first to ensure if this filter configuration is marked as optional
+    // or not. This will be true if the runtime flag is explicitly reverted to false and the
+    // config name is in the optional http filter list.
+    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config &&
                               (optional_http_filters.find(name) != optional_http_filters.end());
 
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
@@ -2181,7 +2191,7 @@ PerFilterConfigs::PerFilterConfigs(
     }
 
     if (config != nullptr) {
-      configs_.emplace(name, config);
+      configs_[name] = std::move(config);
     }
   }
 }

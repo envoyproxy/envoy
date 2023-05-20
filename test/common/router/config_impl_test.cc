@@ -10418,7 +10418,7 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -10441,7 +10441,7 @@ virtual_hosts:
   checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilterButNoRuntime) {
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
