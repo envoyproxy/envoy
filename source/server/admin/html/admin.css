@@ -101,6 +101,7 @@
   width: 2%;
   /* margin-left: -0.5%; */
   margin-left: -0.75%;
+  z-index: 1;
 }
 
 .histogram-percentile {
