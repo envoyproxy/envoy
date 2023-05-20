@@ -95,8 +95,6 @@ EXTENSIONS = {
     #
 
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
-    # TODO(tyxia) this is not in extension remove!!
-    "envoy.matching.inputs.cel_data_input":                    "//source/common/http/matching:inputs_lib",
 
     #
     # Matching actions
