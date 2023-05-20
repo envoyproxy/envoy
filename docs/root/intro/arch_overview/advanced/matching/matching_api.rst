@@ -35,6 +35,7 @@ These input functions are available for matching HTTP requests:
 * :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
 * :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
 * :ref:`Query parameters value <extension_envoy.matching.inputs.query_params>`.
+* :ref:`CEL data input value <extension_envoy.matching.inputs.cel_data_input>`.
 
 .. _extension_category_envoy.matching.network.input:
 
