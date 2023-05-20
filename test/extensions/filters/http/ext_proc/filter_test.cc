@@ -82,11 +82,11 @@ protected:
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-    EXPECT_CALL(stream_info_, bytesSent()).Times(1).WillOnce(Return(100));
-    EXPECT_CALL(stream_info, bytesReceived()).Times(1).WillOnce(Return(200));
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).Times(1);
-    EXPECT_CALL(stream_info, upstreamInfo()).Times(1);
-    EXPECT_CALL(stream_info_.upstream_info_, upstreamHost()).Times(1);
+    EXPECT_CALL(stream_info_, bytesSent()).WillOnce(Return(100));
+    EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(200));
+    EXPECT_CALL(stream_info, upstreamClusterInfo());
+    EXPECT_CALL(stream_info, upstreamInfo());
+    EXPECT_CALL(stream_info_.upstream_info_, upstreamHost());
 
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
@@ -296,10 +296,11 @@ protected:
   // The metadata configured as part of ext_proc filter should be in the filter state.
   // In addition, bytes sent/received should also be stored.
   void expectFilterState(const Envoy::ProtobufWkt::Struct& expected_metadata) {
-    const auto* filterState = stream_info_.filterState()
+    const auto* filterState =
+        stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                    filter_config_name);
+                filter_config_name);
     const Envoy::ProtobufWkt::Struct& loggedMetadata = filterState->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
     EXPECT_EQ(filterState->bytesSent(), 100);
