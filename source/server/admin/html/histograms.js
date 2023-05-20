@@ -97,6 +97,12 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   let prevBucket = null;
   let annotationsDiv;
 
+  // If there are too many buckets, per-bucket label text gets too dense, so skip
+  // some if needed.
+  const maxBucketsWithText = 30;
+  const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
+  let textIntervalIndex = 0;
+
   for (bucket of histogram.totals) {
     maxCount = Math.max(maxCount, bucket.count);
     const upper_bound = bucket.lower_bound + bucket.width;
@@ -251,10 +257,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     }
     console.log('lower_bound=' + bucket.lower_bound + ' width=' + bucket.width +
                 ' left=' + bucketSpan.style.left /* + ' width=' + bucketSpan.style.width */);
-    const lower_label = document.createElement('span');
-    //lower_label.textContent = format(bucket.lower_bound) + '[' + format(bucket.width) + ']';
-    lower_label.textContent = format(bucket.lower_bound); // + ',' + format(bucket.width);
-
     const nextVpx = bucketWidthVpx + marginWidthVpx + leftVpx;
 
 /*
@@ -307,8 +309,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucketSpan.style.backgroundColor = 'cyan';
 */
       detailPopup.textContent =
-          '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') ' +
-          'count=' + bucket.count;
+          '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') '
+          /* + 'count=' + bucket.count */;
     });
 
     bucketSpan.addEventListener('mouseout', (event) => {
@@ -324,24 +326,33 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 */
     });
 
-    //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
-    lower_label.style.left = left;
-    lower_label.style.width = toPercent(bucketWidthVpx);
-/*
-    const upper_label = document.createElement('span');
-    upper_label.textContent = format(upper_bound);
-    upper_label.style.left = toPercent(leftVpx + bucketWidthVpx/2);
-*/
+    graphics.appendChild(bucketSpan);
+
+    if (++textIntervalIndex == textInterval) {
+      textIntervalIndex = 0;
+      const lower_label = document.createElement('span');
+      //lower_label.textContent = format(bucket.lower_bound) + '[' + format(bucket.width) + ']';
+      lower_label.textContent = format(bucket.lower_bound); // + ',' + format(bucket.width);
+
+
+      //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
+      lower_label.style.left = left;
+      lower_label.style.width = toPercent(bucketWidthVpx);
+      /*
+        const upper_label = document.createElement('span');
+        upper_label.textContent = format(upper_bound);
+        upper_label.style.left = toPercent(leftVpx + bucketWidthVpx/2);
+      */
+      labels.appendChild(lower_label);
+    }
 
     const bucketLabel = document.createElement('span');
     bucketLabel.className = 'bucket-label';
     bucketLabel.textContent = format(bucket.count);
     bucketLabel.style.left = left;
     bucketLabel.style.bottom = heightPercent;
-
-    graphics.appendChild(bucketSpan);
     graphics.appendChild(bucketLabel);
-    labels.appendChild(lower_label);
+
     //labels.appendChild(upper_label);
     prevVpx = leftVpx;
     leftVpx = nextVpx;
