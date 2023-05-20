@@ -35,8 +35,7 @@ public:
                          Http::TestRequestHeaderMapImpl& headers) {
     // Add custom_value_pairs to the request header.
     for (auto const& pair : custom_value_pairs) {
-      headers.addCopy(pair.first, pair.second);
-      // headers.setCopy(Http::LowerCaseString(pair.first), pair.second);
+      headers.setCopy(Http::LowerCaseString(pair.first), pair.second);
     }
   }
 

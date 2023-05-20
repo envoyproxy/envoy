@@ -30,7 +30,7 @@ struct CelMatchData : public CustomMatchData {
   StreamActivation data_;
 };
 
-class CelInputMatcher : public Matcher::InputMatcher {
+class CelInputMatcher : public Matcher::InputMatcher, public Logger::Loggable<Logger::Id::matcher> {
 public:
   // TODO(tyxia) Changed to dev::cel
   // Need to change the cel library version
