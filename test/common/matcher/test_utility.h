@@ -63,7 +63,8 @@ struct TestFloatInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputStringFactory(DataInputGetResult result) : result_(std::move(result)), injection_(*this) {}
+  TestDataInputStringFactory(DataInputGetResult result)
+      : result_(std::move(result)), injection_(*this) {}
   TestDataInputStringFactory(absl::string_view data)
       : TestDataInputStringFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
@@ -86,7 +87,8 @@ private:
 // Secondary data input to avoid duplicate type registration.
 class TestDataInputBoolFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputBoolFactory(DataInputGetResult result) : result_(std::move(result)), injection_(*this) {}
+  TestDataInputBoolFactory(DataInputGetResult result)
+      : result_(std::move(result)), injection_(*this) {}
   TestDataInputBoolFactory(absl::string_view data)
       : TestDataInputBoolFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
@@ -108,7 +110,8 @@ private:
 
 class TestDataInputFloatFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputFloatFactory(DataInputGetResult result) : result_(std::move(result)), injection_(*this) {}
+  TestDataInputFloatFactory(DataInputGetResult result)
+      : result_(std::move(result)), injection_(*this) {}
   TestDataInputFloatFactory(float)
       : TestDataInputFloatFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}

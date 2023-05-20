@@ -41,9 +41,11 @@ struct CustomMatchData {
   virtual ~CustomMatchData() = default;
 };
 
-//using MatchingDataType = absl::variant<absl::monostate, std::string, std::unique_ptr<CustomMatchData>>;
-// TODO(tyxia) use shared_ptr to make complication easier
-using MatchingDataType = absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
+// using MatchingDataType = absl::variant<absl::monostate, std::string,
+// std::unique_ptr<CustomMatchData>>;
+//  TODO(tyxia) use shared_ptr to make complication easier
+using MatchingDataType =
+    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
 inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it

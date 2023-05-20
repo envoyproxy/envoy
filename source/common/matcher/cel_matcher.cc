@@ -3,8 +3,18 @@
 namespace Envoy {
 namespace Matcher {
 
+CelInputMatcher::CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr,
+                                 Builder& builder) {
+  auto cel_expression_status = builder.CreateExpression(&input_expr);
+  if (!cel_expression_status.ok()) {
+    throw EnvoyException(
+        absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
+  }
+
+  compiled_expr_ = std::move(cel_expression_status.value());
+}
+
 bool CelInputMatcher::match(const Matcher::MatchingDataType& input) {
-  std::cout << "tyxia is calling" << std::endl;
   Protobuf::Arena arena;
   // TODO(tyxia) think about unique_ptr
   // if (auto* ptr = absl::get_if<std::unique_ptr<Matcher::CustomMatchData>>(&input); ptr !=
@@ -12,8 +22,6 @@ bool CelInputMatcher::match(const Matcher::MatchingDataType& input) {
   if (auto* ptr = absl::get_if<std::shared_ptr<Matcher::CustomMatchData>>(&input); ptr != nullptr) {
     CelMatchData* cel_data = dynamic_cast<CelMatchData*>((*ptr).get());
     if (cel_data != nullptr) {
-      std::cout << "tyxia_called_haha" << std::endl;
-
       auto eval_result = compiled_expr_->Evaluate(cel_data->data_, &arena);
       if (!eval_result.ok() || !eval_result.value().IsBool()) {
         return false;

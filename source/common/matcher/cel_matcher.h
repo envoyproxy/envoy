@@ -31,21 +31,10 @@ struct CelMatchData : public CustomMatchData {
 };
 
 class CelInputMatcher : public Matcher::InputMatcher {
- public:
+public:
   // TODO(tyxia) Changed to dev::cel
   // Need to change the cel library version
-  CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr, Builder& builder)
-      : checked_expr_(input_expr) {
-    // TODO(tyxia) Move to .cc filter
-    auto cel_expression_status = builder.CreateExpression(&checked_expr_);
-    if (!cel_expression_status.ok()) {
-      throw EnvoyException(
-          absl::StrCat("failed to create an expression: ",
-                       cel_expression_status.status().message()));
-    }
-
-    compiled_expr_ = std::move(cel_expression_status.value());
-  }
+  CelInputMatcher(const google::api::expr::v1alpha1::CheckedExpr& input_expr, Builder& builder);
 
   bool match(const Matcher::MatchingDataType& input) override;
 
@@ -54,18 +43,17 @@ class CelInputMatcher : public Matcher::InputMatcher {
     return absl::flat_hash_set<std::string>{"cel_data_input"};
   }
 
- private:
-  // TODO(tyxia) No need for this variable
-  const google::api::expr::v1alpha1::CheckedExpr checked_expr_;
+private:
   ExpressionPtr compiled_expr_;
 };
 
 class CelInputMatcherFactory : public Matcher::InputMatcherFactory {
- public:
-  Matcher::InputMatcherFactoryCb createInputMatcherFactoryCb(
-      const Protobuf::Message& config,
-      Server::Configuration::ServerFactoryContext&) override {
+public:
+  Matcher::InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message& config,
+                              Server::Configuration::ServerFactoryContext&) override {
     const auto& cel_matcher = dynamic_cast<const CelMatcher&>(config);
+    // TODO(tyxia) Why this??
     if (expr_builder_ == nullptr) {
       // expr_builder_ = createCelBuilder(factory_context.arena);
       expr_builder_ = Extensions::Filters::Common::Expr::createBuilder(nullptr);
@@ -73,10 +61,11 @@ class CelInputMatcherFactory : public Matcher::InputMatcherFactory {
 
     // return std::make_unique<CelExprMatcher>(
     //     cel_matcher.expr_match().checked_expr(), *expr_builder_);
-    // TODO(tyxia) Lifetime!!!! Probably no lifetime issue at all as we don't need to store cel matcher
+    // TODO(tyxia) Lifetime!!!! Probably no lifetime issue at all as we don't need to store cel
+    // matcher
     return [cel_matcher = std::move(cel_matcher), this] {
-      return std::make_unique<CelInputMatcher>(
-          cel_matcher.expr_match().checked_expr(), *expr_builder_);
+      return std::make_unique<CelInputMatcher>(cel_matcher.expr_match().checked_expr(),
+                                               *expr_builder_);
     };
   }
 
@@ -85,7 +74,9 @@ class CelInputMatcherFactory : public Matcher::InputMatcherFactory {
   }
 
   std::string name() const override { return "cel_input_matcher_factory"; }
+
 private:
+  // TODO(tyxia) no need for this class member?
   BuilderPtr expr_builder_;
 };
 

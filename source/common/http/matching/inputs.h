@@ -8,9 +8,10 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/filters/common/expr/evaluator.h"
-#include "xds/type/matcher/v3/http_inputs.pb.h"
 #include "source/common/matcher/cel_matcher.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Http {
@@ -205,32 +206,27 @@ public:
 DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
- public:
+public:
   HttpCelDataInput() = default;
   Matcher::DataInputGetResult get(const Envoy::Http::HttpMatchingData& data) const override {
-    // TODO(tyxia) How to differentiate those cases!!!!!
     RequestHeaderMapOptConstRef maybe_request_headers = data.requestHeaders();
     ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
     ResponseTrailerMapOptConstRef maybe_response_trailers = data.responseTrailers();
     // Returns NotAvailable state when all of three are empty. CEL matcher can support mix matching
     // condition of request headers, response headers and response trailers.
     if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
+      std::cout << "tyxia not available \n";
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
-    // TODO(tyxia)
-    // Protobuf::Arena arena;
-    // TODO(tyxia) Provide mutiple headers
-    // std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
-    //     Extensions::Filters::Common::Expr::createActivation(data.streamInfo(), maybe_request_headers.ptr(),
-    //                                                         nullptr, nullptr);
 
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
-    // TODO(tyxia) Simlar with the case above. So we probably can remove 3 && cases above.
+    // TODO(tyxia) probably never hit!!
     if (activation == nullptr) {
+      std::cout << "tyxia not available 2 \n";
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     std::unique_ptr<StreamActivation> stream_activation =
@@ -255,29 +251,26 @@ class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData
     //         std::move(activation)};
   }
 
-  virtual absl::string_view dataInputType() const override {
-     return "cel_data_input";
-  }
-
- private:
+  virtual absl::string_view dataInputType() const override { return "cel_data_input"; }
+  // TODO(tyxia) remove
+private:
 };
 
 class HttpCelDataInputFactory : public Matcher::DataInputFactory<Envoy::Http::HttpMatchingData> {
- public:
-   HttpCelDataInputFactory() = default;
-   std::string name() const override { return "envoy.matching.inputs.cel_data_input"; }
+public:
+  HttpCelDataInputFactory() = default;
+  std::string name() const override { return "envoy.matching.inputs.cel_data_input"; }
 
-   virtual Matcher::DataInputFactoryCb<Envoy::Http::HttpMatchingData>
-   createDataInputFactoryCb(const Protobuf::Message&,
-                            ProtobufMessage::ValidationVisitor&) override {
-     return [] { return std::make_unique<HttpCelDataInput>(); };
-   }
+  virtual Matcher::DataInputFactoryCb<Envoy::Http::HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return [] { return std::make_unique<HttpCelDataInput>(); };
+  }
 
-   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-     return std::make_unique<xds::type::matcher::v3::HttpAttributesCelMatchInput>();
-   }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<xds::type::matcher::v3::HttpAttributesCelMatchInput>();
+  }
 
- private:
+private:
 };
 
 DECLARE_FACTORY(HttpCelDataInputFactory);
