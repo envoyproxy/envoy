@@ -213,7 +213,7 @@ new_features:
     Add support to the route/virtual host level
     :ref:`is_optional <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>` field.
     A route/virtual host level per filter config can be marked as optional, which means that if
-    the filter fails to load, the configuration will no be rejected.
+    the filter fails to load, the configuration will not be rejected.
 
 
 deprecated:
