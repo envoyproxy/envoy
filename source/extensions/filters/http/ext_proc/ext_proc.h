@@ -73,21 +73,25 @@ public:
     cluster_info_ = cluster_info;
   }
   void setUpstreamHost(absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
-    upstream_host_ = host;
+    upstream_host_ = upstream_host;
   }
 
-  uint64_t bytesSent(uint64_t bytes_sent) const { return bytes_sent_; }
-  uint64_t bytesReceived(uint64_t bytes_received) const { return bytes_received_; }
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
-  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
+  uint64_t bytesSent() const { return bytes_sent_; }
+  uint64_t bytesReceived() const { return bytes_received_; }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> clusterInfo() const {
+    return cluster_info_;
+  }
+  absl::optional<Upstream::HostDescriptionConstSharedPtr> upstreamHost() const {
+    return upstream_host_;
+  }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   uint64_t bytes_sent_, bytes_received_;
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info_;
+  absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host_;
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;

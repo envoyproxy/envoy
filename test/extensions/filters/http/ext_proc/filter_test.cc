@@ -27,7 +27,6 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -82,11 +81,6 @@ protected:
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-    EXPECT_CALL(stream_info_, bytesSent()).WillOnce(Return(100));
-    EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(200));
-    EXPECT_CALL(stream_info, upstreamClusterInfo());
-    EXPECT_CALL(stream_info, upstreamInfo());
-    EXPECT_CALL(stream_info_.upstream_info_, upstreamHost());
 
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
@@ -145,6 +139,14 @@ protected:
     auto stream = std::make_unique<MockStream>();
     // We never send with the "close" flag set
     EXPECT_CALL(*stream, send(_, false)).WillRepeatedly(Invoke(this, &HttpFilterTest::doSend));
+
+    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
+    EXPECT_CALL(async_client_stream_info_, bytesSent()).WillRepeatedly(Return(100));
+    EXPECT_CALL(async_client_stream_info_, bytesReceived()).WillRepeatedly(Return(200));
+    EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo());
+    EXPECT_CALL(async_client_stream_info_, upstreamInfo());
+    //EXPECT_CALL(*stream_info_.upstream_info_, upstreamHost());
+
     // close is idempotent and only called once per filter
     EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
     return stream;
@@ -320,7 +322,7 @@ protected:
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  testing::NiceMock<Upstream::MockClusterInfo> cluster_info_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -385,7 +387,6 @@ TEST_F(HttpFilterTest, SimplestPost) {
   Buffer::OwnedImpl empty_data;
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  EXPECT_CALL
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
