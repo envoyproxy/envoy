@@ -919,6 +919,7 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   InSequence sequence;
@@ -936,7 +937,29 @@ TEST_P(Http1ServerConnectionImplTest, Http10) {
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
 
+TEST_P(Http1ServerConnectionImplTest, Http10HostAdded) {
+  codec_settings_.accept_http_10_ = true;
+  codec_settings_.default_host_for_http_10_ = "example.com";
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "example.com"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http10, codec_->protocol());
+}
+
 TEST_P(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -945,6 +968,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10Absolute) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
@@ -956,6 +980,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10Absolute) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
+  codec_settings_.accept_http_10_ = true;
   initialize();
 
   MockRequestDecoder decoder;
@@ -978,7 +1003,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+    EXPECT_EQ("HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n", output);
     EXPECT_EQ(Protocol::Http10, codec_->protocol());
   }
 
@@ -995,6 +1020,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
+  codec_settings_.accept_http_10_ = true;
   // SPELLCHECKER(off)
   HTTPStringTestCase kRequestHTTPStringTestCases[] = {
       {"", {}, {}}, // HTTP/0.9 has no HTTP-version.
@@ -2959,6 +2985,12 @@ TEST_P(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
+#ifdef ENVOY_ENABLE_UHV
+  // The check for required headers is done by UHV. When UHV is enabled this test
+  // is superseded by CodecClientTest.ResponseHeaderValidationFails and
+  // DownstreamProtocolIntegrationTest.DownstreamRequestWithFaultyFilter tests.
+  return;
+#endif
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -4542,6 +4574,29 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
     EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
   }
 #endif
+}
+
+TEST_P(Http1ServerConnectionImplTest, Http10Rejected) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::UpgradeRequired, _, _, _, "low_version"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ("low_version", response_encoder->getStream().responseDetails());
+
+  EXPECT_THAT(status.message(), StartsWith("Upgrade required"));
 }
 
 } // namespace Http

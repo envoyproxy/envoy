@@ -207,6 +207,7 @@ public:
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
   Router::MockScopeKeyBuilder scope_key_builder_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
