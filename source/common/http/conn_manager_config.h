@@ -222,6 +222,8 @@ public:
   // headers have been evaluated, and before attempting to establish a connection with the upstream.
   virtual bool flushAccessLogOnNewRequest() PURE;
 
+  virtual bool flushAccessLogOnTunnelSuccessfullyEstablished() const PURE;
+
   /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol

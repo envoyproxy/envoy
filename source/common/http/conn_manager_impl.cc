@@ -259,12 +259,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
   if (check_for_deferred_close) {
-    // Don't do delay close for responses which are framed by connection close:
-    // HTTP/1.0 and below, upgrades, and CONNECT responses.
-    checkForDeferredClose(
-        (connection_close && (request_complete || http_10_sans_cl)) ||
-        (stream.state_.is_tunneling_ &&
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades")));
+    // Don't do delay close for HTTP/1.0 or if the request is complete.
+    checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
   }
 }
 
@@ -970,7 +966,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
-      Code response_code = Code::BadRequest;
+      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
+                               ? Code::NotImplemented
+                               : Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
       if (redirect && !is_grpc) {
@@ -1082,6 +1080,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  filter_manager_.streamInfo().protocol(protocol);
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeEndDecode(end_stream);
@@ -1138,28 +1137,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
                                                         connection_manager_.stats_.prefixStatName(),
                                                         connection_manager_.stats_.scope_);
-
-  // Make sure we are getting a codec version we support.
-  if (protocol == Protocol::Http10) {
-    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
-    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
-    // HTTP/1.1.
-    //
-    // The protocol may have shifted in the HTTP/1.0 case so reset it.
-    filter_manager_.streamInfo().protocol(protocol);
-    if (!connection_manager_.config_.http1Settings().accept_http_10_) {
-      // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(Code::UpgradeRequired, "", nullptr, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().LowVersion);
-      return;
-    }
-    if (!request_headers_->Host() &&
-        !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
-      // Add a default host if configured to do so.
-      request_headers_->setHost(
-          connection_manager_.config_.http1Settings().default_host_for_http_10_);
-    }
-  }
 
   if (!request_headers_->Host()) {
     // Require host header. For HTTP/1.1 Host has already been translated to :authority.
@@ -1715,6 +1692,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   chargeStats(headers);
 
+  if (state_.is_tunneling_ &&
+      connection_manager_.config_.flushAccessLogOnTunnelSuccessfullyEstablished()) {
+    filter_manager_.log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+  }
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 

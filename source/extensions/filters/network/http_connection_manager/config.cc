@@ -564,6 +564,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     flush_access_log_on_new_request_ =
         config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -764,12 +766,11 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
 }
 #endif
 
-std::function<Http::ApiListenerPtr()>
+std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-    bool clear_hop_by_hop_headers) {
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -781,8 +782,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks,
-          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, clear_hop_by_hop_headers](
+             Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),

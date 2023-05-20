@@ -210,6 +210,27 @@ protected:
     }
   }
 
+  void processRequestTrailersMessage(
+      FakeUpstream& grpc_upstream, bool first_message,
+      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
+    ProcessingRequest request;
+    if (first_message) {
+      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
+      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    }
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    ASSERT_TRUE(request.has_request_trailers());
+    if (first_message) {
+      processor_stream_->startGrpcStream();
+    }
+    ProcessingResponse response;
+    auto* body = response.mutable_request_trailers();
+    const bool sendReply = !cb || (*cb)(request.request_trailers(), *body);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
+    }
+  }
+
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
@@ -315,7 +336,7 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(const uint32_t timeout_ms) {
+  void serverSendNewTimeout(const uint64_t timeout_ms) {
     ProcessingResponse response;
     if (timeout_ms < 1000) {
       response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
@@ -327,7 +348,7 @@ protected:
 
   // The new timeout message is ignored by Envoy due to different reasons, like
   // new_timeout setting is out-of-range, or max_message_timeout is not configured.
-  void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
+  void newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
     // Config max_message_timeout proto to enable the new timeout API.
@@ -1958,6 +1979,39 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig
 // Not setting the max_message_timeout effectively disabled the new timeout API.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcceptedDefaultMax) {
   newTimeoutWrongConfigTest(500);
+}
+
+// Send the new timeout to be an extremely large number, which is out-of-range of duration.
+// Verify the code appropriately handled it.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutOutOfBounds) {
+  // Config max_message_timeout proto to 100ms to enable the new timeout API.
+  max_message_timeout_ms_ = 100;
+  const uint64_t override_message_timeout = 1000000000000000;
+  newTimeoutWrongConfigTest(override_message_timeout);
+}
+
+// Set the ext_proc filter in SKIP header, BUFFERED body mode.
+// Send a request with headers and trailers.
+TEST_P(ExtProcIntegrationTest, SendHeaderAndTrailerInBufferedMode) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  Http::TestRequestTrailerMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace Envoy
