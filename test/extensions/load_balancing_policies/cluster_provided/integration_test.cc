@@ -60,14 +60,17 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterProvidedIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Test the case where the cluster provided load balancer is configured by the load balancing
+// policy API and it works as expected.
 TEST_P(ClusterProvidedIntegrationTest, NormalLoadBalancing) {
   initialize();
 
   for (uint64_t i = 0; i < 4; i++) {
-    for (size_t i = 0; i < fake_upstreams_.size(); i++) {
+    for (size_t upstream_index = 0; upstream_index < fake_upstreams_.size(); upstream_index++) {
       codec_client_ = makeHttpConnection(lookupPort("http"));
 
-      const auto& upstream_target_address = fake_upstreams_[i]->localAddress()->asString();
+      const auto& upstream_target_address =
+          fake_upstreams_[upstream_index]->localAddress()->asString();
 
       Http::TestRequestHeaderMapImpl request_headers{
           {":method", "GET"},
@@ -78,8 +81,8 @@ TEST_P(ClusterProvidedIntegrationTest, NormalLoadBalancing) {
 
       auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
-      EXPECT_EQ(upstream_index.value(), i);
+      auto upstream = waitForNextUpstreamRequest({0, 1, 2});
+      EXPECT_EQ(upstream.value(), upstream_index);
 
       upstream_request_->encodeHeaders(default_response_headers_, true);
 
