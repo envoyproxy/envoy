@@ -60,8 +60,6 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && rm -rf /usr/bin/cmake \
-          && cmake &> /dev/null || echo 'No cmake here!' \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
@@ -116,6 +114,8 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
+       -e DOCKERHUB_USERNAME \
+       -e DOCKERHUB_PASSWORD \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_NO_CACHE_TEST_RESULTS \
@@ -133,6 +133,7 @@ docker run --rm \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_TOKEN \
+       -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \

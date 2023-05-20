@@ -65,6 +65,10 @@ minor_behavior_changes:
     Changed behavior of the fixed heap monitor to count unused mapped pages as
     free memory. This change can be reverted temporarily by setting the runtime guard
     ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
+- area: ext_proc
+  change: |
+    Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
+    to the name of the ext_proc filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -93,6 +97,9 @@ bug_fixes:
     Do not display GRPC_STATUS_NUMBER for non gRPC requests.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status`` to false.
+- area: boringssl
+  change: |
+    Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -193,6 +200,17 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_log_on_tunnel_successfully_established>`.
     Enabling this option will write a log to all access loggers when HTTP tunnels (e.g. Websocket and CONNECT)
     are successfully established.
+- area: admin
+  change: |
+    Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
+- area: fault
+  change: |
+    added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
+    Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: ext_proc
+  change: |
+    added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
+    Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
 - area: matching
   change: |
     added CEL(Common Expression Language) matcher support :ref:`CEL data input value <extension_envoy.matching.inputs.cel_data_input>`.

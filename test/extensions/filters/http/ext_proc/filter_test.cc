@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
@@ -9,6 +10,7 @@
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
@@ -64,6 +66,7 @@ using testing::Unused;
 using namespace std::chrono_literals;
 
 static const uint32_t BufferSize = 100000;
+static const std::string filter_config_name = "scooby.dooby.doo";
 
 // These tests are all unit tests that directly drive an instance of the
 // ext_proc filter and verify the behavior using mocks.
@@ -91,6 +94,7 @@ protected:
           timers_.push_back(timer);
           return timer;
         }));
+    EXPECT_CALL(decoder_callbacks_, filterConfigName()).WillRepeatedly(Return(filter_config_name));
 
     envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
@@ -274,12 +278,23 @@ protected:
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfoName)
+                filter_config_name)
             ->grpcCalls(traffic_direction);
     int calls_count = std::count_if(
         grpc_calls.begin(), grpc_calls.end(),
         [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
     EXPECT_EQ(calls_count, expected_calls_count);
+  }
+
+  // The metadata configured as part of ext_proc filter should be in the filter state.
+  void expectMetadataInFilterState(const Envoy::ProtobufWkt::Struct& expected_metadata) {
+    const Envoy::ProtobufWkt::Struct& loggedMetadata =
+        stream_info_.filterState()
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+                filter_config_name)
+            ->filterMetadata();
+    EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
@@ -310,6 +325,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   failure_mode_allow: true
+  filter_metadata:
+    scooby: "doo"
   )EOF");
 
   EXPECT_TRUE(config_->failureModeAllow());
@@ -365,6 +382,10 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
+
+  Envoy::ProtobufWkt::Struct filter_metadata;
+  (*filter_metadata.mutable_fields())["scooby"].set_string_value("doo");
+  expectMetadataInFilterState(filter_metadata);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -510,6 +531,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
   expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
+  expectMetadataInFilterState(Envoy::ProtobufWkt::Struct());
 }
 
 // Using the default configuration, test the filter with a processor that
