@@ -229,6 +229,8 @@ new_features:
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
+    the filter fails to load, the configuration will not be rejected.
+
 
 deprecated:
 - area: access_log
