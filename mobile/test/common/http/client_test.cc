@@ -131,7 +131,7 @@ public:
     // Grab the response encoder in order to dispatch responses on the stream.
     // Return the request decoder to make sure calls are dispatched to the decoder via the
     // dispatcher API.
-    EXPECT_CALL(api_listener_, newStream(_, _))
+    EXPECT_CALL(*api_listener_, newStream(_, _))
         .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           return *request_decoder_;
@@ -146,7 +146,8 @@ public:
     }
   }
 
-  MockApiListener api_listener_;
+  std::unique_ptr<MockApiListener> owned_api_listener_ = std::make_unique<MockApiListener>();
+  MockApiListener* api_listener_ = owned_api_listener_.get();
   std::unique_ptr<NiceMock<MockRequestDecoder>> request_decoder_{
       std::make_unique<NiceMock<MockRequestDecoder>>()};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -157,7 +158,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
-  Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
+  Client http_client_{std::move(owned_api_listener_), dispatcher_, *stats_store_.rootScope(),
+                      random_};
   envoy_stream_t stream_ = 1;
 
 protected:
@@ -423,7 +425,7 @@ TEST_P(ClientTest, MultipleStreams) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(api_listener_, newStream(_, _))
+  EXPECT_CALL(*api_listener_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         return request_decoder2;
@@ -684,7 +686,7 @@ TEST_P(ClientTest, NullAccessors) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(api_listener_, newStream(_, _))
+  EXPECT_CALL(*api_listener_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return *request_decoder_;

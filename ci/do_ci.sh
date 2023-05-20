@@ -508,9 +508,27 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
 
+    docs-publish-latest)
+        BUILD_SHA=$(git rev-parse HEAD)
+        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+        ;;
+
     docker-upload)
         setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        ;;
+
+    dockerhub-publish)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/distribution:update_dockerhub_repository
+        ;;
+
+    dockerhub-readme)
+        setup_clang_toolchain
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution/dockerhub:readme
+        cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
     fix_proto_format)
