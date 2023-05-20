@@ -268,13 +268,16 @@ TEST(LoggerTest, TestJsonFormatError) {
   log_struct.set_value("asdf");
 
   // This scenario shouldn't happen in production, the test is added mainly for coverage.
-  EXPECT_THROW(Envoy::Logger::Registry::setJsonLogFormat(log_struct), EnvoyException);
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("INVALID_ARGUMENT: Provided struct cannot be serialized as JSON string",
+            status.ToString());
 }
 
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
   ProtobufWkt::Struct log_struct;
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
@@ -290,7 +293,7 @@ TEST(LoggerTest, TestJsonFormatNullField) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%_");
   (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
@@ -307,7 +310,10 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%v");
   (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  EXPECT_THROW(Envoy::Logger::Registry::setJsonLogFormat(log_struct), EnvoyException);
+
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats", status.ToString());
 }
 
 TEST(LoggerTest, TestJsonFormat) {
@@ -316,7 +322,7 @@ TEST(LoggerTest, TestJsonFormat) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%_");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
@@ -345,7 +351,7 @@ TEST(LoggerTest, TestJsonFormatWithEscapedJson) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
-  Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {

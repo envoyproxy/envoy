@@ -1654,8 +1654,10 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
 }
 
 TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlags) {
-  EXPECT_THROW(initialize("test/server/test_data/server/json_application_log_forbidden_flag.yaml"),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
 }
 
 } // namespace

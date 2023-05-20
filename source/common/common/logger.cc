@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
-
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 
@@ -256,7 +254,7 @@ void Registry::setLogFormat(const std::string& log_format) {
   }
 }
 
-void Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   json_options.always_print_primitive_fields = true;
@@ -266,15 +264,15 @@ void Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
       Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
 
   if (!status.ok()) {
-    throw EnvoyException(
-        fmt::format("failed to set log format as JSON string from struct: {}", status.ToString()));
+    return absl::InvalidArgumentError("Provided struct cannot be serialized as JSON string");
   }
 
   if (format_as_json.find("%v") != std::string::npos) {
-    throw EnvoyException("Usage of %v is unavailable for JSON log formats");
+    return absl::InvalidArgumentError("Usage of %v is unavailable for JSON log formats");
   }
 
   setLogFormat(format_as_json);
+  return absl::OkStatus();
 }
 
 Logger* Registry::logger(const std::string& log_name) {

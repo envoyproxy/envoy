@@ -424,7 +424,12 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   if (!options_.logFormatSet() && bootstrap_.has_application_log_format() &&
       bootstrap_.application_log_format().has_json_format()) {
-    Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
+    auto status =
+        Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
+
+    if (!status.ok()) {
+      throw EnvoyException(fmt::format("setJsonLogFormat error: {}", status.ToString()));
+    }
   }
 
 #ifdef ENVOY_PERFETTO

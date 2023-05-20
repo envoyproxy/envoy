@@ -287,11 +287,13 @@ TEST_P(JsonApplicationLogsValidationServerForbiddenFlagsTest, TestNewlineForbidd
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;
-  EXPECT_THROW(ValidationInstance server(
-                   options_, time_system.timeSystem(), Network::Address::InstanceConstSharedPtr(),
-                   stats_store, access_log_lock, component_factory_, Thread::threadFactoryForTest(),
-                   Filesystem::fileSystemForTest()),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
 }
 
 INSTANTIATE_TEST_SUITE_P(
