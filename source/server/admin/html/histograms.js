@@ -125,7 +125,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
           break; // do not increment index; re-consider percentile for next bucket.
         }
         bucket.annotations.push(
-            [percentileValue, supported_percentiles[percentileIndex], PERCENTILE]);
+            [percentileValue, PERCENTILE, supported_percentiles[percentileIndex]]);
       }
 
       for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
@@ -134,7 +134,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         if (interval_upper_bound > upper_bound) {
           break; // do not increment index; re-consider interval for next bucket.
         }
-        bucket.annotations.push([interval.lower_bound, interval.width, interval.count, INTERVAL]);
+        bucket.annotations.push([interval.lower_bound, INTERVAL, interval.width, interval.count]);
       }
 
       if (bucket.annotations.length > 0) {
@@ -213,7 +213,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         // We always put the marker proportionally between this bucket and
         // the next one.
         const span = document.createElement('span');
-        span.className = (annotation[3] == PERCENTILE) ? 'histogram-percentile' :
+        span.className = (annotation[1] == PERCENTILE) ? 'histogram-percentile' :
             'histogram-interval';
         let percentilePercent = toPercentPosition(percentileVpx);
         span.style.left = percentilePercent;
@@ -228,10 +228,10 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         const percentilePLabel = document.createElement('span');
         percentilePLabel.className = 'percentile-label';
         percentilePLabel.style.bottom = 0;
-        if (annotation[3] == PERCENTILE) {
-          percentilePLabel.textContent = 'P' + annotation[1];
+        if (annotation[1] == PERCENTILE) {
+          percentilePLabel.textContent = 'P' + annotation[2];
         } else {
-          percentilePLabel.textContent = 'i:' + annotation[2];
+          percentilePLabel.textContent = 'i:' + annotation[3] + '[' + annotation[2] + ']';
         }
         percentilePLabel.style.left = percentilePercent;
 
