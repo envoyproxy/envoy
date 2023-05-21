@@ -95,7 +95,8 @@ envoy_cc_test(
     ],
     deps = [
         ":test_utility_lib",
-        "//source/common/http/matching:inputs_lib",
+        # "//source/common/http/matching:inputs_lib",
+        "//source/common/http/matching:cel_input_lib",
         "//source/common/matcher:matcher_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/matcher:matcher_mocks",

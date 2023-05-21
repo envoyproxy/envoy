@@ -45,17 +45,16 @@ private:
   Registry::InjectFactory<CommonProtocolInputFactory> injection_;
 };
 
-// TODO(tyxia) Revert
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
-  explicit TestInput(DataInputGetResult result) : result_(std::move(result)) {}
-  DataInputGetResult get(const TestData&) const override { return std::move(result_); }
+  explicit TestInput(DataInputGetResult result) : result_(result) {}
+  DataInputGetResult get(const TestData&) const override { return result_; }
   DataInputGetResult result_;
 };
 
 struct TestFloatInput : public DataInput<TestData> {
-  explicit TestFloatInput(DataInputGetResult result) : result_(std::move(result)) {}
-  DataInputGetResult get(const TestData&) const override { return std::move(result_); }
+  explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
+  DataInputGetResult get(const TestData&) const override { return result_; }
   absl::string_view dataInputType() const override { return "float"; }
   DataInputGetResult result_;
 };
@@ -63,8 +62,7 @@ struct TestFloatInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputStringFactory(DataInputGetResult result)
-      : result_(std::move(result)), injection_(*this) {}
+  TestDataInputStringFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
   TestDataInputStringFactory(absl::string_view data)
       : TestDataInputStringFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
@@ -76,7 +74,6 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }
-
   std::string name() const override { return "string"; }
 
 private:
@@ -87,8 +84,7 @@ private:
 // Secondary data input to avoid duplicate type registration.
 class TestDataInputBoolFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputBoolFactory(DataInputGetResult result)
-      : result_(std::move(result)), injection_(*this) {}
+  TestDataInputBoolFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
   TestDataInputBoolFactory(absl::string_view data)
       : TestDataInputBoolFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
@@ -110,8 +106,7 @@ private:
 
 class TestDataInputFloatFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputFloatFactory(DataInputGetResult result)
-      : result_(std::move(result)), injection_(*this) {}
+  TestDataInputFloatFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
   TestDataInputFloatFactory(float)
       : TestDataInputFloatFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}
