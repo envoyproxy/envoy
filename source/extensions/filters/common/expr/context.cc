@@ -126,7 +126,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else if (value == Referer) {
       Http::HeaderMap::GetResult result = headers_.value_->get(Http::CustomHeaders::get().Referer);
       if (!result.empty()) {
-        // Referer header is registered via `CustomInlineHeaderRegistry` below. It is gurarnteed
+        // Referer header is registered via `CustomInlineHeaderRegistry` below. It is guaranteed
         // that the data will be always at the same slot.
         return convertHeaderEntry(result[0]);
       } else {
