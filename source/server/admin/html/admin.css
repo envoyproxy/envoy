@@ -119,6 +119,8 @@
   top: 55px;
   overflow: hidden;
   padding: 3px;
+  text-align: center;
+  margin-left: -1%;
 }
 
 .histogram-percentile {

@@ -174,15 +174,19 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // arbitrary "virtual pixels" (variables with `Vpx` suffix) during the
   // computation in JS and converting them to percentages for writing element
   // style.
-  const bucketWidthVpx = 40;
+  const bucketWidthVpx = 40 - 38/numBuckets;
   const marginWidthVpx = 20;
-
+  const outerMarginFraction = 0.01;
   const percentileWidthAndMarginVpx = 20;
-  const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
+  const widthVpx = (numBuckets * bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
+        * (1 + 2*outerMarginFraction);
 
-  const toPercent = vpx => formatPercent(vpx / widthVpx);
-  let leftVpx = marginWidthVpx / 2;
-  let prevVpx = 0;
+  const vpxToFractionPosition = vpx => vpx / widthVpx + outerMarginFraction;
+  const toPercentPosition = vpx => formatPercent(vpxToFractionPosition(vpx));
+  const vpxToFractionWidth = vpx => vpx / widthVpx;
+  const toPercentWidth = vpx => formatPercent(vpxToFractionWidth(vpx));
+  let leftVpx = marginWidthVpx;
+  let prevVpx = leftVpx;
   for (i = 0; i < histogram.totals.length; ++i) {
     const bucket = histogram.totals[i];
 
@@ -211,13 +215,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         const span = document.createElement('span');
         span.className = (annotation[3] == PERCENTILE) ? 'histogram-percentile' :
             'histogram-interval';
-        let percentilePercent = toPercent(percentileVpx);
+        let percentilePercent = toPercentPosition(percentileVpx);
         span.style.left = percentilePercent;
 
         // We try to put the text there too unless it's too close to the previous one.
         if (percentileVpx < prevPercentileLabelVpx) {
           percentileVpx = prevPercentileLabelVpx;
-          percentilePercent = toPercent(percentileVpx);
+          percentilePercent = toPercentPosition(percentileVpx);
         }
         prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
 
@@ -274,9 +278,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucketSpan.style.width = '2%';
       leftVpx = widthVpx / 2;
     } else {
-      bucketSpan.style.width = toPercent(bucketWidthVpx);
+      bucketSpan.style.width = toPercentWidth(bucketWidthVpx);
     }
-    bucketSpan.style.left = toPercent(leftVpx);
+    bucketSpan.style.left = toPercentPosition(leftVpx);
 
     let showingCount = false;
     if (++textIntervalIndex == textInterval) {
@@ -287,8 +291,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       lower_label.textContent = format(bucket.lower_bound); // + ',' + format(bucket.width);
 
       //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
-      lower_label.style.left = toPercent(leftVpx);
-      lower_label.style.width = toPercent(bucketWidthVpx);
+      lower_label.style.left = toPercentPosition(leftVpx);
+      lower_label.style.width = toPercentWidth(bucketWidthVpx);
       /*
         const upper_label = document.createElement('span');
         upper_label.textContent = format(upper_bound);
@@ -299,8 +303,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       const bucketLabel = document.createElement('span');
       bucketLabel.className = 'bucket-label';
       bucketLabel.textContent = format(bucket.count);
-      bucketLabel.style.left = toPercent(leftVpx);
-      bucketLabel.style.width = toPercent(bucketWidthVpx);
+      bucketLabel.style.left = toPercentPosition(leftVpx);
+      bucketLabel.style.width = toPercentWidth(bucketWidthVpx);
       bucketLabel.style.bottom = heightPercent;
       graphics.appendChild(bucketLabel);
     }
@@ -320,7 +324,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
                                           histogram.totals[i + 1].lower_bound, bucketSpan);
     }*/
 
-    const magLeft = formatPercent((leftVpx - widthVpx/30) / widthVpx);
+    //const magLeft = formatPercent(vpxToFractionPosition(leftVpx - bucketWidthVpx/2));
+    const magLeft = toPercentPosition(leftVpx);
 
     const leaveHandler = () => {
       pendingTimeout = null;
