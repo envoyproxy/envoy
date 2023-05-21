@@ -112,7 +112,7 @@ public:
   }
 
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&, Server::OverloadManager&) {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
     if (codec_ == nullptr) {
       codec_ = new NiceMock<MockServerConnection>();
     }
@@ -147,7 +147,7 @@ enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
 class FuzzDownstream {
 public:
   FuzzDownstream(ConnectionManagerImpl& conn_manager, FuzzConfig& config)
-      : conn_manager_(conn_manager), config_(config), request_state_(StreamState::PendingHeaders) {
+      : conn_manager_(conn_manager), config_(config) {
     config_.newStream();
     // If sendLocalReply is called:
     ON_CALL(encoder_, encodeHeaders(_, true))
@@ -192,15 +192,14 @@ public:
   FuzzConfig& config_;
   RequestDecoder* decoder_{};
   NiceMock<MockResponseEncoder> encoder_;
-  StreamState request_state_;
+  StreamState request_state_{StreamState::PendingHeaders};
 };
 using FuzzDownstreamPtr = std::unique_ptr<FuzzDownstream>;
 
 // This class mocks the upstream and serves as entry point for responses.
 class FuzzUpstream {
 public:
-  FuzzUpstream(Http::ResponseDecoder& decoder)
-      : decoder_(decoder), response_state_(StreamState::PendingHeaders) {
+  FuzzUpstream(Http::ResponseDecoder& decoder) : decoder_(decoder) {
     ON_CALL(mock_request_encoder_, encodeHeaders(_, _))
         .WillByDefault(Invoke([](const Http::RequestHeaderMap&, bool) { return okStatus(); }));
     ON_CALL(mock_request_encoder_.stream_, resetStream(_))
@@ -230,7 +229,7 @@ public:
   }
 
   Http::ResponseDecoder& decoder_;
-  StreamState response_state_;
+  StreamState response_state_{StreamState::PendingHeaders};
   NiceMock<MockRequestEncoder> mock_request_encoder_;
 };
 
@@ -244,7 +243,7 @@ public:
       : cfg_(cfg), name_(path), path_(path), mock_route_(new Router::MockRoute()),
         route_(mock_route_), internal_redirect_policy_enabled_(internal_redirect_policy_enabled),
         cross_scheme_redirect_allowed_(cross_scheme_redirect_allowed),
-        allows_early_data_for_request_(allows_early_data_for_request), maintenance_(false) {
+        allows_early_data_for_request_(allows_early_data_for_request) {
     ON_CALL(mock_route_->route_entry_, clusterName()).WillByDefault(ReturnRef(name_));
     ON_CALL(mock_route_->route_entry_.internal_redirect_policy_, enabled())
         .WillByDefault(Return(internal_redirect_policy_enabled_));
@@ -351,7 +350,7 @@ public:
   bool internal_redirect_policy_enabled_;
   bool cross_scheme_redirect_allowed_;
   bool allows_early_data_for_request_;
-  bool maintenance_;
+  bool maintenance_{false};
   StreamInfo::MockStreamInfo mock_stream_info_;
 
   std::vector<std::unique_ptr<FuzzUpstream>> upstreams_;
@@ -465,7 +464,7 @@ public:
 
 class Harness {
 public:
-  Harness(FuzzConfig& cfg) : hcm_config_(cfg), reg_(fuzz_conn_pool_factory_), closed_(false) {
+  Harness(FuzzConfig& cfg) : hcm_config_(cfg), reg_(fuzz_conn_pool_factory_) {
     ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault(InvokeWithoutArgs([this]() {
       closed_ = true;
     }));
@@ -503,7 +502,7 @@ public:
       case ActionCase::kRequestHeader: {
         const auto& a = action.request_header();
         FuzzCluster& cluster = cluster_manager->selectOneCluster(a.cluster());
-        FuzzDownstreamPtr stream = std::make_unique<FuzzDownstream>(*hcm_.get(), hcm_config_);
+        FuzzDownstreamPtr stream = std::make_unique<FuzzDownstream>(*hcm_, hcm_config_);
         streams_.push_back(std::move(stream));
         streams_.back()->sendHeaders(a.headers(), a.end_stream(), cluster.getPath());
       } break;
@@ -557,15 +556,15 @@ private:
   FuzzGenericConnPoolFactory fuzz_conn_pool_factory_;
   Registry::InjectFactory<Router::GenericConnPoolFactory> reg_;
 
-  bool closed_;
+  bool closed_{false};
   std::vector<FuzzDownstreamPtr> streams_;
 };
 
 DEFINE_PROTO_FUZZER(const FuzzCase& input) {
   if (harness == nullptr) {
     hcm_config = std::make_unique<FuzzConfig>(Protobuf::RepeatedPtrField<std::string>{});
-    harness = std::make_unique<Harness>(*hcm_config.get());
-    cluster_manager = std::make_unique<FuzzClusterManager>(*hcm_config.get());
+    harness = std::make_unique<Harness>(*hcm_config);
+    cluster_manager = std::make_unique<FuzzClusterManager>(*hcm_config);
     cluster_manager->createDefaultClusters();
     atexit(cleanup);
   }
