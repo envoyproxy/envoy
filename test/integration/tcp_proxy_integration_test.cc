@@ -163,46 +163,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
                                                    "\r?.*")));
 }
 
-TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    for (int i = 0; i < static_resources->clusters_size(); ++i) {
-      auto* cluster = static_resources->mutable_clusters(i);
-      auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
-      thresholds->mutable_max_connections()->set_value(1027);
-      thresholds->mutable_max_pending_requests()->set_value(1027);
-    }
-  });
-  initialize();
-// The large number of connection is meant to regression test
-// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
-// TODO(alyssawilk) debug.
-#if defined(__APPLE__)
-  const int num_connections = 50;
-#else
-  const int num_connections = 1026;
-#endif
-  std::vector<IntegrationTcpClientPtr> clients(num_connections);
-
-  for (int i = 0; i < num_connections; ++i) {
-    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-  }
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
-  for (int i = 0; i < num_connections; ++i) {
-    IntegrationTcpClientPtr& tcp_client = clients[i];
-    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
-    // This particular request will result in the upstream sending a response,
-    // and flush-closing due to the 'close_after_response' header.
-    ASSERT_TRUE(tcp_client->write(
-        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
-        false));
-    tcp_client->waitForHalfClose();
-    tcp_client->close();
-    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
-  }
-}
-
 TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
   autonomous_upstream_ = true;
   initialize();

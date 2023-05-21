@@ -170,6 +170,17 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Network::MockConnection> connection_;
 
+  const std::string sub_cluster_yaml_config_ = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+)EOF";
+
   const std::string default_yaml_config_ = R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -195,6 +206,24 @@ cluster_type:
       dns_lookup_family: AUTO
 )EOF";
 };
+
+// createSubClusterConfig twice.
+TEST_F(ClusterTest, CreateSubClusterConfig) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  const std::string cluster_name = "fake_cluster_name";
+  const std::string host = "localhost";
+  const int port = 80;
+  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+      cluster_->createSubClusterConfig(cluster_name, host, port);
+  EXPECT_EQ(true, sub_cluster_pair.first);
+  EXPECT_EQ(true, sub_cluster_pair.second.has_value());
+
+  // create again, already exists
+  sub_cluster_pair = cluster_->createSubClusterConfig(cluster_name, host, port);
+  EXPECT_EQ(true, sub_cluster_pair.first);
+  EXPECT_EQ(false, sub_cluster_pair.second.has_value());
+}
 
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
@@ -609,8 +638,13 @@ protected:
         true);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
-    std::tie(cluster_, thread_aware_lb_) =
-        cluster_factory->create(cluster_config, cluster_factory_context);
+    auto result = cluster_factory->create(cluster_config, cluster_factory_context);
+    if (result.ok()) {
+      cluster_ = result->first;
+      thread_aware_lb_ = std::move(result->second);
+    } else {
+      throw EnvoyException(std::string(result.status().message()));
+    }
   }
 
 private:

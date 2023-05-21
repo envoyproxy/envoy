@@ -487,6 +487,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
+    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -563,6 +564,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     flush_access_log_on_new_request_ =
         config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -667,7 +670,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -763,12 +766,11 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
 }
 #endif
 
-std::function<Http::ApiListenerPtr()>
+std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-    bool clear_hop_by_hop_headers) {
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -780,8 +782,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks,
-          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, clear_hop_by_hop_headers](
+             Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),

@@ -189,6 +189,10 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 		return f.sendLocalReply("decode-trailer")
 	}
 
+	trailers.Add("existed-trailer", "bar")
+	trailers.Set("x-test-trailer-0", "bar")
+	trailers.Del("x-test-trailer-1")
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}

@@ -37,6 +37,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
@@ -129,6 +130,7 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
+  using Bucket = ParentHistogram::Bucket;
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest()
@@ -773,6 +775,84 @@ TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo");
+  tag_specifier->set_fixed_value("bar");
+
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo");
+  tag_specifier->set_regex("bar");
+
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
+
+  ASSERT_EQ(1, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo_tag");
+  tag_specifier->set_regex("^foo.(.+)");
+
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("foo.bar"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("foo_tag", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexBuiltinExpression) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("cluster.foo.bar"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("envoy.cluster_name", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("foo", symbol_table_.toString(tags[1].second));
 }
 
 class LookupWithStatNameTest : public ThreadLocalStoreNoMocksMixin, public testing::Test {};
@@ -1631,7 +1711,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
-TEST_F(HistogramTest, ParentHistogramBucketSummary) {
+TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Histogram& histogram = scope_.histogramFromString("histogram", Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
@@ -1647,6 +1727,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
+  EXPECT_THAT(parent_histogram->detailedIntervalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 }
 
 TEST_F(HistogramTest, ForEachHistogram) {

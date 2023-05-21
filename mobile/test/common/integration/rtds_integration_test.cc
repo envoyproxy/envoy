@@ -52,8 +52,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   EXPECT_EQ(cc_.on_complete_received_byte_count, 67);
   // Check that the Runtime config is from the static layer.
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   const std::string load_success_counter = "runtime.load_success";
   uint64_t load_success_value = getCounterValue(load_success_counter);
@@ -63,7 +62,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
-      envoy.reloadable_features.skip_dns_lookup_for_proxied_requests: True
+      envoy.reloadable_features.test_feature_false: True
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
@@ -71,8 +70,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
   // Verify that the Runtime config values are from the RTDS response.
-  EXPECT_TRUE(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }
 
 } // namespace
