@@ -2814,8 +2814,8 @@ virtual_hosts:
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
 protected:
   RouterMatcherHashPolicyTest()
-      : add_cookie_nop_(
-            [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
+      : add_cookie_nop_([](const std::string&, const std::string&, std::chrono::seconds,
+                           std::vector<CookieAttribute>) { return ""; }) {
     const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service

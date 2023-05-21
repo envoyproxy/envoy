@@ -63,7 +63,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       Envoy::Http::TestResponseHeaderMapImpl response_headers;
       // Check the format of the cookie sent back to client.
       session_state->onUpdate(mock_host, response_headers);
-
+      std::vector<CookieAttribute> cookie_attributes;
       EXPECT_EQ(response_headers.get_("set-cookie"),
                 Envoy::Http::Utility::makeSetCookieValue(
                     "override_host",
@@ -128,6 +128,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       } else {
         cookie_content = "2.3.4.5:80";
       }
+      std::vector<CookieAttribute> cookie_attributes;
       EXPECT_EQ(response_headers.get_("set-cookie"),
                 Envoy::Http::Utility::makeSetCookieValue(
                     "override_host",

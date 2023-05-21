@@ -588,7 +588,8 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
                                         const std::string& path, const std::chrono::seconds max_age,
-                                        bool httponly) {
+                                        bool httponly,
+                                        const std::vector<Http::CookieAttribute>& attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
@@ -600,6 +601,14 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   if (!path.empty()) {
     absl::StrAppend(&cookie_value, "; Path=", path);
   }
+  for (auto const& attribute : attributes) {
+    if (attribute.value().empty()) {
+      absl::StrAppend(&cookie_value, "; ", attribute.name());
+    } else {
+      absl::StrAppend(&cookie_value, "; ", attribute.name(), "=", attribute.value());
+    }
+  }
+
   if (httponly) {
     absl::StrAppend(&cookie_value, "; HttpOnly");
   }
