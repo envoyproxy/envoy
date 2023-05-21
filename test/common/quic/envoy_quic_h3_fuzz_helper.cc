@@ -417,11 +417,13 @@ void QuicPacketizer::serializeJunkPacket(const std::string& data) {
   framer.SetEncrypter(quic::ENCRYPTION_INITIAL, std::unique_ptr<quic::QuicEncrypter>(encrypter));
 
   size_t length_field_offset = 0;
-  if (!framer.AppendPacketHeader(header, &writer, &length_field_offset)) {
+  if (!framer.AppendIetfPacketHeader(header, &writer, &length_field_offset)) {
     return;
   }
-  writer.WriteBytes(data.data(), data.size());
+  size_t max_data_len = std::min(data.size(), writer.remaining());
+  writer.WriteBytes(data.data(), max_data_len);
   framer.WriteIetfLongHeaderLength(header, &writer, length_field_offset, quic::ENCRYPTION_INITIAL);
+  quic_packet_sizes_[idx_] = writer.length();
   idx_++;
 }
 
