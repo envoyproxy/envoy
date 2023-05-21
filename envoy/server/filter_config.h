@@ -252,13 +252,7 @@ public:
                                Server::Configuration::FactoryContext& context) PURE;
 
   virtual Http::FilterFactoryCb
-  createFilterFactoryFromProtoServer(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::ServerFactoryContext&) {
-    return nullptr;
-  }
-
-  virtual Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+  createFilterServerFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::ServerFactoryContext&) {
     return nullptr;
   }

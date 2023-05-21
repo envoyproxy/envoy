@@ -84,33 +84,18 @@ public:
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
 ////////////
-  Envoy::Http::FilterFactoryCb
-  createFilterFactoryFromProtoServer(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::ServerFactoryContext& server_context) override {
-    return createFilterFactoryFromProtoTypedServer(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, server_context.messageValidationVisitor()),
-                                             stats_prefix, server_context);
-  }
-
-  virtual Envoy::Http::FilterFactoryCb
-  createFilterFactoryFromProtoTypedServer(const ConfigProto&,
-                                    const std::string&,
-                                    Server::Configuration::ServerFactoryContext&) {return nullptr;}
-
-  virtual Envoy::Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::ServerFactoryContext& server_context) override{
-    return createFilterFactoryFromProtoTyped(
+  Envoy::Http::FilterFactoryCb createFilterServerFactoryFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override {
+    return createFilterServerFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
             proto_config, server_context.messageValidationVisitor()),
         stats_prefix, server_context);
   }
 
   virtual Envoy::Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const Protobuf::Message&, const std::string&,
-                                    Server::Configuration::ServerFactoryContext&) {
+  createFilterServerFactoryFromProtoTyped(const ConfigProto&, const std::string&,
+                                          Server::Configuration::ServerFactoryContext&) {
     return nullptr;
   }
 };

@@ -32,7 +32,7 @@ private:
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTypedServer(
+  Http::FilterFactoryCb createFilterServerFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
       const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) override;
 };

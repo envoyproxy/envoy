@@ -36,5 +36,9 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration/filters:set_response_code_filter_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "//test/common/http:common_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
