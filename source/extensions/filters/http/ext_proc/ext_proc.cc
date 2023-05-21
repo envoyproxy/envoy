@@ -127,20 +127,26 @@ Filter::StreamOpenState Filter::openStream() {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
-    logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
-    logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+    // have a proper implementation of streamInfo.
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
   if (stream_) {
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
-    logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
     stream_.reset();
   } else {
     ENVOY_LOG(debug, "Stream already closed");

@@ -87,12 +87,13 @@ public:
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
-  uint64_t bytes_sent_{0}, bytes_received_{0};
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info_;
-  absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host_;
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // The following stats are populated for ext_proc filters using Envoy gRPC only.
+  uint64_t bytes_sent_{0}, bytes_received_{0};
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info_;
+  absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host_;
 };
 
 class FilterConfig {
