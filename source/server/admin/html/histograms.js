@@ -233,13 +233,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         } else {
           percentilePLabel.textContent = 'i:' + annotation[2];
         }
-        percentilePLabel.style.left = percentilePercent; // percentileLeft;
+        percentilePLabel.style.left = percentilePercent;
 
         const percentileVLabel = document.createElement('span');
         percentileVLabel.className = 'percentile-label';
         percentileVLabel.style.bottom = '30%';
         percentileVLabel.textContent = format(annotation[0]);
-        percentileVLabel.style.left = percentilePercent; // percentileLeft;
+        percentileVLabel.style.left = percentilePercent;
 
         annotationsDiv.appendChild(span);
         annotationsDiv.appendChild(percentilePLabel);
@@ -253,33 +253,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     const heightPercent = maxCount == 0 ? 0 : formatPercent(bucket.count / maxCount);
     bucketSpan.style.height = heightPercent;
     const upper_bound = bucket.lower_bound + bucket.width;
-    console.log('lower_bound=' + bucket.lower_bound + ' width=' + bucket.width +
-                ' left=' + bucketSpan.style.left /* + ' width=' + bucketSpan.style.width */);
     const nextVpx = bucketWidthVpx + marginWidthVpx + leftVpx;
 
-/*
-    // We will determine the width of the bucket proportionally based on deltas
-    // between the previous and next buckets.
-    scaleWidth = (previousBucket, prevBucketVpx, nextBucket, nextBucketVpx) => {
-      const bucketDistance = nextBucket - previousBucket;
-      const vpxDistance = nextBucketVpx - prevBucketVpx;
-      const scaledVpx = bucket.width * vpxDistance / bucketDistance;
-      const percent = toPercent(scaledVpx);
-      console.log('prev=' + previousBucket + ',' + prevBucketVpx +
-                  ' next= ' + nextBucket + ',' + nextBucketVpx +
-                  ' bucketDist=' + bucketDistance + ' vpxDist=' + vpxDistance + ' scaled=' +
-                  scaledVpx + ',' + percent);
-      return percent;
-    };
-*/
-
-    if (false /*histogram.totals.length == 1*/) {
-      // Special case one bucket.
-      bucketSpan.style.width = '2%';
-      leftVpx = widthVpx / 2;
-    } else {
-      bucketSpan.style.width = toPercentWidth(bucketWidthVpx);
-    }
+    bucketSpan.style.width = toPercentWidth(bucketWidthVpx);
     bucketSpan.style.left = toPercentPosition(leftVpx);
 
     let showingCount = false;
@@ -287,17 +263,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       showingCount = true;
       textIntervalIndex = 0;
       const lower_label = document.createElement('span');
-      //lower_label.textContent = format(bucket.lower_bound) + '[' + format(bucket.width) + ']';
-      lower_label.textContent = format(bucket.lower_bound); // + ',' + format(bucket.width);
-
-      //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
+      lower_label.textContent = format(bucket.lower_bound);
       lower_label.style.left = toPercentPosition(leftVpx);
       lower_label.style.width = toPercentWidth(bucketWidthVpx);
-      /*
-        const upper_label = document.createElement('span');
-        upper_label.textContent = format(upper_bound);
-        upper_label.style.left = toPercent(leftVpx + bucketWidthVpx/2);
-      */
       labels.appendChild(lower_label);
 
       const bucketLabel = document.createElement('span');
@@ -309,22 +277,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       graphics.appendChild(bucketLabel);
     }
 
-    /* else if (i == 0) {
-      // We can only use the next bucket; there is no previous bucket.
-      bucketSpan.style.width = scaleWidth(bucket.lower_bound, leftVpx,
-                                          histogram.totals[i + 1].lower_bound, nextVpx);
-    } else if (i == histogram.totals.length - 1) {
-      // We can only use the previous bucket; there is no next bucket.
-      bucketSpan.style.width = scaleWidth(prevBucket.lower_bound, prevVpx,
-                                          bucket.lower_bound, leftVpx);
-
-    } else {
-      // We can use the both previous and next buckets.
-      bucketSpan.style.width = scaleWidth(prevBucket.lower_bound, prevVpx,
-                                          histogram.totals[i + 1].lower_bound, bucketSpan);
-    }*/
-
-    //const magLeft = formatPercent(vpxToFractionPosition(leftVpx - bucketWidthVpx/2));
     const magLeft = toPercentPosition(leftVpx);
 
     const leaveHandler = () => {
@@ -346,14 +298,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucketSpan.style.backgroundColor = 'yellow';
       highlightedBucket = bucketSpan;
 
-/*
-      bucketSpan.style.zIndex = 3;
-      bucketSpan.style.width = '10%';
-      bucketSpan.style.height = '60px';
-      console.log('setting left position to ' + magLeft + ' from ' + left);
-      bucketSpan.style.left = magLeft;
-      bucketSpan.style.backgroundColor = 'cyan';
-*/
       detailPopup.textContent =
           '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') '
           + (showingCount ? '' : ('count=' + bucket.count));
@@ -364,17 +308,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       pendingLeave = leaveHandler;
     });
 
-/*
-      bucketSpan.style.zIndex = 1;
-      bucketSpan.style.width = '2%';
-      bucketSpan.style.left = left;
-      bucketSpan.style.height = heightPercent;
-      bucketSpan.textContent = '';
-*/
-
     graphics.appendChild(bucketSpan);
 
-    //labels.appendChild(upper_label);
     prevVpx = leftVpx;
     leftVpx = nextVpx;
     prevBucket = bucket;
