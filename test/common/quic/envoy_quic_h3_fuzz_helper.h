@@ -34,6 +34,7 @@ public:
 
 private:
   void serializePacket(const test::common::quic::QuicFrame& frame);
+  void serializeJunkPacket(const std::string& data);
 
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;

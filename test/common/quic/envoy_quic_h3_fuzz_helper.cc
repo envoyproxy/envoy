@@ -174,11 +174,16 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
 }
 
 void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
-  for (auto& quic_frame : input.frames()) {
+  for (auto& quic_frame_or_junk : input.frames()) {
     if (idx_ >= sizeof(quic_packet_sizes_) / sizeof(quic_packet_sizes_[0])) {
       return;
     }
-    serializePacket(quic_frame);
+    if (quic_frame_or_junk.has_qframe()) {
+      serializePacket(quic_frame_or_junk.qframe());
+    } else if (quic_frame_or_junk.has_junk()) {
+      const std::string& junk = quic_frame_or_junk.junk();
+      serializeJunkPacket(junk);
+    }
   }
 }
 
@@ -395,6 +400,28 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   quic_packet_sizes_[idx_] =
       framer.BuildDataPacket(header, frames, quic_packets_[idx_], sizeof(quic_packets_[idx_]),
                              quic::EncryptionLevel::ENCRYPTION_INITIAL);
+  idx_++;
+}
+
+void QuicPacketizer::serializeJunkPacket(const std::string& data) {
+  quic::QuicPacketHeader header;
+  header.packet_number = packet_number_;
+  header.destination_connection_id = destination_connection_id_;
+  header.source_connection_id = destination_connection_id_;
+  packet_number_++;
+  quic::QuicDataWriter writer(sizeof(quic_packets_[idx_]), quic_packets_[idx_]);
+  quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
+                          quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength);
+
+  auto encrypter = new FuzzEncrypter(quic::Perspective::IS_CLIENT);
+  framer.SetEncrypter(quic::ENCRYPTION_INITIAL, std::unique_ptr<quic::QuicEncrypter>(encrypter));
+
+  size_t length_field_offset = 0;
+  if (!framer.AppendPacketHeader(header, &writer, &length_field_offset)) {
+    return;
+  }
+  writer.WriteBytes(data.data(), data.size());
+  framer.WriteIetfLongHeaderLength(header, &writer, length_field_offset, quic::ENCRYPTION_INITIAL);
   idx_++;
 }
 
