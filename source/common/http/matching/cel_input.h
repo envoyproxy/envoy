@@ -88,6 +88,7 @@ private:
 };
 
 DECLARE_FACTORY(HttpCelDataInputFactory);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
