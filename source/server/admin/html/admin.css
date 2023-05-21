@@ -91,15 +91,12 @@
 
 .histogram-bucket {
   bottom: 0;
-  /* background-color: #c11; */
   background-color: #e6d7ff;
   position: absolute;
   border-color: purple;
   border-width: 1px;
   border-style: solid;
-  /* width: 16px; */
   width: 2%;
-  /* margin-left: -0.5%; */
   margin-left: -0.75%;
   z-index: 1;
 }
@@ -111,8 +108,6 @@
   border-style: solid;
   border-color: black;
   visibility: hidden;
-  /* width: 150px; */
-  /* height: 55px; */
   z-index: 3;
   top: 55px;
   padding: 3px;
@@ -134,7 +129,6 @@
   margin-left: -0.75%;
   top: 0;
   position: absolute;
-  /* margin-left: -2px; */
 }
 
 .histogram-interval {
@@ -145,7 +139,6 @@
   margin-left: 0.5%;
   top: 0;
   position: absolute;
-  /* margin-left: -2px; */
 }
 
 .bucket-label {
@@ -156,8 +149,6 @@
   margin-bottom: 1px;
   text-align: center;
   margin-left: -0.75%;
-  /* color: white; */
-  /* margin-left: -12px; */
 }
 
 .percentile-label {
@@ -165,10 +156,6 @@
   font-family: sans-serif;
   font-size: 12px;
   margin-left: -0.75%;
-  /* margin-left: 8px; */
-  /* margin-left: -5px; */
-  /* margin-right: 3px; */
-  /* color: white; */
   z-index: 2;
 }
 
