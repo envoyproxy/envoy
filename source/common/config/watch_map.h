@@ -4,12 +4,12 @@
 #include <string>
 #include <utility>
 
+#include "envoy/config/custom_config_validators.h"
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/custom_config_validators.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"

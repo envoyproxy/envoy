@@ -57,6 +57,9 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":ads_integration_lib",
         ":http_integration_lib",
@@ -79,6 +82,9 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [":http_integration_lib"],
 )
 
@@ -86,6 +92,9 @@ envoy_cc_test(
     name = "api_listener_integration_test",
     size = "large",
     srcs = ["api_listener_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/mocks/http:stream_encoder_mock",
@@ -122,6 +131,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -141,6 +153,9 @@ envoy_cc_test(
     name = "eds_integration_test",
     size = "large",
     srcs = ["eds_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -160,6 +175,9 @@ envoy_cc_test(
     name = "leds_integration_test",
     size = "large",
     srcs = ["leds_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -182,6 +200,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "filter_manager_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":filter_manager_integration_proto_cc_proto",
@@ -214,6 +235,9 @@ envoy_cc_test(
     srcs = [
         "upstream_access_log_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -230,6 +254,9 @@ envoy_cc_test(
     name = "cluster_filter_integration_test",
     size = "large",
     srcs = ["cluster_filter_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -246,6 +273,9 @@ envoy_cc_test(
     name = "custom_cluster_integration_test",
     size = "large",
     srcs = ["custom_cluster_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -263,6 +293,9 @@ envoy_cc_test(
     srcs = ["vhds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":vhds_lib",
@@ -294,6 +327,9 @@ envoy_cc_test(
         "drain_close_integration_test.cc",
     ]),
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:utility_lib",
@@ -353,6 +389,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
@@ -367,6 +406,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "header_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -390,6 +432,9 @@ envoy_cc_test(
     name = "http_conn_pool_integration_test",
     size = "large",
     srcs = ["http_conn_pool_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
@@ -401,6 +446,9 @@ envoy_cc_test(
     name = "circuit_breakers_integration_test",
     size = "large",
     srcs = ["circuit_breakers_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
@@ -415,6 +463,9 @@ envoy_cc_test(
         "http2_flood_integration_test.cc",
     ],
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
@@ -441,6 +492,9 @@ envoy_cc_test(
         "multiplexed_integration_test.cc",
     ],
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -471,6 +525,9 @@ envoy_cc_test(
     name = "shadow_policy_integration_test",
     size = "large",
     srcs = ["shadow_policy_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -490,6 +547,9 @@ envoy_cc_test(
     name = "upstream_http_filter_integration_test",
     size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -510,6 +570,9 @@ envoy_cc_test(
         "buffer_accounting_integration_test.cc",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":base_overload_integration_test_lib",
         ":http_integration_lib",
@@ -546,6 +609,9 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/extensions/load_balancing_policies/subset:config",
@@ -566,6 +632,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/extensions/load_balancing_policies/subset:config",
@@ -581,6 +650,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "header_casing_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -608,6 +680,9 @@ envoy_cc_test(
         "http_timeout_integration_test.cc",
         "http_timeout_integration_test.h",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
@@ -622,6 +697,9 @@ envoy_cc_test(
         "filter_integration_test.cc",
     ]),
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -696,6 +774,9 @@ envoy_cc_test(
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 48,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -719,6 +800,9 @@ envoy_cc_test(
         "multiplexed_upstream_integration_test.cc",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -740,6 +824,9 @@ envoy_cc_test(
             "integration_admin_test.h",
         ],
     ),
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//envoy/http:header_map_interface",
@@ -836,6 +923,9 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -1160,6 +1250,9 @@ envoy_cc_test(
         "integration_test.h",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/registry",
@@ -1191,7 +1284,10 @@ envoy_cc_test(
         "redirect_integration_test.cc",
     ],
     shard_count = 8,
-    tags = ["nofips"],
+    tags = [
+        "cpu:3",
+        "nofips",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1222,6 +1318,9 @@ envoy_cc_test(
         "websocket_integration_test.h",
     ],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1295,6 +1394,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -1320,6 +1422,9 @@ envoy_cc_test(
     size = "large",
     srcs = ["header_prefix_integration_test.cc"],
     coverage = False,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1362,6 +1467,9 @@ envoy_cc_test(
     size = "large",
     srcs = ["overload_integration_test.cc"],
     shard_count = 8,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
@@ -1378,6 +1486,9 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "rtds_integration_test.cc",
     ]),
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -1471,6 +1582,7 @@ envoy_cc_test(
     # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
     # correctly handle symlinks.
     tags = [
+        "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
     ],
@@ -1507,6 +1619,9 @@ envoy_cc_test(
     srcs = [
         "sds_generic_secret_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/registry",
@@ -1536,6 +1651,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1564,6 +1682,36 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_proxy_many_connections_test",
+    size = "large",
+    srcs = [
+        "tcp_proxy_many_connections_test.cc",
+    ],
+    shard_count = 1,
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_tunneling_integration_test",
     size = "large",
     srcs = [
@@ -1573,6 +1721,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 16,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1591,6 +1742,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "tcp_conn_pool_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":integration_lib",
@@ -1675,6 +1829,9 @@ envoy_cc_test(
         ["dynamic_validation_integration_test.cc"],
     ),
     data = ["//test/config/integration:server_xds_files"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
@@ -1692,6 +1849,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -1723,6 +1883,9 @@ envoy_cc_test(
     ]),
     data = [
         "//test/config/integration/certs",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -1891,6 +2054,9 @@ envoy_cc_test(
     srcs = [
         "scoped_rds_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":scoped_rds_lib",
@@ -1916,6 +2082,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "listener_lds_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -1947,6 +2116,9 @@ envoy_cc_test(
     name = "cx_limit_integration_test",
     size = "large",
     srcs = ["cx_limit_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//envoy/network:filter_interface",
@@ -1962,6 +2134,9 @@ envoy_cc_test(
     name = "direct_response_integration_test",
     size = "large",
     srcs = ["direct_response_integration_test.cc"],
+    tags = [
+        "cpu:2",
+    ],
     deps = [
         ":http_integration_lib",
     ],
@@ -1974,6 +2149,9 @@ envoy_cc_test(
         "local_reply_integration_test.cc",
     ],
     shard_count = 2,
+    tags = [
+        "cpu:2",
+    ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1987,6 +2165,9 @@ envoy_cc_test(
     srcs = [
         "command_formatter_extension_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/common/formatter:command_extension_lib",
@@ -1998,6 +2179,9 @@ envoy_cc_test(
     name = "health_check_integration_test",
     size = "large",
     srcs = ["health_check_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -2013,6 +2197,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "cluster_upstream_extension_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
@@ -2038,6 +2225,7 @@ envoy_cc_test(
     data = ["//test/config/integration/certs"],
     shard_count = 12,
     tags = [
+        "cpu:4",
         "nofips",
     ],
     deps = select({
@@ -2075,6 +2263,7 @@ envoy_cc_test(
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
     tags = [
+        "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
         "nofips",
@@ -2111,6 +2300,9 @@ envoy_cc_test(
     srcs = [
         "original_ip_detection_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/extensions/http/original_ip_detection/custom_header:config",
@@ -2123,6 +2315,9 @@ envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -2144,6 +2339,9 @@ envoy_cc_test(
     srcs = [
         "typed_metadata_integration_test.cc",
     ],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_protocol_integration_lib",
         ":typed_metadata_integration_proto_cc_proto",
@@ -2161,6 +2359,9 @@ envoy_cc_test(
     srcs = ["tcp_proxy_odcds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":ads_integration_lib",
@@ -2183,6 +2384,9 @@ envoy_cc_test(
         "xds_delegate_extension_integration_test.cc",
     ]),
     external_deps = ["abseil_strings"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":xds_delegate_test_config_proto_cc_proto",
@@ -2205,6 +2409,9 @@ envoy_cc_test(
     size = "large",
     srcs = ["xds_config_tracker_integration_test.cc"],
     external_deps = ["abseil_strings"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":http_integration_lib",
         ":xds_config_tracker_test_proto_cc_proto",
@@ -2230,6 +2437,9 @@ envoy_cc_test(
     size = "large",
     srcs = [
         "default_header_validator_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
     ],
     deps = [
         ":http_protocol_integration_lib",
