@@ -306,23 +306,29 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucketSpan.style.backgroundColor = 'yellow';
       highlightedBucket = bucketSpan;
 
-      let annotationText = [];
+      detailPopup.replaceChildren();
+      const bounds = document.createElement('div');
+      bounds.textContent = '[' + format(bucket.lower_bound) + ', ' +
+          format(bucket.lower_bound + bucket.width) + ')';
+      detailPopup.appendChild(bounds);
+      if (!showingCount) {
+        const count = document.createElement('div');
+        count.textContent = 'count=' + bucket.count;
+        detailPopup.appendChild(count);
+      }
       if (bucket.annotations) {
         for (annotation of bucket.annotations) {
           if (annotation[1] == PERCENTILE) {
+            const span = document.createElement('div');
             if (annotation[1] == PERCENTILE) {
-              annotationText.push('P' + annotation[2] + '= ' + annotation[0]);
+              span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
             } else {
-              annotationText.push('I' + annotation[3] + '[' + annotation[2] + ']=' + annotation[0]);
+              span.textContent = 'I' + annotation[3] + '[' + annotation[2] + ']: ' + format(annotation[0]);
             }
+            detailPopup.appendChild(span);
           }
         }
       }
-
-      detailPopup.textContent =
-          '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') '
-          + (showingCount ? '' : ('count=' + bucket.count)) + ' '
-          + annotationText.join(' ');
     });
 
     bucketSpan.addEventListener('mouseout', (event) => {

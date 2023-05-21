@@ -110,17 +110,20 @@
   border-width: 1px;
   border-style: solid;
   border-color: black;
-  font-family: sans-serif;
-  font-size: 14px;
   visibility: hidden;
   /* width: 150px; */
   /* height: 55px; */
   z-index: 3;
   top: 55px;
-  overflow: hidden;
   padding: 3px;
-  text-align: center;
   margin-left: -1%;
+}
+
+.histogram-popup div {
+  font-family: sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  text-align: center;
 }
 
 .histogram-percentile {
