@@ -4,6 +4,7 @@
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/matching/inputs.h"
+#include "source/common/http/matching/cel_input.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
