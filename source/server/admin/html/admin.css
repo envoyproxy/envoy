@@ -97,7 +97,7 @@
   border-width: 1px;
   border-style: solid;
   width: 2%;
-  margin-left: -0.75%;
+  /*margin-left: -0.75%;*/
   z-index: 1;
 }
 
@@ -126,7 +126,7 @@
   background-color: #306844;
   height: 30%;
   width: 4px;
-  margin-left: -0.75%;
+  /*margin-left: -0.75%;*/
   top: 0;
   position: absolute;
 }
@@ -148,14 +148,14 @@
   font-size: 12px;
   margin-bottom: 1px;
   text-align: center;
-  margin-left: -0.75%;
+  /*margin-left: -0.75%;*/
 }
 
 .percentile-label {
   position: absolute;
   font-family: sans-serif;
   font-size: 12px;
-  margin-left: -0.75%;
+  /*margin-left: -0.75%;*/
   z-index: 2;
 }
 
@@ -165,6 +165,6 @@
   font-family: sans-serif;
   font-size: 12px;
   text-align: center;
-  margin-left: -0.75%;
+  /*margin-left: -0.75%;*/
   overflow-x: visible;
 }
