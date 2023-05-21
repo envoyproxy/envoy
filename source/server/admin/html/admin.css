@@ -149,6 +149,8 @@
   font-family: sans-serif;
   font-size: 12px;
   margin-bottom: 1px;
+  text-align: center;
+  margin-left: -0.75%;
   /* color: white; */
   /* margin-left: -12px; */
 }

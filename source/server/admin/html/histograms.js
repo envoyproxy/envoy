@@ -37,8 +37,6 @@ function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
   }
 }
 
-let layout_evenly = true;
-
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = document.createElement('div');
   const label = document.createElement('span');
@@ -170,9 +168,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // arbitrary "virtual pixels" (variables with `Vpx` suffix) during the
   // computation in JS and converting them to percentages for writing element
   // style.
-  const bucketWidthVpx = 20;
-
-  const marginWidthVpx = 40;
+  const bucketWidthVpx = 40;
+  const marginWidthVpx = 20;
 
   const percentileWidthAndMarginVpx = 20;
   const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
@@ -245,16 +242,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     bucketSpan.className = 'histogram-bucket';
     const heightPercent = maxCount == 0 ? 0 : formatPercent(bucket.count / maxCount);
     bucketSpan.style.height = heightPercent;
-    const left = toPercent(leftVpx);
     const upper_bound = bucket.lower_bound + bucket.width;
-    if (layout_evenly) {
-      bucketSpan.style.left = left;
-    } else {
-      const leftPercent = xvalueToPercent(bucket.lower_bound - minXValue);
-      bucketSpan.style.left = leftPercent + '%';
-      const rightPercent = xvalueToPercent(upper_bound - minXValue);
-      bucketSpan.style.width = (rightPercent - leftPercent) + '%';
-    }
     console.log('lower_bound=' + bucket.lower_bound + ' width=' + bucket.width +
                 ' left=' + bucketSpan.style.left /* + ' width=' + bucketSpan.style.width */);
     const nextVpx = bucketWidthVpx + marginWidthVpx + leftVpx;
@@ -277,9 +265,14 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
     if (histogram.totals.length == 1) {
       // Special case one bucket.
-      bucketSpan.style.width = '10%';
-      bucketSpan.style.left = '45%';
-    }/* else if (i == 0) {
+      bucketSpan.style.width = '2%';
+      leftVpx = widthVpx / 2;
+    } else {
+      bucketSpan.style.width = toPercent(bucketWidthVpx);
+    }
+    bucketSpan.style.left = toPercent(leftVpx);
+
+    /* else if (i == 0) {
       // We can only use the next bucket; there is no previous bucket.
       bucketSpan.style.width = scaleWidth(bucket.lower_bound, leftVpx,
                                           histogram.totals[i + 1].lower_bound, nextVpx);
@@ -334,9 +327,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       //lower_label.textContent = format(bucket.lower_bound) + '[' + format(bucket.width) + ']';
       lower_label.textContent = format(bucket.lower_bound); // + ',' + format(bucket.width);
 
-
       //lower_label.style.left = toPercent(leftVpx - bucketWidthVpx/2);
-      lower_label.style.left = left;
+      lower_label.style.left = toPercent(leftVpx);
       lower_label.style.width = toPercent(bucketWidthVpx);
       /*
         const upper_label = document.createElement('span');
@@ -349,7 +341,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     const bucketLabel = document.createElement('span');
     bucketLabel.className = 'bucket-label';
     bucketLabel.textContent = format(bucket.count);
-    bucketLabel.style.left = left;
+    bucketLabel.style.left = toPercent(leftVpx);
+    bucketLabel.style.width = toPercent(bucketWidthVpx);
     bucketLabel.style.bottom = heightPercent;
     graphics.appendChild(bucketLabel);
 
