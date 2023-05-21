@@ -187,7 +187,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const toPercentWidth = vpx => formatPercent(vpxToFractionWidth(vpx));
   let leftVpx = marginWidthVpx;
   let prevVpx = leftVpx;
-  for (i = 0; i < histogram.totals.length; ++i) {
+  for (i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
 
     if (annotationsDiv && bucket.annotations &&
@@ -277,7 +277,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       graphics.appendChild(bucketLabel);
     }
 
-    const magLeft = toPercentPosition(leftVpx);
+    const bucketOnLeftSide = i <= numBuckets / 2;
+    const bucketPosVpx = bucketOnLeftSide ? leftVpx :
+          (widthVpx - (leftVpx + 2*bucketWidthVpx));
 
     const leaveHandler = () => {
       pendingTimeout = null;
@@ -293,14 +295,34 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         pendingLeave();
       }
 
-      detailPopup.style.left = magLeft;
+      if (bucketOnLeftSide) {
+        detailPopup.style.left = toPercentPosition(bucketPosVpx);
+        detailPopup.style.right = '';
+      } else {
+        detailPopup.style.left = '';
+        detailPopup.style.right = toPercentPosition(bucketPosVpx);
+      }
       detailPopup.style.visibility = 'visible';
       bucketSpan.style.backgroundColor = 'yellow';
       highlightedBucket = bucketSpan;
 
+      let annotationText = [];
+      if (bucket.annotations) {
+        for (annotation of bucket.annotations) {
+          if (annotation[1] == PERCENTILE) {
+            if (annotation[1] == PERCENTILE) {
+              annotationText.push('P' + annotation[2] + '= ' + annotation[0]);
+            } else {
+              annotationText.push('I' + annotation[3] + '[' + annotation[2] + ']=' + annotation[0]);
+            }
+          }
+        }
+      }
+
       detailPopup.textContent =
           '[' + format(bucket.lower_bound) + ', ' + format(bucket.lower_bound + bucket.width) + ') '
-          + (showingCount ? '' : ('count=' + bucket.count));
+          + (showingCount ? '' : ('count=' + bucket.count)) + ' '
+          + annotationText.join(' ');
     });
 
     bucketSpan.addEventListener('mouseout', (event) => {
