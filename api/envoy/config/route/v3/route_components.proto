@@ -838,6 +838,7 @@ message RouteAction {
       // The name of the cookie attribute.
       string name = 1 [(validate.rules).string = {min_len: 1}];
 
+      // The optional value of the cookie attribute.
       string value = 2;
     }
 

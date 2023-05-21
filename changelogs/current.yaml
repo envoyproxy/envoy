@@ -199,6 +199,9 @@ new_features:
 - area: admin
   change: |
     Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
+- area: http
+  change: |
+    added support for configuring additional :ref:`cookie attributes <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>`.
 
 deprecated:
 - area: access_log
