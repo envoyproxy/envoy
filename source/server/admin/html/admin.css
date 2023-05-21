@@ -131,7 +131,7 @@
   background-color: #306844;
   height: 30%;
   width: 4px;
-  margin-left: 0.5%;
+  margin-left: -0.75%;
   top: 0;
   position: absolute;
   /* margin-left: -2px; */
@@ -164,6 +164,7 @@
   position: absolute;
   font-family: sans-serif;
   font-size: 12px;
+  margin-left: -0.75%;
   /* margin-left: 8px; */
   /* margin-left: -5px; */
   /* margin-right: 3px; */

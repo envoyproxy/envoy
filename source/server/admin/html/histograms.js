@@ -87,6 +87,20 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const detailPopup = document.createElement('div');
   detailPopup.className = 'histogram-popup';
   graphics.appendChild(detailPopup);
+  detailPopup.addEventListener('mouseover', (event) => {
+    // If the mouse enters the popup then cancel the timer that would
+    // erase it. This should make it easier to cut&paste the contents
+    // of the popup.
+    if (pendingTimeout) {
+      window.clearTimeout(pendingTimeout);
+      pendingTimeout = null;
+      // The 'leave' handler needs to remain -- we'll call that 2 seconds
+      // after the mouse leaves the popup.
+    }
+  });
+  detailPopup.addEventListener('mouseout', (event) => {
+    pendingTimeout = window.setTimeout(pendingLeave, 2000);
+  });
 
   graphics.className = 'histogram-graphics';
   labels.className = 'histogram-labels';
