@@ -131,7 +131,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       bucket.annotations = [];
       for (; percentileIndex < percentile_values.length; ++percentileIndex) {
         const percentileValue = percentile_values[percentileIndex].cumulative;
-        if (percentileValue > upper_bound) {
+        if (percentileValue >= upper_bound) {
           break; // do not increment index; re-consider percentile for next bucket.
         }
         bucket.annotations.push(
@@ -141,7 +141,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
         const interval = histogram.intervals[intervalIndex];
         //const interval_upper_bound = interval.lower_bound + interval.width;
-        if (interval.lower_bound > upper_bound) {
+        if (interval.lower_bound >= upper_bound) {
           break; // do not increment index; re-consider interval for next bucket.
         }
         bucket.annotations.push([interval.lower_bound, INTERVAL, interval.width, interval.count]);
