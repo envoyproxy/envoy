@@ -26,6 +26,7 @@ envoy_cmake(
         "BUILD_AVX512": "on",
         "BUILD_AVX512VBMI": "on",
         "BUILD_EXAMPLES": "off",
+        "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "on",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
