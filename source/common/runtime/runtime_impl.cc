@@ -268,6 +268,10 @@ void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
 void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   double converted_double;
   if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
+  static const std::string error_message =
+      "Runtime YAML appears to be setting doubles as strings. Support for this is planned "
+      "to removed in the next release. If you need this to continue working as a double "
+      "please ping on https://github.com/envoyproxy/envoy/issues/27434";
     setNumberValue(entry, converted_double);
   }
 }
@@ -287,7 +291,10 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
     return;
   }
-
+  IS_ENVOY_BUG(
+      "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
+      "to removed in the next release. If you need this to continue working as a fraction "
+      "please ping on https://github.com/envoyproxy/envoy/issues/27434");
   uint32_t numerator;
   if (!absl::SimpleAtoi(match_string, &numerator)) {
     return;
@@ -313,9 +320,16 @@ void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
+  static const std::string error_message =
+      "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
+      "to removed in the next release. If you need this to continue working as a boolean "
+      "please ping on https://github.com/envoyproxy/envoy/issues/27434";
+
   if (absl::EqualsIgnoreCase(stripped, "true")) {
+    IS_ENVOY_BUG(error_message);
     entry.bool_value_ = true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    IS_ENVOY_BUG(error_message);
     entry.bool_value_ = false;
   }
 }
@@ -336,8 +350,6 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kStringValue:
     entry.raw_string_value_ = value.string_value();
     parseEntryDoubleValue(entry);
-    // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
-    // functions and see if we can remove the special casing.
     parseEntryBooleanValue(entry);
     parseEntryFractionalPercentValue(entry);
     if (!raw_string.empty()) {
