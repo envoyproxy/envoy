@@ -2014,8 +2014,8 @@ TEST_P(ExtProcIntegrationTest, SendHeaderAndTrailerInBufferedMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Test the filter with header allow list configed and verify only the allowed headers
-// in request or response headers and tailers are sent to the ext_proc server.
+// Test the filter with header allow list configured and verify only the allowed headers
+// in request or response headers and trailers are sent to the ext_proc server.
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
   auto* forward_rules = proto_config_.mutable_forward_rules();
   auto* list = forward_rules->mutable_allowed_headers();
