@@ -585,7 +585,7 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::Hidden) {
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
 
@@ -595,7 +595,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result;
-  if (import_mode != Gauge::ImportMode::Hidden) {
+  if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
     fast_reject_result = parent_.fastRejects(final_stat_name);
   } else {
     fast_reject_result = StatsMatcher::FastResult::Matches;

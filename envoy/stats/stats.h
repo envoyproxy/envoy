@@ -132,10 +132,10 @@ class Gauge : public Metric {
 public:
   // TODO(diazalan): Rename ImportMode to more generic name
   enum class ImportMode {
-    Uninitialized, // Gauge was discovered during hot-restart transfer.
-    NeverImport,   // On hot-restart, each process starts with gauge at 0.
-    Accumulate,    // Transfers gauge state on hot-restart.
-    Hidden,        // For deferred-stats gauges
+    Uninitialized,    // Gauge was discovered during hot-restart transfer.
+    NeverImport,      // On hot-restart, each process starts with gauge at 0.
+    Accumulate,       // Transfers gauge state on hot-restart.
+    HiddenAccumulate, // Will be transferred on hot-restart and ignored by admin/stats-sink
   };
 
   ~Gauge() override = default;

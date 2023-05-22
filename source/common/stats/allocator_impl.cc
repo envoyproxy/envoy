@@ -183,8 +183,9 @@ public:
       // an alternate scope. See
       // https://github.com/envoyproxy/envoy/issues/7227.
       break;
-    case ImportMode::Hidden:
+    case ImportMode::HiddenAccumulate:
       flags_ |= Flags::Hidden;
+      flags_ |= Flags::LogicAccumulate;
       break;
     }
   }
@@ -217,10 +218,10 @@ public:
   ImportMode importMode() const override {
     if (flags_ & Flags::NeverImport) {
       return ImportMode::NeverImport;
+    } else if ((flags_ & Flags::Hidden) && (flags_ & Flags::LogicAccumulate)) {
+      return ImportMode::HiddenAccumulate;
     } else if (flags_ & Flags::LogicAccumulate) {
       return ImportMode::Accumulate;
-    } else if (flags_ & Flags::Hidden) {
-      return ImportMode::Hidden;
     }
     return ImportMode::Uninitialized;
   }
@@ -250,13 +251,12 @@ public:
       flags_ &= ~Flags::Used;
       flags_ |= Flags::NeverImport;
       break;
-    case ImportMode::Hidden:
+    case ImportMode::HiddenAccumulate:
       ASSERT(current == ImportMode::Uninitialized);
       flags_ |= Flags::Hidden;
+      flags_ |= Flags::LogicAccumulate;
       break;
     }
-    ASSERT(flags_ & Flags::NeverImport + flags_ & Flags::LogicAccumulate + flags_ &
-           Flags::Hidden <= 1);
   }
 
   void setParentValue(uint64_t value) override { parent_value_ = value; }
