@@ -213,8 +213,8 @@ new_features:
     Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
 - area: http
   change: |
-    added support for configuring additional :ref:`cookie attributes <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>`.
-    
+    added support for configuring additional :ref:`cookie attributes <envoy_api_field_route.RouteAction.HashPolicy.Cookie>`.
+
 deprecated:
 - area: access_log
   change: |
