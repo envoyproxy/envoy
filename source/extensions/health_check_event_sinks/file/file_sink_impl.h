@@ -1,7 +1,8 @@
 #pragma once
 
+#include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.h"
 #include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.validate.h"
-#include "envoy/extensions/health_check_event_sinks/file/v3/file.proto.h"
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/upstream/health_check_event_sink.h"
 
