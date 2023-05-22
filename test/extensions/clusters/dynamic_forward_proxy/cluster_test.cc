@@ -225,11 +225,29 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
+TEST_F(ClusterTest, InvalidSubClusterConfig) {
+  const std::string bad_sub_cluster_yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      lb_policy: CLUSTER_PROVIDED
+)EOF";
+
+  EXPECT_THROW(initialize(bad_sub_cluster_yaml_config, false), EnvoyException);
+}
+
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
   makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")));
 
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
