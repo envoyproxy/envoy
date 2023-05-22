@@ -11,10 +11,10 @@
 
 namespace Envoy {
 
-enum TestServerType {
-  HTTP1_HTTP,
-  HTTP2_HTTPS,
-  HTTP3_HTTPS,
+enum class TestServerType {
+  HTTP1_WITHOUT_TLS,
+  HTTP2_WITH_TLS,
+  HTTP3,
 };
 
 class TestServer {

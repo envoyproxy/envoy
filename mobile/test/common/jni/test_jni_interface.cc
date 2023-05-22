@@ -13,7 +13,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp3TestServer(JNIEnv* env,
                                                                                  jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(Envoy::TestServerType::HTTP3_HTTPS);
+  start_server(Envoy::TestServerType::HTTP3);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -27,7 +27,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp2TestServer(JNIEnv* env,
                                                                                  jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server(Envoy::TestServerType::HTTP2_HTTPS);
+  start_server(Envoy::TestServerType::HTTP2_WITH_TLS);
 }
 
 extern "C" JNIEXPORT void JNICALL

@@ -68,16 +68,16 @@ void TestServer::startTestServer(TestServerType test_server_type) {
   Network::DownstreamTransportSocketFactoryPtr factory;
 
   switch (test_server_type) {
-  case TestServerType::HTTP3_HTTPS:
+  case TestServerType::HTTP3:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
     factory = createQuicUpstreamTlsContext(factory_context_);
     break;
-  case TestServerType::HTTP2_HTTPS:
+  case TestServerType::HTTP2_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
     factory = createUpstreamTlsContext(factory_context_);
     break;
-  case TestServerType::HTTP1_HTTP:
+  case TestServerType::HTTP1_WITHOUT_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
     factory = Network::Test::createRawBufferDownstreamSocketFactory();
     break;
@@ -87,7 +87,7 @@ void TestServer::startTestServer(TestServerType test_server_type) {
                                                    upstream_config_, true);
 
   // Legacy behavior for cronet tests.
-  if (test_server_type == TestServerType::HTTP3_HTTPS) {
+  if (test_server_type == TestServerType::HTTP3) {
     upstream_->setResponseHeaders(
         std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
             {{":status", "200"},

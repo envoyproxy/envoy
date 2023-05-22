@@ -4,7 +4,7 @@
 @implementation EnvoyTestServer
 
 + (void)startHttp3Server {
-  start_server(Envoy::TestServerType::HTTP3_HTTPS);
+  start_server(Envoy::TestServerType::HTTP3);
 }
 
 + (NSInteger)getEnvoyPort {
@@ -12,11 +12,11 @@
 }
 
 + (void)startHttp2Server {
-  start_server(Envoy::TestServerType::HTTP2_HTTPS);
+  start_server(Envoy::TestServerType::HTTP2_WITH_TLS);
 }
 
 + (void)startHttp1PlaintextServer {
-  start_server(Envoy::TestServerType::HTTP1_HTTP);
+  start_server(Envoy::TestServerType::HTTP1_WITHOUT_TLS);
 }
 
 + (void)shutdownTestServer {
