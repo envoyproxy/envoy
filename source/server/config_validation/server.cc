@@ -87,7 +87,7 @@ void ValidationInstance::initialize(const Options& options,
 
   if (!options.logFormatSet() && bootstrap_.has_application_log_format() &&
       bootstrap_.application_log_format().has_json_format()) {
-    auto status =
+    const auto status =
         Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
 
     if (!status.ok()) {

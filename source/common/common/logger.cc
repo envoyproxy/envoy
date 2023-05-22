@@ -260,7 +260,7 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
   json_options.always_print_primitive_fields = true;
 
   std::string format_as_json;
-  auto status =
+  const auto status =
       Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
 
   if (!status.ok()) {
