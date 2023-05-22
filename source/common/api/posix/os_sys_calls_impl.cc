@@ -140,6 +140,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 
 bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ipVersion) const {
 #if !defined(__linux__)
+  UNREFERENCED_PARAMETER(ipVersion);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
