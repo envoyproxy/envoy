@@ -1062,7 +1062,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
@@ -1071,7 +1071,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
@@ -1080,7 +1080,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
@@ -1089,7 +1089,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
