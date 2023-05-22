@@ -222,7 +222,7 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
     } else {
       const std::string encoded_address =
           Envoy::Base64::encode(address_string.data(), address_string.size());
-      std::vector<CookieAttribute> cookie_attributes;
+      std::vector<Http::CookieAttribute> cookie_attributes;
       EXPECT_EQ(
           Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address,
                                                    "/test", std::chrono::seconds(120), true,
@@ -423,7 +423,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
                   ProtoCookieObject(address_string, 120, "/test", "HttpOnly"));
       } else {
         encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
-        std::vector<CookieAttribute> cookie_attributes;
+        std::vector<Http::CookieAttribute> cookie_attributes;
         // The selected upstream server address would be selected to the response headers.
         EXPECT_EQ(Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address,
                                                            "/test", std::chrono::seconds(120), true,
@@ -764,7 +764,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
       } else {
         const std::string route_encoded_address =
             Envoy::Base64::encode(route_address_string.data(), route_address_string.size());
-        std::vector<CookieAttribute> cookie_attributes;
+        std::vector<Http::CookieAttribute> cookie_attributes;
         EXPECT_EQ(Envoy::Http::Utility::makeSetCookieValue("route-session-cookie",
                                                            route_encoded_address, "/test",
                                                            std::chrono::seconds(120), true),
