@@ -292,12 +292,6 @@ EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_re
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setOverrideConfigForTests(
-    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config) {
-  config_override_for_tests_ = std::move(config);
-  return *this;
-}
-
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
   // The yaml utilities have non-relevant thread asserts.
   Thread::SkipAsserts skip;
@@ -1017,12 +1011,7 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
-  if (config_override_for_tests_) {
-    bootstrap = std::move(config_override_for_tests_);
-  } else {
-    bootstrap = generateBootstrap();
-  }
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
 
   envoy_engine_t envoy_engine =
       init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
