@@ -264,7 +264,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
   // If the referer header is registered with `CustomInlineHeaderRegistry` somewhere else already,
   // multiple headers will be placed into same slot. (i.e., single entry). Thus, assert here
   // to ensure that two entries are created before proceeding to test multiple entries removal.
-  ASSERT_TRUE(headers.size(), 2);
+  ASSERT_EQ(headers.size(), 2);
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
