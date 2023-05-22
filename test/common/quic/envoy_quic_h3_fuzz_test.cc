@@ -138,9 +138,9 @@ struct Harness {
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
     auto connection_socket = Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
     auto connection = std::make_unique<EnvoyQuicServerConnection>(
-        quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_.get(),
-        *alarm_factory_.get(), &writer_, false, quic::ParsedQuicVersionVector{quic_version_},
-        std::move(connection_socket), generator_);
+        quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_, *alarm_factory_,
+        &writer_, false, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection_socket),
+        generator_);
 
     auto decrypter = std::make_unique<FuzzDecrypter>(quic::Perspective::IS_SERVER);
     auto encrypter = std::make_unique<FuzzEncrypter>(quic::Perspective::IS_SERVER);

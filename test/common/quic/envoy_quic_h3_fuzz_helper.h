@@ -59,21 +59,21 @@ class FuzzEncrypter : public quic::NullEncrypter {
 public:
   explicit FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective){};
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
-                     size_t* output_length, size_t max_output_length) {
+                     size_t* output_length, size_t max_output_length) override {
     ASSERT(plaintext.length() <= max_output_length);
     memcpy(output, plaintext.data(), plaintext.length());
     *output_length = plaintext.length();
     return true;
   };
-  size_t GetMaxPlaintextSize(size_t ciphertext_size) const { return ciphertext_size; }
-  size_t GetCiphertextSize(size_t plaintext_size) const { return plaintext_size; }
+  size_t GetMaxPlaintextSize(size_t ciphertext_size) const override { return ciphertext_size; }
+  size_t GetCiphertextSize(size_t plaintext_size) const override { return plaintext_size; }
 };
 
 class FuzzDecrypter : public quic::NullDecrypter {
 public:
   explicit FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective){};
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
-                     size_t* output_length, size_t max_output_length) {
+                     size_t* output_length, size_t max_output_length) override {
     ASSERT(ciphertext.length() <= max_output_length);
     memcpy(output, ciphertext.data(), ciphertext.length());
     *output_length = ciphertext.length();
