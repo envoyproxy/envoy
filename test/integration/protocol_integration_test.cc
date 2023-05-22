@@ -4286,7 +4286,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
   ASSERT(!Api::OsSysCallsSingleton::get().supportsUdpGso());
-  SocketInterfaceSwap socket_swap;
+  SocketInterfaceSwap socket_swap(downstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4295,8 +4297,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
 
   // Makes us have Envoy's writes to downstream return EBADF
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
-  socket_swap.write_matcher_->setDestinationPort(
-      codec_client_->connection()->connectionInfoProvider().localAddress()->ip()->port());
+  socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
@@ -4321,7 +4322,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
 }
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
-  SocketInterfaceSwap socket_swap;
+  SocketInterfaceSwap socket_swap(upstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
