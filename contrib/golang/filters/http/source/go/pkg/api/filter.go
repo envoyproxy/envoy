@@ -120,12 +120,13 @@ const (
 	LifeSpanConnection  LifeSpan = 2
 	LifeSpanTopSpan     LifeSpan = 3
 )
+
 type StreamSharing int
 
 const (
 	None                             StreamSharing = 0
 	SharedWithUpstreamConnection     StreamSharing = 1
-    SharedWithUpstreamConnectionOnce StreamSharing = 2
+	SharedWithUpstreamConnectionOnce StreamSharing = 2
 )
 
 type FilterState interface {

@@ -1065,8 +1065,8 @@ void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filte
   state.streamInfo().setDynamicMetadata(filter_name, value);
 }
 
-CAPIStatus Filter::setStringFilterState(std::string key, std::string value, int state_type,
-                                        int life_span, int stream_sharing) {
+CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
+                                        int state_type, int life_span, int stream_sharing) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1087,13 +1087,15 @@ CAPIStatus Filter::setStringFilterState(std::string key, std::string value, int 
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
+    auto key_str = std::string(key);
+    auto value_str = std::string(value);
     auto weak_ptr = weak_from_this();
     state.getDispatcher().post(
-        [this, &state, weak_ptr, key, value, state_type, life_span, stream_sharing] {
+        [this, &state, weak_ptr, key_str, value_str, state_type, life_span, stream_sharing] {
           if (!weak_ptr.expired() && !hasDestroyed()) {
             Thread::LockGuard lock(mutex_);
             state.streamInfo().filterState()->setData(
-                key, std::make_shared<GoStringFilterState>(value),
+                key_str, std::make_shared<GoStringFilterState>(value_str),
                 static_cast<StreamInfo::FilterState::StateType>(state_type),
                 static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
                 static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));

@@ -181,8 +181,8 @@ public:
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
-  CAPIStatus setStringFilterState(std::string key, std::string value, int state_type, int life_span,
-                                  int stream_sharing);
+  CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing);
 
 private:
   bool hasDestroyed() {
@@ -263,7 +263,7 @@ public:
 
 class GoStringFilterState : public StreamInfo::FilterState::Object {
 public:
-  GoStringFilterState(const std::string& value) : value_(value) {}
+  GoStringFilterState(absl::string_view value) : value_(value) {}
   const std::string& value() const { return value_; }
 
 private:
