@@ -145,6 +145,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
           break; // do not increment index; re-consider interval for next bucket.
         }
         bucket.annotations.push([interval.lower_bound, INTERVAL, interval.width, interval.count]);
+        console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
+                    interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
       }
 
       if (bucket.annotations.length > 0) {
@@ -298,21 +300,21 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       highlightedBucket = bucketSpan;
 
       detailPopup.replaceChildren();
-      makeElement(detailPopup, 'div').textContent =
-          '[' + format(bucket.lower_bound) + ', ' +
-          format(bucket.lower_bound + bucket.width) + ')';
+      const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
+            format(lower_bound + width) + ')';
+      makeElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
       if (!showingCount) {
         makeElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
       }
       if (bucket.annotations) {
         for (annotation of bucket.annotations) {
+          const span = makeElement(detailPopup, 'div');
           if (annotation[1] == PERCENTILE) {
-            const span = makeElement(detailPopup, 'div');
-            if (annotation[1] == PERCENTILE) {
-              span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
-            } else {
-              span.textContent = 'I' + annotation[3] + '[' + annotation[2] + ']: ' + format(annotation[0]);
-            }
+            span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
+          } else {
+            console.log('popping up interval annotation ' + annotation);
+            span.textContent = 'Interval ' + formatRange(annotation[0], annotation[2]) +
+                ': ' + annotation[3];
           }
         }
       }
