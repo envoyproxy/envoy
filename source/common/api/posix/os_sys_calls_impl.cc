@@ -138,8 +138,8 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
-#if !defined(__linux__) || !defined(IPV6_TRANSPARENT)
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ipVersion) const {
+#if !defined(__linux__)
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -149,32 +149,46 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
   //
   // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
+  // But there are also has ipv4 only or ipv6 only scenarios.
   //
   // And these socket options need CAP_NET_ADMIN capability to be applied.
   // The CAP_NET_ADMIN capability should be applied by root user before call this function.
-  static const bool is_supported = [] {
+
+  int fd = 0;
+  int val = 0;
+  bool result = false;
+  bool is_support = false;
+  switch (ipVersion) {
+  case Network::Address::IpVersion::v4:
     // Check ipv4 case
-    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
-    int val = 1;
-    bool result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
-    ::close(fd);
-    if (!result) {
-      return false;
-    }
+    static const bool ipv4_is_supported = [&] {
+      fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+      if (fd < 0) {
+        return false;
+      }
+      val = 1;
+      result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
+      ::close(fd);
+      return result;
+    }();
+    is_support = ipv4_is_supported;
+    break;
+  case Network::Address::IpVersion::v6:
     // Check ipv6 case
-    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
-    val = 1;
-    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
-    ::close(fd);
-    return result;
-  }();
-  return is_supported;
+    static const bool ipv6_is_supported = [&] {
+      fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+      if (fd < 0) {
+        return false;
+      }
+      val = 1;
+      result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+      ::close(fd);
+      return result;
+    }();
+    is_support = ipv6_is_supported;
+    break;
+  }
+  return is_support;
 #endif
 }
 
