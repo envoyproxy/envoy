@@ -1,4 +1,4 @@
-#include "test/common/integration/test_server.h"
+#include "test/common/integration/test_server_interface.h"
 
 #include "extension_registry.h"
 
