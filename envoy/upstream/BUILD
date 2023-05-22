@@ -45,9 +45,8 @@ envoy_cc_library(
     name = "health_check_event_sink_interface",
     hdrs = ["health_check_event_sink.h"],
     deps = [
-        "//envoy/server:health_checker_config_interface",
         "//envoy/config:typed_config_interface",
-        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
+        "//envoy/server:health_checker_config_interface",
     ],
 )
 

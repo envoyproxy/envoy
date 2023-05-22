@@ -24,4 +24,4 @@ envoy_cc_extension(
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_check_event_sinks/file/v3:pkg_cc_proto",
     ],
-)
+

@@ -12,10 +12,12 @@
 #include "envoy/server/health_checker_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/string.pb.h"
+#include "envoy/upstream/health_check_event_sink.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -25,20 +27,23 @@ class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
   HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, TimeSource& time_source,
                              const envoy::config::core::v3::HealthCheck& health_check_config,
-                             Server::Configuration::CommonFactoryContext& context)
-      : time_source_(time_source), context_(context) {
+                             Server::Configuration::HealthCheckerFactoryContext& context)
+      : time_source_(time_source) {
     if (!health_check_config.event_log_path().empty()) {
+      ENVOY_LOG_MISC(debug, "Boteng event_logger file_ {}", health_check_config.event_log_path());
       file_ = log_manager.createAccessLog(Filesystem::FilePathAndType{
           Filesystem::DestinationType::File, health_check_config.event_log_path()});
     }
 
     for (const auto& config : health_check_config.event_logger()) {
+      ENVOY_LOG_MISC(debug, "Boteng event_logger config");
       if (!config.has_typed_config())
         continue;
-      const auto& validator_config =
-          Envoy::MessageUtil::anyConvertAndValidate<envoy::config::accesslog::v3::AccessLog>(
-              config.typed_config(), context.messageValidationVisitor());
-      access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(validator_config, context));
+      ENVOY_LOG_MISC(debug, "Boteng event_logger config not triggered.");
+      auto& event_sink_factory =
+          Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
+      event_sinks_.emplace_back(
+          event_sink_factory.createHealthCheckEventSink(config.typed_config(), context));
     }
   }
 
@@ -56,16 +61,16 @@ public:
   void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) override;
 
-  std::vector<AccessLog::InstanceSharedPtr> accessLogs() const { return access_logs_; };
+  std::vector<HealthCheckEventSinkSharedPtr> accessLogs() const { return event_sinks_; };
 
 private:
   void createHealthCheckEvent(
       envoy::data::core::v3::HealthCheckerType health_checker_type, const HostDescription& host,
       std::function<void(envoy::data::core::v3::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
-  Server::Configuration::CommonFactoryContext& context_;
+  // Server::Configuration::HealthCheckerFactoryContext& context_;
   AccessLog::AccessLogFileSharedPtr file_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  std::vector<HealthCheckEventSinkSharedPtr> event_sinks_;
 };
 
 } // namespace Upstream

@@ -6,7 +6,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -56,7 +55,6 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
     envoy::data::core::v3::HealthCheckerType health_checker_type, const HostDescription& host,
     std::function<void(envoy::data::core::v3::HealthCheckEvent&)> callback) const {
   envoy::data::core::v3::HealthCheckEvent event;
-  StreamInfo::StreamInfoImpl stream_info(context_.mainThreadDispatcher().timeSource(), nullptr);
   event.set_cluster_name(host.cluster().name());
   event.set_health_checker_type(health_checker_type);
 
@@ -67,10 +65,8 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 
   callback(event);
-  stream_info.setHealthCheckEvent(std::make_shared<envoy::data::core::v3::HealthCheckEvent>(event));
-
-  for (const auto& access_log : access_logs_) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  for (const auto& event_sink : event_sinks_) {
+    event_sink->log(event);
   }
 
 #ifdef ENVOY_ENABLE_YAML

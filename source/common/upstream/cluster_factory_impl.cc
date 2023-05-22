@@ -108,7 +108,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
           cluster.health_checks()[0], *new_cluster_pair.first, server_context.runtime(),
           server_context.mainThreadDispatcher(), server_context.accessLogManager(),
-          context.messageValidationVisitor(), server_context.api(), server_context));
+          context.messageValidationVisitor(), server_context.api()));
     }
   }
 

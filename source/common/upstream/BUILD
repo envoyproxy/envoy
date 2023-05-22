@@ -212,11 +212,11 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:health_checker_config_interface",
+        "//envoy/upstream:health_check_event_sink_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",

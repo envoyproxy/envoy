@@ -47,13 +47,11 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
   return cluster->name();
 }
 
-HealthCheckerSharedPtr
-HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
-                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager,
-                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                             Server::Configuration::ServerFactoryContext& server_factory_context) {
+HealthCheckerSharedPtr HealthCheckerFactory::create(
+    const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+    Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+    AccessLog::AccessLogManager& log_manager,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
@@ -84,13 +82,13 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
   }
 
   std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api));
+      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api,
+                                          log_manager));
 
   if (!health_check_config.event_log_path().empty() ||
       !health_check_config.event_logger().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
-        log_manager, dispatcher.timeSource(), health_check_config,
-        static_cast<Server::Configuration::CommonFactoryContext&>(server_factory_context));
+        log_manager, dispatcher.timeSource(), health_check_config, *context);
   }
   context->setEventLogger(std::move(event_logger));
   return factory->createCustomHealthChecker(health_check_config, *context);

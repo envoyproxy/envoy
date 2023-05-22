@@ -190,13 +190,12 @@ TEST(HealthCheckerFactoryTest, CreateThriftViaUpstreamHealthCheckerFactory) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_NE(nullptr,
             dynamic_cast<CustomThriftHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
                     Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
-                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api, server_context)
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
                     .get()));
 }
 

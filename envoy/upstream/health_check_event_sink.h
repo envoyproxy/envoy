@@ -8,7 +8,7 @@ namespace Upstream {
  * Sink for health check event.
  */
 class HealthCheckEventSink {
- public:
+public:
   virtual ~HealthCheckEventSink() = default;
 
   virtual void log(envoy::data::core::v3::HealthCheckEvent event) PURE;
@@ -21,20 +21,18 @@ using HealthCheckEventSinkSharedPtr = std::shared_ptr<HealthCheckEventSink>;
  * A factory abstract class for creating instances of HealthCheckEventSink.
  */
 class HealthCheckEventSinkFactory : public Config::TypedFactory {
- public:
+public:
   ~HealthCheckEventSinkFactory() override = default;
 
   /**
    * Creates an HealthCheckEventSink using the given config.
    */
-  virtual HealthCheckEventSinkPtr createHealthCheckEventSink(
-      const ProtobufWkt::Any& config,
-      Server::Configuration::HealthCheckerFactoryContext& context) PURE;
+  virtual HealthCheckEventSinkPtr
+  createHealthCheckEventSink(const ProtobufWkt::Any& config,
+                             Server::Configuration::HealthCheckerFactoryContext& context) PURE;
 
-  std::string category() const override {
-    return "envoy.health_check_event_sink";
-  }
+  std::string category() const override { return "envoy.health_check_event_sink"; }
 };
 
-}  // namespace Upstream
-}  // namespace Envoy
+} // namespace Upstream
+} // namespace Envoy
