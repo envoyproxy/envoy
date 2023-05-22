@@ -765,7 +765,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
-      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
+      if (!mut_status.ok()) {
+        ENVOY_LOG(error, "Immediate response mutations failed");
+      }
     }
   };
 
