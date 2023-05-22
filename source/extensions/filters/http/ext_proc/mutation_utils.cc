@@ -40,6 +40,11 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  const Checker& checker,
                                                  Counter& rejected_mutations) {
   for (const auto& hdr : mutation.remove_headers()) {
+    if (!Envoy::Http::validHeaderString(hdr)) {
+      ENVOY_LOG(debug, "remove_headers mutation contain null character, may not be removed.");
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError("Invalid null character in remove_headers mutation.");
+    }
     const LowerCaseString remove_header(hdr);
     switch (checker.check(CheckOperation::REMOVE, remove_header, "")) {
     case CheckResult::OK:
@@ -61,6 +66,11 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   for (const auto& sh : mutation.set_headers()) {
     if (!sh.has_header()) {
       continue;
+    }
+    if (!Envoy::Http::validHeaderString(sh.header().key())) {
+      ENVOY_LOG(debug, "set_headers mutation contain null character, may not be appended.");
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError("Invalid null character in set_headers mutation.");
     }
     const LowerCaseString header_name(sh.header().key());
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
@@ -87,6 +97,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       break;
     case CheckResult::FAIL:
       ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
+      rejected_mutations.inc();
       return absl::InvalidArgumentError(
           absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
     }

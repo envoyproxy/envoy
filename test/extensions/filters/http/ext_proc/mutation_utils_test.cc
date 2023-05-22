@@ -188,6 +188,35 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
 
+TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-append-this\n");
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(1);
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
+TEST(MutationUtils, TestRemoveHeaderWithNullCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("host\r");
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(1);
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
 // Ensure that we actually replace the body
 TEST(MutationUtils, TestBodyMutationReplace) {
   Buffer::OwnedImpl buf;
