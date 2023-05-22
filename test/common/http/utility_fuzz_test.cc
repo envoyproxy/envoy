@@ -71,7 +71,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
     std::chrono::seconds max_age(cookie_value.max_age());
-    std::vector<CookieAttribute> cookie_attributes;
+    std::vector<Http::CookieAttribute> cookie_attributes;
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
                                       max_age, cookie_value.httponly(), cookie_attributes);
     break;
