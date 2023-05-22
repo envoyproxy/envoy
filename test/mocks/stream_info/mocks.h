@@ -138,7 +138,6 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
-
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
