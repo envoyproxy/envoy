@@ -110,28 +110,22 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntime) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
             0);
-
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   auto codec_client2 = makeHttpConnection(lookupPort("admin"));
   default_request_headers_.setPath("/runtime");
   response = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_CONTAINS(
-  std::cerr << "HERE" << response->body();
   codec_client2->close();
 
-  const std::string expected_json = R"EOF({
+  const std::string expected_json1 = R"EOF(
   "circuit_breakers.cluster_0.default.max_retries": {
-   "final_value": "1024",
-   "layer_values": [
-    "1024",
-    ""
-   ]
-  }
- },
 )EOF";
+  EXPECT_TRUE(absl::StrContains(response->body(), expected_json1));
 
-  EXPECT_THAT(response, Contains(expected_json));
+  const std::string expected_json2 = R"EOF("final_value": "1024")EOF";
+  EXPECT_TRUE(absl::StrContains(response->body(), expected_json2));
+#endif
 }
 
 } // namespace
