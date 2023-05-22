@@ -157,7 +157,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_, invocation_mode_);
+    headers.setHost(std::format("https://lambda.{}.amazonaws.com", arn_->region()))
+        setLambdaHeaders(headers, arn_, invocation_mode_);
     sigv4_signer_->signEmptyPayload(headers, arn_->region());
     return Http::FilterHeadersStatus::Continue;
   }
@@ -225,8 +226,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setContentLength(decoding_buffer.length());
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
-
-  setLambdaHeaders(*request_headers_, arn_, invocation_mode_);
+  request_headers_->setHost(std::format("https://lambda.{}.amazonaws.com", arn_->region()))
+      setLambdaHeaders(*request_headers_, arn_, invocation_mode_);
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
   sigv4_signer_->sign(*request_headers_, hash, arn_->region());
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
