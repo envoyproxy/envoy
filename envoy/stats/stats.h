@@ -93,6 +93,11 @@ public:
   virtual bool used() const PURE;
 
   /**
+   * Indicates whether this metric has it's hidden flag on
+   */
+  virtual bool hidden() const PURE;
+
+  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.

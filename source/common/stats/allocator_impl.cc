@@ -85,6 +85,7 @@ public:
   // Metric
   SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
+  bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
