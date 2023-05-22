@@ -1,4 +1,4 @@
-#include "source/common/config/xds_mux/sotw_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_source_id.h"

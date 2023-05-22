@@ -34,7 +34,6 @@ RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
-RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -74,11 +73,11 @@ RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_preserve_url_encoded_case);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_translate_backslash_to_slash);
-RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
+RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
@@ -105,8 +104,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
 // Android.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
-// TODO(alyssawilk) remove in Q2.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 

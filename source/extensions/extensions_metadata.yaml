@@ -1570,3 +1570,13 @@ envoy.config_subscription.filesystem_collection:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
+envoy.config_mux.delta_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable
+envoy.config_mux.sotw_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable

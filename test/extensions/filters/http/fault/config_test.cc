@@ -28,6 +28,8 @@ TEST(FaultFilterConfigTest, ValidateFail) {
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   const std::string yaml_string = R"EOF(
+  filter_metadata:
+    hello: "world"
   delay:
     percentage:
       numerator: 100

@@ -8,6 +8,7 @@
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -16,12 +17,14 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 class Cluster : public Upstream::BaseDynamicClusterImpl,
+                public Extensions::Common::DynamicForwardProxy::DfpCluster,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+  ~Cluster() override;
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -41,8 +44,28 @@ public:
                                Network::DnsResolver::ResolutionStatus) override {}
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
+  bool enableSubCluster() const override { return enable_sub_cluster_; }
+  Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
+                                          Upstream::LoadBalancerContext* context) const;
+  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+  createSubClusterConfig(const std::string& cluster_name, const std::string& host,
+                         const int port) override;
+  bool touch(const std::string& cluster_name) override;
+  void checkIdleSubCluster();
 
 private:
+  struct ClusterInfo {
+    ClusterInfo(std::string cluster_name, Cluster& parent);
+    void touch();
+    bool checkIdle();
+
+    std::string cluster_name_;
+    Cluster& parent_;
+    std::atomic<std::chrono::steady_clock::duration> last_used_time_;
+  };
+
+  using ClusterInfoMap = absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>>;
+
   struct HostInfo {
     HostInfo(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& shared_host_info,
              const Upstream::LogicalHostSharedPtr& logical_host)
@@ -145,12 +168,25 @@ private:
   const envoy::config::endpoint::v3::LocalityLbEndpoints dummy_locality_lb_endpoint_;
   const envoy::config::endpoint::v3::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  const envoy::config::cluster::v3::Cluster orig_cluster_config_;
+
+  Event::TimerPtr idle_timer_;
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);
+
+  mutable absl::Mutex cluster_map_lock_;
+  ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
+
+  Upstream::ClusterManager& cm_;
+  const size_t max_sub_clusters_;
+  const std::chrono::milliseconds sub_cluster_ttl_;
+  const envoy::config::cluster::v3::Cluster_LbPolicy sub_cluster_lb_policy_;
+  const bool enable_sub_cluster_;
 
   friend class ClusterFactory;
   friend class ClusterTest;
