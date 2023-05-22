@@ -2,7 +2,7 @@
 
 #include <list>
 
-#include "source/common/config/update_ack.h"
+#include "source/extensions/config_subscription/grpc/update_ack.h"
 
 #include "absl/container/flat_hash_map.h"
 
