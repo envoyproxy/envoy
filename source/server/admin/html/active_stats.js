@@ -184,6 +184,7 @@ function onSubmit() {
 }
 
 function saveState() {
+/*
   const newValues = getParamValues();
   if (allValuesEqual(newValues, currentValues)) {
     return;
@@ -192,6 +193,7 @@ function saveState() {
   history.pushState(currentValues, null,
                     'html-active?filter=' + encodeURIComponent(currentValues.filter) +
                     '&type=' + encodeURIComponent(currentValues.type));
+*/
 }
 
 function setControls() {
@@ -240,9 +242,9 @@ async function loadStats() {
 
   // Compute the fetch URL prefix based on the current URL, so that the admin
   // site can be hosted underneath a site-specific URL structure.
-  const statsPos = href.indexOf('/stats/html-active');
+  const statsPos = href.indexOf('/stats');
   if (statsPos == -1) {
-    statusDiv.textContent = 'Cannot find /stats/html-active in ' + href;
+    statusDiv.textContent = 'Cannot find /stats in ' + href;
     return;
   }
   const prefix = href.substring(0, statsPos);

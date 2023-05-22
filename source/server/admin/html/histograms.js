@@ -76,7 +76,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   };
 
   for (i = 0; i < supported_percentiles.length; ++i) {
-    updateMinMaxValue(percentile_values[i].cumulative, percentile_values[i].cumulative);
+    const cumulative = percentile_values[i].cumulative;
+    updateMinMaxValue(cumulative, cumulative);
   }
   const graphics = document.createElement('div');
   const labels = document.createElement('div');
@@ -144,8 +145,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
       for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
         const interval = histogram.intervals[intervalIndex];
-        const interval_upper_bound = interval.lower_bound + interval.width;
-        if (interval_upper_bound > upper_bound) {
+        //const interval_upper_bound = interval.lower_bound + interval.width;
+        if (interval.lower_bound > upper_bound) {
           break; // do not increment index; re-consider interval for next bucket.
         }
         bucket.annotations.push([interval.lower_bound, INTERVAL, interval.width, interval.count]);
@@ -168,13 +169,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   for (bucket of histogram.intervals) {
     maxCount = Math.max(maxCount, bucket.count);
   }
-
-  const histogramTotalWidth = maxXValue - minXValue;
-  const scaledXValue = xvalue => 9999*(xvalue / histogramTotalWidth) + 1; // between 1 and 10000;
-  const xvalueToPercent = xvalue => {
-    const log = log10(scaledXValue(xvalue)); // Between 0 and 4
-    return 25*log;
-  };
 
   // Lay out the buckets evenly, independent of the bucket values. It's up
   // to the `circlhist` library to space out the buckets in a shape tuned to
