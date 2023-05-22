@@ -732,7 +732,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
     : ConfigHelper(version, basicBootstrap(bootstrap_, config)) {}
 
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
-                           envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+                           const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   RELEASE_ASSERT(!finalized_, "");
   bootstrap_ = bootstrap;
 

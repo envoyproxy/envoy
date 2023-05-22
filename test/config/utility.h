@@ -141,7 +141,7 @@ public:
 
   // Sets up config with the provided bootstrap.
   ConfigHelper(const Network::Address::IpVersion version,
-               envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
