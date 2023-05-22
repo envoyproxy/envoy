@@ -198,7 +198,7 @@ TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
   s->mutable_header()->set_key("x-append-this\n");
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
-  EXPECT_CALL(rejections, inc()).Times(1);
+  EXPECT_CALL(rejections, inc());
   EXPECT_FALSE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
@@ -212,7 +212,7 @@ TEST(MutationUtils, TestRemoveHeaderWithNullCharacter) {
   mutation.add_remove_headers("host\r");
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
-  EXPECT_CALL(rejections, inc()).Times(1);
+  EXPECT_CALL(rejections, inc());
   EXPECT_FALSE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
