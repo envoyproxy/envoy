@@ -7,12 +7,18 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/env.yml
+    secrets: inherit
+
   cctests:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_cc_tests == 'true' }}
+    needs: env
     name: cc_tests
     runs-on: ubuntu-20.04
     timeout-minutes: 120
