@@ -82,6 +82,13 @@ function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bu
   };
 }
 
+function timeoutFn(detailPopup) {
+  return (event) => {
+    pendingLeave = leaveHandlerFn(detailPopup);
+    pendingTimeout = window.setTimeout(pendingLeave, 2000);
+  };
+}
+
 function leaveHandlerFn(detailPopup) {
   return () => {
     pendingTimeout = null;
@@ -342,10 +349,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         detailPopup, toPercentPosition(bucketPosVpx), bucketOnLeftSide, bucket, bucketSpan,
         showingCount));
 
-    bucketSpan.addEventListener('mouseout', (event) => {
-      pendingLeave = leaveHandlerFn(detailPopup);
-      pendingTimeout = window.setTimeout(pendingLeave, 2000);
-    });
+    bucketSpan.addEventListener('mouseout', timeoutFn(detailPopup));
 
     prevVpx = leftVpx;
     leftVpx = nextVpx;
