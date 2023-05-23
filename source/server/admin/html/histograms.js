@@ -1,3 +1,14 @@
+const marginWidthVpx = 20;
+const outerMarginFraction = 0.01;
+const percentileWidthAndMarginVpx = 20;
+
+// If there are too many buckets, per-bucket label text gets too dense and the
+// text becomes illegible, so skip some if needed. We always put the range in
+// the popup, and when skipped, we'll put the count in the popup as well, in
+// addition to any percentiles or interval ranges.
+const maxBucketsWithText = 30;
+
+
 function renderHistograms(histogramDiv, data) {
   histogramDiv.replaceChildren();
   for (stat of data.stats) {
@@ -135,47 +146,11 @@ function computeMinMax(histogram) {
 
 }
 
-function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
-  const div = makeElement(histogramDiv, 'div');
-  const label = makeElement(div, 'span', 'histogram-name');
-  label.textContent = histogram.name + (changeCount == null ? "" : " (" + changeCount + ")");
-
-  const numBuckets = histogram.totals.length;
-  if (numBuckets == 0) {
-    makeElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
-    return;
-  }
-
-  const [minValue, maxValue] = computeMinMax(histogram);
-  let i = 0;
-  const graphics = makeElement(div, 'div', 'histogram-graphics');
-  const labels = makeElement(div, 'div', 'histogram-labels');
-
-  // We have business logic to ensure only be one popup div is visible at a
-  // time.  However, we need a separate popup div for each histogram
-  // so that they can be positioned relative to the histogram's graphics.
-  const detailPopup = makeElement(graphics, 'div', 'histogram-popup');
-
-  detailPopup.addEventListener('mouseover', enterPopup);
-  detailPopup.addEventListener('mouseout', leavePopup);
-
-  // First we can over the detailed bucket value and count info, and determine
-  // some limits so we can scale the histogram data to (for now) consume
-  // the desired width and height, which we'll express as percentages, so
-  // the graphics stretch when the user stretches the window.
+function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles) {
   let maxCount = 0;
+  let prevBucket = null;
   let percentileIndex = 0;
   let intervalIndex = 0;
-  let prevBucket = null;
-  let annotationsDiv;
-
-  // If there are too many buckets, per-bucket label text gets too dense and the
-  // text becomes illegible, so skip some if needed. We always put the range in
-  // the popup, and when skipped, we'll put the count in the popup as well, in
-  // addition to any percentiles or interval ranges.
-  const maxBucketsWithText = 30;
-  const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
-  let textIntervalIndex = 0;
   const percentile_values = histogram.percentiles;
 
   for (bucket of histogram.totals) {
@@ -212,13 +187,45 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
       if (bucket.annotations.length > 0) {
         bucket.annotations.sort((a, b) => a[0] < b[0]);
-        if (!annotationsDiv) {
-          annotationsDiv = makeElement(div, 'div', 'histogram-percentiles');
-        }
       }
     }
     prevBucket = bucket;
   }
+  return maxCount;
+}
+
+function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
+  const div = makeElement(histogramDiv, 'div');
+  const label = makeElement(div, 'span', 'histogram-name');
+  label.textContent = histogram.name + (changeCount == null ? "" : " (" + changeCount + ")");
+
+  const numBuckets = histogram.totals.length;
+  if (numBuckets == 0) {
+    makeElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
+    return;
+  }
+
+  const [minValue, maxValue] = computeMinMax(histogram);
+  const graphics = makeElement(div, 'div', 'histogram-graphics');
+  const labels = makeElement(div, 'div', 'histogram-labels');
+
+  // We have business logic to ensure only be one popup div is visible at a
+  // time.  However, we need a separate popup div for each histogram
+  // so that they can be positioned relative to the histogram's graphics.
+  const detailPopup = makeElement(graphics, 'div', 'histogram-popup');
+  detailPopup.addEventListener('mouseover', enterPopup);
+  detailPopup.addEventListener('mouseout', leavePopup);
+
+  // First we can over the detailed bucket value and count info, and determine
+  // some limits so we can scale the histogram data to (for now) consume
+  // the desired width and height, which we'll express as percentages, so
+  // the graphics stretch when the user stretches the window.
+  let prevBucket = null;
+
+  const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
+  let textIntervalIndex = 0;
+  let maxCount = assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles);
+  let annotationsDiv = makeElement(div, 'div', 'histogram-percentiles');
 
   // It's unlikely that an interval bucket value will increase the overall maxCount
   // but just to be sure we'll scan through them.
@@ -239,9 +246,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // computation in JS and converting them to percentages for writing element
   // style.
   const bucketWidthVpx = 40 - 38/numBuckets;
-  const marginWidthVpx = 20;
-  const outerMarginFraction = 0.01;
-  const percentileWidthAndMarginVpx = 20;
   const widthVpx = (numBuckets * bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
         * (1 + 2*outerMarginFraction);
 
@@ -251,7 +255,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const toPercentWidth = vpx => formatPercent(vpxToFractionWidth(vpx));
   let leftVpx = marginWidthVpx;
   let prevVpx = leftVpx;
-  for (i = 0; i < numBuckets; ++i) {
+  for (let i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
 
     if (annotationsDiv && bucket.annotations &&
@@ -337,8 +341,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     }
 
     const bucketOnLeftSide = i <= numBuckets / 2;
-    const bucketPosVpx = bucketOnLeftSide ? leftVpx :
-          (widthVpx - (leftVpx + 2*bucketWidthVpx));
+    const bucketPosVpx = bucketOnLeftSide ? leftVpx : (widthVpx - (leftVpx + 2*bucketWidthVpx));
 
     bucketSpan.addEventListener('mouseover', showPopupFn(
         detailPopup, toPercentPosition(bucketPosVpx), bucketOnLeftSide, bucket, bucketSpan,
