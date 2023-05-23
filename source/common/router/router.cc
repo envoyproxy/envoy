@@ -547,14 +547,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // `host_` returns a string_view so doing this should be safe.
     absl::string_view sni_value = parsed_authority.host_;
 
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni()) {
+    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamServerName::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(sni_value),
           StreamInfo::FilterState::StateType::Mutable);
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation()) {
+    if (upstream_http_protocol_options.value().auto_san_validation() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamSubjectAltNames::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamSubjectAltNames::key(),
           std::make_unique<Network::UpstreamSubjectAltNames>(
