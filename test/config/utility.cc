@@ -32,7 +32,7 @@
 namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
-basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, std::string& config) {
+basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const std::string& config) {
   TestUtility::loadFromYaml(config, bootstrap);
   return bootstrap;
 }
@@ -728,7 +728,8 @@ envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::str
   return endpoint;
 }
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api&, std::string config)
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
+                           const std::string& config)
     : ConfigHelper(version, basicBootstrap(bootstrap_, config)) {}
 
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,

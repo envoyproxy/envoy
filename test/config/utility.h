@@ -149,7 +149,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
-               std::string config = httpProxyConfig(false, false));
+               const std::string& config = httpProxyConfig(false, false));
 
   static void
   initializeTls(const ServerSslOptions& options,

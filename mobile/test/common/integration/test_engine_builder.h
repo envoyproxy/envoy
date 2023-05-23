@@ -26,13 +26,13 @@ public:
 
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const override {
     if (override_bootstrap_ != nullptr) {
-      return std::move(override_bootstrap_);
+      return std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(*override_bootstrap_);
     }
     return Platform::EngineBuilder::generateBootstrap();
   }
 
 private:
-  mutable std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> override_bootstrap_;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> override_bootstrap_;
 };
 
 } // namespace Envoy

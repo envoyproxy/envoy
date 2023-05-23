@@ -70,7 +70,7 @@ public:
 
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      envoy::config::bootstrap::v3::Bootstrap bootstrap);
+                      const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
