@@ -71,19 +71,12 @@ public:
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, context);
-
-
-    // TODO(tyxia) I can only test the filter which has implemented server_context version
-    // ext_proc.
-    // return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-    //                                               proto_config, context.messageValidationVisitor()),
-    //                                           stats_prefix, context.getServerFactoryContext());
   }
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
-////////////
+
   Envoy::Http::FilterFactoryCb createFilterServerFactoryFromProto(
       const Protobuf::Message& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override {
