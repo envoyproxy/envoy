@@ -39,6 +39,51 @@ function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
 
 let pendingLeave;
 let pendingTimeout;
+let highlightedBucket;
+
+function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bucketSpan,
+                    showingCount) {
+  return () => {
+    if (pendingTimeout) {
+      window.clearTimeout(pendingTimeout);
+      pendingLeave();
+    }
+
+    if (bucketOnLeftSide) {
+      detailPopup.style.left = bucketPosPercent;
+      detailPopup.style.right = '';
+    } else {
+      detailPopup.style.left = '';
+      detailPopup.style.right = bucketPosPercent;
+    }
+    detailPopup.style.visibility = 'visible';
+    bucketSpan.style.backgroundColor = 'yellow';
+    highlightedBucket = bucketSpan;
+
+    detailPopup.replaceChildren();
+    const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
+          format(lower_bound + width) + ')';
+    makeElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
+    if (!showingCount) {
+      makeElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
+    }
+    if (bucket.annotations) {
+      for (annotation of bucket.annotations) {
+        const span = makeElement(detailPopup, 'div');
+        if (annotation[1] == PERCENTILE) {
+          span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
+        } else {
+          console.log('popping up interval annotation ' + annotation);
+          span.textContent = 'Interval ' + formatRange(annotation[0], annotation[2]) +
+              ': ' + annotation[3];
+        }
+      }
+    }
+  };
+}
+
+function onMouseLeave() {
+}
 
 function makeElement(parent, type, className) {
   const element = document.createElement(type);
@@ -55,7 +100,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   label.textContent = histogram.name + (changeCount == null ? "" : " (" + changeCount + ")");
 
   let timeout;
-  let highlightedBucket;
 
   const numBuckets = histogram.totals.length;
   if (numBuckets == 0) {
@@ -228,19 +272,24 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         }
         prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
 
-        const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-        percentilePLabel.style.bottom = 0;
-        if (annotation[1] == PERCENTILE) {
-          percentilePLabel.textContent = 'P' + annotation[2];
-        } else {
-          percentilePLabel.textContent = 'i:' + annotation[3] + '[' + annotation[2] + ']';
-        }
-        percentilePLabel.style.left = percentilePercent;
+        // Don't draw textual labels for the percentiles and intervals if there are
+        // more than one: they'll just get garbled. The user can over over the
+        // bucket to see the detail.
+        if (bucket.annotations.length == 1) {
+          const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
+          percentilePLabel.style.bottom = 0;
+          if (annotation[1] == PERCENTILE) {
+            percentilePLabel.textContent = 'P' + annotation[2];
+          } else {
+            percentilePLabel.textContent = 'i:' + annotation[3] + '[' + annotation[2] + ']';
+          }
+          percentilePLabel.style.left = percentilePercent;
 
-        const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-        percentileVLabel.style.bottom = '30%';
-        percentileVLabel.textContent = format(annotation[0]);
-        percentileVLabel.style.left = percentilePercent;
+          const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
+          percentileVLabel.style.bottom = '30%';
+          percentileVLabel.textContent = format(annotation[0]);
+          percentileVLabel.style.left = percentilePercent;
+        }
       }
     }
 
@@ -278,10 +327,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       pendingTimeout = null;
       pendingLeave = null;
       detailPopup.style.visibility = 'hidden';
-      highlightedBucket.style.backgroundColor = '#e6d7ff';
-      highlightedBucket = null;
+      if (highlightedBucket) {
+        highlightedBucket.style.backgroundColor = '#e6d7ff';
+        highlightedBucket = null;
+      }
     };
 
+/*
     bucketSpan.addEventListener('mouseover', (event) => {
       if (pendingTimeout) {
         window.clearTimeout(pendingTimeout);
@@ -319,6 +371,10 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         }
       }
     });
+*/
+    bucketSpan.addEventListener('mouseover', showPopupFn(
+        detailPopup, toPercentPosition(bucketPosVpx), bucketOnLeftSide, bucket, bucketSpan,
+        showingCount));
 
     bucketSpan.addEventListener('mouseout', (event) => {
       pendingTimeout = window.setTimeout(leaveHandler, 2000);
