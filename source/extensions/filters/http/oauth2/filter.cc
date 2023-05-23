@@ -532,13 +532,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    std::string cookie_attribute_httponly = cookie_tail_http_only;
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.oauth_make_token_cookie_httponly")) {
-      cookie_attribute_httponly = cookie_tail_http_only;
-    } else {
-      cookie_attribute_httponly = cookie_tail;
-    }
+    std::string cookie_attribute_httponly = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.oauth_make_token_cookie_httponly")? cookie_tail_http_only : cookie_tail;
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
