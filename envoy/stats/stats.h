@@ -93,7 +93,7 @@ public:
   virtual bool used() const PURE;
 
   /**
-   * Indicates whether this metric is hidden from admin/stats sink.
+   * Indicates whether this metric is hidden.
    */
   virtual bool hidden() const PURE;
 
