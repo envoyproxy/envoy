@@ -158,8 +158,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    headers.setHost(std::format("https://lambda.{}.amazonaws.com", arn_->region()))
-        setLambdaHeaders(headers, arn_, invocation_mode_);
+    setLambdaHeaders(headers, arn_, invocation_mode_);
     sigv4_signer_->signEmptyPayload(headers, arn_->region());
     return Http::FilterHeadersStatus::Continue;
   }
