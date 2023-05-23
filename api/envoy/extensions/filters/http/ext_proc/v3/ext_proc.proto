@@ -101,7 +101,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -196,6 +196,14 @@ message ExternalProcessor {
   // will be added to StreamInfo's filter state under the namespace corresponding to the
   // ext_proc filter name.
   google.protobuf.Struct filter_metadata = 13;
+
+  // [#not-implemented-hide:]
+  // If ``allow_mode_override`` is set to true, the filter config :ref:`processing_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // can be overridden by the response message from the external processing server
+  // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
+  // If not set, ``mode_override`` API in the response message will be ignored.
+  bool allow_mode_override = 14;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
