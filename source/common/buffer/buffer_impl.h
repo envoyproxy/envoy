@@ -669,6 +669,7 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
+  void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) override;
   Reservation reserveForRead() override;
   ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
