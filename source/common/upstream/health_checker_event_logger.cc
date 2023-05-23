@@ -78,7 +78,6 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
                                                    /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 
-  ENVOY_LOG_MISC(info, "Boteng {}", json);
 #endif
 }
 } // namespace Upstream
