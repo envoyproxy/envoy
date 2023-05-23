@@ -7,6 +7,16 @@ BASE_COMMIT="$(git merge-base origin/main HEAD)"
 CHANGED_FILES="$(git diff "${BASE_COMMIT}" --name-only)"
 CHANGE_MATCH='^mobile/|^bazel/repository_locations\.bzl|^\.bazelrc|^\.github/workflows/mobile-*|^\.github/workflows/env.yml'
 
+# The logic in this file is roughly:
+#
+#    pull_request + changed files = run all mobile CI
+#
+#    main = run some mobile CI
+#
+#    all other commits = run minimal mobile CI (these jobs have no conditions)
+#
+# Branches are not currently tested, altho that should be restricted by the workflow
+
 
 run_default_ci () {
     {
