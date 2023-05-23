@@ -1192,6 +1192,7 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenExclusionRegex) {
 
 TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenInclusionRegex) {
   envoy::config::metrics::v3::StatsConfig stats_config_;
+  // Create inclusion list to only accept names that have at least one capital letter.
   stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*[A-Z].*"));
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));

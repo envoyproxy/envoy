@@ -93,7 +93,7 @@ public:
   virtual bool used() const PURE;
 
   /**
-   * Indicates whether this metric has it's hidden flag on
+   * Indicates whether this metric has it's hidden flag on.
    */
   virtual bool hidden() const PURE;
 
@@ -137,9 +137,10 @@ class Gauge : public Metric {
 public:
   // TODO(diazalan): Rename ImportMode to more generic name
   enum class ImportMode {
-    Uninitialized,    // Gauge was discovered during hot-restart transfer.
-    NeverImport,      // On hot-restart, each process starts with gauge at 0.
-    Accumulate,       // Transfers gauge state on hot-restart.
+    Uninitialized, // Gauge was discovered during hot-restart transfer.
+    NeverImport,   // On hot-restart, each process starts with gauge at 0.
+    Accumulate,    // Transfers gauge state on hot-restart.
+    // TODO(Diazalan): Add functionality for Hidden to be ignored by admin/stats-sink
     HiddenAccumulate, // Will be transferred on hot-restart and ignored by admin/stats-sink
   };
 
