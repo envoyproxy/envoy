@@ -86,13 +86,7 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        filter_metadata_(config.filter_metadata()) {
-    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
-      header_matchers_.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
-    }
-  }
+        filter_metadata_(config.filter_metadata()), header_matchers_(initHeadMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -122,6 +116,16 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+  const std::vector<Matchers::StringMatcherPtr> initHeadMatchers(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+    std::vector<Matchers::StringMatcherPtr> header_matchers;
+    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+      header_matchers.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+    }
+    return header_matchers;
+  }
 
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
@@ -131,9 +135,9 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  // Empty header_matchers_ means allow all.
-  std::vector<Matchers::StringMatcherPtr> header_matchers_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // Empty header_matchers_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
