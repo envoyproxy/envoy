@@ -94,6 +94,22 @@ function leaveHandlerFn(detailPopup) {
   };
 }
 
+function enterPopup() {
+  // If the mouse enters the popup then cancel the timer that would
+  // erase it. This should make it easier to cut&paste the contents
+  // of the popup.
+  if (pendingTimeout) {
+    window.clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+    // The 'leave' handler needs to remain -- we'll call that 2 seconds
+    // after the mouse leaves the popup.
+  }
+}
+
+function leavePopup() {
+  pendingTimeout = window.setTimeout(pendingLeave, 2000);
+}
+
 function makeElement(parent, type, className) {
   const element = document.createElement(type);
   if (className) {
@@ -141,20 +157,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // so that they can be positioned relative to the histogram's graphics.
   const detailPopup = makeElement(graphics, 'div', 'histogram-popup');
 
-  detailPopup.addEventListener('mouseover', (event) => {
-    // If the mouse enters the popup then cancel the timer that would
-    // erase it. This should make it easier to cut&paste the contents
-    // of the popup.
-    if (pendingTimeout) {
-      window.clearTimeout(pendingTimeout);
-      pendingTimeout = null;
-      // The 'leave' handler needs to remain -- we'll call that 2 seconds
-      // after the mouse leaves the popup.
-    }
-  });
-  detailPopup.addEventListener('mouseout', (event) => {
-    pendingTimeout = window.setTimeout(pendingLeave, 2000);
-  });
+  detailPopup.addEventListener('mouseover', enterPopup);
+  detailPopup.addEventListener('mouseout', leavePopup);
 
   // First we can over the detailed bucket value and count info, and determine
   // some limits so we can scale the histogram data to (for now) consume
