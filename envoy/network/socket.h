@@ -42,7 +42,7 @@ private:
 #define ENVOY_MAKE_SOCKET_OPTION_NAME(level, option)                                               \
   Network::SocketOptionName(level, option, #level "/" #option)
 
-// Moved from source/common/network/socket_option_impl.h to avoid dependency loops. 
+// Moved from source/common/network/socket_option_impl.h to avoid dependency loops.
 #ifdef IP_TRANSPARENT
 #define ENVOY_SOCKET_IP_TRANSPARENT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_TRANSPARENT)
 #else
