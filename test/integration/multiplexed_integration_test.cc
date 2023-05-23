@@ -2166,7 +2166,13 @@ TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
 // Ordering of inheritance is important here, SocketInterfaceSwap must be
 // destroyed after HttpProtocolIntegrationTest.
 class SocketSwappableMultiplexedIntegrationTest : public SocketInterfaceSwap,
-                                                  public HttpProtocolIntegrationTest {};
+                                                  public HttpProtocolIntegrationTest {
+public:
+  SocketSwappableMultiplexedIntegrationTest()
+      : SocketInterfaceSwap(GetParam().downstream_protocol == Http::CodecType::HTTP3
+                                ? Network::Socket::Type::Datagram
+                                : Network::Socket::Type::Stream) {}
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SocketSwappableMultiplexedIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

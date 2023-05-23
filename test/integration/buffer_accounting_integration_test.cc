@@ -114,7 +114,8 @@ public:
   }
 
   Http2BufferWatermarksTest()
-      : HttpIntegrationTest(
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        HttpIntegrationTest(
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==

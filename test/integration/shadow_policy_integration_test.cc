@@ -13,7 +13,9 @@ namespace {
 class ShadowPolicyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  ShadowPolicyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+  ShadowPolicyIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()),
+        SocketInterfaceSwap(Network::Socket::Type::Stream) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
     autonomous_upstream_ = true;
     setUpstreamCount(2);

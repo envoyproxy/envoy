@@ -3981,7 +3981,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
   ASSERT(!Api::OsSysCallsSingleton::get().supportsUdpGso());
-  SocketInterfaceSwap socket_swap;
+  SocketInterfaceSwap socket_swap(downstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4015,7 +4017,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
 }
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
-  SocketInterfaceSwap socket_swap;
+  SocketInterfaceSwap socket_swap(upstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
