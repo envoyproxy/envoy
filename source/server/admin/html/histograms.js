@@ -126,6 +126,15 @@ function makeElement(parent, type, className) {
   return element;
 }
 
+function computeMinMax(histogram) {
+  const last = histogram.totals[histogram.totals.length - 1];
+  return [Math.min(histogram.percentiles[0].cumulative,
+                   histogram.totals[0].lower_bound),
+          Math.max(histogram.percentiles[0].cumulative,
+                   last.lower_bound + last.width)];
+
+}
+
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = makeElement(histogramDiv, 'div');
   const label = makeElement(div, 'span', 'histogram-name');
@@ -137,25 +146,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     return;
   }
 
+  const [minValue, maxValue] = computeMinMax(histogram);
   let i = 0;
-  const percentile_values = histogram.percentiles;
-  let minXValue = null;
-  let maxXValue = null;
-  const updateMinMaxValue = (min, max) => {
-    if (minXValue == null) {
-      minXValue = min;
-      maxXValue = max;
-    } else if (min < minXValue) {
-      minXValue = min;
-    } else if (max > maxXValue) {
-      maxXValue = max;
-    }
-  };
-
-  for (i = 0; i < supported_percentiles.length; ++i) {
-    const cumulative = percentile_values[i].cumulative;
-    updateMinMaxValue(cumulative, cumulative);
-  }
   const graphics = makeElement(div, 'div', 'histogram-graphics');
   const labels = makeElement(div, 'div', 'histogram-labels');
 
@@ -184,11 +176,12 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const maxBucketsWithText = 30;
   const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
   let textIntervalIndex = 0;
+  const percentile_values = histogram.percentiles;
 
   for (bucket of histogram.totals) {
     maxCount = Math.max(maxCount, bucket.count);
     const upper_bound = bucket.lower_bound + bucket.width;
-    updateMinMaxValue(bucket.lower_bound, upper_bound);
+    //updateMinMaxValue(bucket.lower_bound, upper_bound);
 
     // Attach percentile records with values between the previous bucket and
     // this one. We will drop percentiles before the first bucket. Thus each
