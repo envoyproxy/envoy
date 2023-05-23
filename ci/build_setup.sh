@@ -66,6 +66,8 @@ function setup_clang_toolchain() {
     fi
   fi
 
+  ENVOY_CLANG_SETUP=1
+  export ENVOY_CLANG_SETUP
   BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
   export BAZEL_BUILD_OPTION_LIST
   echo "clang toolchain with ${ENVOY_STDLIB} configured"

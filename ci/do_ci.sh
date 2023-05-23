@@ -642,6 +642,14 @@ case $CI_TARGET in
             --remote_download_minimal \
             "${BAZEL_RELEASE_OPTIONS[@]}" \
             "${TEST_TARGETS[@]}"
+        ;&
+
+    # NB: This must follow release)
+    release.server_only)
+        if [[ -z "$ENVOY_CLANG_SETUP" ]]; then
+            setup_clang_toolchain
+        fi
+        echo "bazel release build..."
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               //distribution/binary:release
@@ -658,12 +666,6 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
-        ;;
-
-    release.server_only)
-        setup_clang_toolchain
-        echo "bazel release build..."
-        bazel_envoy_binary_build release
         ;;
 
     sizeopt)
