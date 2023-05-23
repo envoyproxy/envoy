@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.health_check_event_sinks.file.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.health_check_event_sinks.file.v3";
 option java_outer_classname = "FileProto";
@@ -17,5 +18,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The health check event will be converted to JSON.
 message HealthCheckEventFileSink {
   // Specifies the path to the health check event log.
-  string event_log_path = 1;
+  string event_log_path = 1 [(validate.rules).string = {min_len: 1}];
 }

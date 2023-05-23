@@ -37,10 +37,8 @@ public:
     for (const auto& config : health_check_config.event_logger()) {
       if (!config.has_typed_config())
         continue;
-      auto& event_sink_factory =
-          Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
-      event_sinks_.emplace_back(
-          event_sink_factory.createHealthCheckEventSink(config.typed_config(), context));
+      auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
+      event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));
     }
   }
 
@@ -58,16 +56,13 @@ public:
   void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) override;
 
-  std::vector<HealthCheckEventSinkSharedPtr> eventSinks() const { return event_sinks_; };
-
 private:
   void createHealthCheckEvent(
       envoy::data::core::v3::HealthCheckerType health_checker_type, const HostDescription& host,
       std::function<void(envoy::data::core::v3::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
-  // Server::Configuration::HealthCheckerFactoryContext& context_;
   AccessLog::AccessLogFileSharedPtr file_;
-  std::vector<HealthCheckEventSinkSharedPtr> event_sinks_;
+  std::vector<HealthCheckEventSinkPtr> event_sinks_;
 };
 
 } // namespace Upstream

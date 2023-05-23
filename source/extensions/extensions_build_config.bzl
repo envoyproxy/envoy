@@ -71,7 +71,7 @@ EXTENSIONS = {
     #
 
     "envoy.health_check_event_sinks.file":              "//source/extensions/health_check_event_sinks/file:file_sink_lib",
-    
+
     #
     # Input Matchers
     #

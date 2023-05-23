@@ -6458,7 +6458,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
 
-TEST(HealthCheckEventLoggerImplTest, EventLoggers) {
+TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   envoy::config::core::v3::HealthCheck health_check_config;
   auto event_log = health_check_config.mutable_event_logger()->Add();
   envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink config;
@@ -6487,8 +6487,6 @@ TEST(HealthCheckEventLoggerImplTest, EventLoggers) {
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
-
-  EXPECT_EQ(event_logger.eventSinks().size(), 1);
 
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
   EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
