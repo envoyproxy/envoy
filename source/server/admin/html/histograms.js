@@ -108,8 +108,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const label = makeElement(div, 'span', 'histogram-name');
   label.textContent = histogram.name + (changeCount == null ? "" : " (" + changeCount + ")");
 
-  let timeout;
-
   const numBuckets = histogram.totals.length;
   if (numBuckets == 0) {
     makeElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
@@ -138,7 +136,11 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   const graphics = makeElement(div, 'div', 'histogram-graphics');
   const labels = makeElement(div, 'div', 'histogram-labels');
 
+  // We have business logic to ensure only be one popup div is visible at a
+  // time.  However, we need a separate popup div for each histogram
+  // so that they can be positioned relative to the histogram's graphics.
   const detailPopup = makeElement(graphics, 'div', 'histogram-popup');
+
   detailPopup.addEventListener('mouseover', (event) => {
     // If the mouse enters the popup then cancel the timer that would
     // erase it. This should make it easier to cut&paste the contents
