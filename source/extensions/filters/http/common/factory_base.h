@@ -129,13 +129,6 @@ public:
         stats_prefix, DualInfo(context), context.getServerFactoryContext());
   }
 
-  // Envoy::Http::FilterFactoryCb
-  // createFilterFactoryFromProto(const Protobuf::Message&,
-  //                              const std::string&,
-  //                              Server::Configuration::ServerFactoryContext&) override {
-  //   return nullptr;
-  // }
-
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix, DualInfo info,

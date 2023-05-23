@@ -108,7 +108,6 @@ public:
     HttpIntegrationTest::createUpstreams();
     // Create separate "upstreams" for ExtProc gRPC servers
     for (int i = 0; i < 2; ++i) {
-      std::cout << "tyxia_not_called \n";
       grpc_upstreams_.push_back(&addFakeUpstream(Http::CodecType::HTTP2));
     }
   }
@@ -159,7 +158,6 @@ public:
     config_helper_.loadHttpConnectionManager(hcm_config);
     auto* match_delegate_filter = hcm_config.add_http_filters();
     match_delegate_filter->set_name("envoy.filters.http.match_delegate");
-    std::cout << "tyxia_4 \n";
 
     // Build extesnion config.
     envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;

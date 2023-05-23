@@ -42,6 +42,9 @@ public:
 
     auto callback = factory.createFilterServerFactoryFromProto(*message, context.stat_prefix_,
                                                                context.server_factory_context_);
+
+    // Fallback to use factory context.
+    // TODO(tyxia) we can use config option to select which method to be invoked first.
     if (callback == nullptr) {
       callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
                                                       context.factory_context_);
