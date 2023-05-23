@@ -11,9 +11,11 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/hea
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Health Check Log File Sink]
-// [#extension: envoy.health_check_event_sinks.file"]
+// [#extension: envoy.health_check_event_sinks.file]
 
-// Health check event file sink
+// Health check event file sink.
+// The health check event will be converted to JSON.
 message HealthCheckEventFileSink {
+  // Specifies the path to the health check event log.
   string event_log_path = 1;
 }

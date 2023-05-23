@@ -800,7 +800,7 @@ envoy.health_check_event_sinks.file:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
-  - envoy.extensions.health_check_event_sink.file.v3.HealthCheckEventFileSink
+  - envoy.extensions.health_check_event_sinks.file.v3.HealthCheckEventFileSink
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection

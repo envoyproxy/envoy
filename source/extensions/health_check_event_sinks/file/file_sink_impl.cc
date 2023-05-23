@@ -13,7 +13,6 @@ void HealthCheckEventFileSink::log(envoy::data::core::v3::HealthCheckEvent event
   const auto json =
       MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
                                                    /* always_print_primitive_fields */ true);
-  ENVOY_LOG_MISC(debug, "Boteng {}", json);
   file_->write(fmt::format("{}\n", json));
 #endif
 };

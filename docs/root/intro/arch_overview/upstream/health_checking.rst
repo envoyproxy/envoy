@@ -85,12 +85,21 @@ Health check event logging
 --------------------------
 
 A per-healthchecker log of ejection and addition events can optionally be produced by Envoy by
-specifying a log file path in :ref:`the HealthCheck config <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>`.
+specifying a log file path in :ref:`the HealthCheck config event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>`.
 The log is structured as JSON dumps of
 :ref:`HealthCheckEvent messages <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>`.
 
+Note: :ref:`the HealthCheck config event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` is deperated in favor of 
+:ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
+The :ref:`event_log_path <envoy_v3_api_field_extensions.health_check_event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>` is used in the file sink extension for the JSON dumps.
+
+A new event sink extension catalog
+`envoy.health_check_event_sinks` is created, and APIs can be found :ref:`here <api_v3_health_check_event_sinks>`.
+
 Envoy can be configured to log all health check failure events by setting the :ref:`always_log_health_check_failures
 flag <envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_failures>` to true.
+
+
 
 Passive health checking
 -----------------------

@@ -8,7 +8,7 @@
 #include "envoy/config/core/v3/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -34,7 +34,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -6407,15 +6406,14 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api);
+  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
+                                          log_manager);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config,
-                                          server_context);
+  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6460,23 +6458,16 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
 
-TEST(HealthCheckEventLoggerImplTest, AccessLoggers) {
+TEST(HealthCheckEventLoggerImplTest, EventLoggers) {
   envoy::config::core::v3::HealthCheck health_check_config;
   auto event_log = health_check_config.mutable_event_logger()->Add();
-  envoy::config::accesslog::v3::AccessLog access_log;
-  access_log.set_name("envoy.access_loggers.file");
-  envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
-  file_access_log.set_path("unused");
-  file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-      "%HEALTH_CHECK_EVENT%");
-  access_log.mutable_typed_config()->PackFrom(file_access_log);
-  event_log->mutable_typed_config()->PackFrom(access_log);
+  envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink config;
+  config.set_event_log_path("foo");
+  event_log->mutable_typed_config()->PackFrom(config);
 
   NiceMock<AccessLog::MockAccessLogManager> log_manager;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  StringViewSaver access_log_data;
-  ON_CALL(server_context, accessLogManager()).WillByDefault(ReturnRef(log_manager));
-  ON_CALL(*log_manager.file_, write(_)).WillByDefault(SaveArg<0>(&access_log_data));
+  StringViewSaver file_log_data;
+  ON_CALL(*log_manager.file_, write(_)).WillByDefault(SaveArg<0>(&file_log_data));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
@@ -6488,32 +6479,54 @@ TEST(HealthCheckEventLoggerImplTest, AccessLoggers) {
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api);
+  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
+                                          log_manager);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config,
-                                          server_context);
+  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
 
-  EXPECT_EQ(event_logger.accessLogs().size(), 1);
+  EXPECT_EQ(event_logger.eventSinks().size(), 1);
 
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
-  EXPECT_TRUE(access_log_data.value().find("eject_unhealthy_event") != std::string::npos);
+  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                           "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
   event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
-  EXPECT_TRUE(access_log_data.value().find("add_healthy_event") != std::string::npos);
+  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                           "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
+                           "\"2009-02-13T23:31:31.234Z\"}\n");
 
   event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
                             false);
-  EXPECT_TRUE(access_log_data.value().find("health_check_failure_event") != std::string::npos);
+  EXPECT_EQ(file_log_data.value(),
+            "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+            "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+            "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+            "cluster\",\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
+            "\"first_check\":false},"
+            "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
   event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
-  EXPECT_TRUE(access_log_data.value().find("degraded_healthy_host") != std::string::npos);
+  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                           "cluster\",\"degraded_healthy_host\":{},"
+                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
-  EXPECT_TRUE(access_log_data.value().find("no_longer_degraded_host") != std::string::npos);
+  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                           "cluster\",\"no_longer_degraded_host\":{},"
+                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 }
 
 // Validate that the proto constraints don't allow zero length edge durations.

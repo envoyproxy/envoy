@@ -85,7 +85,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
       new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api,
                                           log_manager));
 
-  if (!health_check_config.event_log_path().empty() ||
+  if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
         log_manager, dispatcher.timeSource(), health_check_config, *context);

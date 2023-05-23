@@ -29,17 +29,14 @@ public:
                              const envoy::config::core::v3::HealthCheck& health_check_config,
                              Server::Configuration::HealthCheckerFactoryContext& context)
       : time_source_(time_source) {
-    if (!health_check_config.event_log_path().empty()) {
-      ENVOY_LOG_MISC(debug, "Boteng event_logger file_ {}", health_check_config.event_log_path());
+    if (!health_check_config.event_log_path().empty() /* deprecated */) {
       file_ = log_manager.createAccessLog(Filesystem::FilePathAndType{
           Filesystem::DestinationType::File, health_check_config.event_log_path()});
     }
 
     for (const auto& config : health_check_config.event_logger()) {
-      ENVOY_LOG_MISC(debug, "Boteng event_logger config");
       if (!config.has_typed_config())
         continue;
-      ENVOY_LOG_MISC(debug, "Boteng event_logger config not triggered.");
       auto& event_sink_factory =
           Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
       event_sinks_.emplace_back(
@@ -61,7 +58,7 @@ public:
   void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) override;
 
-  std::vector<HealthCheckEventSinkSharedPtr> accessLogs() const { return event_sinks_; };
+  std::vector<HealthCheckEventSinkSharedPtr> eventSinks() const { return event_sinks_; };
 
 private:
   void createHealthCheckEvent(
