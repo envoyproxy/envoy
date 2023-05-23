@@ -132,14 +132,14 @@ function makeElement(parent, type, className) {
   return element;
 }
 
-function computeMinMax(histogram) {
+/*function computeMinMax(histogram) {
   const last = histogram.totals[histogram.totals.length - 1];
   return [Math.min(histogram.percentiles[0].cumulative,
                    histogram.totals[0].lower_bound),
           Math.max(histogram.percentiles[0].cumulative,
                    last.lower_bound + last.width)];
 
-}
+}*/
 
 function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles) {
   let maxCount = 0;
@@ -177,6 +177,10 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
         bucket.annotations.push(new Interval(interval.lower_bound, interval.width, interval.count));
         //console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
         //interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
+
+        // It's unlikely that an interval bucket value will increase the overall maxCount
+        // but just to be sure we'll scan through them.
+        maxCount = Math.max(maxCount, interval.count);
       }
 
       if (bucket.annotations.length > 0) {
@@ -223,6 +227,134 @@ class Interval extends Annotation {
   }
 }
 
+// Captures context needed to lay out the histogram graphically.
+class Painter {
+  constructor(div, numBuckets, maxCount) {
+    this.numBuckets = numBuckets;
+    this.maxCount = maxCount;
+    this.leftVpx = marginWidthVpx;
+    this.prevVpx = this.leftVpx;
+    this.prevBucket = null;
+    this.bucketWidthVpx = 40 - 38/numBuckets;
+    this.widthVpx = (numBuckets * this.bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
+        * (1 + 2*outerMarginFraction);
+    this.textIntervalIndex = 0;
+    this.bucketWidthPercent = formatPercent(this.vpxToWidth(this.bucketWidthVpx));
+
+    this.graphics = makeElement(div, 'div', 'histogram-graphics');
+    this.labels = makeElement(div, 'div', 'histogram-labels');
+    this.annotationsDiv = makeElement(div, 'div', 'histogram-percentiles');
+
+    // We have business logic to ensure only be one popup div is visible at a
+    // time.  However, we need a separate popup div for each histogram
+    // so that they can be positioned relative to the histogram's graphics.
+    this.detailPopup = makeElement(this.graphics, 'div', 'histogram-popup');
+    this.detailPopup.addEventListener('mouseover', enterPopup);
+    this.detailPopup.addEventListener('mouseout', leavePopup);
+
+    this.textInterval = Math.ceil(numBuckets / maxBucketsWithText);
+  }
+
+  drawAnnotation(bucket, annotation) {
+    if (!this.prevBucket) {
+      alert('unexpected call of annotation from first bucket');
+    }
+
+    // Find the ideal place to draw the percentile bar, by linearly
+    // interpolating between the current bucket and the previous bucket.
+    // We know that the next bucket does not come into play because
+    // the percentiles held underneath a bucket are based on a value that
+    // is at most as large as the current bucket.
+    let percentileVpx = this.leftVpx;
+    const bucketDelta = bucket.lower_bound - this.prevBucket.lower_bound;
+    if (bucketDelta > 0) {
+      const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
+      percentileVpx = weight * this.prevVpx + (1 - weight) * this.leftVpx;
+    }
+
+    // We always put the marker proportionally between this bucket and
+    // the next one.
+    const span = makeElement(this.annotationsDiv, 'span', annotation.cssClass());
+    let percentilePercent = formatPercent(this.vpxToPosition(percentileVpx));
+    span.style.left = percentilePercent;
+
+    // Don't draw textual labels for the percentiles and intervals if there are
+    // more than one: they'll just get garbled. The user can over over the
+    // bucket to see the detail.
+    if (bucket.annotations.length == 1) {
+      const percentilePLabel = makeElement(this.annotationsDiv, 'span', 'percentile-label');
+      percentilePLabel.style.bottom = 0;
+      percentilePLabel.textContent = annotation.toString();
+      percentilePLabel.style.left = percentilePercent;
+
+      const percentileVLabel = makeElement(this.annotationsDiv, 'span', 'percentile-label');
+      percentileVLabel.style.bottom = '30%';
+      percentileVLabel.textContent = format(annotation.value);
+      percentileVLabel.style.left = percentilePercent;
+    }
+  }
+
+  drawBucket(bucket, index) {
+    this.leftPercent = formatPercent(this.vpxToPosition(this.leftVpx));
+
+    const bucketSpan = makeElement(this.graphics, 'span', 'histogram-bucket');
+    const heightPercent = this.maxCount == 0 ? 0 : formatPercent(bucket.count / this.maxCount);
+    bucketSpan.style.height = heightPercent;
+    const upper_bound = bucket.lower_bound + bucket.width;
+
+    bucketSpan.style.width = this.bucketWidthPercent;
+    bucketSpan.style.left = this.leftPercent;
+
+    let showingCount = false;
+    if (++this.textIntervalIndex == this.textInterval) {
+      showingCount = true;
+      this.textIntervalIndex = 0;
+      this.drawBucketLabel(bucket, heightPercent);
+    }
+
+    const bucketOnLeftSide = index <= this.numBuckets / 2;
+    const bucketPosVpx = bucketOnLeftSide ? this.leftVpx :
+          (this.widthVpx - (this.leftVpx + 2*this.bucketWidthVpx));
+
+    bucketSpan.addEventListener('mouseover', showPopupFn(
+        this.detailPopup, formatPercent(this.vpxToPosition(bucketPosVpx)), bucketOnLeftSide,
+        bucket, bucketSpan, showingCount));
+
+    bucketSpan.addEventListener('mouseout', timeoutFn(this.detailPopup));
+
+    this.prevVpx = this.leftVpx;
+    this.leftVpx += this.bucketWidthVpx + marginWidthVpx;
+
+    // First we can over the detailed bucket value and count info, and determine
+    // some limits so we can scale the histogram data to (for now) consume
+    // the desired width and height, which we'll express as percentages, so
+    // the graphics stretch when the user stretches the window.
+    this.prevBucket = bucket;
+  }
+
+  drawBucketLabel(bucket, heightPercent) {
+    const widthPercent = this.bucketWidthPercent
+    const lower_label = makeElement(this.labels, 'span');
+    lower_label.textContent = format(bucket.lower_bound);
+    lower_label.style.left = this.leftPercent;
+    lower_label.style.width = widthPercent;
+
+    const bucketLabel = makeElement(this.graphics, 'span', 'bucket-label');
+    bucketLabel.textContent = format(bucket.count);
+    bucketLabel.style.left = this.leftPercent;
+    bucketLabel.style.width = widthPercent;
+    bucketLabel.style.bottom = heightPercent;
+  }
+
+  vpxToPosition(vpx) {
+    return vpx / this.widthVpx + outerMarginFraction;
+  }
+
+  vpxToWidth(vpx) {
+    return vpx / this.widthVpx;
+  }
+}
+
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = makeElement(histogramDiv, 'div');
   const label = makeElement(div, 'span', 'histogram-name');
@@ -234,33 +366,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     return;
   }
 
-  const [minValue, maxValue] = computeMinMax(histogram);
-  const graphics = makeElement(div, 'div', 'histogram-graphics');
-  const labels = makeElement(div, 'div', 'histogram-labels');
+  //const [minValue, maxValue] = computeMinMax(histogram);
 
-  // We have business logic to ensure only be one popup div is visible at a
-  // time.  However, we need a separate popup div for each histogram
-  // so that they can be positioned relative to the histogram's graphics.
-  const detailPopup = makeElement(graphics, 'div', 'histogram-popup');
-  detailPopup.addEventListener('mouseover', enterPopup);
-  detailPopup.addEventListener('mouseout', leavePopup);
-
-  // First we can over the detailed bucket value and count info, and determine
-  // some limits so we can scale the histogram data to (for now) consume
-  // the desired width and height, which we'll express as percentages, so
-  // the graphics stretch when the user stretches the window.
-  let prevBucket = null;
-
-  const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
-  let textIntervalIndex = 0;
-  let maxCount = assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles);
-  let annotationsDiv = makeElement(div, 'div', 'histogram-percentiles');
-
-  // It's unlikely that an interval bucket value will increase the overall maxCount
-  // but just to be sure we'll scan through them.
-  for (bucket of histogram.intervals) {
-    maxCount = Math.max(maxCount, bucket.count);
-  }
+  const maxCount = assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles);
 
   // Lay out the buckets evenly, independent of the bucket values. It's up
   // to the `circlhist` library to space out the buckets in a shape tuned to
@@ -274,91 +382,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   // arbitrary "virtual pixels" (variables with `Vpx` suffix) during the
   // computation in JS and converting them to percentages for writing element
   // style.
-  const bucketWidthVpx = 40 - 38/numBuckets;
-  const widthVpx = (numBuckets * bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
-        * (1 + 2*outerMarginFraction);
+  const painter = new Painter(div, numBuckets, maxCount);
 
-  const vpxToFractionPosition = vpx => vpx / widthVpx + outerMarginFraction;
-  const toPercentPosition = vpx => formatPercent(vpxToFractionPosition(vpx));
-  const vpxToFractionWidth = vpx => vpx / widthVpx;
-  const toPercentWidth = vpx => formatPercent(vpxToFractionWidth(vpx));
-  let leftVpx = marginWidthVpx;
-  let prevVpx = leftVpx;
   for (let i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
-
     for (annotation of bucket.annotations) {
-      // Find the ideal place to draw the percentile bar, by linearly
-      // interpolating between the current bucket and the previous bucket.
-      // We know that the next bucket does not come into play because
-      // the percentiles held underneath a bucket are based on a value that
-      // is at most as large as the current bucket.
-      let percentileVpx = leftVpx;
-      const bucketDelta = bucket.lower_bound - prevBucket.lower_bound;
-      if (bucketDelta > 0) {
-        const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
-        percentileVpx = weight * prevVpx + (1 - weight) * leftVpx;
-      }
-
-      // We always put the marker proportionally between this bucket and
-      // the next one.
-      const span = makeElement(annotationsDiv, 'span', annotation.cssClass());
-      let percentilePercent = toPercentPosition(percentileVpx);
-      span.style.left = percentilePercent;
-
-      // Don't draw textual labels for the percentiles and intervals if there are
-      // more than one: they'll just get garbled. The user can over over the
-      // bucket to see the detail.
-      if (bucket.annotations.length == 1) {
-        const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-        percentilePLabel.style.bottom = 0;
-        percentilePLabel.textContent = annotation.toString();
-        percentilePLabel.style.left = percentilePercent;
-
-        const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-        percentileVLabel.style.bottom = '30%';
-        percentileVLabel.textContent = format(annotation.value);
-        percentileVLabel.style.left = percentilePercent;
-      }
+      painter.drawAnnotation(bucket, annotation);
     }
-
-    // Now draw the bucket.
-    const bucketSpan = makeElement(graphics, 'span', 'histogram-bucket');
-    const heightPercent = maxCount == 0 ? 0 : formatPercent(bucket.count / maxCount);
-    bucketSpan.style.height = heightPercent;
-    const upper_bound = bucket.lower_bound + bucket.width;
-    const nextVpx = bucketWidthVpx + marginWidthVpx + leftVpx;
-
-    bucketSpan.style.width = toPercentWidth(bucketWidthVpx);
-    bucketSpan.style.left = toPercentPosition(leftVpx);
-
-    let showingCount = false;
-    if (++textIntervalIndex == textInterval) {
-      showingCount = true;
-      textIntervalIndex = 0;
-      const lower_label = makeElement(labels, 'span');
-      lower_label.textContent = format(bucket.lower_bound);
-      lower_label.style.left = toPercentPosition(leftVpx);
-      lower_label.style.width = toPercentWidth(bucketWidthVpx);
-
-      const bucketLabel = makeElement(graphics, 'span', 'bucket-label');
-      bucketLabel.textContent = format(bucket.count);
-      bucketLabel.style.left = toPercentPosition(leftVpx);
-      bucketLabel.style.width = toPercentWidth(bucketWidthVpx);
-      bucketLabel.style.bottom = heightPercent;
-    }
-
-    const bucketOnLeftSide = i <= numBuckets / 2;
-    const bucketPosVpx = bucketOnLeftSide ? leftVpx : (widthVpx - (leftVpx + 2*bucketWidthVpx));
-
-    bucketSpan.addEventListener('mouseover', showPopupFn(
-        detailPopup, toPercentPosition(bucketPosVpx), bucketOnLeftSide, bucket, bucketSpan,
-        showingCount));
-
-    bucketSpan.addEventListener('mouseout', timeoutFn(detailPopup));
-
-    prevVpx = leftVpx;
-    leftVpx = nextVpx;
-    prevBucket = bucket;
+    painter.drawBucket(bucket, i);
   }
 }
