@@ -42,6 +42,9 @@ let formatPercent = Intl.NumberFormat('en', {
   maximumFractionDigits: 2
 }).format;
 
+const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
+      format(lower_bound + width) + ')';
+
 function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
   for (histogram of details) {
     renderHistogram(histogramDiv, supported_percentiles, histogram, null);
@@ -72,8 +75,6 @@ function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bu
     highlightedBucket = bucketSpan;
 
     detailPopup.replaceChildren();
-    const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
-          format(lower_bound + width) + ')';
     makeElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
     if (!showingCount) {
       makeElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
@@ -81,13 +82,7 @@ function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bu
     if (bucket.annotations) {
       for (annotation of bucket.annotations) {
         const span = makeElement(detailPopup, 'div');
-        if (annotation[1] == PERCENTILE) {
-          span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
-        } else {
-          console.log('popping up interval annotation ' + annotation);
-          span.textContent = 'Interval ' + formatRange(annotation[0], annotation[2]) +
-              ': ' + annotation[3];
-        }
+        span.textContent = annotation.detail();
       }
     }
   };
@@ -170,8 +165,8 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
         if (percentileValue >= upper_bound) {
           break; // do not increment index; re-consider percentile for next bucket.
         }
-        bucket.annotations.push(
-            [percentileValue, PERCENTILE, supported_percentiles[percentileIndex]]);
+        bucket.annotations.push(new Percentile(
+            percentileValue, supported_percentiles[percentileIndex]));
       }
 
       for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
@@ -180,18 +175,53 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
         if (interval.lower_bound >= upper_bound) {
           break; // do not increment index; re-consider interval for next bucket.
         }
-        bucket.annotations.push([interval.lower_bound, INTERVAL, interval.width, interval.count]);
-        console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
-                    interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
+        bucket.annotations.push(new Interval(interval.lower_bound, interval.width, interval.count));
+        //console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
+        //interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
       }
 
       if (bucket.annotations.length > 0) {
-        bucket.annotations.sort((a, b) => a[0] < b[0]);
+        bucket.annotations.sort((a, b) => a.value < b.value);
       }
     }
     prevBucket = bucket;
   }
   return maxCount;
+}
+
+class Annotation {
+  constructor(value) {
+    this.value = value;
+  }
+
+  cssClass() { throw new Error('pure virtual function cssClass'); }
+  toString() { throw new Error('pure virtual function toString'); }
+  detail() { throw new Error('pure virtual function detail'); }
+}
+
+class Percentile extends Annotation {
+  constructor(value, percentile) {
+    super(value);
+    this.percentile = percentile;
+  }
+
+  cssClass() { return 'histogram-percentile'; }
+  toString() { return 'P' + this.percentile; }
+  detail() { return 'P' + this.percentile + ': ' + format(this.value); }
+}
+
+class Interval extends Annotation {
+  constructor(value, width, count) {
+    super(value)
+    this.width = width;
+    this.count = count;
+  }
+
+  cssClass() { return 'histogram-interval'; }
+  toString() { return 'i:' + this.count; }
+  detail() {
+    return 'Interval ' + formatRange(this.value, this.width) + ': ' + this.count;
+  }
 }
 
 function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
@@ -274,15 +304,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         let percentileVpx = leftVpx;
         const bucketDelta = bucket.lower_bound - prevBucket.lower_bound;
         if (bucketDelta > 0) {
-          const weight = (bucket.lower_bound - annotation[0]) / bucketDelta;
+          const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
           percentileVpx = weight * prevVpx + (1 - weight) * leftVpx;
         }
 
         // We always put the marker proportionally between this bucket and
         // the next one.
-        const span = makeElement(annotationsDiv, 'span',
-                                 (annotation[1] == PERCENTILE) ? 'histogram-percentile' :
-                                 'histogram-interval');
+        const span = makeElement(annotationsDiv, 'span', annotation.cssClass());
         let percentilePercent = toPercentPosition(percentileVpx);
         span.style.left = percentilePercent;
 
@@ -299,16 +327,12 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         if (bucket.annotations.length == 1) {
           const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
           percentilePLabel.style.bottom = 0;
-          if (annotation[1] == PERCENTILE) {
-            percentilePLabel.textContent = 'P' + annotation[2];
-          } else {
-            percentilePLabel.textContent = 'i:' + annotation[3] + '[' + annotation[2] + ']';
-          }
+          percentilePLabel.textContent = annotation.toString();
           percentilePLabel.style.left = percentilePercent;
 
           const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
           percentileVLabel.style.bottom = '30%';
-          percentileVLabel.textContent = format(annotation[0]);
+          percentileVLabel.textContent = format(annotation.value);
           percentileVLabel.style.left = percentilePercent;
         }
       }
