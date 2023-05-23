@@ -177,8 +177,10 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   let prevBucket = null;
   let annotationsDiv;
 
-  // If there are too many buckets, per-bucket label text gets too dense, so skip
-  // some if needed.
+  // If there are too many buckets, per-bucket label text gets too dense and the
+  // text becomes illegible, so skip some if needed. We always put the range in
+  // the popup, and when skipped, we'll put the count in the popup as well, in
+  // addition to any percentiles or interval ranges.
   const maxBucketsWithText = 30;
   const textInterval = Math.ceil(numBuckets / maxBucketsWithText);
   let textIntervalIndex = 0;
