@@ -75,9 +75,10 @@ jobs:
       name: 'Log app run'
   swiftbaselineapp:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
-    needs: env
+    needs:
+    - env
+    - iosbuild
     name: swift_baseline_app
-    needs: iosbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
