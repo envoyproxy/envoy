@@ -287,11 +287,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   for (let i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
 
-    // Keep track of where we write each percentile so if the next one is very close,
-    // we can minimize overlapping the text. This is not perfect as the JS is not
-    // tracking how wide the text actually is.
-    let prevPercentileLabelVpx = 0;
-
     for (annotation of bucket.annotations) {
       // Find the ideal place to draw the percentile bar, by linearly
       // interpolating between the current bucket and the previous bucket.
@@ -310,13 +305,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
       const span = makeElement(annotationsDiv, 'span', annotation.cssClass());
       let percentilePercent = toPercentPosition(percentileVpx);
       span.style.left = percentilePercent;
-
-      // We try to put the text there too unless it's too close to the previous one.
-      if (percentileVpx < prevPercentileLabelVpx) {
-        percentileVpx = prevPercentileLabelVpx;
-        percentilePercent = toPercentPosition(percentileVpx);
-      }
-      prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
 
       // Don't draw textual labels for the percentiles and intervals if there are
       // more than one: they'll just get garbled. The user can over over the
