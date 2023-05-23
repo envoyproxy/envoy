@@ -151,7 +151,7 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
   for (bucket of histogram.totals) {
     maxCount = Math.max(maxCount, bucket.count);
     const upper_bound = bucket.lower_bound + bucket.width;
-    //updateMinMaxValue(bucket.lower_bound, upper_bound);
+    bucket.annotations = [];
 
     // Attach percentile records with values between the previous bucket and
     // this one. We will drop percentiles before the first bucket. Thus each
@@ -159,7 +159,6 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
     // with pairs of [percentile, value], which can then be used while
     // rendering the bucket.
     if (prevBucket != null) {
-      bucket.annotations = [];
       for (; percentileIndex < percentile_values.length; ++percentileIndex) {
         const percentileValue = percentile_values[percentileIndex].cumulative;
         if (percentileValue >= upper_bound) {
@@ -288,53 +287,50 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   for (let i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
 
-    if (annotationsDiv && bucket.annotations &&
-        bucket.annotations.length > 0) {
-      // Keep track of where we write each percentile so if the next one is very close,
-      // we can minimize overlapping the text. This is not perfect as the JS is not
-      // tracking how wide the text actually is.
-      let prevPercentileLabelVpx = 0;
+    // Keep track of where we write each percentile so if the next one is very close,
+    // we can minimize overlapping the text. This is not perfect as the JS is not
+    // tracking how wide the text actually is.
+    let prevPercentileLabelVpx = 0;
 
-      for (annotation of bucket.annotations) {
-        // Find the ideal place to draw the percentile bar, by linearly
-        // interpolating between the current bucket and the previous bucket.
-        // We know that the next bucket does not come into play because
-        // the percentiles held underneath a bucket are based on a value that
-        // is at most as large as the current bucket.
-        let percentileVpx = leftVpx;
-        const bucketDelta = bucket.lower_bound - prevBucket.lower_bound;
-        if (bucketDelta > 0) {
-          const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
-          percentileVpx = weight * prevVpx + (1 - weight) * leftVpx;
-        }
+    for (annotation of bucket.annotations) {
+      // Find the ideal place to draw the percentile bar, by linearly
+      // interpolating between the current bucket and the previous bucket.
+      // We know that the next bucket does not come into play because
+      // the percentiles held underneath a bucket are based on a value that
+      // is at most as large as the current bucket.
+      let percentileVpx = leftVpx;
+      const bucketDelta = bucket.lower_bound - prevBucket.lower_bound;
+      if (bucketDelta > 0) {
+        const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
+        percentileVpx = weight * prevVpx + (1 - weight) * leftVpx;
+      }
 
-        // We always put the marker proportionally between this bucket and
-        // the next one.
-        const span = makeElement(annotationsDiv, 'span', annotation.cssClass());
-        let percentilePercent = toPercentPosition(percentileVpx);
-        span.style.left = percentilePercent;
+      // We always put the marker proportionally between this bucket and
+      // the next one.
+      const span = makeElement(annotationsDiv, 'span', annotation.cssClass());
+      let percentilePercent = toPercentPosition(percentileVpx);
+      span.style.left = percentilePercent;
 
-        // We try to put the text there too unless it's too close to the previous one.
-        if (percentileVpx < prevPercentileLabelVpx) {
-          percentileVpx = prevPercentileLabelVpx;
-          percentilePercent = toPercentPosition(percentileVpx);
-        }
-        prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
+      // We try to put the text there too unless it's too close to the previous one.
+      if (percentileVpx < prevPercentileLabelVpx) {
+        percentileVpx = prevPercentileLabelVpx;
+        percentilePercent = toPercentPosition(percentileVpx);
+      }
+      prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
 
-        // Don't draw textual labels for the percentiles and intervals if there are
-        // more than one: they'll just get garbled. The user can over over the
-        // bucket to see the detail.
-        if (bucket.annotations.length == 1) {
-          const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-          percentilePLabel.style.bottom = 0;
-          percentilePLabel.textContent = annotation.toString();
-          percentilePLabel.style.left = percentilePercent;
+      // Don't draw textual labels for the percentiles and intervals if there are
+      // more than one: they'll just get garbled. The user can over over the
+      // bucket to see the detail.
+      if (bucket.annotations.length == 1) {
+        const percentilePLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
+        percentilePLabel.style.bottom = 0;
+        percentilePLabel.textContent = annotation.toString();
+        percentilePLabel.style.left = percentilePercent;
 
-          const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
-          percentileVLabel.style.bottom = '30%';
-          percentileVLabel.textContent = format(annotation.value);
-          percentileVLabel.style.left = percentilePercent;
-        }
+        const percentileVLabel = makeElement(annotationsDiv, 'span', 'percentile-label');
+        percentileVLabel.style.bottom = '30%';
+        percentileVLabel.textContent = format(annotation.value);
+        percentileVLabel.style.left = percentilePercent;
       }
     }
 
