@@ -45,6 +45,7 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
                       InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
+  headers.setHost("lambda");
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
@@ -157,8 +158,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    headers.setHost(std::format("https://lambda.{}.amazonaws.com", arn_->region()))
-        setLambdaHeaders(headers, arn_, invocation_mode_);
+    setLambdaHeaders(headers, arn_, invocation_mode_);
     sigv4_signer_->signEmptyPayload(headers, arn_->region());
     return Http::FilterHeadersStatus::Continue;
   }
@@ -226,8 +226,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setContentLength(decoding_buffer.length());
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
-  request_headers_->setHost(std::format("https://lambda.{}.amazonaws.com", arn_->region()))
-      setLambdaHeaders(*request_headers_, arn_, invocation_mode_);
+  setLambdaHeaders(*request_headers_, arn_, invocation_mode_);
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
   sigv4_signer_->sign(*request_headers_, hash, arn_->region());
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
