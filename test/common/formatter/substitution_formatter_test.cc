@@ -2249,7 +2249,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
 
-  // Add the NaN test for number value. This behavior will be changed in the future proto
+  // Add the NaN test for number value. This behavior will be changed in the future Protobuf
   // dependency upgrade, and the Json serialization will fail if the number value is NaN or
   // Infinity. We need to change the `getJsonStringFromMessage` description, re-evaluate the use
   // of ENVOY_BUG in the MetaDataFormatter::format method, and modify the following two tests.
