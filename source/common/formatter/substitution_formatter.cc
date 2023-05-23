@@ -1070,7 +1070,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_WIRE_BYTES_SENT",
@@ -1848,9 +1849,15 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
     : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
 absl::optional<std::string> GrpcStatusFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return absl::nullopt;
+    }
+  }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
@@ -1880,9 +1887,15 @@ absl::optional<std::string> GrpcStatusFormatter::format(
 }
 
 ProtobufWkt::Value GrpcStatusFormatter::formatValue(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return unspecifiedValue();
+    }
+  }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {

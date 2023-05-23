@@ -100,7 +100,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
-        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
@@ -453,6 +452,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         ":resource_manager_lib",
+        ":upstream_http_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",

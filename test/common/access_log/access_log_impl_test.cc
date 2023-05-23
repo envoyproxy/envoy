@@ -1216,6 +1216,7 @@ typed_config:
       inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER% %GRPC_STATUS()% %GRPC_STATUS(CAMEL_STRING)% %GRPC_STATUS(SNAKE_STRING)% %GRPC_STATUS(NUMBER)%\n"
   )EOF";
 
+  request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   {
     EXPECT_CALL(*file_, write(_));

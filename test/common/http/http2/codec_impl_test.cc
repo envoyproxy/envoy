@@ -968,6 +968,12 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // The check for required headers is done by UHV. When UHV is enabled this test
+  // is superseded by CodecClientTest.ResponseHeaderValidationFails and
+  // DownstreamProtocolIntegrationTest.DownstreamRequestWithFaultyFilter tests.
+  return;
+#endif
 
   const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
   driveToCompletion();

@@ -31,8 +31,9 @@ in the configuration snippet below:
 Statistics
 ----------
 
-Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*. The
-following counters are available:
+Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
+*_resp_fast* and *_resp_slow* metrics will only be emitted when ``enable_latency_threshold_metrics`` is set to ``true``.
+The following counters are available:
 
 .. csv-table::
   :header: Name, Type, Description
@@ -47,27 +48,30 @@ following counters are available:
   getdata_rq, Counter, Number of getdata requests
   create_rq, Counter, Number of create requests
   create2_rq, Counter, Number of create2 requests
+  createcontainer_rq, Counter, Number of createcontainer requests
+  createttl_rq, Counter, Number of createttl requests
   setdata_rq, Counter, Number of setdata requests
   getchildren_rq, Counter, Number of getchildren requests
   getchildren2_rq, Counter, Number of getchildren2 requests
-  remove_rq, Counter, Number of delete requests
+  delete_rq, Counter, Number of delete requests
   exists_rq, Counter, Number of stat requests
   getacl_rq, Counter, Number of getacl requests
   setacl_rq, Counter, Number of setacl requests
   sync_rq, Counter, Number of sync requests
+  check_rq, Counter, Number of check requests
   multi_rq, Counter, Number of multi transaction requests
   reconfig_rq, Counter, Number of reconfig requests
-  close_rq, Counter, Number of close requests
   setwatches_rq, Counter, Number of setwatches requests
   setwatches2_rq, Counter, Number of setwatches2 requests
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
-  check_rq, Counter, Number of check requests
+  getephemerals_rq, Counter, Number of getephemerals requests
+  getallchildrennumber_rq, Counter, Number of getallchildrennumber requests
+  close_rq, Counter, Number of close requests
   response_bytes, Counter, Number of bytes in decoded response messages
   connect_resp, Counter, Number of connect responses
   ping_resp, Counter, Number of ping responses
   auth_resp, Counter, Number of auth responses
-  watch_event, Counter, Number of watch events fired by the server
   getdata_resp, Counter, Number of getdata responses
   create_resp, Counter, Number of create responses
   create2_resp, Counter, Number of create2 responses
@@ -76,22 +80,77 @@ following counters are available:
   setdata_resp, Counter, Number of setdata responses
   getchildren_resp, Counter, Number of getchildren responses
   getchildren2_resp, Counter, Number of getchildren2 responses
-  getephemerals_resp, Counter, Number of getephemerals responses
-  getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
-  remove_resp, Counter, Number of remove responses
+  delete_resp, Counter, Number of delete responses
   exists_resp, Counter, Number of exists responses
   getacl_resp, Counter, Number of getacl responses
   setacl_resp, Counter, Number of setacl responses
   sync_resp, Counter, Number of sync responses
+  check_resp, Counter, Number of check responses
   multi_resp, Counter, Number of multi responses
   reconfig_resp, Counter, Number of reconfig responses
-  close_resp, Counter, Number of close responses
   setauth_resp, Counter, Number of setauth responses
   setwatches_resp, Counter, Number of setwatches responses
   setwatches2_resp, Counter, Number of setwatches2 responses
   checkwatches_resp, Counter, Number of checkwatches responses
   removewatches_resp, Counter, Number of removewatches responses
-  check_resp, Counter, Number of check responses
+  getephemerals_resp, Counter, Number of getephemerals responses
+  getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
+  close_resp, Counter, Number of close responses
+  watch_event, Counter, Number of watch events fired by the server
+  connect_resp_fast, Counter, Number of connect responses faster than the threshold
+  ping_resp_fast, Counter, Number of ping responses faster than the threshold
+  auth_resp_fast, Counter, Number of auth responses faster than the threshold
+  getdata_resp_fast, Counter, Number of getdata responses faster than the threshold
+  create_resp_fast, Counter, Number of create responses faster than the threshold
+  create2_resp_fast, Counter, Number of create2 responses faster than the threshold
+  createcontainer_resp_fast, Counter, Number of createcontainer responses faster than the threshold
+  createttl_resp_fast, Counter, Number of createttl responses faster than the threshold
+  setdata_resp_fast, Counter, Number of setdata responses faster than the threshold
+  getchildren_resp_fast, Counter, Number of getchildren responses faster than the threshold
+  getchildren2_resp_fast, Counter, Number of getchildren2 responses faster than the threshold
+  delete_resp_fast, Counter, Number of delete responses faster than the threshold
+  exists_resp_fast, Counter, Number of exists responses faster than the threshold
+  getacl_resp_fast, Counter, Number of getacl responses faster than the threshold
+  setacl_resp_fast, Counter, Number of setacl responses faster than the threshold
+  sync_resp_fast, Counter, Number of sync responses faster than the threshold
+  check_resp_fast, Counter, Number of check responses faster than the threshold
+  multi_resp_fast, Counter, Number of multi responses faster than the threshold
+  reconfig_resp_fast, Counter, Number of reconfig responses faster than the threshold
+  setauth_resp_fast, Counter, Number of setauth responses faster than the threshold
+  setwatches_resp_fast, Counter, Number of setwatches responses faster than the threshold
+  setwatches2_resp_fast, Counter, Number of setwatches2 responses faster than the threshold
+  checkwatches_resp_fast, Counter, Number of checkwatches responses faster than the threshold
+  removewatches_resp_fast, Counter, Number of removewatches responses faster than the threshold
+  getephemerals_resp_fast, Counter, Number of getephemerals responses faster than the threshold
+  getallchildrennumber_resp_fast, Counter, Number of getallchildrennumber responses faster than the threshold
+  close_resp_fast, Counter, Number of close responses faster than the threshold
+  connect_resp_slow, Counter, Number of connect responses slower than the threshold
+  ping_resp_slow, Counter, Number of ping responses slower than the threshold
+  auth_resp_slow, Counter, Number of auth responses slower than the threshold
+  getdata_resp_slow, Counter, Number of getdata responses slower than the threshold
+  create_resp_slow, Counter, Number of create responses slower than the threshold
+  create2_resp_slow, Counter, Number of create2 responses slower than the threshold
+  createcontainer_resp_slow, Counter, Number of createcontainer responses slower than the threshold
+  createttl_resp_slow, Counter, Number of createttl responses slower than the threshold
+  setdata_resp_slow, Counter, Number of setdata responses slower than the threshold
+  getchildren_resp_slow, Counter, Number of getchildren responses slower than the threshold
+  getchildren2_resp_slow, Counter, Number of getchildren2 responses slower than the threshold
+  delete_resp_slow, Counter, Number of delete responses slower than the threshold
+  exists_resp_slow, Counter, Number of exists responses slower than the threshold
+  getacl_resp_slow, Counter, Number of getacl responses slower than the threshold
+  setacl_resp_slow, Counter, Number of setacl responses slower than the threshold
+  sync_resp_slow, Counter, Number of sync responses slower than the threshold
+  check_resp_slow, Counter, Number of check responses slower than the threshold
+  multi_resp_slow, Counter, Number of multi responses slower than the threshold
+  reconfig_resp_slow, Counter, Number of reconfig responses slower than the threshold
+  setauth_resp_slow, Counter, Number of setauth responses slower than the threshold
+  setwatches_resp_slow, Counter, Number of setwatches responses slower than the threshold
+  setwatches2_resp_slow, Counter, Number of setwatches2 responses slower than the threshold
+  checkwatches_resp_slow, Counter, Number of checkwatches responses slower than the threshold
+  removewatches_resp_slow, Counter, Number of removewatches responses slower than the threshold
+  getephemerals_resp_slow, Counter, Number of getephemerals responses slower than the threshold
+  getallchildrennumber_resp_slow, Counter, Number of getallchildrennumber responses slower than the threshold
+  close_resp_slow, Counter, Number of close responses slower than the threshold
 
 
 .. _config_network_filters_zookeeper_proxy_latency_stats:
@@ -99,7 +158,7 @@ following counters are available:
 Per opcode latency statistics
 -----------------------------
 
-The filter will gather latency statistics in the *<stat_prefix>.zookeeper.<opcode>_response_latency* namespace.
+The filter will gather latency statistics in the *<stat_prefix>.zookeeper.<opcode>_resp_latency* namespace.
 Latency stats are in milliseconds:
 
 .. csv-table::
@@ -110,30 +169,30 @@ Latency stats are in milliseconds:
   ping_response_latency, Histogram, Opcode execution time in milliseconds
   auth_response_latency, Histogram, Opcode execution time in milliseconds
   watch_event, Histogram, Opcode execution time in milliseconds
-  getdata_response_latency, Histogram, Opcode execution time in milliseconds
-  create_response_latency, Histogram, Opcode execution time in milliseconds
-  create2_response_latency, Histogram, Opcode execution time in milliseconds
-  createcontainer_response_latency, Histogram, Opcode execution time in milliseconds
-  createttl_response_latency, Histogram, Opcode execution time in milliseconds
-  setdata_response_latency, Histogram, Opcode execution time in milliseconds
-  getchildren_response_latency, Histogram, Opcode execution time in milliseconds
-  getchildren2_response_latency, Histogram, Opcode execution time in milliseconds
-  getephemerals_response_latency, Histogram, Opcode execution time in milliseconds
-  getallchildrennumber_response_latency, Histogram, Opcode execution time in milliseconds
-  remove_response_latency, Histogram, Opcode execution time in milliseconds
-  exists_response_latency, Histogram, Opcode execution time in milliseconds
-  getacl_response_latency, Histogram, Opcode execution time in milliseconds
-  setacl_response_latency, Histogram, Opcode execution time in milliseconds
-  sync_response_latency, Histogram, Opcode execution time in milliseconds
-  multi_response_latency, Histogram, Opcode execution time in milliseconds
-  reconfig_response_latency, Histogram, Opcode execution time in milliseconds
-  close_response_latency, Histogram, Opcode execution time in milliseconds
-  setauth_response_latency, Histogram, Opcode execution time in milliseconds
-  setwatches_response_latency, Histogram, Opcode execution time in milliseconds
-  setwatches2_response_latency, Histogram, Opcode execution time in milliseconds
-  checkwatches_response_latency, Histogram, Opcode execution time in milliseconds
-  removewatches_response_latency, Histogram, Opcode execution time in milliseconds
-  check_response_latency, Histogram, Opcode execution time in milliseconds
+  getdata_resp_latency, Histogram, Opcode execution time in milliseconds
+  create_resp_latency, Histogram, Opcode execution time in milliseconds
+  create2_resp_latency, Histogram, Opcode execution time in milliseconds
+  createcontainer_resp_latency, Histogram, Opcode execution time in milliseconds
+  createttl_resp_latency, Histogram, Opcode execution time in milliseconds
+  setdata_resp_latency, Histogram, Opcode execution time in milliseconds
+  getchildren_resp_latency, Histogram, Opcode execution time in milliseconds
+  getchildren2_resp_latency, Histogram, Opcode execution time in milliseconds
+  getephemerals_resp_latency, Histogram, Opcode execution time in milliseconds
+  getallchildrennumber_resp_latency, Histogram, Opcode execution time in milliseconds
+  delete_resp_latency, Histogram, Opcode execution time in milliseconds
+  exists_resp_latency, Histogram, Opcode execution time in milliseconds
+  getacl_resp_latency, Histogram, Opcode execution time in milliseconds
+  setacl_resp_latency, Histogram, Opcode execution time in milliseconds
+  sync_resp_latency, Histogram, Opcode execution time in milliseconds
+  multi_resp_latency, Histogram, Opcode execution time in milliseconds
+  reconfig_resp_latency, Histogram, Opcode execution time in milliseconds
+  close_resp_latency, Histogram, Opcode execution time in milliseconds
+  setauth_resp_latency, Histogram, Opcode execution time in milliseconds
+  setwatches_resp_latency, Histogram, Opcode execution time in milliseconds
+  setwatches2_resp_latency, Histogram, Opcode execution time in milliseconds
+  checkwatches_resp_latency, Histogram, Opcode execution time in milliseconds
+  removewatches_resp_latency, Histogram, Opcode execution time in milliseconds
+  check_resp_latency, Histogram, Opcode execution time in milliseconds
 
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
