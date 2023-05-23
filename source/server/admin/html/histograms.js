@@ -1,14 +1,75 @@
-const marginWidthVpx = 20;
-const computeBucketWidthVpx = numBuckets => 40 - 38/numBuckets;
-const outerMarginFraction = 0.01;
-const baseHeightFraction = 0.03;
+// Functions to render a JSON histogram representation into an HTML/CSS.
+// There are several ways to do this:
+//   1. lay out in CSS with flex-boxes
+//   2. draw using SVG
+//   3. render as divs with pixel positions
+//   4. render as divs with percentage positions
+// This implements option #4. There are pros/cons to each of these. The benefits of #4:
+//   1. The user can get a clearer picture by making the window bigger, without having
+//      to re-layout the graphics.
+//   2. The divs can be made sensitive to mouse enter/leave to pop up
+//      more detail
+// There are also drawbacks:
+//   1. Need to write graphics layout code, and think about coordiante systems, resulting
+//      in several hundred lines of JavaScript.
+//   2. Some risk of having the text look garbled in some scenarios. This appears to
+//      be rare enough that it's likely not worth investing time to fix at the moment.
 
-// If there are too many buckets, per-bucket label text gets too dense and the
-// text becomes illegible, so skip some if needed. We always put the range in
-// the popup, and when skipped, we'll put the count in the popup as well, in
-// addition to any percentiles or interval ranges.
-const maxBucketsWithText = 30;
+const constants = {
+  // Horizontal spacing betwen buckets, expressed in vpx (Virtual Pixels) in a
+  // coordinate system invented to make arithmetic and debugging easier.
+  marginWidthVpx: 20,
 
+  // Horizontal spacing between the edge of the window and the histogram buckets,
+  // expressed as a fraction.
+  outerMarginFraction: 0.01,
+
+  // The minimum height of a bucket bar, expressed as a percentage of the
+  // configured height of a configured bar. By giving a histogram with count=1
+  // a minimum height we make it easier for the mouse to hover over it, in
+  // order to pop up more detail.
+  baseHeightFraction: 0.03,
+
+  // If there are too many buckets, per-bucket label text gets too dense and the
+  // text becomes illegible, so skip some if needed. We always put the range in
+  // the popup, and when skipped, we'll put the count in the popup as well, in
+  // addition to any percentiles or interval ranges.
+  maxBucketsWithText: 30
+};
+
+let globalState = {
+  // Holds a function to be called when the mouse leaves a popup. This is
+  // null when there is no visible popup.
+  pendingLeave: null,
+
+  // Holds the timer object for the currently-visible popup. This is
+  // maintained so we can cancel the timeout if the user moves to a new
+  // bucket, in which case we'll immediately hide the popup so we can
+  // display the new one.
+  pendingTimeout: null,
+
+  // Holds the histogram bucket object that is currently highlighted,
+  // which makes it possible to erase the highlight after the mouse moves
+  // out of it
+  highlightedBucket: null
+};
+
+// Formula to compute bucket width based on number of buckets. This formula
+// was derived from trial and error, to improve the appearance of the display.
+// Consider this table of values:
+//     numBuckets   bucketWidthVpx    Ratio vs marginWidthVpx
+//     1            2                 1:10
+//     2            21                1:2
+//     3            27                2:3
+//     10           36                1.8:1
+//     20           38                1.9:1
+// These ratios appear to look good across a wide range of numBuckets.
+function computeBucketWidthVpx(numBuckets) {
+  return 40 - 38/numBuckets;
+}
+
+// Top-level entry point to render all the detailed histograms found in a JSON
+// stats response.
 function renderHistograms(histogramDiv, data) {
   histogramDiv.replaceChildren();
   for (stat of data.stats) {
@@ -17,46 +78,46 @@ function renderHistograms(histogramDiv, data) {
       if (histograms.supported_percentiles && histograms.details) {
         renderHistogramDetail(histogramDiv, histograms.supported_percentiles, histograms.details);
       }
-      continue;
     }
   }
 }
 
-const log_10 = Math.log(10);
-function log10(num) {
-  return Math.log(num) / log_10;
-}
-
+// formats a number using up to 2 decimal places. See
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
 let format = Intl.NumberFormat('en', {
   notation: 'compact',
   maximumFractionDigits: 2
 }).format;
 
+// Formats a percentage using up to 2 decimal places. These are
+// used for writing CSS percents.
 let formatPercent = Intl.NumberFormat('en', {
   style: 'percent',
   maximumFractionDigits: 2
 }).format;
 
-const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
-      format(lower_bound + width) + ')';
+// Formats a range for a histogram bucket, using inclusive/beginning and
+// exclusive end, computed from the width.
+function formatRange(lower_bound, width) {
+  return '[' + format(lower_bound) + ', ' + format(lower_bound + width) + ')';
+}
 
+// Renders an array histograms.
 function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
   for (histogram of details) {
     renderHistogram(histogramDiv, supported_percentiles, histogram, null);
   }
 }
 
-let pendingLeave;
-let pendingTimeout;
-let highlightedBucket;
-
+// Generates a function to render histogram information, capturing the
+// variables passed in. This is used to establish a mouse-enter list on
+// the histogram bucket, but without pulling in the entire drawing context.
 function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bucketSpan,
-                    showingCount) {
-  return () => {
-    if (pendingTimeout) {
-      window.clearTimeout(pendingTimeout);
-      pendingLeave();
+                     showingCount) {
+  return (event) => {
+    if (globalState.pendingTimeout) {
+      window.clearTimeout(globalState.pendingTimeout);
+      globalState.pendingLeave();
     }
 
     if (bucketOnLeftSide) {
@@ -84,17 +145,20 @@ function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bu
   };
 }
 
+// Generates a timeout function for the provided popup div.
 function timeoutFn(detailPopup) {
   return (event) => {
-    pendingLeave = leaveHandlerFn(detailPopup);
-    pendingTimeout = window.setTimeout(pendingLeave, 2000);
+    globalState.pendingLeave = leaveHandlerFn(detailPopup);
+    globalState.pendingTimeout = window.setTimeout(globalState.pendingLeave, 2000);
   };
 }
 
+// Generates a handler function to be called when the mouse leaves
+// a popup.
 function leaveHandlerFn(detailPopup) {
-  return () => {
-    pendingTimeout = null;
-    pendingLeave = null;
+  return (event) => {
+    globalState.pendingTimeout = null;
+    globalState.pendingLeave = null;
     detailPopup.style.visibility = 'hidden';
     if (highlightedBucket) {
       highlightedBucket.style.backgroundColor = '#e6d7ff';
@@ -107,16 +171,16 @@ function enterPopup() {
   // If the mouse enters the popup then cancel the timer that would
   // erase it. This should make it easier to cut&paste the contents
   // of the popup.
-  if (pendingTimeout) {
-    window.clearTimeout(pendingTimeout);
-    pendingTimeout = null;
+  if (globalState.pendingTimeout) {
+    window.clearTimeout(globalState.pendingTimeout);
+    globalState.pendingTimeout = null;
     // The 'leave' handler needs to remain -- we'll call that 2 seconds
     // after the mouse leaves the popup.
   }
 }
 
 function leavePopup() {
-  pendingTimeout = window.setTimeout(pendingLeave, 2000);
+  globalState.pendingTimeout = window.setTimeout(globalState.pendingLeave, 2000);
 }
 
 function makeElement(parent, type, className) {
@@ -219,12 +283,12 @@ class Painter {
   constructor(div, numBuckets, maxCount) {
     this.numBuckets = numBuckets;
     this.maxCount = maxCount;
-    this.leftVpx = marginWidthVpx;
+    this.leftVpx = constants.marginWidthVpx;
     this.prevVpx = this.leftVpx;
     this.prevBucket = null;
     this.bucketWidthVpx = computeBucketWidthVpx(numBuckets);
-    this.widthVpx = (numBuckets * this.bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
-        * (1 + 2*outerMarginFraction);
+    this.widthVpx = (numBuckets * this.bucketWidthVpx + (numBuckets + 1) * constants.marginWidthVpx)
+        * (1 + 2*constants.outerMarginFraction);
     this.textIntervalIndex = 0;
     this.bucketWidthPercent = formatPercent(this.vpxToWidth(this.bucketWidthVpx));
 
@@ -239,7 +303,7 @@ class Painter {
     this.detailPopup.addEventListener('mouseover', enterPopup);
     this.detailPopup.addEventListener('mouseout', leavePopup);
 
-    this.textInterval = Math.ceil(numBuckets / maxBucketsWithText);
+    this.textInterval = Math.ceil(numBuckets / constants.maxBucketsWithText);
   }
 
   drawAnnotation(bucket, annotation) {
@@ -286,8 +350,8 @@ class Painter {
 
     const bucketSpan = makeElement(this.graphics, 'span', 'histogram-bucket');
     const heightPercent = this.maxCount == 0 ? 0 :
-          formatPercent(baseHeightFraction + (bucket.count / this.maxCount) *
-                        (1 - baseHeightFraction));
+          formatPercent(constants.baseHeightFraction + (bucket.count / this.maxCount) *
+                        (1 - constants.baseHeightFraction));
     bucketSpan.style.height = heightPercent;
     const upper_bound = bucket.lower_bound + bucket.width;
 
@@ -312,7 +376,7 @@ class Painter {
     bucketSpan.addEventListener('mouseout', timeoutFn(this.detailPopup));
 
     this.prevVpx = this.leftVpx;
-    this.leftVpx += this.bucketWidthVpx + marginWidthVpx;
+    this.leftVpx += this.bucketWidthVpx + constants.marginWidthVpx;
 
     // First we can over the detailed bucket value and count info, and determine
     // some limits so we can scale the histogram data to (for now) consume
@@ -336,7 +400,7 @@ class Painter {
   }
 
   vpxToPosition(vpx) {
-    return this.vpxToWidth(vpx) + outerMarginFraction;
+    return this.vpxToWidth(vpx) + constants.outerMarginFraction;
   }
 
   vpxToWidth(vpx) {
