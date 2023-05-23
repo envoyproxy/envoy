@@ -38,7 +38,7 @@ jobs:
         cd mobile && BAZEL_BUILD_OPTION_LIST="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
             COVERAGE_THRESHOLD=76 \
-            ../test/run_envoy_bazel_coverage.sh //test/common/...
+            ../test/run_envoy_bazel_coverage.sh //test/common/... //test/cc/...
     - name: 'Package coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: |
