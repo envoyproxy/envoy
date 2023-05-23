@@ -1101,12 +1101,14 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = [
         "server.cc",
+        "ssl_utility.cc",
         "utility.cc",
-    ] + envoy_select_enable_yaml(["ssl_utility.cc"]),
+    ],
     hdrs = [
         "server.h",
+        "ssl_utility.h",
         "utility.h",
-    ] + envoy_select_enable_yaml(["ssl_utility.h"]),
+    ],
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
