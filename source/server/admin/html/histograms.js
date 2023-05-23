@@ -82,7 +82,16 @@ function showPopupFn(detailPopup, bucketPosPercent, bucketOnLeftSide, bucket, bu
   };
 }
 
-function onMouseLeave() {
+function leaveHandlerFn(detailPopup) {
+  return () => {
+    pendingTimeout = null;
+    pendingLeave = null;
+    detailPopup.style.visibility = 'hidden';
+    if (highlightedBucket) {
+      highlightedBucket.style.backgroundColor = '#e6d7ff';
+      highlightedBucket = null;
+    }
+  };
 }
 
 function makeElement(parent, type, className) {
@@ -323,62 +332,13 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     const bucketPosVpx = bucketOnLeftSide ? leftVpx :
           (widthVpx - (leftVpx + 2*bucketWidthVpx));
 
-    const leaveHandler = () => {
-      pendingTimeout = null;
-      pendingLeave = null;
-      detailPopup.style.visibility = 'hidden';
-      if (highlightedBucket) {
-        highlightedBucket.style.backgroundColor = '#e6d7ff';
-        highlightedBucket = null;
-      }
-    };
-
-/*
-    bucketSpan.addEventListener('mouseover', (event) => {
-      if (pendingTimeout) {
-        window.clearTimeout(pendingTimeout);
-        pendingLeave();
-      }
-
-      if (bucketOnLeftSide) {
-        detailPopup.style.left = toPercentPosition(bucketPosVpx);
-        detailPopup.style.right = '';
-      } else {
-        detailPopup.style.left = '';
-        detailPopup.style.right = toPercentPosition(bucketPosVpx);
-      }
-      detailPopup.style.visibility = 'visible';
-      bucketSpan.style.backgroundColor = 'yellow';
-      highlightedBucket = bucketSpan;
-
-      detailPopup.replaceChildren();
-      const formatRange = (lower_bound, width) => '[' + format(lower_bound) + ', ' +
-            format(lower_bound + width) + ')';
-      makeElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
-      if (!showingCount) {
-        makeElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
-      }
-      if (bucket.annotations) {
-        for (annotation of bucket.annotations) {
-          const span = makeElement(detailPopup, 'div');
-          if (annotation[1] == PERCENTILE) {
-            span.textContent = 'P' + annotation[2] + ': ' + format(annotation[0]);
-          } else {
-            console.log('popping up interval annotation ' + annotation);
-            span.textContent = 'Interval ' + formatRange(annotation[0], annotation[2]) +
-                ': ' + annotation[3];
-          }
-        }
-      }
-    });
-*/
     bucketSpan.addEventListener('mouseover', showPopupFn(
         detailPopup, toPercentPosition(bucketPosVpx), bucketOnLeftSide, bucket, bucketSpan,
         showingCount));
 
     bucketSpan.addEventListener('mouseout', (event) => {
-      pendingTimeout = window.setTimeout(leaveHandler, 2000);
-      pendingLeave = leaveHandler;
+      pendingLeave = leaveHandlerFn(detailPopup);
+      pendingTimeout = window.setTimeout(pendingLeave, 2000);
     });
 
     prevVpx = leftVpx;
