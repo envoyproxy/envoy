@@ -97,8 +97,6 @@
                                             appId:(NSString *)appId
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
-                             typedDirectResponses:
-                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -160,7 +158,6 @@
   self.appVersion = appVersion;
   self.appId = appId;
   self.runtimeGuards = runtimeGuards;
-  self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
@@ -209,10 +206,6 @@
   for (NSString *key in self.runtimeGuards) {
     BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
     builder.setRuntimeGuard([key toCXXString], value);
-  }
-
-  for (EMODirectResponse *directResponse in self.typedDirectResponses) {
-    builder.addDirectResponse([directResponse toCXX]);
   }
 
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);

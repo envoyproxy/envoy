@@ -3,7 +3,7 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
-def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = []):
+def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = [], testonly = False):
     native.objc_library(
         name = name,
         srcs = srcs,
@@ -15,6 +15,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
         visibility = visibility,
         data = data,
         deps = deps,
+        testonly = testonly,
     )
 
 # Macros providing a way to easily/consistently define Swift/ObjC unit test targets.
