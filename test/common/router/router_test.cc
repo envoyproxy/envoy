@@ -519,7 +519,7 @@ TEST_F(RouterTest, AddCookie) {
       }));
 
   std::string cookie_value;
-  std::vector<Http::CookieAttribute> cookie_attributes;
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,
@@ -561,7 +561,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  std::vector<Http::CookieAttribute> cookie_attributes;
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,
@@ -605,7 +605,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
       }));
 
   std::string choco_c, foo_c;
-  std::vector<Http::CookieAttribute> cookie_attributes;
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,

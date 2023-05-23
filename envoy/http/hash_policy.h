@@ -24,6 +24,8 @@ private:
   std::string value_;
 };
 
+using CookieAttributeRefVector = std::vector<std::reference_wrapper<const CookieAttribute>>;
+
 /**
  * Request hash policy. I.e., if using a hashing load balancer, how a request should be hashed onto
  * an upstream host.
@@ -41,7 +43,7 @@ public:
    */
   using AddCookieCallback = std::function<std::string(
       const std::string& key, const std::string& path, std::chrono::seconds ttl,
-      const std::vector<CookieAttribute>& attributes)>;
+      const CookieAttributeRefVector attributes)>;
 
   /**
    * @param downstream_address is the address of the connected client host, or nullptr if the

@@ -912,38 +912,44 @@ TEST(HttpUtility, TestParseSetCookieWithQuotes) {
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {
-  std::vector<CookieAttribute> attributes;
+  CookieAttributeRefVector ref_attributes;
   EXPECT_EQ("name=\"value\"; Max-Age=10",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false,
-                                        attributes));
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false,
-                                        attributes));
-  EXPECT_EQ(
-      "name=\"value\"; Max-Age=10; HttpOnly",
-      Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true, attributes));
+                                        ref_attributes));
+  EXPECT_EQ("name=\"value\"; Max-Age=10; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; HttpOnly",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true,
-                                        attributes));
+                                        ref_attributes));
 
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false,
-                                        attributes));
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false,
-                                        attributes));
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/; HttpOnly",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true,
-                                        attributes));
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/; HttpOnly",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
-                                        attributes));
+                                        ref_attributes));
+
+  std::vector<CookieAttribute> attributes;
   attributes.push_back({"SameSite", "None"});
   attributes.push_back({"Secure", ""});
   attributes.push_back({"Partitioned", ""});
+  for (const auto& attribute : attributes) {
+    ref_attributes.push_back(attribute);
+  }
+
   EXPECT_EQ("name=\"value\"; Path=/; SameSite=None; Secure; Partitioned; HttpOnly",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
-                                        attributes));
+                                        ref_attributes));
 }
 
 TEST(HttpUtility, SendLocalReply) {

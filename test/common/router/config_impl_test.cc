@@ -2815,7 +2815,7 @@ class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestB
 protected:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_([](const std::string&, const std::string&, std::chrono::seconds,
-                           std::vector<Http::CookieAttribute>) { return ""; }) {
+                           const Http::CookieAttributeRefVector) { return ""; }) {
     const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2978,11 +2978,11 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(42);
 
   MockFunction<std::string(const std::string&, const std::string&, long,
-                           const std::vector<Http::CookieAttribute>&)>
+                           const Http::CookieAttributeRefVector)>
       mock_cookie_cb;
   auto add_cookie =
       [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
-                        const std::vector<Http::CookieAttribute>& attributes) -> std::string {
+                        const Http::CookieAttributeRefVector& attributes) -> std::string {
     return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
@@ -3040,11 +3040,11 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
 TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
   MockFunction<std::string(const std::string&, const std::string&, long,
-                           const std::vector<Http::CookieAttribute>&)>
+                           const Http::CookieAttributeRefVector)>
       mock_cookie_cb;
   auto add_cookie =
       [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
-                        const std::vector<Http::CookieAttribute>& attributes) -> std::string {
+                        const Http::CookieAttributeRefVector attributes) -> std::string {
     return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
@@ -3061,11 +3061,11 @@ TEST_F(RouterMatcherCookieHashPolicyTest, SetCookiePath) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
   firstRouteHashPolicy()->mutable_cookie()->set_path("/");
   MockFunction<std::string(const std::string&, const std::string&, long,
-                           const std::vector<Http::CookieAttribute>&)>
+                           const Http::CookieAttributeRefVector)>
       mock_cookie_cb;
   auto add_cookie =
       [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
-                        const std::vector<Http::CookieAttribute>& attributes) -> std::string {
+                        const Http::CookieAttributeRefVector attributes) -> std::string {
     return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 

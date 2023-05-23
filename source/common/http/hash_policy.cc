@@ -81,7 +81,7 @@ class CookieHashMethod : public HashMethodImplBase {
 public:
   CookieHashMethod(const std::string& key, const std::string& path,
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal,
-                   const std::vector<CookieAttribute>& attributes)
+                   const CookieAttributeRefVector attributes)
       : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl), attributes_(attributes) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
@@ -104,7 +104,7 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
-  const std::vector<CookieAttribute>& attributes_;
+  const CookieAttributeRefVector attributes_;
 };
 
 class IpHashMethod : public HashMethodImplBase {
@@ -194,9 +194,13 @@ HashPolicyImpl::HashPolicyImpl(
       for (const auto& attribute : hash_policy->cookie().attributes()) {
         attributes.push_back({attribute.name(), attribute.value()});
       }
+      CookieAttributeRefVector ref_attributes;
+      for (const auto& attribute : attributes) {
+        ref_attributes.push_back(attribute);
+      }
       hash_impls_.emplace_back(new CookieHashMethod(hash_policy->cookie().name(),
                                                     hash_policy->cookie().path(), ttl,
-                                                    hash_policy->terminal(), attributes));
+                                                    hash_policy->terminal(), ref_attributes));
       break;
     }
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::

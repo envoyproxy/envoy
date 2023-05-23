@@ -411,7 +411,7 @@ public:
             callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
             *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age,
-                   const std::vector<Http::CookieAttribute>& attributes) {
+                   Http::CookieAttributeRefVector attributes) {
               return addDownstreamSetCookie(key, path, max_age, attributes);
             },
             callbacks_->streamInfo().filterState());
@@ -504,7 +504,7 @@ public:
    */
   std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
                                      std::chrono::seconds max_age,
-                                     const std::vector<Http::CookieAttribute>& attributes) {
+                                     Http::CookieAttributeRefVector attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
