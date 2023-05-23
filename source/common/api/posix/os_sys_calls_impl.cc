@@ -5,6 +5,8 @@
 #include <cerrno>
 #include <string>
 
+#include "envoy/network/socket.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -138,9 +140,9 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ipVersion) const {
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ip_version) const {
 #if !defined(__linux__)
-  UNREFERENCED_PARAMETER(ipVersion);
+  UNREFERENCED_PARAMETER(ip_version);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -155,41 +157,22 @@ bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ipVersion
   // And these socket options need CAP_NET_ADMIN capability to be applied.
   // The CAP_NET_ADMIN capability should be applied by root user before call this function.
 
-  int fd = 0;
-  int val = 0;
-  bool result = false;
-  bool is_support = false;
-  switch (ipVersion) {
-  case Network::Address::IpVersion::v4:
-    // Check ipv4 case
-    static const bool ipv4_is_supported = [&] {
-      fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-      if (fd < 0) {
-        return false;
-      }
-      val = 1;
-      result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
-      ::close(fd);
-      return result;
-    }();
-    is_support = ipv4_is_supported;
-    break;
-  case Network::Address::IpVersion::v6:
-    // Check ipv6 case
-    static const bool ipv6_is_supported = [&] {
-      fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-      if (fd < 0) {
-        return false;
-      }
-      val = 1;
-      result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
-      ::close(fd);
-      return result;
-    }();
-    is_support = ipv6_is_supported;
-    break;
-  }
-  return is_support;
+  static constexpr auto transparent_supported = [](int family) {
+    auto opt_tp = family == AF_INET ? ENVOY_SOCKET_IP_TRANSPARENT : ENVOY_SOCKET_IPV6_TRANSPARENT;
+    int fd = ::socket(family, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int val = 1;
+    bool result = (0 == ::setsockopt(fd, opt_tp.level(), opt_tp.option(), &val, sizeof(val)));
+    ::close(fd);
+    return result;
+  };
+  // Check ipv4 case
+  static const bool ipv4_is_supported = transparent_supported(AF_INET);
+  // Check ipv6 case
+  static const bool ipv6_is_supported = transparent_supported(AF_INET6);
+  return ip_version == Network::Address::IpVersion::v4 ? ipv4_is_supported : ipv6_is_supported;
 #endif
 }
 
