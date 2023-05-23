@@ -1164,7 +1164,6 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixExclusion) {
 }
 
 TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixInclusive) {
-
   envoy::config::metrics::v3::StatsConfig stats_config_;
   stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_prefix(
       "cluster.");
