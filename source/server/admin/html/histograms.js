@@ -1,13 +1,13 @@
 const marginWidthVpx = 20;
+const computeBucketWidthVpx = numBuckets => 40 - 38/numBuckets;
 const outerMarginFraction = 0.01;
-const percentileWidthAndMarginVpx = 20;
+const baseHeightFraction = 0.03;
 
 // If there are too many buckets, per-bucket label text gets too dense and the
 // text becomes illegible, so skip some if needed. We always put the range in
 // the popup, and when skipped, we'll put the count in the popup as well, in
 // addition to any percentiles or interval ranges.
 const maxBucketsWithText = 30;
-
 
 function renderHistograms(histogramDiv, data) {
   histogramDiv.replaceChildren();
@@ -26,10 +26,6 @@ const log_10 = Math.log(10);
 function log10(num) {
   return Math.log(num) / log_10;
 }
-
-// We merge percentiles and intervals in the display.
-const PERCENTILE = 0;
-const INTERVAL = 1;
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
 let format = Intl.NumberFormat('en', {
@@ -132,15 +128,6 @@ function makeElement(parent, type, className) {
   return element;
 }
 
-/*function computeMinMax(histogram) {
-  const last = histogram.totals[histogram.totals.length - 1];
-  return [Math.min(histogram.percentiles[0].cumulative,
-                   histogram.totals[0].lower_bound),
-          Math.max(histogram.percentiles[0].cumulative,
-                   last.lower_bound + last.width)];
-
-}*/
-
 function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles) {
   let maxCount = 0;
   let prevBucket = null;
@@ -235,7 +222,7 @@ class Painter {
     this.leftVpx = marginWidthVpx;
     this.prevVpx = this.leftVpx;
     this.prevBucket = null;
-    this.bucketWidthVpx = 40 - 38/numBuckets;
+    this.bucketWidthVpx = computeBucketWidthVpx(numBuckets);
     this.widthVpx = (numBuckets * this.bucketWidthVpx + (numBuckets + 1) * marginWidthVpx)
         * (1 + 2*outerMarginFraction);
     this.textIntervalIndex = 0;
@@ -298,7 +285,9 @@ class Painter {
     this.leftPercent = formatPercent(this.vpxToPosition(this.leftVpx));
 
     const bucketSpan = makeElement(this.graphics, 'span', 'histogram-bucket');
-    const heightPercent = this.maxCount == 0 ? 0 : formatPercent(bucket.count / this.maxCount);
+    const heightPercent = this.maxCount == 0 ? 0 :
+          formatPercent(baseHeightFraction + (bucket.count / this.maxCount) *
+                        (1 - baseHeightFraction));
     bucketSpan.style.height = heightPercent;
     const upper_bound = bucket.lower_bound + bucket.width;
 
@@ -309,7 +298,7 @@ class Painter {
     if (++this.textIntervalIndex == this.textInterval) {
       showingCount = true;
       this.textIntervalIndex = 0;
-      this.drawBucketLabel(bucket, heightPercent);
+      this.drawBucketLabels(bucket, heightPercent);
     }
 
     const bucketOnLeftSide = index <= this.numBuckets / 2;
@@ -332,7 +321,7 @@ class Painter {
     this.prevBucket = bucket;
   }
 
-  drawBucketLabel(bucket, heightPercent) {
+  drawBucketLabels(bucket, heightPercent) {
     const widthPercent = this.bucketWidthPercent
     const lower_label = makeElement(this.labels, 'span');
     lower_label.textContent = format(bucket.lower_bound);
@@ -347,7 +336,7 @@ class Painter {
   }
 
   vpxToPosition(vpx) {
-    return vpx / this.widthVpx + outerMarginFraction;
+    return this.vpxToWidth(vpx) + outerMarginFraction;
   }
 
   vpxToWidth(vpx) {
@@ -365,8 +354,6 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
     makeElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
     return;
   }
-
-  //const [minValue, maxValue] = computeMinMax(histogram);
 
   const maxCount = assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles);
 
