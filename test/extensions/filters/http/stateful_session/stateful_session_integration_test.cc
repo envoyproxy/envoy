@@ -765,9 +765,9 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
         const std::string route_encoded_address =
             Envoy::Base64::encode(route_address_string.data(), route_address_string.size());
         std::vector<Http::CookieAttribute> cookie_attributes;
-        EXPECT_EQ(Envoy::Http::Utility::makeSetCookieValue("route-session-cookie",
-                                                           route_encoded_address, "/test",
-                                                           std::chrono::seconds(120), true),
+        EXPECT_EQ(Envoy::Http::Utility::makeSetCookieValue(
+                      "route-session-cookie", route_encoded_address, "/test",
+                      std::chrono::seconds(120), true, cookie_attributes),
                   response->headers()
                       .get(Http::LowerCaseString("set-cookie"))[0]
                       ->value()
