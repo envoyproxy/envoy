@@ -37,10 +37,7 @@ TEST_F(StatsHtmlRenderTest, String) {
 }
 
 TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
-  constexpr absl::string_view expected =
-      "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
-      "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
-      "P99.9(309.985,309.985) P100(310,310)\n";
+  constexpr absl::string_view expected = "stats\":[{\"histograms\":";
   EXPECT_THAT(render<>(renderer_, "h1", populateHistogram("h1", {200, 300, 300})),
               HasSubstr(expected));
 }

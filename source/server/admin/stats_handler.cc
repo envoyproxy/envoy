@@ -171,29 +171,33 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
 }
 
 Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
-  const Admin::ParamDescriptorVec common_params{
-      {Admin::ParamDescriptor::Type::String, "filter",
-       "Regular expression (Google re2) for filtering stats"},
-      {Admin::ParamDescriptor::Type::Enum,
-       "type",
-       "Stat types to include.",
-       {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-        StatLabels::TextReadouts}}};
+  Admin::ParamDescriptor usedonly{
+      Admin::ParamDescriptor::Type::Boolean, "usedonly",
+      "Only include stats that have been written by system since restart"};
+  Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
+                                           "histogram_buckets",
+                                           "Histogram bucket display mode",
+                                           {"cumulative", "disjoint", "detailed", "none"}};
+  Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
+                                "format",
+                                "Format to use",
+                                {"html", "active-html", "text", "json"}};
+  Admin::ParamDescriptor filter{Admin::ParamDescriptor::Type::String, "filter",
+                                "Regular expression (Google re2) for filtering stats"};
+  Admin::ParamDescriptor type{Admin::ParamDescriptor::Type::Enum,
+                              "type",
+                              "Stat types to include.",
+                              {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
+                               StatLabels::Gauges, StatLabels::TextReadouts}};
 
-  Admin::ParamDescriptorVec params;
+  Admin::ParamDescriptorVec params{usedonly, filter};
   if (!active_mode) {
-    params.push_back({Admin::ParamDescriptor::Type::Enum,
-        "format",
-        "Format to use",
-        {"html", "active-html", "text", "json"}});
-    params.push_back({Admin::ParamDescriptor::Type::Boolean, "usedonly",
-                      "Only include stats that have been written by system since restart"});
-    params.push_back({Admin::ParamDescriptor::Type::Enum,
-        "histogram_buckets",
-        "Histogram bucket display mode",
-        {"cumulative", "disjoint", "detailed", "none"}});
+    params.push_back(format);
   }
-  params.insert(params.end(), common_params.begin(), common_params.end());
+  params.push_back(type);
+  if (!active_mode) {
+    params.push_back(histogram_buckets);
+  }
 
   return {
       "/stats",

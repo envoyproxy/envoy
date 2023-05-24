@@ -2,21 +2,21 @@
 // There are several ways to do this:
 //   1. lay out in CSS with flex-boxes
 //   2. draw using SVG
-//   3. render as divs with pixel positions
-//   4. render as divs with percentage positions
+//   3. render as `divs` with pixel positions
+//   4. render as `divs` with percentage positions
 // This implements option #4. There are pros/cons to each of these. The benefits of #4:
 //   1. The user can get a clearer picture by making the window bigger, without having
 //      to re-layout the graphics.
-//   2. The divs can be made sensitive to mouse enter/leave to pop up
+//   2. The `divs` can be made sensitive to mouse enter/leave to pop up
 //      more detail
 // There are also drawbacks:
-//   1. Need to write graphics layout code, and think about coordiante systems, resulting
+//   1. Need to write graphics layout code, and think about coordinate systems, resulting
 //      in several hundred lines of JavaScript.
 //   2. Some risk of having the text look garbled in some scenarios. This appears to
 //      be rare enough that it's likely not worth investing time to fix at the moment.
 
 const constants = {
-  // Horizontal spacing betwen buckets, expressed in vpx (Virtual Pixels) in a
+  // Horizontal spacing between buckets, expressed in `VPX` (Virtual Pixels) in a
   // coordinate system invented to make arithmetic and debugging easier.
   marginWidthVpx: 20,
 
@@ -57,7 +57,7 @@ let globalState = {
 // Formula to compute bucket width based on number of buckets. This formula
 // was derived from trial and error, to improve the appearance of the display.
 // Consider this table of values:
-//     numBuckets   bucketWidthVpx    Ratio vs marginWidthVpx
+//     numBuckets   `bucketWidthVpx`  Ratio vs `marginWidthVpx`
 //     1            2                 1:10
 //     2            21                1:2
 //     3            27                2:3
