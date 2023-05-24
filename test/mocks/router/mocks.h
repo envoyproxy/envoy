@@ -449,8 +449,8 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
-  testing::NiceMock<MockPathMatcher> path_matcher_;
-  testing::NiceMock<MockPathRewriter> path_rewriter_;
+  PathMatcherSharedPtr path_matcher_;
+  PathRewriterSharedPtr path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -492,6 +492,16 @@ public:
 
 class MockRoute : public Route {
 public:
+  struct MockRouteMetadataObj : public Envoy::Config::TypedMetadata::Object {};
+  class MockRouteMetadata : public Envoy::Config::TypedMetadata {
+  public:
+    const Envoy::Config::TypedMetadata::Object* getData(const std::string&) const override {
+      return &object_;
+    }
+
+  private:
+    MockRouteMetadataObj object_;
+  };
   MockRoute();
   ~MockRoute() override;
 
@@ -513,6 +523,7 @@ public:
   testing::NiceMock<MockDecorator> decorator_;
   testing::NiceMock<MockRouteTracing> route_tracing_;
   envoy::config::core::v3::Metadata metadata_;
+  MockRouteMetadata typed_metadata_;
 };
 
 class MockConfig : public Config {
