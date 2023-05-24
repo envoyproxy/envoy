@@ -18,13 +18,26 @@ namespace UnitTestFuzz {
 
 class FuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
+  FuzzerMocks()
+      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")), buffer_("foo") {
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     ON_CALL(decoder_callbacks_, addDecodedTrailers()).WillByDefault(ReturnRef(request_trailers_));
     ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(response_trailers_));
+    ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Return());
+    ON_CALL(encoder_callbacks_, addEncodedData(_, _)).WillByDefault(Return());
+    ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(buffer_ptr_ = &buffer_));
+    ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(buffer_ptr_ = &buffer_));
+    ON_CALL(decoder_callbacks_, continueDecoding()).WillByDefault(Return());
+    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault(Return());
+    ON_CALL(decoder_callbacks_, modifyDecodingBuffer(_)).WillByDefault(Return());
+    ON_CALL(encoder_callbacks_, modifyEncodingBuffer(_)).WillByDefault(Return());
+    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).WillByDefault(Return());
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _)).WillByDefault(Return());
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -33,6 +46,8 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Http::TestRequestTrailerMapImpl> request_trailers_;
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
+  NiceMock<Buffer::OwnedImpl> buffer_;
+  NiceMock<Buffer::OwnedImpl>* buffer_ptr_;
 };
 
 DEFINE_PROTO_FUZZER(
