@@ -1350,6 +1350,142 @@ TEST_F(HttpFilterTest, MetadataContext) {
       0, check_request.attributes().metadata_context().typed_filter_metadata().count("rock.bass"));
 }
 
+// Verifies that specified connection metadata is passed along in the check request
+TEST_F(HttpFilterTest, ConnectionMetadataContext) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  metadata_context_namespaces:
+  - connection.and.request.have.data
+  - connection.has.data
+  - request.has.data
+  - neither.have.data
+  - untyped.and.typed.connection.data
+  - typed.connection.data
+  - untyped.connection.data
+  typed_metadata_context_namespaces:
+  - untyped.and.typed.connection.data
+  - typed.connection.data
+  - untyped.connection.data
+  )EOF");
+
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: request
+    request.has.data:
+      data: request
+  )EOF";
+
+  const std::string connection_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: connection_untyped
+    connection.has.data:
+      data: connection_untyped
+    untyped.and.typed.connection.data:
+      data: connection_untyped
+    untyped.connection.data:
+      data: connection_untyped
+    not.selected.data:
+      data: connection_untyped
+  typed_filter_metadata:
+    untyped.and.typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    not.selected.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+  )EOF";
+
+  prepareCheck();
+
+  envoy::config::core::v3::Metadata request_metadata, connection_metadata;
+  TestUtility::loadFromYaml(request_yaml, request_metadata);
+  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(request_metadata));
+  connection_.stream_info_.metadata_ = connection_metadata;
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+
+  filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("connection.and.request.have.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("request.has.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("connection_untyped", check_request.attributes()
+                                      .metadata_context()
+                                      .filter_metadata()
+                                      .at("connection.has.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ("connection_untyped", check_request.attributes()
+                                      .metadata_context()
+                                      .filter_metadata()
+                                      .at("untyped.and.typed.connection.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "neither.have.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "not.selected.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "typed.connection.data"));
+
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("untyped.and.typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
+                   "untyped.connection.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
+                   "not.selected.data"));
+}
+
 // Test that filter can be disabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterDisabled) {
   initialize(R"EOF(
