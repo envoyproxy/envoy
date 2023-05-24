@@ -2248,6 +2248,36 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
                                       stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
+
+  // Add the NaN test for number value. This behavior will be changed in the future Protobuf
+  // dependency upgrade, and the Json serialization will fail if the number value is NaN or
+  // Infinity. We need to change the `getJsonStringFromMessage` description, re-evaluate the use
+  // of ENVOY_BUG in the MetaDataFormatter::format method, and modify the following two tests.
+  {
+    ProtobufWkt::Value val;
+    val.set_number_value(std::numeric_limits<double>::quiet_NaN());
+    ProtobufWkt::Struct struct_obj;
+    (*struct_obj.mutable_fields())["nan_val"] = val;
+    (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
+
+    DynamicMetadataFormatter formatter("com.test", {"nan_val"}, absl::optional<size_t>());
+    EXPECT_EQ("\"NaN\"", formatter.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body, AccessLog::AccessLogType::NotSet));
+  }
+
+  // Add the Infinity test for number value.
+  {
+    ProtobufWkt::Value val;
+    val.set_number_value(std::numeric_limits<double>::infinity());
+    ProtobufWkt::Struct struct_obj;
+    (*struct_obj.mutable_fields())["inf_val"] = val;
+    (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
+
+    DynamicMetadataFormatter formatter("com.test", {"inf_val"}, absl::optional<size_t>());
+    EXPECT_EQ("\"Infinity\"",
+              formatter.format(request_headers, response_headers, response_trailers, stream_info,
+                               body, AccessLog::AccessLogType::NotSet));
+  }
 }
 
 TEST(SubstitutionFormatterTest, FilterStateFormatter) {
