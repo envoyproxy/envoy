@@ -392,7 +392,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
       sock.getSocketOption(opt_dst.level(), opt_dst.option(), &orig_addr, &addr_len).return_value_;
 
   if (status != 0) {
-    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent(*ipVersion)) {
       socklen_t flag_len = sizeof(int);
       int is_tp;
       status =

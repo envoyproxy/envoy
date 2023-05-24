@@ -2,6 +2,10 @@ load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+load(
+    "//test/extensions/filters/network/common/fuzz:config.bzl",
+    "READFILTER_FUZZ_FILTERS",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -22,6 +26,7 @@ envoy_entry_point(
     name = "check",
     args = [
         "--extensions_build_config=$(location :extensions_build_config)",
+        "--extensions_fuzzed_count=%s" % len(READFILTER_FUZZ_FILTERS),
         "--path=%s" % PATH,
         "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
         "-b gofmt:$(location @go_sdk//:bin/gofmt)",
