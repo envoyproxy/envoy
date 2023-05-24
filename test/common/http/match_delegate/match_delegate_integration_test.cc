@@ -38,7 +38,7 @@ public:
                                                                           {"match-header", "route"},
                                                                           {":authority", "host"}};
 
-  const std::string default_config_ = R"EOF(
+  constexpr std::string default_config_ = R"EOF(
       name: ext_proc
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -48,7 +48,7 @@ public:
             "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
             code: 403
     )EOF";
-  const std::string per_route_config_ = R"EOF(
+  constexpr std::string per_route_config_ = R"EOF(
       xds_matcher:
         matcher_tree:
           input:

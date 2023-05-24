@@ -197,6 +197,10 @@ new_features:
     :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
     Which allows the associated matcher to be defined on a per route basis.
+- area: match_delegate
+  change: |
+    If no matcher is set the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter is now set to skip rather than erroring out.
 - area: access_log
   change: |
     added additional HCM access log option :ref:`flush_log_on_tunnel_successfully_established

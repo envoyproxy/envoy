@@ -1,4 +1,5 @@
 #include <optional>
+#include <string>
 
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
@@ -40,13 +41,6 @@ class CompositeFilterIntegrationTest : public testing::TestWithParam<Network::Ad
 public:
   CompositeFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  static Route* getMutableRoute(VirtualHost* vh, const bool& add) {
-    if (add) {
-      return vh->add_routes();
-    }
-    return vh->mutable_routes()->Mutable(0);
-  }
-
   ExtensionWithMatcherPerRoute createPerRouteConfig(
       std::function<void(envoy::config::core::v3::TypedExtensionConfig*)> base_action_function) {
     ExtensionWithMatcherPerRoute per_route_config;
@@ -71,7 +65,7 @@ public:
     return per_route_config;
   }
 
-  void addPerRouteResponseCodeFilter(const bool& add, const std::string& filter_name,
+  void addPerRouteResponseCodeFilter(const std::string& filter_name,
                                      const std::string& route_prefix, const int& code,
                                      const bool& response_prefix = false) {
     SetResponseCodeFilterConfig set_response_code;
@@ -83,22 +77,17 @@ public:
       cfg->set_name("set-response-code-filter");
       cfg->mutable_typed_config()->PackFrom(set_response_code);
     });
-    addPerRouteConfig(per_route_config, filter_name, route_prefix, add);
-  }
-
-  void addPerRouteConfig(const ExtensionWithMatcherPerRoute& config, const std::string& filter_name,
-                         const std::string& route_prefix, const bool& add) {
     config_helper_.addConfigModifier(
-        [config, filter_name, route_prefix, add](ConfigHelper::HttpConnectionManager& cm) {
+        [per_route_config, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
           auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
-          auto* route = getMutableRoute(vh, add);
+          auto* route = vh->mutable_routes()->Mutable(0);
           route->mutable_match()->set_prefix(route_prefix);
           route->mutable_route()->set_cluster("cluster_0");
-          (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(config);
+          (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config);
         });
   }
 
-  const char* filter_config_template = R"EOF(
+  const absl::string_view filter_config_template_ = R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -141,7 +130,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
+  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -163,8 +152,8 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
 TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
-  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 401);
+  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
+  addPerRouteResponseCodeFilter("composite", "/somepath", 401);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -173,13 +162,32 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
 }
 
+// Test an empty match tree resolving with a per route config.
+TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
+  config_helper_.prependFilter(R"EOF(
+      name: composite
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+    )EOF");
+  addPerRouteResponseCodeFilter("composite", "/somepath", 402);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
+}
+
 // Test that the specified filters apply per route configs to requests.
 TEST_P(CompositeFilterIntegrationTest, TestPerRouteMultipleFilters) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite_2"));
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
+  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite_2"));
+  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
 
-  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 407, true);
-  addPerRouteResponseCodeFilter(false, "composite_2", "/somepath", 402);
+  addPerRouteResponseCodeFilter("composite", "/somepath", 407, true);
+  addPerRouteResponseCodeFilter("composite_2", "/somepath", 402);
 
   initialize();
   {
