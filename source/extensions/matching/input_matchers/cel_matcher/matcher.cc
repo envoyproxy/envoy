@@ -34,7 +34,7 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     if (compiled_expr_ == nullptr || cel_data == nullptr) {
       // TODO(tyxia) Add some logs
       ENVOY_LOG(debug, "Failed to match due to either the absence of the compiled CEL expression "
-                       "or the failure of retrieving the CEL data")
+                       "or the failure of retrieving the CEL data");
       return false;
     }
 
