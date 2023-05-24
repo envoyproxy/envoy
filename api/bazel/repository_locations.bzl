@@ -137,7 +137,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bufbuild/buf/releases/download/v{version}/buf-Linux-x86_64.tar.gz"],
         release_date = "2023-02-09",
         use_category = ["api"],
-        tags = ["manual"],
         license = "Apache-2.0",
         license_url = "https://github.com/bufbuild/buf/blob/v{version}/LICENSE",
     ),
