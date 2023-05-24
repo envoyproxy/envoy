@@ -162,10 +162,15 @@ public:
     router_->onDestroy();
   }
 
+  // testAutoSniOptions checks that UpstreamServerName is server_name if non-empty,
+  // and that the first UpstreamSubjectAltNames is alt_server_name if non-empty.
+  // UpstreamServerName is pre-set to pre_set_sni if non-empty.
   void testAutoSniOptions(
       absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
-      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "host",
-      bool should_validate_san = false, std::string alt_server_name = "host") {
+      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "",
+      std::string alt_server_name = "", std::string pre_set_sni = "",
+      StreamInfo::FilterState::LifeSpan pre_set_life_span =
+          StreamInfo::FilterState::LifeSpan::FilterChain) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
         .WillByDefault(ReturnRef(dummy_option));
@@ -173,18 +178,26 @@ public:
         .WillByDefault(ReturnRef(stream_info.filterState()));
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
         .WillOnce(Return(&cancellable_));
-    stream_info.filterState()->setData(Network::UpstreamServerName::key(),
-                                       std::make_unique<Network::UpstreamServerName>("dummy"),
-                                       StreamInfo::FilterState::StateType::Mutable);
+
+    if (!pre_set_sni.empty()) {
+      // Simulate a network filter setting the server name, e.g. based on SNI seen by the
+      // tls_inspector by using the LifeSpan::Connection
+      stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                         std::make_unique<Network::UpstreamServerName>(pre_set_sni),
+                                         StreamInfo::FilterState::StateType::Mutable,
+                                         pre_set_life_span);
+    }
     expectResponseTimerCreate();
 
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
-    EXPECT_EQ(server_name,
-              stream_info.filterState()
-                  ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                  ->value());
-    if (should_validate_san) {
+    if (!server_name.empty()) {
+      EXPECT_EQ(server_name, stream_info.filterState()
+                                 ->getDataReadOnly<Network::UpstreamServerName>(
+                                     Network::UpstreamServerName::key())
+                                 ->value());
+    }
+    if (!alt_server_name.empty()) {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
                                      ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                          Network::UpstreamSubjectAltNames::key())
@@ -205,7 +218,24 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
+}
+
+TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExists) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host");
+}
+
+TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host",
+                     StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
@@ -214,7 +244,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header(":authority");
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
@@ -233,7 +263,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
@@ -242,7 +272,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
   dummy_option.value().set_auto_san_validation(true);
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
@@ -252,7 +282,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header(":authority");
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
@@ -263,7 +293,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
 
   const auto server_name = "foo.bar";
   Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
-  testAutoSniOptions(dummy_option, headers, server_name, true, server_name);
+  testAutoSniOptions(dummy_option, headers, server_name, server_name);
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride) {
@@ -273,7 +303,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride)
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
@@ -284,7 +314,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
 
   const auto server_name = "127.0.0.1";
   Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
-  testAutoSniOptions(dummy_option, headers, "dummy", true, server_name);
+  testAutoSniOptions(dummy_option, headers, "", server_name);
 }
 
 TEST_F(RouterTest, RouteNotFound) {
