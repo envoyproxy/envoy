@@ -32,7 +32,6 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     CelMatchData* cel_data = dynamic_cast<CelMatchData*>((*ptr).get());
     // Return false if we don't have compiled CEL expression or CEL input data is empty.
     if (compiled_expr_ == nullptr || cel_data == nullptr) {
-      // TODO(tyxia) Add some logs
       ENVOY_LOG(debug, "Failed to match due to either the absence of the compiled CEL expression "
                        "or the failure of retrieving the CEL data");
       return false;

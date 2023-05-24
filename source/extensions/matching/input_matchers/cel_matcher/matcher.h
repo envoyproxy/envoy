@@ -36,8 +36,8 @@ using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActiva
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 
-// CEL matcher matching data
-struct CelMatchData : public ::Envoy::Matcher::CustomMatchData {
+// CEL matcher specific matching data
+class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
   explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
   StreamActivation data_;
 };
@@ -54,6 +54,7 @@ public:
   }
 
 private:
+  // Expression builder must not be destroyed before the compiled expression.
   BuilderPtr expr_builder_;
   CompiledExpressionPtr compiled_expr_;
 };

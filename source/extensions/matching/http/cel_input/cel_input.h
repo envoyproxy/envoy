@@ -33,22 +33,19 @@ public:
     RequestHeaderMapOptConstRef maybe_request_headers = data.requestHeaders();
     ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
     ResponseTrailerMapOptConstRef maybe_response_trailers = data.responseTrailers();
-    // Returns NotAvailable state when all of three are empty. CEL matcher can support mixed
-    // matching condition of request headers, response headers and response trailers.
+
+    // Returns NotAvailable state when all of three below are empty.
     if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
+    // CEL library can support mixed matching condition of request headers, response headers and
+    // response trailers.
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
-    // TODO(tyxia) probably never hit!! Removed
-    if (activation == nullptr) {
-      std::cout << "tyxia not available 2 \n";
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
     std::unique_ptr<StreamActivation> stream_activation =
         absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
 
