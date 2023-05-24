@@ -1,14 +1,15 @@
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/filters/http/buffer/config.h"
 
+#include "test/common/http/filters/assertion/config.h"
+#include "test/common/http/filters/route_cache_reset/config.h"
+#include "test/common/http/filters/test_accessor/config.h"
+#include "test/common/http/filters/test_event_tracker/config.h"
+#include "test/common/http/filters/test_kv_store/config.h"
+#include "test/common/http/filters/test_logger/config.h"
+#include "test/common/http/filters/test_read/config.h"
+
 #include "external/envoy_build_config/test_extensions.h"
-#include "library/common/extensions/filters/http/assertion/config.h"
-#include "library/common/extensions/filters/http/route_cache_reset/config.h"
-#include "library/common/extensions/filters/http/test_accessor/config.h"
-#include "library/common/extensions/filters/http/test_event_tracker/config.h"
-#include "library/common/extensions/filters/http/test_kv_store/config.h"
-#include "library/common/extensions/filters/http/test_logger/config.h"
-#include "library/common/extensions/filters/http/test_read/config.h"
 
 void register_test_extensions() {
   Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
