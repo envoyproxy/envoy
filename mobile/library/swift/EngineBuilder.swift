@@ -59,7 +59,6 @@ open class EngineBuilder: NSObject {
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var runtimeGuards: [String: Bool] = [:]
-  private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var rtdsLayerName: String?
   private var rtdsTimeoutSeconds: UInt32 = 0
@@ -693,15 +692,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add a direct response to be used when configuring the engine.
-  /// This function is internal so it is not publicly exposed to production builders,
-  /// but is available for use by the `TestEngineBuilder`.
-  ///
-  /// - parameter directResponse: The response configuration to add.
-  func addDirectResponseInternal(_ directResponse: DirectResponse) {
-    self.directResponses.append(directResponse)
-  }
-
   func makeConfig() -> EnvoyConfiguration {
     EnvoyConfiguration(
       adminInterfaceEnabled: self.adminInterfaceEnabled,
@@ -733,7 +723,6 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
@@ -814,10 +803,6 @@ private extension EngineBuilder {
 
     for (runtimeGuard, value) in self.runtimeGuards {
       cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for directResponse in self.directResponses {
-      cxxBuilder.addDirectResponse(directResponse.toCXX())
     }
 
     for filter in self.nativeFilterChain.reversed() {

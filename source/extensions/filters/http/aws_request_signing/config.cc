@@ -15,8 +15,8 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
 Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -33,6 +33,26 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
+    const AwsRequestSigningProtoPerRouteConfig& per_route_config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  auto credentials_provider =
+      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+  const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
+      per_route_config.aws_request_signing().match_excluded_headers().begin(),
+      per_route_config.aws_request_signing().match_excluded_headers().end());
+  auto signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+      per_route_config.aws_request_signing().service_name(),
+      per_route_config.aws_request_signing().region(), credentials_provider,
+      context.mainThreadDispatcher().timeSource(), matcher_config);
+  return std::make_shared<const FilterConfigImpl>(
+      std::move(signer), per_route_config.stat_prefix(), context.scope(),
+      per_route_config.aws_request_signing().host_rewrite(),
+      per_route_config.aws_request_signing().use_unsigned_payload());
 }
 
 /**
