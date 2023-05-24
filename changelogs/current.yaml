@@ -227,7 +227,8 @@ new_features:
     Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
 - area: matching
   change: |
-    added CEL(Common Expression Language) matcher support :ref:`CEL data input value <extension_envoy.matching.inputs.cel_data_input>`.
+    added CEL(Common Expression Language) matcher support :ref:`CEL data input <extension_envoy.matching.inputs.cel_data_input>`
+    and :ref:`CEL input matcher <extension_envoy.matching.matchers.cel_matcher>`.
 
 deprecated:
 - area: access_log
