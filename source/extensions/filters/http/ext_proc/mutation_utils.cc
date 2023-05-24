@@ -31,8 +31,8 @@ bool MutationUtils::headerInAllowList(
 }
 
 void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
-                                   envoy::config::core::v3::HeaderMap& proto_out,
-                                   const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
+                                   const std::vector<Matchers::StringMatcherPtr>& header_matchers,
+                                   envoy::config::core::v3::HeaderMap& proto_out) {
   headers_in.iterate([&proto_out,
                       &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {

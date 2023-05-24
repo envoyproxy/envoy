@@ -86,7 +86,7 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        filter_metadata_(config.filter_metadata()), header_matchers_(initHeadMatchers(config)) {}
+        filter_metadata_(config.filter_metadata()), header_matchers_(initHeaderMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -116,7 +116,7 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  const std::vector<Matchers::StringMatcherPtr> initHeadMatchers(
+  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
     std::vector<Matchers::StringMatcherPtr> header_matchers;
     for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {

@@ -35,7 +35,7 @@ TEST(MutationUtils, TestBuildHeaders) {
 
   envoy::config::core::v3::HeaderMap proto_headers;
   std::vector<Matchers::StringMatcherPtr> header_matchers;
-  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -264,7 +264,7 @@ TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
   header_matchers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
-  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
@@ -289,7 +289,7 @@ TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
   header_matchers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
-  MutationUtils::headersToProto(headers, proto_headers, header_matchers);
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
