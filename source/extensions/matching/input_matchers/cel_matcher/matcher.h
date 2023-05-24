@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <memory>
@@ -16,8 +17,9 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Common {
-namespace Matcher {
+namespace Matching {
+namespace InputMatchers {
+namespace CelMatcher {
 
 using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
 using ::Envoy::Matcher::InputMatcher;
@@ -34,6 +36,7 @@ using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActiva
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 
+// CEL matcher matching data
 struct CelMatchData : public ::Envoy::Matcher::CustomMatchData {
   explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
   StreamActivation data_;
@@ -56,28 +59,8 @@ private:
   CompiledExpressionPtr compiled_expr_;
 };
 
-class CelInputMatcherFactory : public InputMatcherFactory {
-public:
-  InputMatcherFactoryCb
-  createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              Server::Configuration::ServerFactoryContext&) override {
-    const auto& cel_matcher = dynamic_cast<const CelMatcher&>(config);
-
-    return [cel_matcher = std::move(cel_matcher)] {
-      return std::make_unique<CelInputMatcher>(cel_matcher.expr_match());
-    };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<CelMatcher>();
-  }
-
-  std::string name() const override { return "cel_input_matcher_factory"; }
-
-private:
-};
-
-} // namespace Matcher
-} // namespace Common
+} // namespace CelMatcher
+} // namespace InputMatchers
+} // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

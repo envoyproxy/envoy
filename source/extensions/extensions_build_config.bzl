@@ -73,6 +73,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
+    "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
 
     #
     # Network Matchers
@@ -89,7 +90,8 @@ EXTENSIONS = {
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
-
+    # TODO(tyxia) Move this to extension.
+    # "envoy.matching.inputs.cel_data_input":             "//source/common/http/matching:cel_input_lib",
     #
     # Generic Inputs
     #

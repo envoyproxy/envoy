@@ -8,8 +8,8 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/matcher/cel_matcher.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
 
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
@@ -17,8 +17,8 @@ namespace Envoy {
 namespace Http {
 namespace Matching {
 
-using ::Envoy::Extensions::Common::Matcher::CelMatchData;
 using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
+using ::Envoy::Extensions::Matching::InputMatchers::CelMatcher::CelMatchData;
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
 public:

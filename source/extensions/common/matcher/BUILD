@@ -36,16 +36,3 @@ envoy_cc_extension(
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_extension(
-    name = "cel_matcher_lib",
-    srcs = ["cel_matcher.cc"],
-    hdrs = ["cel_matcher.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//source/common/protobuf:utility_lib",
-        "//envoy/matcher:matcher_interface",
-        "//source/extensions/filters/common/expr:evaluator_lib",
-        # "@com_google_googleapis//google/api/expr:checked_cc_proto",
-    ],
-

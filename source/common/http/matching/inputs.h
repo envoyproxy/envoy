@@ -206,63 +206,6 @@ public:
 
 DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
-// class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
-// public:
-//   HttpCelDataInput() = default;
-//   Matcher::DataInputGetResult get(const Envoy::Http::HttpMatchingData& data) const override {
-//     RequestHeaderMapOptConstRef maybe_request_headers = data.requestHeaders();
-//     ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
-//     ResponseTrailerMapOptConstRef maybe_response_trailers = data.responseTrailers();
-//     // Returns NotAvailable state when all of three are empty. CEL matcher can support mix
-//     matching
-//     // condition of request headers, response headers and response trailers.
-//     if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
-//       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-//     }
-
-//     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
-//         Extensions::Filters::Common::Expr::createActivation(
-//             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
-//             maybe_response_trailers.ptr());
-
-//     // TODO(tyxia) probably never hit!!
-//     if (activation == nullptr) {
-//       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-//     }
-//     std::unique_ptr<StreamActivation> stream_activation =
-//         absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
-
-//     static_assert(std::is_move_constructible<StreamActivation>::value, "not move constructible");
-//     static_assert(std::is_move_assignable<StreamActivation>::value, "not move assignable");
-
-//     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-//             std::make_unique<Matcher::CelMatchData>(std::move(*stream_activation))};
-//   }
-
-//   virtual absl::string_view dataInputType() const override { return "cel_data_input"; }
-//   // TODO(tyxia) remove
-// private:
-// };
-
-// class HttpCelDataInputFactory : public Matcher::DataInputFactory<Envoy::Http::HttpMatchingData> {
-// public:
-//   HttpCelDataInputFactory() = default;
-//   std::string name() const override { return "envoy.matching.inputs.cel_data_input"; }
-
-//   virtual Matcher::DataInputFactoryCb<Envoy::Http::HttpMatchingData>
-//   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&)
-//   override {
-//     return [] { return std::make_unique<HttpCelDataInput>(); };
-//   }
-
-//   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-//     return std::make_unique<xds::type::matcher::v3::HttpAttributesCelMatchInput>();
-//   }
-
-// private:
-// };
-
-// DECLARE_FACTORY(HttpCelDataInputFactory);
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

@@ -51,9 +51,11 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         # "//source/common/matcher:cel_matcher_lib",
-        "//source/extensions/common/matcher:cel_matcher_lib",
+        # "//source/extensions/common/matcher:cel_matcher_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        # "//source/extensions/matching/input_matchers/cel_matcher:config",
+        "//source/extensions/matching/input_matchers/cel_matcher:cel_matcher_lib",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
 )
