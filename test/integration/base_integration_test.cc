@@ -29,6 +29,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+}
+
 using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
@@ -40,13 +46,13 @@ using ::testing::ReturnRef;
 
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
-      config_helper_(version, *api_, config),
+      config_helper_(version, bootstrap),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
@@ -73,14 +79,22 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
 #endif
 }
 
+BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(upstream_address_fn, version, configToBootstrap(config)) {}
+
+const BaseIntegrationTest::InstanceConstSharedPtrFn
+BaseIntegrationTest::defaultAddressFunction(Network::Address::IpVersion version) {
+  return [version](int) {
+    return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
+                                                  0);
+  };
+}
+
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
-    : BaseIntegrationTest(
-          [version](int) {
-            return Network::Utility::parseInternetAddress(
-                Network::Test::getLoopbackAddressString(version), 0);
-          },
-          version, config) {}
+    : BaseIntegrationTest(defaultAddressFunction(version), version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);

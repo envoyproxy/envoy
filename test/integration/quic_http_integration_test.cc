@@ -1489,8 +1489,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
 
   // Remove filter_chain_1.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1532,8 +1531,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
 
   // Remove filter_chain_1.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1552,8 +1550,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   makeRequestAndWaitForResponse(*codec_client_0);
 
   // Modify the default filter chain.
-  ConfigHelper new_config_helper1(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(new_config_helper.bootstrap()));
+  ConfigHelper new_config_helper1(version_, new_config_helper.bootstrap());
   new_config_helper1.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                            -> void {
     auto default_filter_chain =
@@ -1576,9 +1573,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   makeRequestAndWaitForResponse(*codec_client_1);
 
   // Remove the default filter chain.
-  ConfigHelper new_config_helper2(
-      version_, *api_,
-      MessageUtil::getJsonStringFromMessageOrError(new_config_helper1.bootstrap()));
+  ConfigHelper new_config_helper2(version_, config_helper_.bootstrap());
   new_config_helper2.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1607,8 +1602,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   codec_client_0->close();
 
   // Modify 1st transport socket factory to disable early data.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false);
 
   new_config_helper.setLds("1");

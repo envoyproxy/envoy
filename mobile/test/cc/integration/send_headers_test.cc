@@ -1,4 +1,5 @@
 #include "test/common/integration/test_engine_builder.h"
+#include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -62,7 +63,9 @@ struct Status {
 
 TEST(SendHeadersTest, CanSendHeaders) {
   TestEngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.createEngine(CONFIG);
+  auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
+  TestUtility::loadFromYaml(CONFIG, *bootstrap);
+  Platform::EngineSharedPtr engine = engine_builder.createEngine(std::move(bootstrap));
 
   Status status;
   absl::Notification stream_complete;

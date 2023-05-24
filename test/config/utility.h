@@ -139,12 +139,16 @@ public:
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
+  // Sets up config with the provided bootstrap.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
                const std::string& config = httpProxyConfig(false, false));
 
   static void
