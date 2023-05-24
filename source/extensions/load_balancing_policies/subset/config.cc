@@ -151,8 +151,7 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
   ASSERT(typed_config != nullptr,
          "Invalid load balancing policy configuration for subset load balancer");
 
-  // Create the load balancer factory that will be used to create the load balancer in the worker
-  // acctually.
+  // Create the load balancer factory that will be used to create the load balancer in the workers.
   auto lb_factory =
       std::make_shared<LbFactory>(*typed_config, cluster_info, runtime, random, time_source);
 

@@ -748,18 +748,19 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight)
     : original_priority_set_(subset_lb.original_priority_set_),
+      original_local_priority_set_(subset_lb.original_local_priority_set_),
       locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
   // Create at least one host set.
   getOrCreateHostSet(0);
 
   auto lb_pair = subset_lb.child_lb_creator_->createLoadBalancer(
-      *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.scope_,
-      subset_lb.runtime_, subset_lb.random_, subset_lb.time_source_);
+      *this, original_local_priority_set_, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_,
+      subset_lb.random_, subset_lb.time_source_);
 
   if (lb_pair.first != nullptr) {
     thread_aware_lb_ = std::move(lb_pair.first);
     thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create({*this, subset_lb.original_local_priority_set_});
+    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   } else {
     lb_ = std::move(lb_pair.second);
   }
@@ -901,7 +902,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
   if (thread_aware_lb_ != nullptr) {
-    lb_ = thread_aware_lb_->factory()->create();
+    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   }
 }
 

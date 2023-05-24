@@ -254,6 +254,7 @@ private:
 
   private:
     const PrioritySet& original_priority_set_;
+    const PrioritySet* original_local_priority_set_{};
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
     bool empty_ = true;

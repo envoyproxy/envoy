@@ -1491,6 +1491,8 @@ envoy.load_balancing_policies.subset:
   - envoy.load_balancing_policies
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.subset.v3.Sebset
 envoy.load_balancing_policies.cluster_provided:
   categories:
   - envoy.load_balancing_policies
