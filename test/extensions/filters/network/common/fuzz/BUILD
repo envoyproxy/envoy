@@ -9,6 +9,10 @@ load(
     "//source/extensions:all_extensions.bzl",
     "envoy_filters_from_selected",
 )
+load(
+    ":config.bzl",
+    "READFILTER_FUZZ_FILTERS",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -35,22 +39,6 @@ envoy_proto_library(
         "@envoy_api//envoy/config/listener/v3:pkg",
     ],
 )
-
-# The filters to be fuzzed by the network_readfilter_fuzz_test. Prefer to add only stable filters,
-# that do not have a dedicated fuzzer to them.
-READFILTER_FUZZ_FILTERS = [
-    "envoy.filters.network.client_ssl_auth",
-    "envoy.filters.network.ext_authz",
-    "envoy.filters.network.envoy_mobile_http_connection_manager",
-    # A dedicated http_connection_manager fuzzer can be found in
-    # test/common/http/conn_manager_impl_fuzz_test.cc
-    "envoy.filters.network.http_connection_manager",
-    "envoy.filters.network.local_ratelimit",
-    "envoy.filters.network.ratelimit",
-    "envoy.filters.network.rbac",
-    # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-    # "envoy.filters.network.tcp_proxy",
-]
 
 envoy_cc_test_library(
     name = "vig_anymap_ext_lib",
