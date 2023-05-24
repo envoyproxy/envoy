@@ -96,11 +96,11 @@ CEL Matching
 
 .. _extension_envoy.matching.inputs.cel_data_input:
 
-* :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>` CEL matching data input.
+* CEL matching data input: :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
 
 .. _extension_envoy.matching.matchers.cel_matcher:
 
-* :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>` CEL input matcher.
+* CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
 
 Matching actions
 ################

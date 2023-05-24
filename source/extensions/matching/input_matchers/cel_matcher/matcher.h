@@ -5,15 +5,13 @@
 #include <string>
 #include <variant>
 
-// #include "eval/public/cel_expression.h"
-// #include "eval/public/cel_value.h"
-#include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/common/protobuf/utility.h"
-// #include "google/api/expr/checked.proto.h"
-// #include "third_party/cel/cpp/eval/public/base_activation.h"
 #include "envoy/matcher/matcher.h"
-#include "xds/type/matcher/v3/cel.pb.h"
+
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+
 #include "absl/types/variant.h"
+#include "xds/type/matcher/v3/cel.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +19,6 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
-using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
 using ::Envoy::Matcher::InputMatcher;
 using ::Envoy::Matcher::InputMatcherFactoryCb;
 using ::Envoy::Matcher::MatchingDataType;

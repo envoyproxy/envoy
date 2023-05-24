@@ -9,16 +9,14 @@ namespace CelMatcher {
 CelInputMatcher::CelInputMatcher(const CelExpression& input_expr) {
   expr_builder_ = Extensions::Filters::Common::Expr::createBuilder(nullptr);
   switch (input_expr.expr_specifier_case()) {
-  case CelExpression::ExprSpecifierCase::kParsedExpr: {
+  case CelExpression::ExprSpecifierCase::kParsedExpr:
     compiled_expr_ =
         Filters::Common::Expr::createExpression(*expr_builder_, input_expr.parsed_expr().expr());
     return;
-  }
-  case CelExpression::ExprSpecifierCase::kCheckedExpr: {
+  case CelExpression::ExprSpecifierCase::kCheckedExpr:
     compiled_expr_ =
         Filters::Common::Expr::createExpression(*expr_builder_, input_expr.checked_expr().expr());
     return;
-  }
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
@@ -30,11 +28,10 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
   if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
       ptr != nullptr) {
     CelMatchData* cel_data = dynamic_cast<CelMatchData*>((*ptr).get());
-    // Return false if we don't have compiled CEL expression or CEL input data is empty.
-    if (compiled_expr_ == nullptr || cel_data == nullptr) {
-      ENVOY_LOG(debug, "Failed to match due to the absence of CEL expression or no CEL data");
-      return false;
-    }
+    // Compiled expression here should not be nullptr as the program will be panic in constructor
+    // if such error cases happen. CEL matching data also should not be nullptr as error should be
+    // thrown in at CEL library already.
+    ASSERT(compiled_expr_ != nullptr && cel_data != nullptr)
 
     auto eval_result = compiled_expr_->Evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
