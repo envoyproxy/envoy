@@ -38,7 +38,9 @@ jobs:
   swifthelloworld:
     if: ${{ needs.env.outputs.mobile_ios_build == 'true' }}
     name: swift_helloworld
-    needs: iosbuild
+    needs:
+    - env
+    - iosbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
@@ -115,9 +117,10 @@ jobs:
       name: 'Log app run'
   swiftexperimentalapp:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
-    needs: env
+    needs:
+    - env
+    - iosbuild
     name: swift_experimental_app
-    needs: iosbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
@@ -158,9 +161,10 @@ jobs:
       name: 'Log app run'
   swiftasyncawait:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
-    needs: env
+    needs:
+    - env
+    - iosbuild
     name: swift_async_await
-    needs: iosbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
@@ -214,9 +218,10 @@ jobs:
       name: 'Log app run'
   objchelloworld:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
-    needs: env
+    needs:
+    - env
+    - iosbuild
     name: objc_helloworld
-    needs: iosbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
