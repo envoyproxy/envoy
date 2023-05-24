@@ -29,7 +29,7 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 
 // Creates a default bootstrap config from the EngineBuilder.
 // Only used to build the Engine if `override_builder_config_` is set to true.
-std::string defaultConfig();
+envoy::config::bootstrap::v3::Bootstrap defaultConfig();
 
 // A base class for Envoy Mobile client integration tests which interact with Envoy through the
 // Http::Client class.
@@ -38,8 +38,7 @@ std::string defaultConfig();
 // into a test lib.
 class BaseClientIntegrationTest : public BaseIntegrationTest {
 public:
-  BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
-                            const std::string& bootstrap_config = defaultConfig());
+  BaseClientIntegrationTest(Network::Address::IpVersion ip_version);
   virtual ~BaseClientIntegrationTest() = default;
   // Note: This class does not inherit from testing::Test and so this TearDown() method
   // does not override testing::Test::TearDown(). As a result, it will not be called

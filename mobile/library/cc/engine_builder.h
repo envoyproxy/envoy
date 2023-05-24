@@ -37,6 +37,7 @@ struct NodeLocality {
 class EngineBuilder {
 public:
   EngineBuilder();
+  virtual ~EngineBuilder() {}
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
@@ -109,20 +110,9 @@ public:
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
   // This is separated from build() for the sake of testability
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
+  virtual std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
   EngineSharedPtr build();
-
-protected:
-  // Overrides the EngineBuilder's constructed configuration with the YAML config supplied in the
-  // `config` parameter. Any prior or subsequent calls to the EngineBuilder's APIs are ignored in
-  // favor of using the YAML string to construct the Envoy Engine's Bootsrap configuration.
-  //
-  // This method is protected so that production code does not rely on it.
-  //
-  // Tests that need access to this method should go through the TestEngineBuilder class, which
-  // provides access to this method.
-  EngineBuilder& setOverrideConfigForTests(std::string config);
 
 private:
   struct NativeFilterConfig {
@@ -149,7 +139,6 @@ private:
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
-  std::string config_override_for_tests_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;
