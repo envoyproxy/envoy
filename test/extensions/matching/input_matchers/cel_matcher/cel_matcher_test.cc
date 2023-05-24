@@ -8,12 +8,11 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
-// TODO(tyxia) Update after it is moved.
-#include "source/extensions/matching/http/cel_input/cel_input.h"
-#include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
-#include "source/extensions/matching/input_matchers/cel_matcher/config.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/matching/http/cel_input/cel_input.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/config.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"

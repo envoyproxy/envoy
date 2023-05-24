@@ -45,16 +45,13 @@ public:
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
-    // TODO(tyxia) probably never hit!!
+    // TODO(tyxia) probably never hit!! Removed
     if (activation == nullptr) {
       std::cout << "tyxia not available 2 \n";
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     std::unique_ptr<StreamActivation> stream_activation =
         absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
-
-    static_assert(std::is_move_constructible<StreamActivation>::value, "not move constructible");
-    static_assert(std::is_move_assignable<StreamActivation>::value, "not move assignable");
 
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::make_unique<CelMatchData>(std::move(*stream_activation))};

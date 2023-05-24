@@ -176,18 +176,6 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   }
 }
 
-TEST(MatchingData, HttpCelDataInput) {
-  HttpMatchingDataImpl data(createStreamInfo());
-  {
-    TestRequestHeaderMapImpl request_headers({{"authenticated_user", "staging"}});
-    data.onRequestHeaders(request_headers);
-    HttpCelDataInput input;
-    auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-  }
-}
-
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

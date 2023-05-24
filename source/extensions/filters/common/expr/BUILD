@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "evaluator_lib",
     srcs = ["evaluator.cc"],
     hdrs = ["evaluator.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":context_lib",
         "//source/common/http:utility_lib",
