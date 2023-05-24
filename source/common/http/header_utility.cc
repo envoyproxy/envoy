@@ -301,6 +301,19 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   }
 }
 
+bool HeaderUtility::hostHasPort(absl::string_view original_host) {
+  const absl::string_view::size_type port_start = getPortStart(original_host);
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  if (port_start == absl::string_view::npos) {
+    return false;
+  }
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return false;
+  }
+  return true;
+}
+
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
                                                           absl::optional<uint32_t> listener_port) {
   const absl::string_view original_host = headers.getHostValue();

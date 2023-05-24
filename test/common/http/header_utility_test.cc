@@ -56,6 +56,26 @@ TEST_F(HeaderUtilityTest, HasHost) {
   }
 }
 
+TEST_F(HeaderUtilityTest, HostHasPort) {
+  const std::vector<std::pair<std::string, bool>> host_headers{
+      {"localhost", false},      // w/o port part
+      {"localhost:443", true},   // name w/ port
+      {"", false},               // empty
+      {":443", true},            // just port
+      {"192.168.1.1", false},    // ipv4
+      {"192.168.1.1:443", true}, // ipv4 w/ port
+      {"[fc00::1]:443", true},   // ipv6 w/ port
+      {"[fc00::1]", false},      // ipv6
+      {":", false},              // malformed string #1
+      {"]:", false},             // malformed string #2
+      {":abc", false},           // malformed string #3
+  };
+
+  for (const auto& host_pair : host_headers) {
+    EXPECT_EQ(host_pair.second, HeaderUtility::hostHasPort(host_pair.first));
+  }
+}
+
 // Port's part from host header get removed
 TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
