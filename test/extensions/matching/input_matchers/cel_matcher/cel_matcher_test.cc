@@ -74,15 +74,6 @@ public:
     case ExpressionType::NoExpression:
       break;
     }
-    // if (is_checked_expr) {
-    //   google::api::expr::v1alpha1::CheckedExpr checked_expr;
-    //   Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
-    //   cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
-    // } else {
-    //   google::api::expr::v1alpha1::ParsedExpr parsed_expr;
-    //   Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
-    //   cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
-    // }
 
     xds::type::matcher::v3::Matcher matcher;
     auto* inner_matcher = matcher.mutable_matcher_list()->add_matchers();
