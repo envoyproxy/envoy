@@ -31,7 +31,7 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     // Compiled expression here should not be nullptr as the program will be panic in constructor
     // if such error cases happen. CEL matching data also should not be nullptr as error should be
     // thrown in at CEL library already.
-    ASSERT(compiled_expr_ != nullptr && cel_data != nullptr)
+    ASSERT(compiled_expr_ != nullptr && cel_data != nullptr);
 
     auto eval_result = compiled_expr_->Evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
