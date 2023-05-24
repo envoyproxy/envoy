@@ -104,13 +104,7 @@ public:
   Envoy::Http::Matching::HttpMatchingDataImpl data_;
 };
 
-// google3/third_party/envoy/src/test/extensions/common/matcher/trie_matcher_test.cc
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
-  // HttpCelDataInputTestFactory factory;
-  //  Http::Matching::HttpCelDataInputFactory factory;
-  //  Registry::InjectFactory<Http::Matching::HttpCelDataInputFactory> register_factory(factory);
-  //  TODO(tyxia) Refer to envoy.matching.inputs.destination_ip!!!
-
   auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
 
   Http::TestRequestHeaderMapImpl request_headers = default_headers_;

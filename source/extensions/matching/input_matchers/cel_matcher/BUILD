@@ -13,6 +13,7 @@ envoy_cc_library(
     name = "cel_matcher_lib",
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
+    # TODO(tyxia) tweak visibility after cel inputs is moved
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/matcher:matcher_interface",

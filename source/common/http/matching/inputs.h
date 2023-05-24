@@ -9,17 +9,9 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 
-// #include "source/common/matcher/cel_matcher.h"
-// #include "source/extensions/filters/common/expr/evaluator.h"
-
-#include "xds/type/matcher/v3/http_inputs.pb.h"
-
 namespace Envoy {
 namespace Http {
 namespace Matching {
-
-// using Envoy::Extensions::Filters::Common::Expr::StreamActivation;
-
 /**
  * Common base class for all the header/trailer DataInputs.
  */

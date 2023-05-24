@@ -85,14 +85,3 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_library(
-    name = "cel_matcher_lib",
-    srcs = ["cel_matcher.cc"],
-    hdrs = ["cel_matcher.h"],
-    deps = [
-        "//envoy/matcher:matcher_interface",
-        "//source/extensions/filters/common/expr:evaluator_lib",
-        # "@com_google_googleapis//google/api/expr:checked_cc_proto",
-    ],
-)
