@@ -27,17 +27,7 @@ namespace Matcher {
 
 // Abstract interface for custom matching data.
 // Overrides this interface to provide custom matcher specific implementation.
-struct CustomMatchData {
-  CustomMatchData() = default;
-
-  // Non-copyable/non-assignable
-  CustomMatchData(const CustomMatchData&) = delete;
-  CustomMatchData& operator=(const CustomMatchData&) = delete;
-
-  // Move-constructible/move-assignable
-  CustomMatchData(CustomMatchData&& other) = default;
-  CustomMatchData& operator=(CustomMatchData&& other) = default;
-
+class CustomMatchData {
   virtual ~CustomMatchData() = default;
 };
 
