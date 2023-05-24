@@ -766,7 +766,8 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
-        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed");
+        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
+                              mut_status.message());
       }
     }
   };
