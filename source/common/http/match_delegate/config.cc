@@ -284,7 +284,7 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
       matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
-  std::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
+  absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
       std::nullopt;
   if (proto_config.has_xds_matcher()) {
     factory_cb = matcher_factory.create(proto_config.xds_matcher());
