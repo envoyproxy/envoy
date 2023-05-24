@@ -38,6 +38,7 @@ using BuilderPtr = std::unique_ptr<Builder>;
 
 // CEL matcher specific matching data
 class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
+public:
   explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
   StreamActivation data_;
 };
@@ -48,7 +49,7 @@ public:
 
   bool match(const MatchingDataType& input) override;
 
-  // TODO(tyxia) Formalize the validation the approach. Use fixed string for now.
+  // TODO(tyxia) Formalize the validation approach. Use fixed string for now.
   virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
     return absl::flat_hash_set<std::string>{"cel_data_input"};
   }

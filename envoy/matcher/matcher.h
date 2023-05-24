@@ -28,6 +28,7 @@ namespace Matcher {
 // Abstract interface for custom matching data.
 // Overrides this interface to provide custom matcher specific implementation.
 class CustomMatchData {
+public:
   virtual ~CustomMatchData() = default;
 };
 
