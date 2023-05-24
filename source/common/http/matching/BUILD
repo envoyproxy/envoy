@@ -32,30 +32,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
-        # "//source/common/matcher:cel_matcher_lib",
-        # "//source/extensions/filters/common/expr:evaluator_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
-    name = "cel_input_lib",
-    srcs = ["cel_input.cc"],
-    hdrs = [
-        "cel_input.h",
-    ],
-    deps = [
-        "//envoy/http:filter_interface",
-        "//envoy/http:header_map_interface",
-        "//source/common/http:header_utility_lib",
-        "//source/common/http:utility_lib",
-        # "//source/common/matcher:cel_matcher_lib",
-        # "//source/extensions/common/matcher:cel_matcher_lib",
-        "//source/extensions/filters/common/expr:evaluator_lib",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
-        # "//source/extensions/matching/input_matchers/cel_matcher:config",
-        "//source/extensions/matching/input_matchers/cel_matcher:cel_matcher_lib",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
 )

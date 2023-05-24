@@ -173,6 +173,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/common_inputs/environment @snowp @donyu
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @UNOWNED
+# CEL data input
+/*/extensions/matching/http/cel_input @tyxia @UNOWNED
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @UNOWNED
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa

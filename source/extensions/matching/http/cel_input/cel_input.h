@@ -14,8 +14,14 @@
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
 namespace Matching {
+namespace Http {
+namespace CelInput {
+
+using ::Envoy::Http::RequestHeaderMapOptConstRef;
+using ::Envoy::Http::ResponseHeaderMapOptConstRef;
+using ::Envoy::Http::ResponseTrailerMapOptConstRef;
 
 using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
 using ::Envoy::Extensions::Matching::InputMatchers::CelMatcher::CelMatchData;
@@ -74,6 +80,8 @@ public:
 
 DECLARE_FACTORY(HttpCelDataInputFactory);
 
-} // namespace Matching
+} // namespace CelInput
 } // namespace Http
+} // namespace Matching
+} // namespace Extensions
 } // namespace Envoy

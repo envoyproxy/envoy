@@ -91,7 +91,7 @@ EXTENSIONS = {
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
     # TODO(tyxia) Move this to extension.
-    # "envoy.matching.inputs.cel_data_input":             "//source/common/http/matching:cel_input_lib",
+    "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
     #
     # Generic Inputs
     #

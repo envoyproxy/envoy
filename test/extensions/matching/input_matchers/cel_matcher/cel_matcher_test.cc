@@ -9,7 +9,7 @@
 #include "envoy/registry/registry.h"
 
 // TODO(tyxia) Update after it is moved.
-#include "source/common/http/matching/cel_input.h"
+#include "source/extensions/matching/http/cel_input/cel_input.h"
 #include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
 #include "source/extensions/matching/input_matchers/cel_matcher/config.h"
 #include "source/common/matcher/matcher.h"
@@ -30,6 +30,11 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
+using ::Envoy::Http::LowerCaseString;
+using ::Envoy::Http::TestRequestHeaderMapImpl;
+using ::Envoy::Http::TestResponseHeaderMapImpl;
+using ::Envoy::Http::TestResponseTrailerMapImpl;
+
 class CelMatcherTest : public ::testing::Test {
 public:
   CelMatcherTest()
@@ -37,10 +42,10 @@ public:
         data_(Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_)) {}
 
   void buildCustomHeader(const absl::flat_hash_map<std::string, std::string>& custom_value_pairs,
-                         Http::TestRequestHeaderMapImpl& headers) {
+                         TestRequestHeaderMapImpl& headers) {
     // Add custom_value_pairs to the request header.
     for (auto const& pair : custom_value_pairs) {
-      headers.setCopy(Http::LowerCaseString(pair.first), pair.second);
+      headers.setCopy(LowerCaseString(pair.first), pair.second);
     }
   }
 
@@ -98,7 +103,7 @@ public:
   absl::string_view context_ = "";
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 
-  Http::TestRequestHeaderMapImpl default_headers_{
+  TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":scheme", "http"}, {":authority", "host"}};
 
   Envoy::Http::Matching::HttpMatchingDataImpl data_;
@@ -107,7 +112,7 @@ public:
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
   data_.onRequestHeaders(request_headers);
   // data.onRequestHeaders(request_headers);
@@ -123,7 +128,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
 
   // Build header with request header value field mismatched case.
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"authenticated_user", "NOT_MATCHED"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -133,7 +138,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   EXPECT_EQ(result.on_match_, absl::nullopt);
 
   // Build header with request header key field mismatched case.
-  Http::TestRequestHeaderMapImpl request_headers_2 = default_headers_;
+  TestRequestHeaderMapImpl request_headers_2 = default_headers_;
   buildCustomHeader({{"NOT_MATCHED", "staging"}}, request_headers_2);
   Envoy::Http::Matching::HttpMatchingDataImpl data_2 =
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
@@ -157,7 +162,7 @@ TEST_F(CelMatcherTest, CelMatcherNoRequestAttributes) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeadePathCelExprString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -171,7 +176,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeadePathCelExprString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   // The matching condition is: request.path == '/foo'.
   buildCustomHeader({{":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
@@ -185,10 +190,10 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
   auto matcher_tree = buildMatcherTree(ReponseHeadeCelExprString);
 
-  Http::TestResponseHeaderMapImpl response_headers;
-  response_headers.addCopy(Http::LowerCaseString(":status"), "200");
-  response_headers.addCopy(Http::LowerCaseString("content-type"), "text/plain");
-  response_headers.addCopy(Http::LowerCaseString("content-length"), "3");
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
   data_.onResponseHeaders(response_headers);
 
   const auto result = matcher_tree->match(data_);
@@ -201,7 +206,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
   auto matcher_tree = buildMatcherTree(ReponseHeadeCelExprString);
 
-  Http::TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
   data_.onResponseHeaders(response_headers);
 
   const auto result = matcher_tree->match(data_);
@@ -213,7 +218,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
   auto matcher_tree = buildMatcherTree(ReponseTrailerCelExprString);
 
-  Http::TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
   const auto result = matcher_tree->match(data_);
@@ -226,8 +231,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
   auto matcher_tree = buildMatcherTree(ReponseTrailerCelExprString);
 
-  Http::TestResponseTrailerMapImpl response_trailers = {
-      {"transfer-encoding", "chunked_not_matched"}};
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked_not_matched"}};
   data_.onResponseTrailers(response_trailers);
 
   const auto result = matcher_tree->match(data_);
@@ -239,7 +243,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeaderAndPathCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "staging"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -253,7 +257,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeaderAndPathCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "prod"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -266,7 +270,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeaderOrPathCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "prod"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -280,7 +284,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeaderOrPathCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "prod"}, {":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
@@ -293,14 +297,14 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestResponseMatched) {
   auto matcher_tree = buildMatcherTree(RequestAndResponseCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "staging"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  Http::TestResponseHeaderMapImpl response_headers = {{"content-type", "text/plain"}};
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/plain"}};
   data_.onResponseHeaders(response_headers);
 
-  Http::TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
   const auto result = matcher_tree->match(data_);
@@ -313,14 +317,14 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseMatched) {
 TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestAndResponseCelString);
 
-  Http::TestRequestHeaderMapImpl request_headers = default_headers_;
+  TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "staging"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  Http::TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
   data_.onResponseHeaders(response_headers);
 
-  Http::TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
   const auto result = matcher_tree->match(data_);

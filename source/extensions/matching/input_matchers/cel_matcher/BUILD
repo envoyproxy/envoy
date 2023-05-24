@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
     # TODO(tyxia) tweak visibility after cel inputs is moved
-    visibility = ["//visibility:public"],
+    # visibility = ["//visibility:public"],
     deps = [
         "//envoy/matcher:matcher_interface",
         "//source/common/protobuf:utility_lib",
@@ -26,7 +26,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
+    # visibility = ["//visibility:public"],
     deps = [
         ":cel_matcher_lib",
         "//envoy/matcher:matcher_interface",
