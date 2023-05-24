@@ -1129,6 +1129,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
+            "envoy.matching.inputs.cel_data_input",
+            "envoy.matching.matchers.cel_matcher",
         ],
         release_date = "2023-03-03",
         cpe = "cpe:2.3:a:google:flatbuffers:*",

@@ -36,10 +36,6 @@ These input functions are available for matching HTTP requests:
 * :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
 * :ref:`Query parameters value <extension_envoy.matching.inputs.query_params>`.
 
-.. _extension_envoy.matching.inputs.cel_data_input:
-
-* :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
-
 .. _extension_category_envoy.matching.network.input:
 
 Network Input Functions
@@ -91,6 +87,20 @@ are available in some contexts:
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+
+
+CEL Matching
+************
+
+CEL(Common Expression Language) based matching:
+
+.. _extension_envoy.matching.inputs.cel_data_input:
+
+* :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>` CEL matching data input.
+
+.. _extension_envoy.matching.matchers.cel_matcher:
+
+* :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>` CEL input matcher.
 
 Matching actions
 ################

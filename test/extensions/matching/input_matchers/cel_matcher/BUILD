@@ -19,8 +19,8 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.matching.matchers.cel_matcher"],
     deps = [
-        "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/common/matcher:matcher_lib",
+        "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:cel_matcher_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//test/common/matcher:test_utility_lib",
