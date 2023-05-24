@@ -103,12 +103,13 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
-    filter_state->setData(ExtProcLoggingInfoName, std::make_shared<ExtProcLoggingInfo>(),
+  if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
+    filter_state->setData(callbacks.filterConfigName(),
+                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -126,12 +127,22 @@ Filter::StreamOpenState Filter::openStream() {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+    // have a proper implementation of streamInfo.
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
   if (stream_) {
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -435,6 +446,16 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   }
 
   if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+    // If no gRPC stream yet, opens it before sending data.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
@@ -514,6 +535,17 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   body_req->set_body(data.toString());
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
+                              bool end_stream) {
+  if (state.hasBufferedData()) {
+    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
+  } else {
+    // If there is no buffered data, sends an empty body.
+    Buffer::OwnedImpl data("");
+    sendBodyChunk(state, data, new_state, end_stream);
+  }
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {

@@ -436,6 +436,11 @@ public:
    * for upstream filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
+
+  /**
+   * @return absl::string_view the name of the filter as configured in the filter chain.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
 };
 
 class DecoderFilterWatermarkCallbacks {

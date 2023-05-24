@@ -7,17 +7,17 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
   sizecurrent:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
     name: size_current
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:818d28832abf2a7c0cb2bff00435be231729a0bf
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -39,12 +39,12 @@ jobs:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizemain:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
     name: size_main
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:818d28832abf2a7c0cb2bff00435be231729a0bf
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -68,13 +68,15 @@ jobs:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizecompare:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs:
+    - sizecurrent
+    - sizemain
     name: size_compare
-    needs: [sizecurrent, sizemain]
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     container:
-      image: envoyproxy/envoy-build-ubuntu:818d28832abf2a7c0cb2bff00435be231729a0bf
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
     steps:
     - uses: actions/checkout@v3
     - uses: actions/download-artifact@v3

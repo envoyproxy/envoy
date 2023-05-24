@@ -60,14 +60,27 @@ parameters:
   displayName: "Run Packaging"
   type: string
   default: true
-- name: publishNetlify
-  displayName: "Publish Netlify"
+
+- name: publishDockerhub
+  displayName: "Publish Dockerhub"
   type: string
-  default: true
+  default: false
+- name: publishDocs
+  displayName: "Publish Docs"
+  type: string
+  default: false
+- name: publishDocsLatest
+  displayName: "Publish latest docs"
+  type: string
+  default: false
+- name: publishDocsRelease
+  displayName: "Publish release docs"
+  type: string
+  default: false
 - name: publishGithubRelease
   displayName: "Publish Github release"
   type: string
-  default: true
+  default: false
 
 
 jobs:
@@ -213,8 +226,83 @@ jobs:
           set -e
           rm -rf $(Build.StagingDirectory)/.gnupg
 
+- job: docs
+  displayName: Publish docs
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.publishDocs }}, 'true'))
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: docs
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+      stepsPost:
+
+      - script: |
+          ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
+        condition: |
+          and(not(canceled()),
+              eq(${{ parameters.publishDockerhub }}, 'true'))
+        displayName: "Publish Dockerhub description and README"
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_RBE: "1"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+
+      # Trigger Netlify rebuild of latest docs
+      - script: |
+          ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+        displayName: "Upload Docs to GCS"
+        condition: |
+          and(not(canceled()),
+              eq(${{ parameters.publishDocsLatest }}, 'true'))
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_RBE: "1"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'
+        condition: |
+          and(not(canceled()),
+              eq(${{ parameters.publishDocsLatest }}, 'true'))
+        displayName: "Publish latest docs"
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
+
+      # Publish docs to the website
+      - task: InstallSSHKey@0
+        condition: |
+          and(not(canceled()),
+              eq(${{ parameters.publishDocsRelease }}, 'true'))
+        inputs:
+          hostName: $(authGithubSSHKeyPublic)
+          sshPublicKey: "${{ parameters.authSSHDocsKeyPublic }}"
+          sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
+          sshKeySecureFile: "${{ parameters.authSSHDocsKey }}"
+      - script: docs/publish.sh
+        condition: |
+          and(not(canceled()),
+              eq(${{ parameters.publishDocsRelease }}, 'true'))
+        displayName: "Publish release docs"
+        workingDirectory: $(Build.SourcesDirectory)
+
 - job: success
-  dependsOn: ["docker", "package_x64", "package_arm64"]
+  dependsOn: ["docker", "package_x64", "package_arm64", "docs"]
   displayName: Success (linux artefacts)
   pool:
     vmImage: "ubuntu-20.04"
@@ -226,80 +314,12 @@ jobs:
     and(
       in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+      in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none
   - bash: |
       echo "building publishable assets complete"
-
-- job: docs
-  displayName: Publish docs to netlify
-  dependsOn: ["success"]
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.publishNetlify }}, 'true'))
-  pool:
-    vmImage: "ubuntu-20.04"
-  steps:
-  - task: Cache@2
-    inputs:
-      key: 'docs | $(cacheKeyBazelFiles)'
-      path: $(Build.StagingDirectory)/repository_cache
-    continueOnError: true
-
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-      AZP_BRANCH: $(Build.SourceBranch)
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-    displayName: "Generate docs"
-
-  - script: |
-      ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
-    displayName: "Publish Dockerhub description and README"
-    env:
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_RBE: "1"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-      DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
-      DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
-    condition: and(eq(variables['isMain'], 'true'), eq(variables['PostSubmit'], true))
-
-  - script: |
-      ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
-    displayName: "Upload Docs to GCS"
-    env:
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_RBE: "1"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-    condition: eq(variables['isMain'], 'true')
-
-  - task: InstallSSHKey@0
-    inputs:
-      hostName: $(authGithubSSHKeyPublic)
-      sshPublicKey: "${{ parameters.authSSHDocsKeyPublic }}"
-      sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
-      sshKeySecureFile: "${{ parameters.authSSHDocsKey }}"
-
-  - script: docs/publish.sh
-    displayName: "Publish to GitHub"
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
 
 - job: github
   displayName: Publish release tag
