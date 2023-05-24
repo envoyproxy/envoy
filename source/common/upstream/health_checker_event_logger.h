@@ -35,8 +35,9 @@ public:
     }
 
     for (const auto& config : health_check_config.event_logger()) {
-      if (!config.has_typed_config())
+      if (!config.has_typed_config()) {
         continue;
+      }
       auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
       event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));
     }

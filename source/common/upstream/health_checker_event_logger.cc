@@ -70,8 +70,10 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   }
 
 #ifdef ENVOY_ENABLE_YAML
-  if (file_ == nullptr)
+  if (file_ == nullptr) {
     return;
+  }
+
   // Make sure the type enums make it into the JSON
   const auto json =
       MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
