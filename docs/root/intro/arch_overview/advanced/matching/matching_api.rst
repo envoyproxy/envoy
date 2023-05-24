@@ -148,69 +148,6 @@ with the tree matcher in an arbitrary order. The example describes the following
 the filter if ``some-header: skip_filter`` is present and ``second-header`` is set to *either* ``foo`` or
 ``bar``.
 
-Per-Route Configuration
-****************************
-
-The matcher can also be configured on a per-route basis.
-For example, to match only on a specific ``/static`` route:
-
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      typed_per_filter_config:
-        envoy.filters.http.match_delegate:
-          "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcherPerRoute
-          extension_config:
-            name: set-response-code
-            typed_config:
-              "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-              code: 403
-          xds_matcher:
-            matcher_tree:
-              input:
-                name: request-headers
-                typed_config:
-                  "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                  header_name: match-header
-              exact_match_map:
-                map:
-                  match:
-                    action:
-                      name: skip
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-      routes:
-      - match: { prefix: "/static" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          envoy.filters.http.match_delegate:
-            "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcherPerRoute
-            extension_config:
-              name: set-response-code
-              typed_config:
-                "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-                code: 200
-            xds_matcher:
-              matcher_tree:
-                input:
-                  name: request-headers
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                    header_name: match-header
-                exact_match_map:
-                  map:
-                    match:
-                      action:
-                        name: skip
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
-
 .. _arch_overview_matching_api_iteration_impact:
 
 HTTP Filter Iteration Impact
