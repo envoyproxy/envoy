@@ -34,6 +34,12 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
 
+enum class ExpressionType {
+  CheckedExpression = 0,
+  ParsedExpression = 1,
+  NoExpression = 2,
+};
+
 class CelMatcherTest : public ::testing::Test {
 public:
   CelMatcherTest()
@@ -49,11 +55,34 @@ public:
   }
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
-  buildMatcherTree(const std::string& cel_expr_config) {
-    google::api::expr::v1alpha1::CheckedExpr checked_expr;
-    Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+  buildMatcherTree(const std::string& cel_expr_config,
+                   ExpressionType expr_type = ExpressionType::CheckedExpression) {
     xds::type::matcher::v3::CelMatcher cel_matcher;
-    cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+    switch (expr_type) {
+    case ExpressionType::CheckedExpression: {
+      google::api::expr::v1alpha1::CheckedExpr checked_expr;
+      Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+      cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+      break;
+    }
+    case ExpressionType::ParsedExpression: {
+      google::api::expr::v1alpha1::ParsedExpr parsed_expr;
+      Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+      cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+      break;
+    }
+    case ExpressionType::NoExpression:
+      break;
+    }
+    // if (is_checked_expr) {
+    //   google::api::expr::v1alpha1::CheckedExpr checked_expr;
+    //   Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+    //   cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+    // } else {
+    //   google::api::expr::v1alpha1::ParsedExpr parsed_expr;
+    //   Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+    //   cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+    // }
 
     xds::type::matcher::v3::Matcher matcher;
     auto* inner_matcher = matcher.mutable_matcher_list()->add_matchers();
@@ -326,6 +355,52 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatched) {
   // The match was completed, no match found.
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
   EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestResponseMatchedWithParsedExpr) {
+  auto matcher_tree =
+      buildMatcherTree(RequestAndResponseCelString, ExpressionType::ParsedExpression);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/plain"}};
+  data_.onResponseHeaders(response_headers);
+
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  data_.onResponseTrailers(response_trailers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
+  auto matcher_tree =
+      buildMatcherTree(RequestAndResponseCelString, ExpressionType::ParsedExpression);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
+  data_.onResponseHeaders(response_headers);
+
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  data_.onResponseTrailers(response_trailers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was completed, no match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, NoCelExpression) {
+  EXPECT_DEATH(buildMatcherTree(RequestHeadeCelExprString, ExpressionType::NoExpression),
+               ".*panic: unset oneof.*");
 }
 
 } // namespace CelMatcher

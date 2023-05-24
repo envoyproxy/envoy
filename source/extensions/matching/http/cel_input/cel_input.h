@@ -23,7 +23,6 @@ using ::Envoy::Http::RequestHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseTrailerMapOptConstRef;
 
-using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
 using ::Envoy::Extensions::Matching::InputMatchers::CelMatcher::CelMatchData;
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
@@ -46,14 +45,11 @@ public:
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
-    std::unique_ptr<StreamActivation> stream_activation =
-        absl::WrapUnique(static_cast<StreamActivation*>(activation.release()));
-
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::make_unique<CelMatchData>(std::move(*stream_activation))};
+            std::make_unique<CelMatchData>(std::move(activation))};
   }
 
-  virtual absl::string_view dataInputType() const override { return "cel_data_input"; }
+  absl::string_view dataInputType() const override { return "cel_data_input"; }
 };
 
 class HttpCelDataInputFactory : public Matcher::DataInputFactory<Envoy::Http::HttpMatchingData> {
@@ -66,7 +62,7 @@ public:
     return [] { return std::make_unique<HttpCelDataInput>(); };
   }
 
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<xds::type::matcher::v3::HttpAttributesCelMatchInput>();
   }
 };

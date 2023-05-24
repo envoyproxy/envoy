@@ -32,12 +32,11 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     CelMatchData* cel_data = dynamic_cast<CelMatchData*>((*ptr).get());
     // Return false if we don't have compiled CEL expression or CEL input data is empty.
     if (compiled_expr_ == nullptr || cel_data == nullptr) {
-      ENVOY_LOG(debug, "Failed to match due to either the absence of the compiled CEL expression "
-                       "or the failure of retrieving the CEL data");
+      ENVOY_LOG(debug, "Failed to match due to the absence of CEL expression or no CEL data");
       return false;
     }
 
-    auto eval_result = compiled_expr_->Evaluate(cel_data->data_, &arena);
+    auto eval_result = compiled_expr_->Evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
       return eval_result.value().BoolOrDie();
     }

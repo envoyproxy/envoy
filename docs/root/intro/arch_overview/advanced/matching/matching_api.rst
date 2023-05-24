@@ -92,7 +92,7 @@ are available in some contexts:
 CEL Matching
 ************
 
-CEL(Common Expression Language) based matching:
+`Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching.
 
 .. _extension_envoy.matching.inputs.cel_data_input:
 

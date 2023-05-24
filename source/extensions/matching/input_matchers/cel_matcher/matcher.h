@@ -23,11 +23,9 @@ namespace CelMatcher {
 
 using ::Envoy::Extensions::Filters::Common::Expr::StreamActivation;
 using ::Envoy::Matcher::InputMatcher;
-using ::Envoy::Matcher::InputMatcherFactory;
 using ::Envoy::Matcher::InputMatcherFactoryCb;
 using ::Envoy::Matcher::MatchingDataType;
 
-using google::api::expr::runtime::CelValue;
 using xds::type::v3::CelExpression;
 
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
@@ -39,8 +37,8 @@ using BuilderPtr = std::unique_ptr<Builder>;
 // CEL matcher specific matching data
 class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
 public:
-  explicit CelMatchData(StreamActivation data) : data_(std::move(data)) {}
-  StreamActivation data_;
+  explicit CelMatchData(BaseActivationPtr activation) : activation_(std::move(activation)) {}
+  BaseActivationPtr activation_;
 };
 
 class CelInputMatcher : public InputMatcher, public Logger::Loggable<Logger::Id::matcher> {
@@ -50,7 +48,7 @@ public:
   bool match(const MatchingDataType& input) override;
 
   // TODO(tyxia) Formalize the validation approach. Use fixed string for now.
-  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
+  absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
     return absl::flat_hash_set<std::string>{"cel_data_input"};
   }
 

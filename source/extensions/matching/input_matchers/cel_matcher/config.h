@@ -16,7 +16,7 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
-class CelInputMatcherFactory : public InputMatcherFactory {
+class CelInputMatcherFactory : public ::Envoy::Matcher::InputMatcherFactory {
 public:
   InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
