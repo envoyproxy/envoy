@@ -36,7 +36,6 @@ public:
     // Returns NotAvailable state when all of three are empty. CEL matcher can support mix matching
     // condition of request headers, response headers and response trailers.
     if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
-      std::cout << "tyxia not available \n";
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 

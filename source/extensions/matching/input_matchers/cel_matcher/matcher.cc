@@ -33,22 +33,18 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     // Return false if we don't have compiled CEL expression or CEL input data is empty.
     if (compiled_expr_ == nullptr || cel_data == nullptr) {
       // TODO(tyxia) Add some logs
-      if (compiled_expr_ == nullptr) {
-        std::cout << "tyxia_xia_called_8\n";
-      }
-      if (cel_data == nullptr) {
-        std::cout << "tyxia_xia_called_2\n";
-      }
+      ENVOY_LOG(debug,
+                "Failed to match because either compiled CEL expression is missing or retrieval of "
+                "CEL data failed.")
       return false;
     }
 
     auto eval_result = compiled_expr_->Evaluate(cel_data->data_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
-      std::cout << "tyxia_xia_called_5\n";
       return eval_result.value().BoolOrDie();
     }
   }
-  std::cout << "tyxia_xia_called_3\n";
+
   return false;
 }
 

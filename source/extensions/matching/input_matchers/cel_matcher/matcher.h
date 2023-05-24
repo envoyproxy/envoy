@@ -54,7 +54,6 @@ public:
   }
 
 private:
-  // TODO(tyxia) lifetime
   BuilderPtr expr_builder_;
   CompiledExpressionPtr compiled_expr_;
 };

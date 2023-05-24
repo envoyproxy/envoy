@@ -77,13 +77,9 @@ public:
     MessageUtil::loadFromYaml(on_match_config, on_match,
                               ProtobufMessage::getStrictValidationVisitor());
 
-    // TODO(tyxia) build remove
-    // std::cout << on_match.DebugString() << std::endl;
     inner_matcher->mutable_on_match()->MergeFrom(on_match);
 
     auto string_factory_on_match = Matcher::TestDataInputStringFactory("value");
-    // TODO(tyxia) build remove
-    // std::cout << matcher.DebugString() << std::endl;
 
     Matcher::MockMatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> validation_visitor;
     EXPECT_CALL(validation_visitor,

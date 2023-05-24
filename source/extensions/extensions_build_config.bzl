@@ -90,13 +90,17 @@ EXTENSIONS = {
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
-    # TODO(tyxia) Move this to extension.
-    "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+
     #
     # Generic Inputs
     #
 
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
+
+    #
+    # CEL Matching Data Input
+    #
+    "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
 
     #
     # Matching actions
