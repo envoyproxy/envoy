@@ -38,7 +38,7 @@ These input functions are available for matching HTTP requests:
 
 .. _extension_envoy.matching.inputs.cel_data_input:
 
-* :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>`.
+* :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
 
 .. _extension_category_envoy.matching.network.input:
 

@@ -12,7 +12,6 @@ envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
     deps = [
-        "//source/common/http/matching:cel_input_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
         "//source/common/network:address_lib",
