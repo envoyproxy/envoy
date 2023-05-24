@@ -47,20 +47,6 @@ public:
           typed_config:
             "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
             code: 403
-        xds_matcher:
-          matcher_tree:
-            input:
-              name: request-headers
-              typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: match-header
-            exact_match_map:
-              map:
-                match:
-                  action:
-                    name: skip
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
     )EOF";
   const std::string per_route_config_ = R"EOF(
       xds_matcher:
@@ -72,7 +58,7 @@ public:
               header_name: match-header
           exact_match_map:
             map:
-              route:
+              match:
                 action:
                   name: skip
                   typed_config:
@@ -101,20 +87,21 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
 
 TEST_P(MatchDelegateInegrationTest, BasicFlow) {
   initialize();
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("403"));
-}
-
-TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
-  setPerRouteConfig(per_route_config_, "/test");
-  initialize();
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
 }
+
+TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
+  setPerRouteConfig(per_route_config_, "/test");
+  initialize();
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("403"));
+}
+
 } // namespace
 } // namespace MatchDelegate
 } // namespace Http

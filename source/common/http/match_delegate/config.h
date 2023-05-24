@@ -19,7 +19,8 @@ namespace MatchDelegate {
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
-class DelegatingStreamFilter : public Envoy::Http::StreamFilter {
+class DelegatingStreamFilter : public Logger::Loggable<Logger::Id::http>,
+                               public Envoy::Http::StreamFilter {
 public:
   using MatchDataUpdateFunc = std::function<void(Envoy::Http::Matching::HttpMatchingDataImpl&)>;
 
@@ -31,7 +32,7 @@ public:
     void evaluateMatchTree(MatchDataUpdateFunc data_update_func);
     bool skipFilter() const { return skip_filter_; }
     void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
-      if (has_match_tree_ && matching_data_ == nullptr) {
+      if (matching_data_ == nullptr) {
         matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
       }
     }
@@ -89,8 +90,6 @@ public:
   Envoy::Http::FilterMetadataStatus encodeMetadata(Envoy::Http::MetadataMap& metadata_map) override;
   void encodeComplete() override;
   void setEncoderFilterCallbacks(Envoy::Http::StreamEncoderFilterCallbacks& callbacks) override;
-
-  void resolveMatchTree(const Envoy::Http::StreamFilterCallbacks* callbacks);
 
 private:
   FilterMatchState match_state_;

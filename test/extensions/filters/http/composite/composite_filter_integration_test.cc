@@ -40,7 +40,7 @@ class CompositeFilterIntegrationTest : public testing::TestWithParam<Network::Ad
 public:
   CompositeFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  Route* getMutableRoute(VirtualHost* vh, const bool& add) {
+  static Route* getMutableRoute(VirtualHost* vh, const bool& add) {
     if (add) {
       return vh->add_routes();
     }
@@ -171,35 +171,6 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
-}
-
-// Verifies function of the per-route config in the ExtensionWithMatcher class with multiple routes.
-TEST_P(CompositeFilterIntegrationTest, TestMultiplePerRoute) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template, "composite"));
-  addPerRouteResponseCodeFilter(false, "composite", "/somepath", 401);
-  addPerRouteResponseCodeFilter(true, "composite", "/otherpath", 402);
-  initialize();
-
-  {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
-  }
-
-  cleanupUpstreamAndDownstream();
-
-  {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    const Http::TestRequestHeaderMapImpl custom_request_headers_ = {{":method", "POST"},
-                                                                    {":path", "/otherpath"},
-                                                                    {":scheme", "http"},
-                                                                    {"match-header", "match"},
-                                                                    {":authority", "blah"}};
-    auto response = codec_client_->makeRequestWithBody(custom_request_headers_, 1024);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
-  }
 }
 
 // Test that the specified filters apply per route configs to requests.
