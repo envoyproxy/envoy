@@ -1066,7 +1066,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
-                   *headers);
+                   Http::Utility::RedactSensitiveHeaderInfo(*headers));
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);

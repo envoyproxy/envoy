@@ -318,36 +318,40 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
 }
 
 void forEachCookie(
+    absl::string_view cookie_header_value,
+    const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
+  // Split the cookie header into individual cookies.
+  for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
+    // Find the key part of the cookie (i.e. the name of the cookie).
+    size_t first_non_space = s.find_first_not_of(' ');
+    size_t equals_index = s.find('=');
+    if (equals_index == absl::string_view::npos) {
+      // The cookie is malformed if it does not have an `=`. Continue
+      // checking other cookies in this header.
+      continue;
+    }
+    absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+    absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
+
+    // Cookie values may be wrapped in double quotes.
+    // https://tools.ietf.org/html/rfc6265#section-4.1.1
+    if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+      v = v.substr(1, v.size() - 2);
+    }
+
+    if (!cookie_consumer(k, v)) {
+      return;
+    }
+  }
+}
+
+void forEachCookie(
     const HeaderMap& headers, const LowerCaseString& cookie_header,
     const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
   const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
   for (size_t index = 0; index < cookie_headers.size(); index++) {
-    auto cookie_header_value = cookie_headers[index]->value().getStringView();
-
-    // Split the cookie header into individual cookies.
-    for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
-      // Find the key part of the cookie (i.e. the name of the cookie).
-      size_t first_non_space = s.find_first_not_of(' ');
-      size_t equals_index = s.find('=');
-      if (equals_index == absl::string_view::npos) {
-        // The cookie is malformed if it does not have an `=`. Continue
-        // checking other cookies in this header.
-        continue;
-      }
-      absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-      absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-      // Cookie values may be wrapped in double quotes.
-      // https://tools.ietf.org/html/rfc6265#section-4.1.1
-      if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-        v = v.substr(1, v.size() - 2);
-      }
-
-      if (!cookie_consumer(k, v)) {
-        return;
-      }
-    }
+    forEachCookie(cookie_headers[index]->value().getStringView(), cookie_consumer);
   }
 }
 
@@ -1492,6 +1496,52 @@ bool Utility::isValidRefererValue(absl::string_view value) {
   }
 
   return true;
+}
+
+void Utility::RedactSensitiveHeaderInfo::dumpState(std::ostream& os) const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.debug_redact_sensitive")) {
+    headers_.iterate([&os](const HeaderEntry& header) -> HeaderMap::Iterate {
+      os << "'" << header.key().getStringView() << "', '";
+      if (header.key() == Http::Headers::get().Path) {
+        handlePath(os, header.value());
+      } else if (header.key() == Http::Headers::get().Cookie) {
+        handleCookie(os, header.value());
+      } else if (header.key() == Http::CustomHeaders::get().Authorization) {
+        os << "[redacted]";
+      } else {
+        os << header.value().getStringView();
+      }
+      os << "'\n";
+      return HeaderMap::Iterate::Continue;
+    });
+  } else {
+    os << headers_;
+  }
+}
+
+void Utility::RedactSensitiveHeaderInfo::handlePath(std::ostream& os, const HeaderString& value) {
+  std::string stripped = Utility::stripQueryString(value);
+  if (stripped != value.getStringView()) {
+    os << stripped << "?[redacted]";
+  } else {
+    os << value.getStringView();
+  }
+}
+
+void Utility::RedactSensitiveHeaderInfo::handleCookie(std::ostream& os, const HeaderString& value) {
+  bool first = true;
+  forEachCookie(value.getStringView(),
+                [&os, &first](absl::string_view k, absl::string_view) -> bool {
+                  if (!first) {
+                    os << ";";
+                  }
+                  first = false;
+                  os << k << "="
+                     << "[redacted]";
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
 }
 
 } // namespace Http

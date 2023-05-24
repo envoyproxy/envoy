@@ -687,7 +687,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
+  ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_,
+                   Http::Utility::RedactSensitiveHeaderInfo(headers));
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
