@@ -11,7 +11,8 @@ namespace Upstream {
 class HealthCheckEventFileSink : public HealthCheckEventSink {
 public:
   explicit HealthCheckEventFileSink(
-      const envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink& config,
+      const envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink&
+          config,
       AccessLog::AccessLogManager& log_manager)
       : file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
             Filesystem::DestinationType::File, config.event_log_path()})) {}
