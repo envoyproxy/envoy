@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace {
 
-// Terminating CONNECT and sending raw TCP upstream.
+// Terminates CONNECT-UDP and sends raw UDP datagrams upstream.
 class ConnectUdpTerminationIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   ConnectUdpTerminationIntegrationTest() {}
@@ -91,6 +91,25 @@ TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
                         absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
 }
+
+TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
+}
+
+TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
+}
+
+TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
+}
+
+TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
+}
+
+TEST_P(ConnectUdpTerminationIntegrationTest, PathWithInvalidUriTemplate) {
+}
+
+TEST_P(ConnectUdpTerminationIntegrationTest, InvalidCapsulesSent) {
+}
+
 
 INSTANTIATE_TEST_SUITE_P(HttpVersions, ConnectUdpTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
