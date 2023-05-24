@@ -837,8 +837,11 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
   if (filter == nullptr) {
-    ASSERT(!state_.local_complete_);
-    state_.local_complete_ = end_stream;
+    if (streamInfo().responseCodeDetails().value() !=
+        StreamInfo::ResponseCodeDetails::get().ViaUpstream) {
+      ASSERT(!state_.local_complete_);
+      state_.local_complete_ = end_stream;
+    }
     return encoder_filters_.begin();
   }
 
