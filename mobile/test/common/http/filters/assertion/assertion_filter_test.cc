@@ -1,11 +1,11 @@
+#include "test/common/http/filters/assertion/config.h"
+#include "test/common/http/filters/assertion/filter.h"
+#include "test/common/http/filters/assertion/filter.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "library/common/extensions/filters/http/assertion/config.h"
-#include "library/common/extensions/filters/http/assertion/filter.h"
-#include "library/common/extensions/filters/http/assertion/filter.pb.h"
 
 using testing::ByMove;
 using testing::Return;

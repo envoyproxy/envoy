@@ -1,6 +1,6 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -14,7 +14,7 @@ envoy_proto_library(
     srcs = ["filter.proto"],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "test_remote_response_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -36,7 +36,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
