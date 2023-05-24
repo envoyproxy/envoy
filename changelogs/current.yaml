@@ -212,6 +212,11 @@ new_features:
 - area: admin
   change: |
     Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
+- area: upstream
+  change: |
+    Added :ref:`cluster provided extension
+    <envoy_v3_api_msg_extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided>`
+    to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: fault
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
