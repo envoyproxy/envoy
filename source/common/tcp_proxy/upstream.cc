@@ -153,6 +153,7 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
   if (!request_encoder_) {
     return;
   }
+  ENVOY_LOG(debug, "http upstream resetting encoder");
   request_encoder_->getStream().removeCallbacks(*this);
   if (!write_half_closed_ || !read_half_closed_) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);

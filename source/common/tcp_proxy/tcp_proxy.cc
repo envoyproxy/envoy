@@ -685,8 +685,8 @@ void Filter::onConnectTimeout() {
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
-                 read_callbacks_->connection(), data.length(), end_stream);
+  ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}, has upstream {}",
+                 read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr);
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
   if (upstream_) {
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());

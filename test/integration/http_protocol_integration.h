@@ -14,6 +14,7 @@ struct HttpProtocolTestParams {
   Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
+  bool tunneling_with_upstream_filters;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -76,6 +77,9 @@ public:
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
+    config_helper_.addRuntimeOverride(Runtime::upstream_http_filters_with_tcp_proxy,
+                                      GetParam().tunneling_with_upstream_filters ? "true"
+                                                                                 : "false");
   }
 
   void SetUp() override {

@@ -28,6 +28,8 @@ constexpr absl::string_view defer_processing_backedup_streams =
     "envoy.reloadable_features.defer_processing_backedup_streams";
 constexpr absl::string_view expand_agnostic_stream_lifetime =
     "envoy.reloadable_features.expand_agnostic_stream_lifetime";
+constexpr absl::string_view upstream_http_filters_with_tcp_proxy =
+    "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy";
 
 } // namespace Runtime
 } // namespace Envoy
