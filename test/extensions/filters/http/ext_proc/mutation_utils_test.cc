@@ -188,7 +188,7 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
 
-TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
+TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {"host", "localhost:1000"},
@@ -197,7 +197,7 @@ TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
   Envoy::Stats::MockCounter rejections;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
-  // Test header key contains null character.
+  // Test header key contains invalid character.
   s->mutable_header()->set_key("x-append-this\n");
   s->mutable_header()->set_value("value");
   EXPECT_CALL(rejections, inc());
@@ -206,7 +206,7 @@ TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
 
   mutation.Clear();
   s = mutation.add_set_headers();
-  // Test header value contains null character.
+  // Test header value contains invalid character.
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("value\r");
   EXPECT_CALL(rejections, inc());
@@ -214,7 +214,7 @@ TEST(MutationUtils, TestSetHeaderWithNullCharacter) {
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
-TEST(MutationUtils, TestRemoveHeaderWithNullCharacter) {
+TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {"host", "localhost:1000"},
