@@ -52,7 +52,6 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
-  HealthCheckEventLoggerPtr event_logger;
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
   switch (health_check_config.health_checker_case()) {
@@ -87,10 +86,11 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {
+    HealthCheckEventLoggerPtr event_logger;
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
         log_manager, dispatcher.timeSource(), health_check_config, *context);
+    context->setEventLogger(std::move(event_logger));
   }
-  context->setEventLogger(std::move(event_logger));
   return factory->createCustomHealthChecker(health_check_config, *context);
 }
 

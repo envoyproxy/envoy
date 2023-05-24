@@ -7,4 +7,4 @@ Health check event sinks
   :glob:
   :maxdepth: 2
 
-  ../../extensions/health_check_event_sinks/*/v3/*
+  ../../extensions/health_check/event_sinks/*/v3/*

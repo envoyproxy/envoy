@@ -1,4 +1,4 @@
-#include "source/extensions/health_check_event_sinks/file/file_sink_impl.h"
+#include "source/extensions/health_check/event_sinks/file/file_sink_impl.h"
 
 #include "envoy/registry/registry.h"
 
@@ -20,7 +20,7 @@ void HealthCheckEventFileSink::log(envoy::data::core::v3::HealthCheckEvent event
 HealthCheckEventSinkPtr HealthCheckEventFileSinkFactory::createHealthCheckEventSink(
     const ProtobufWkt::Any& config, Server::Configuration::HealthCheckerFactoryContext& context) {
   const auto& validator_config = Envoy::MessageUtil::anyConvertAndValidate<
-      envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink>(
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink>(
       config, context.messageValidationVisitor());
   return std::make_unique<HealthCheckEventFileSink>(validator_config, context.accessLogManager());
 }

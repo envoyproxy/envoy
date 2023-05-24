@@ -8,7 +8,7 @@
 #include "envoy/config/core/v3/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.h"
+#include "envoy/extensions/health_check/event_sinks/file/v3/file.pb.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -6461,7 +6461,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
 TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   envoy::config::core::v3::HealthCheck health_check_config;
   auto event_log = health_check_config.mutable_event_logger()->Add();
-  envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink config;
+  envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("foo");
   event_log->mutable_typed_config()->PackFrom(config);
 

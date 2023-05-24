@@ -31,7 +31,7 @@ public:
   createHealthCheckEventSink(const ProtobufWkt::Any& config,
                              Server::Configuration::HealthCheckerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.health_check_event_sink"; }
+  std::string category() const override { return "envoy.health_check.event_sinks"; }
 };
 
 } // namespace Upstream

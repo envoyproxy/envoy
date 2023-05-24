@@ -20,6 +20,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/upstream:health_check_event_sink_interface",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/health_check_event_sinks/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_check/event_sinks/file/v3:pkg_cc_proto",
     ],
 )

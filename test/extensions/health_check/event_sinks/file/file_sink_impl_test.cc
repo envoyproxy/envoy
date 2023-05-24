@@ -1,9 +1,9 @@
-#include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.h"
-#include "envoy/extensions/health_check_event_sinks/file/v3/file.pb.validate.h"
+#include "envoy/extensions/health_check/event_sinks/file/v3/file.pb.h"
+#include "envoy/extensions/health_check/event_sinks/file/v3/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/extensions/health_check_event_sinks/file/file_sink_impl.h"
+#include "source/extensions/health_check/event_sinks/file/file_sink_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -21,10 +21,10 @@ namespace Upstream {
 
 TEST(HealthCheckEventFileSinkFactory, createHealthCheckEventSink) {
   auto factory = Envoy::Registry::FactoryRegistry<HealthCheckEventSinkFactory>::getFactory(
-      "envoy.health_check_event_sink.file");
+      "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
 
-  envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink config;
+  envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("test_path");
   Envoy::ProtobufWkt::Any typed_config;
   typed_config.PackFrom(config);
@@ -35,17 +35,17 @@ TEST(HealthCheckEventFileSinkFactory, createHealthCheckEventSink) {
 
 TEST(HealthCheckEventFileSinkFactory, createEmptyHealthCheckEventSink) {
   auto factory = Envoy::Registry::FactoryRegistry<HealthCheckEventSinkFactory>::getFactory(
-      "envoy.health_check_event_sink.file");
+      "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
   auto empty_proto = factory->createEmptyConfigProto();
   auto config = *dynamic_cast<
-      envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink*>(
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink*>(
       empty_proto.get());
   EXPECT_TRUE(config.event_log_path().empty());
 }
 
 TEST(HealthCheckEventFileSink, logTest) {
-  envoy::extensions::health_check_event_sinks::file::v3::HealthCheckEventFileSink config;
+  envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("test_path");
   NiceMock<AccessLog::MockAccessLogManager> log_manager;
   StringViewSaver file_log_data;

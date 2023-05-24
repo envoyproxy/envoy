@@ -371,7 +371,7 @@ message HealthCheck {
   // .. attention::
   // This field is deprecated in favor of the extension
   // :ref:`event_logger <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>` and
-  // :ref:`event_log_path <envoy_v3_api_field_extensions.health_check_event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
+  // :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
   // in the file sink extension.
   //
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
@@ -379,7 +379,7 @@ message HealthCheck {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // A list of event log sinks to process the health check event.
-  // [#extension-category: envoy.health_check_event_sinks]
+  // [#extension-category: envoy.health_check.event_sinks]
   repeated TypedExtensionConfig event_logger = 25;
 
   // [#not-implemented-hide:]
