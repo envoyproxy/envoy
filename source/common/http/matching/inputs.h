@@ -237,18 +237,6 @@ DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
 //     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
 //             std::make_unique<Matcher::CelMatchData>(std::move(*stream_activation))};
-
-//     //  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-//     //         // TODO(tyxia) make unique
-//     //         std::make_shared<Matcher::CelMatchData>()};
-
-//     // absl::optional<StreamActivation> opt_ret;
-//     // opt_ret.emplace(std::move(*stream_activation));
-//     // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-//     //         std::move(opt_ret)};
-
-//     // return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-//     //         std::move(activation)};
 //   }
 
 //   virtual absl::string_view dataInputType() const override { return "cel_data_input"; }

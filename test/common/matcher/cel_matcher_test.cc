@@ -10,7 +10,7 @@
 
 // #include "source/common/http/matching/inputs.h"
 #include "source/common/http/matching/cel_input.h"
-#include "source/common/matcher/cel_matcher.h"
+#include "source/extensions/common/matcher/cel_matcher.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 

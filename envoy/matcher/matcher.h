@@ -26,8 +26,7 @@ class ServerFactoryContext;
 namespace Matcher {
 
 // Abstract interface for custom matching data.
-// Overrides this interface to provide custom matcher specific implementation. `CelMatchData` is an
-// example.
+// Overrides this interface to provide custom matcher specific implementation.
 struct CustomMatchData {
   CustomMatchData() = default;
 
@@ -42,9 +41,6 @@ struct CustomMatchData {
   virtual ~CustomMatchData() = default;
 };
 
-// using MatchingDataType = absl::variant<absl::monostate, std::string,
-// std::unique_ptr<CustomMatchData>>;
-//  TODO(tyxia) use shared_ptr to make complication easier
 using MatchingDataType =
     absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
 inline constexpr absl::string_view DefaultMatchingDataType = "string";
