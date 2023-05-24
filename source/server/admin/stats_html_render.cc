@@ -47,7 +47,7 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
-  AdminHtmlUtil::renderTableBegin(response /*, "Parameter" */);
+  AdminHtmlUtil::renderTableBegin(response);
   AdminHtmlUtil::renderEndpointTableRow(response, url_handler, params.query_, 1, !active_, active_);
   if (active_) {
     std::string buf;
@@ -75,34 +75,6 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
 }
-
-#if 0
-void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
-                               const Stats::ParentHistogram& histogram) {
-  uint32_t index = ++histogram_index_;
-  response.addFragments({"<div id='"histogram-, index,
-          "'></div><script>renderHistogram('histogram-'", index, "', '",
-
-><div class='histogram-name'>", Html::Utility::sanitize(name),
-          "</div>
-
-  // Note: we ignore buckets_mode in HTML and always renter a detailed view.
-  switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets:
-    response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
-    break;
-  case Utility::HistogramBucketsMode::Cumulative:
-    response.addFragments({name, ": ", histogram.bucketSummary(), "\n"});
-    break;
-  case Utility::HistogramBucketsMode::Disjoint:
-    addDisjointBuckets(name, histogram, response);
-    break;
-  case Utility::HistogramBucketsMode::Detailed:
-    //addDetailedBuckets(name, histogram, response);
-    break;
-  }
-}
-#endif
 
 } // namespace Server
 } // namespace Envoy

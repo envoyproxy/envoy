@@ -37,7 +37,8 @@ TEST_F(StatsHtmlRenderTest, String) {
 }
 
 TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
-  constexpr absl::string_view expected = "stats\":[{\"histograms\":";
+  // The goal of this test is to show that we have embedded the histogram as a json fragment.
+  constexpr absl::string_view expected = "const json = \n{\"stats\":[{\"histograms\":";
   EXPECT_THAT(render<>(renderer_, "h1", populateHistogram("h1", {200, 300, 300})),
               HasSubstr(expected));
 }
