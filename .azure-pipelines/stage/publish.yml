@@ -241,6 +241,8 @@ jobs:
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
       stepsPost:
 
       - script: |

@@ -58,6 +58,9 @@ parameters:
   type: stepList
   default: []
 
+- name: env
+  type: object
+  default: {}
 
 steps:
 - checkout: self
@@ -179,6 +182,8 @@ steps:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
+    ${{ each var in parameters.env }}:
+      ${{ var.key }}: ${{ var.value }}
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
