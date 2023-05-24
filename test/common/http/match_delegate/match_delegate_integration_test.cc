@@ -85,7 +85,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(MatchDelegateInegrationTest, BasicFlow) {
+TEST_P(MatchDelegateInegrationTest, NoMatcherDefault) {
   initialize();
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
