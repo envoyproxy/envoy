@@ -426,8 +426,9 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.random":            "//source/extensions/load_balancing_policies/random:config",
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
-    "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
-    "envoy.load_balancing_policies.subset":       "//source/extensions/load_balancing_policies/subset:config",
+    "envoy.load_balancing_policies.ring_hash":         "//source/extensions/load_balancing_policies/ring_hash:config",
+    "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
+    "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
 
     #
     # HTTP Early Header Mutation
@@ -446,6 +447,8 @@ EXTENSIONS = {
     "envoy.config_subscription.aggregated_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
     "envoy.config_subscription.aggregated_delta_grpc_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
     "envoy.config_subscription.ads_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+    "envoy.config_mux.delta_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
+    "envoy.config_mux.sotw_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

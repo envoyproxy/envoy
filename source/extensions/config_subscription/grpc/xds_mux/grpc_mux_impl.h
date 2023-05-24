@@ -23,9 +23,9 @@
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/watch_map.h"
-#include "source/common/config/xds_mux/delta_subscription_state.h"
-#include "source/common/config/xds_mux/sotw_subscription_state.h"
 #include "source/common/grpc/common.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -63,8 +63,7 @@ public:
               const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
+              CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");
@@ -225,8 +224,7 @@ public:
                const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
                const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
                bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-               JitteredExponentialBackOffStrategyPtr backoff_strategy,
-               XdsConfigTrackerOptRef xds_config_tracker);
+               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -241,8 +239,7 @@ public:
               const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              JitteredExponentialBackOffStrategyPtr backoff_strategy,
-              XdsConfigTrackerOptRef xds_config_tracker,
+              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");
 

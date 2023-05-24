@@ -236,9 +236,9 @@ void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
   dlb_event_->setEnabled(Event::FileReadyType::Read);
 }
 
-void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socket) {
+void DlbBalancedConnectionHandlerImpl::post(
+    [[maybe_unused]] Network::ConnectionSocketPtr&& socket) {
 #ifdef DLB_DISABLED
-  socket->isOpen();
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
   // The pointer will be casted to unique_ptr in onDlbEvents(), no need to consider free.

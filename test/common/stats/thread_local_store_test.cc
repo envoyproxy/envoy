@@ -37,6 +37,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
@@ -129,6 +130,7 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
+  using Bucket = ParentHistogram::Bucket;
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest()
@@ -1709,7 +1711,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
-TEST_F(HistogramTest, ParentHistogramBucketSummary) {
+TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Histogram& histogram = scope_.histogramFromString("histogram", Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
@@ -1725,6 +1727,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
+  EXPECT_THAT(parent_histogram->detailedIntervalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 }
 
 TEST_F(HistogramTest, ForEachHistogram) {

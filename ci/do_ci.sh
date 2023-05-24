@@ -508,9 +508,27 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
 
+    docs-publish-latest)
+        BUILD_SHA=$(git rev-parse HEAD)
+        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+        ;;
+
     docker-upload)
         setup_clang_toolchain
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        ;;
+
+    dockerhub-publish)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/distribution:update_dockerhub_repository
+        ;;
+
+    dockerhub-readme)
+        setup_clang_toolchain
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution/dockerhub:readme
+        cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
     fix_proto_format)
@@ -567,32 +585,18 @@ case $CI_TARGET in
         ;;
 
     publish)
-        # If we are on a non-main release branch but the patch version is 0 - then this branch
-        # has just been created, and the tag/release was cut from `main` - there is no need to
-        # create the tag/release from here
-        version="$(cat VERSION.txt)"
-        patch_version="$(echo "$version" | rev | cut -d. -f1)"
-        if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
-            if [[ "$patch_version" -eq 0 ]]; then
-                # It can take some time to get here in CI so the branch may have changed - create the release
-                # from the current commit (as this only happens on non-PRs we are safe from merges)
-                BUILD_SHA="$(git rev-parse HEAD)"
-                bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
-                # TODO(phlax): move this to pytooling
-                mkdir -p linux/amd64 linux/arm64 publish
-                # linux/amd64
-                tar xf /build/bazel.release/release.tar.zst -C ./linux/amd64
-                cp -a linux/amd64/envoy "publish/envoy-${version}-linux-x86_64"
-                cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${version}-linux-x86_64"
-                # linux/arm64
-                tar xf /build/bazel.release.arm64/release.tar.zst -C ./linux/arm64
-                cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
-                cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
-                "${ENVOY_SRCDIR}/ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
-                exit 0
-            fi
+        setup_clang_toolchain
+        BUILD_SHA="$(git rev-parse HEAD)"
+        VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
+        PUBLISH_ARGS=(
+            --publish-commitish="$BUILD_SHA"
+            --publish-assets=/build/release.signed/release.signed.tar.zst)
+        if [[ "$VERSION_DEV" == "dev" ]]; then
+            PUBLISH_ARGS+=(--dry-run)
         fi
-        echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:publish \
+              -- "${PUBLISH_ARGS[@]}"
         ;;
 
     release)
@@ -646,6 +650,16 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "bazel release build..."
         bazel_envoy_binary_build release
+        ;;
+
+    release.signed)
+        echo "Signing binary packages..."
+        setup_clang_toolchain
+        # The default config expects these files
+        mkdir -p distribution/custom
+        cp -a /build/bazel.*/*64 distribution/custom/
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
+        cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         ;;
 
     sizeopt)
