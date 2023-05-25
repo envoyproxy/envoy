@@ -50,8 +50,9 @@ jobs:
 
   - template: ../bazel.yml
     parameters:
-      ciTarget: trigger_verify
+      ciTarget: verify.trigger
       authGithub: "$(key.value)"
+      # Please see `ci/do_ci.sh` for notes on required vars.
       env:
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
