@@ -83,6 +83,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/config_subscription/rest:94.3"
 "source/extensions/config_subscription:94.8"
 "source/extensions/config_subscription/grpc:94.0"
+"source/extensions/matching/input_matchers/cel_matcher:90.7" #Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
