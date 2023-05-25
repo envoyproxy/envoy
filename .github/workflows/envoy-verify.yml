@@ -24,7 +24,7 @@ jobs:
       ${{
           github.repository == 'envoyproxy/envoy'
           && (!contains(github.actor, '[bot]')
-              || github.actor == trigger-workflow-envoy[bot])
+              || github.actor == 'trigger-workflow-envoy[bot]')
       }}
     uses: ./.github/workflows/workflow-start.yml
     permissions:
