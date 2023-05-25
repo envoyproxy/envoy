@@ -38,7 +38,7 @@ public:
                                                                           {"match-header", "route"},
                                                                           {":authority", "host"}};
 
-  constexpr std::string default_config_ = R"EOF(
+  const std::string default_config_ = R"EOF(
       name: ext_proc
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -48,7 +48,7 @@ public:
             "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
             code: 403
     )EOF";
-  constexpr std::string per_route_config_ = R"EOF(
+  const std::string per_route_config_ = R"EOF(
       xds_matcher:
         matcher_tree:
           input:
@@ -64,21 +64,6 @@ public:
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
     )EOF";
-
-  void setPerRouteConfig(const std::string& per_route_cfg, const std::string& path) {
-    config_helper_.addConfigModifier(
-        [this, per_route_cfg, path](ConfigHelper::HttpConnectionManager& cm) {
-          auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
-          auto* route = vh->mutable_routes()->Mutable(0);
-          route->mutable_route()->set_cluster("cluster_0");
-          route->mutable_match()->set_prefix(path);
-          const auto matcher = TestUtility::parseYaml<ExtensionWithMatcherPerRoute>(per_route_cfg);
-          Any cfg_any;
-          ASSERT_TRUE(cfg_any.PackFrom(matcher));
-          route->mutable_typed_per_filter_config()->insert(
-              MapPair<std::string, Any>("envoy.filters.http.match_delegate", cfg_any));
-        });
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
@@ -95,7 +80,17 @@ TEST_P(MatchDelegateInegrationTest, NoMatcherDefault) {
 }
 
 TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
-  setPerRouteConfig(per_route_config_, "/test");
+  config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_route()->set_cluster("cluster_0");
+    route->mutable_match()->set_prefix("/test");
+    const auto matcher = TestUtility::parseYaml<ExtensionWithMatcherPerRoute>(per_route_config_);
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(matcher));
+    route->mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.match_delegate", cfg_any));
+  });
   initialize();
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
