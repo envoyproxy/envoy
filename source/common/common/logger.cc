@@ -271,6 +271,10 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
     return absl::InvalidArgumentError("Usage of %v is unavailable for JSON log formats");
   }
 
+  if (format_as_json.find("%_") != std::string::npos) {
+    return absl::InvalidArgumentError("Usage of %_ is unavailable for JSON log formats");
+  }
+
   setLogFormat(format_as_json);
   return absl::OkStatus();
 }

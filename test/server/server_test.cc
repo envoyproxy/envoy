@@ -1654,11 +1654,18 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
-TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlags) {
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
   EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/json_application_log_forbidden_flag.yaml"),
+      initialize("test/server/test_data/server/json_application_log_forbidden_flagv.yaml"),
       EnvoyException,
       "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlag_) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
 }
 
 } // namespace
