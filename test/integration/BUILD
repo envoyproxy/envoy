@@ -9,7 +9,6 @@ load(
     "envoy_proto_library",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
-    "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
     "envoy_sh_test",
 )
@@ -1102,11 +1101,11 @@ envoy_cc_test_library(
     srcs = [
         "server.cc",
         "utility.cc",
-    ] + envoy_select_enable_yaml(["ssl_utility.cc"]),
+        "ssl_utility.cc"],
     hdrs = [
         "server.h",
         "utility.h",
-    ] + envoy_select_enable_yaml(["ssl_utility.h"]),
+         "ssl_utility.h"],
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
@@ -1157,10 +1156,9 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ] + envoy_select_enable_yaml([
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
-    ]),
+    ],
 )
 
 envoy_cc_test_library(
