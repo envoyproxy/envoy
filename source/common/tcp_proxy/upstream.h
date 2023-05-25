@@ -415,7 +415,7 @@ protected:
   HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
-  void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+  void virtual resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
   Http::RequestEncoder* request_encoder_{};
@@ -488,6 +488,11 @@ private:
                                                parent_.downstream_info_.filterState());
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
+        // If we did not receive a valid CONNECT response yet we treat this as a pool
+        // failure, otherwise we forward the event downstream.
+        if (parent_.conn_pool_callbacks_ != nullptr) {
+          parent_.conn_pool_callbacks_->onFailure();
+        }
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();
@@ -561,6 +566,7 @@ public:
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   void setRequestEncoder(Http::RequestEncoder&, bool) override {}
   bool isValidResponse(const Http::ResponseHeaderMap&) override;
+  void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true) override;
 };
 
 } // namespace TcpProxy

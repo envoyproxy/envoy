@@ -158,12 +158,7 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
-  // If we did not receive a valid CONNECT response yet we treat this as a pool
-  // failure, otherwise we forward the event downstream.
-  if (conn_pool_callbacks_ != nullptr) {
-    conn_pool_callbacks_->onFailure();
-    return;
-  }
+
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
   }
@@ -405,6 +400,13 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   }
 
   return true;
+}
+
+void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    upstream_request_->resetStream();
+  }
 }
 
 Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
