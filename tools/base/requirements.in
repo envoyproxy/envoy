@@ -5,7 +5,7 @@ cffi>=1.15.0
 colorama
 coloredlogs
 dependatool>=0.2.2
-envoy.base.utils>=0.4.10
+envoy.base.utils>=0.4.11
 envoy.code.check>=0.4.1
 envoy.dependency.check>=0.1.7
 envoy.distribution.release>=0.0.9
