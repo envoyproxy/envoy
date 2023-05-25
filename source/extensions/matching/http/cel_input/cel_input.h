@@ -38,7 +38,7 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
-    // CEL library can support mixed matching condition of request headers, response headers and
+    // CEL library supports mixed matching condition of request headers, response headers and
     // response trailers.
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
