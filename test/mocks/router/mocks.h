@@ -438,10 +438,7 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
-
-  const RouteStatsContextOptRef routeStatsContext() const override {
-    return RouteStatsContextOptRef();
-  }
+  MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};

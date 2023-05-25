@@ -119,6 +119,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
   path_rewriter_ = std::make_shared<testing::NiceMock<MockPathRewriter>>();
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
+  ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
