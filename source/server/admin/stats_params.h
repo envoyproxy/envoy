@@ -40,6 +40,12 @@ enum class StatsType {
   All,
 };
 
+enum class HiddenFlag {
+  Include,
+  ShowOnly,
+  Exclude,
+};
+
 struct StatsParams {
   /**
    * Parses the URL's query parameter, populating this.
@@ -59,6 +65,7 @@ struct StatsParams {
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
   StatsFormat format_{StatsFormat::Text};
+  HiddenFlag hidden_{HiddenFlag::Exclude};
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
