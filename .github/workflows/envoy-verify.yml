@@ -53,7 +53,7 @@ jobs:
             BUCKET="envoy-pr"
         fi
 
-        DOWNLOAD_PATH="$(echo "${{ github.event.inputs.sha }}" | head -c 7)"
+        DOWNLOAD_PATH="$(echo "${{ inputs.ref }}" | head -c 7)"
 
         tmpdir=$(mktemp -d)
         cd "$tmpdir"
