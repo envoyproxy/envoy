@@ -58,15 +58,14 @@ parameters:
   type: stepList
   default: []
 
+- name: env
+  type: object
+  default: {}
 
 steps:
 - checkout: self
   fetchDepth: ${{ parameters.repoFetchDepth }}
   fetchTags: ${{ parameters.repoFetchTags }}
-
-- ${{ each step in parameters.stepsPre }}:
-  - ${{ each pair in step }}:
-      ${{ pair.key }}: ${{ pair.value }}
 
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
 #
@@ -132,6 +131,10 @@ steps:
     version: "$(cacheKeyBuildImage)"
     arch: "${{ parameters.artifactSuffix }}"
 
+- ${{ each step in parameters.stepsPre }}:
+  - ${{ each pair in step }}:
+      ${{ pair.key }}: ${{ pair.value }}
+
 - bash: |
     echo "disk space at beginning of build:"
     df -h
@@ -162,7 +165,8 @@ steps:
       AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
     ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
       AZP_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
-    ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+    # Any PR or CI run in envoy-presubmit uses the fake SCM hash
+    ${{ if or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.DefinitionName'], 'envoy-presubmit')) }}:
       # sha1sum of `ENVOY_PULL_REQUEST`
       BAZEL_FAKE_SCM_REVISION: e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
     ${{ if parameters.rbe }}:
@@ -178,6 +182,8 @@ steps:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
+    ${{ each var in parameters.env }}:
+      ${{ var.key }}: ${{ var.value }}
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
@@ -190,7 +196,7 @@ steps:
     # Cleanup offending files with unicode names
     rm -rf $(Build.StagingDirectory)/bazel_root/base/external/go_sdk/test/fixedbugs
   displayName: "Check disk space at end"
-  condition: always()
+  condition: not(canceled())
 
 - ${{ each step in parameters.stepsPost }}:
   - ${{ each pair in step }}:
@@ -216,10 +222,10 @@ steps:
     testRunTitle: "${{ parameters.ciTarget }}"
     searchFolder: $(Build.StagingDirectory)/bazel_root
   timeoutInMinutes: 10
-  condition: eq('${{ parameters.publishTestResults }}', 'true')
+  condition: eq(${{ parameters.publishTestResults }}, 'true')
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
     artifactName: ${{ parameters.ciTarget }}
   timeoutInMinutes: 10
-  condition: eq('${{ parameters.publishEnvoy }}', 'true')
+  condition: eq(${{ parameters.publishEnvoy }}, 'true')

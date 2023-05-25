@@ -65,6 +65,8 @@ public:
                                                    nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 #ifdef ENVOY_ENABLE_UHV
+    ON_CALL(*header_validator_, validateRequestHeaders(_))
+        .WillByDefault(Return(HeaderValidator::ValidationResult::success()));
     ON_CALL(*header_validator_, transformRequestHeaders(_))
         .WillByDefault(
             Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult::success())));
@@ -310,6 +312,33 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 }
 
 #ifdef ENVOY_ENABLE_UHV
+TEST_F(CodecClientTest, RequestHeaderValidationFails) {
+  initialize();
+  EXPECT_CALL(*header_validator_, validateRequestHeaders(_))
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  auto status = request_encoder.encodeHeaders(request_headers, true);
+  EXPECT_THAT(status, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                               testing::HasSubstr("some error")));
+  // Router will reset upstream request when encodeHeaders returns failure status
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
+}
+
 TEST_F(CodecClientTest, RequestHeaderTransformationFails) {
   initialize();
   EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
@@ -389,8 +418,8 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
   EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
-      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
-          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // Invalid response should cause stream reset
   EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
@@ -444,8 +473,8 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
   EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
-      .WillOnce(Return(HeaderValidatorBase::ValidationResult{
-          HeaderValidatorBase::ValidationResult::Action::Reject, "some error"}));
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // By default H/2 and H/3 connections are disconnected on protocol errors
   EXPECT_CALL(*connection_, close(_));
   inner_decoder->decodeHeaders(std::move(response_headers), true);

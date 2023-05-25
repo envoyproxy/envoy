@@ -208,6 +208,7 @@ envoy.filters.http.aws_request_signing:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
 envoy.filters.http.bandwidth_limit:
   categories:
   - envoy.filters.http
@@ -728,6 +729,13 @@ envoy.filters.udp_listener.udp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+envoy.formatter.cel:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.cel.v3.Cel
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -1483,6 +1491,13 @@ envoy.load_balancing_policies.subset:
   - envoy.load_balancing_policies
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.load_balancing_policies.cluster_provided:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
@@ -1561,5 +1576,15 @@ envoy.config_subscription.grpc:
 envoy.config_subscription.filesystem_collection:
   categories:
   - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_mux.delta_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable
+envoy.config_mux.sotw_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
   security_posture: unknown
   status: stable

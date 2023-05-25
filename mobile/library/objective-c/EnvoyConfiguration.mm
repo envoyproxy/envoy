@@ -78,7 +78,6 @@
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
-                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
@@ -98,8 +97,6 @@
                                             appId:(NSString *)appId
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
-                             typedDirectResponses:
-                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -143,7 +140,6 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
-  self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
@@ -162,7 +158,6 @@
   self.appVersion = appVersion;
   self.appId = appId;
   self.runtimeGuards = runtimeGuards;
-  self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
@@ -213,10 +208,6 @@
     builder.setRuntimeGuard([key toCXXString], value);
   }
 
-  for (EMODirectResponse *directResponse in self.typedDirectResponses) {
-    builder.addDirectResponse([directResponse toCXX]);
-  }
-
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
 
   builder.addDnsFailureRefreshSeconds(self.dnsFailureRefreshSecondsBase,
@@ -232,7 +223,6 @@
     }
     builder.addDnsPreresolveHostnames(hostnames);
   }
-  builder.enableHappyEyeballs(self.enableHappyEyeballs);
   builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);

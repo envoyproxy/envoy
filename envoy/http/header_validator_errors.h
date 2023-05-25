@@ -24,5 +24,14 @@ struct UhvResponseCodeDetailValues {
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;
 
+struct Http1ResponseCodeDetailValues {
+  const std::string InvalidTransferEncoding = "http1.invalid_transfer_encoding";
+  const std::string TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
+  const std::string ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
+  const std::string ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
+};
+
+using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
+
 } // namespace Http
 } // namespace Envoy

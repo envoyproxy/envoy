@@ -10,8 +10,7 @@ import (
 const Name = "routeconfig"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, configFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, configFactory, &parser{})
 }
 
 func configFactory(c interface{}) api.StreamFilterFactory {

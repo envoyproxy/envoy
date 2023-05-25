@@ -126,6 +126,7 @@ private:
         : route_config_provider_(route_config_provider), parent_(parent) {}
 
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                  OptRef<const Router::ScopeKeyBuilder> scope_key_builder,
                                   ActiveStream& parent)
         // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
         // implemented. Inline provider will be cast to nullptr here but it is not full implemented
@@ -133,7 +134,7 @@ private:
         // functional inline scope route provider in the future.
         : scoped_route_config_provider_(
               dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
-          parent_(parent) {}
+          scope_key_builder_(scope_key_builder), parent_(parent) {}
 
     void
     requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
@@ -147,6 +148,7 @@ private:
   private:
     Router::RouteConfigProvider* route_config_provider_;
     Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+    OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
     ActiveStream& parent_;
   };
 
@@ -169,15 +171,6 @@ private:
 
     const Network::Connection* connection();
     uint64_t streamId() { return stream_id_; }
-
-    // This is a helper function for encodeHeaders and responseDataTooLarge which allows for
-    // shared code for the two headers encoding paths. It does header munging, updates timing
-    // stats, and sends the headers to the encoder.
-    void encodeHeadersInternal(ResponseHeaderMap& headers, bool end_stream);
-    // This is a helper function for encodeData and responseDataTooLarge which allows for shared
-    // code for the two data encoding paths. It does stats updates and tracks potential end of
-    // stream.
-    void encodeDataInternal(Buffer::Instance& data, bool end_stream);
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason,
@@ -491,7 +484,7 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-    Http::HeaderValidatorPtr header_validator_;
+    Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
 
@@ -544,7 +537,10 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::Tracer& tracer() { return *config_.tracer(); }
+  void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
+                            StreamInfo::ResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
+  void handleCodecOverloadError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag,
                          absl::string_view details);
@@ -568,12 +564,13 @@ private:
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Random::RandomGenerator& random_generator_;
-  Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Event::Dispatcher* dispatcher_{};
   ConnectionManagerListenerStats& listener_stats_;
+  Server::OverloadManager& overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a

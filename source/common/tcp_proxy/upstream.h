@@ -368,6 +368,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   bool startUpstreamSecureTransport() override;
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
@@ -410,6 +411,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
 
 protected:
   HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,

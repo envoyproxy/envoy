@@ -22,7 +22,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
-@property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
@@ -40,7 +39,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
-@property (nonatomic, strong) NSArray<EMODirectResponse *> *typedDirectResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -76,7 +74,6 @@ NS_ASSUME_NONNULL_BEGIN
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
-                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
@@ -96,8 +93,6 @@ NS_ASSUME_NONNULL_BEGIN
                                             appId:(NSString *)appId
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
-                             typedDirectResponses:
-                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:

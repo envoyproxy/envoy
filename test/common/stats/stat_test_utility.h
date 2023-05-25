@@ -13,6 +13,11 @@
 
 namespace Envoy {
 namespace Stats {
+
+// Helper methods to facilitate using testing::ElementsAre with bucket vectors.
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b);
+std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket);
+
 namespace TestUtil {
 
 class TestSymbolTableHelper {
