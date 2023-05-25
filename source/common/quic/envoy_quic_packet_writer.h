@@ -23,6 +23,8 @@ public:
   bool IsBatchMode() const override { return envoy_udp_packet_writer_->isBatchMode(); }
   // Currently this writer doesn't support pacing offload.
   bool SupportsReleaseTime() const override { return false; }
+  // Currently this writer doesn't support Explicit Congestion Notification.
+  bool SupportsEcn() const override { return false; }
 
   absl::optional<int> MessageTooBigErrorCode() const override;
   quic::QuicByteCount GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const override;
