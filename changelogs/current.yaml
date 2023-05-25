@@ -241,3 +241,7 @@ deprecated:
   change: |
     deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
     in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
+- area: health_check
+  change: |
+    deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
+    :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
