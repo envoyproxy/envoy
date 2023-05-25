@@ -18,6 +18,7 @@ envoy_proto_library(
     name = "dummy",
     srcs = ["dummy.proto"],
 )
+
 envoy_extension_cc_test(
     name = "config_test",
     size = "small",
@@ -57,8 +58,8 @@ envoy_extension_cc_mock(
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.geoip"],
     deps = [
-      ":dummy_cc_proto",
-      "//source/extensions/filters/http/geoip:provider_config",
+        ":dummy_cc_proto",
+        "//source/extensions/filters/http/geoip:provider_config",
     ],
 )
 

@@ -1,14 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_proto_library",
-)
-load(
-    "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2

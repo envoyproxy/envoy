@@ -211,7 +211,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context),
       Envoy::EnvoyException,
-      "Didn't find a registered implementation for 'envoy.geoip_providers.unknown' with type URL: ''");
+      "Didn't find a registered implementation for 'envoy.geoip_providers.unknown' with type URL: "
+      "''");
 }
 
 } // namespace

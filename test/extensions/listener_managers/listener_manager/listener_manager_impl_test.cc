@@ -29,6 +29,8 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/listener_managers/listener_manager/config.pb.h"
+#include "test/extensions/listener_managers/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"
@@ -36,8 +38,6 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/listener_managers/listener_manager/config.pb.h"
-#include "test/extensions/listener_managers/listener_manager/config.pb.validate.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -600,7 +600,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
   }
 
   std::string name() const override { return "non_terminal"; }
@@ -679,9 +680,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::TestStatsFilter>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -699,9 +699,6 @@ private:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -714,6 +711,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -727,9 +726,6 @@ filter_chains:
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, UsingAddressAsStatsPrefixForMultipleAddresses) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -747,6 +743,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -5918,18 +5916,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::OriginalDstTestFilter>();
   }
 
   std::string name() const override { return "test.listener.original_dst"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -5943,6 +5937,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5987,9 +5983,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -6003,6 +5996,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6042,9 +6037,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -6058,6 +6050,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6122,16 +6116,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      // Using Struct instead of a custom per-filter empty config proto
-      // This is only allowed in tests.
-      return std::make_unique<Envoy::ProtobufWkt::Struct>();
+      return std::make_unique<
+          test::extensions::listener_managers::listener_manager::OriginalDstTestIPv6Filter>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
@@ -6143,6 +6134,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       name: foo
     listener_filters:
     - name: "test.listener.original_dstipv6"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestIPv6Filter
   )EOF",
                                                        Network::Address::IpVersion::v6);
 

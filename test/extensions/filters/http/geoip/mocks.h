@@ -1,9 +1,9 @@
 #include "source/extensions/filters/http/geoip/geoip_provider_config.h"
 
-#include "gmock/gmock.h"
-
 #include "test/extensions/filters/http/geoip/dummy.pb.h"
 #include "test/extensions/filters/http/geoip/dummy.pb.validate.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
