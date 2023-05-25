@@ -22,9 +22,9 @@ jobs:
   check:
     if: |
       ${{
-          github.repository == 'phlax/envoy'
+          github.repository == 'envoyproxy/envoy'
           && (!contains(github.actor, '[bot]')
-              || github.actor == trigger-workflow-verify-examples[bot])
+              || github.actor == trigger-workflow-envoy[bot])
       }}
     uses: ./.github/workflows/workflow-start.yml
     permissions:

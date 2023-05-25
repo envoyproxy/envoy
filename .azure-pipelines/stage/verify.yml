@@ -62,7 +62,6 @@ jobs:
           ENVOY_BRANCH: "$(Build.SourceBranch)"
         GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
         GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
-        ENVOY_REPO: phlax/envoy
 
 - job: packages_x64
   displayName: Debs (x64)
