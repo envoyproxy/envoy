@@ -10288,6 +10288,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -10334,6 +10335,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -10377,6 +10379,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -10419,6 +10422,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});

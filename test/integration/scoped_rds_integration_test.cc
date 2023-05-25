@@ -465,6 +465,7 @@ key:
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route", "cluster_0"), "1");
   };
 
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
 

@@ -571,6 +571,7 @@ key:
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.
 TEST_F(ScopedRdsTest, OptionalUnknownFactoryForPerVirtualHostTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});

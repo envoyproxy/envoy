@@ -50,6 +50,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
 }
 
 TEST_F(HTTPTypedPerFilterConfigTest, HcmIgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
 

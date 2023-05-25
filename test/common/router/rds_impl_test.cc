@@ -182,6 +182,7 @@ http_filters:
 }
 
 TEST_F(RdsImplTest, RdsAndStaticWithHcmOptionalUnknownFilterPerVirtualHostConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -392,6 +393,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
 TEST_F(RdsImplTest, HcmOptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
@@ -581,6 +583,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
 
 // validate the optional unknown factory will be ignored for per route typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerRouteTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
