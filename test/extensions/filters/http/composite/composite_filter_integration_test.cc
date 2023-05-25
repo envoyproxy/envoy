@@ -159,7 +159,7 @@ public:
     auto* match_delegate_filter = hcm_config.add_http_filters();
     match_delegate_filter->set_name("envoy.filters.http.match_delegate");
 
-    // Build extesnion config.
+    // Build extension config.
     envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;
     extension_config.mutable_extension_config()->set_name("composite");
     envoy::extensions::filters::http::composite::v3::Composite composite_config;
