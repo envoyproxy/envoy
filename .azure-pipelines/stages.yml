@@ -169,11 +169,17 @@ stages:
 - stage: verify
   displayName: Verify
   dependsOn: ["env", "publish"]
+  variables:
+    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
   jobs:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
       bucketGCP: $(GcsArtifactBucket)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
+      runDocker: variables['RUN_DOCKER']
 
 - stage: macos
   displayName: macOS

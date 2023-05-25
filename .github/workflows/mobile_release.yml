@@ -8,7 +8,12 @@ on:
 
 jobs:
   android_release_artifacts:
-    if: github.repository == 'envoyproxy/envoy'
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
     name: android_release_artifacts
     runs-on: ubuntu-20.04
     timeout-minutes: 120

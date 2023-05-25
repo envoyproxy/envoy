@@ -164,6 +164,16 @@ envoy_entry_point(
     script = "envoy.project",
 )
 
+envoy_entry_point(
+    name = "trigger",
+    args = [
+        "trigger",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
 ''')
 
 _envoy_repo = repository_rule(

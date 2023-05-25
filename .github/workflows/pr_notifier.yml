@@ -14,7 +14,12 @@ jobs:
       pull-requests: read  # for pr_notifier.py
     name: PR Notifier
     runs-on: ubuntu-20.04
-    if: github.repository == 'envoyproxy/envoy'
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.8
