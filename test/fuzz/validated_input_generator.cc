@@ -206,7 +206,7 @@ void ValidatedInputGenerator::handleAnyRules(
 void ValidatedInputGenerator::handleMessageTypedField(
     Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
     const Protobuf::Reflection* reflection, const validate::FieldRules& rules,
-    const absl::Span<const Protobuf::Message* const>& parents, const bool force_create) {
+    const absl::Span<const Protobuf::Message* const>& parents, bool force_create, bool cut_off) {
 
   if (field.is_repeated()) {
     const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -250,6 +250,9 @@ void ValidatedInputGenerator::handleMessageTypedField(
         break;
       }
       default:
+        if (cut_off) {
+          value->Clear();
+        }
         break;
       }
     }
@@ -264,7 +267,7 @@ void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
                                                         const Protobuf::FieldDescriptor& field,
                                                         const Protobuf::Reflection* reflection,
                                                         const validate::FieldRules& rules,
-                                                        const bool force) {
+                                                        bool force) {
 
   if (field.is_repeated()) {
     const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -314,13 +317,13 @@ void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
 void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                       const Protobuf::FieldDescriptor& field,
                                       const absl::Span<const Protobuf::Message* const> parents) {
-  onField(msg, field, parents, false);
+  onField(msg, field, parents, false, false);
 }
 
 void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                       const Protobuf::FieldDescriptor& field,
                                       const absl::Span<const Protobuf::Message* const> parents,
-                                      const bool force_create) {
+                                      bool force_create, bool cut_off) {
   const Protobuf::Reflection* reflection = msg.GetReflection();
 
   if (!field.options().HasExtension(validate::rules) && !force_create) {
@@ -393,7 +396,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   }
   case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
-    handleMessageTypedField(msg, field, reflection, rules, parents, force_create);
+    handleMessageTypedField(msg, field, reflection, rules, parents, force_create, cut_off);
     break;
   }
   default:
@@ -403,7 +406,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
 
 void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
                                              absl::Span<const Protobuf::Message* const> parents,
-                                             bool, absl::string_view const& field_name) {
+                                             bool, absl::string_view field_name) {
   ++current_depth_;
   const Protobuf::Reflection* reflection = msg.GetReflection();
   const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
@@ -416,28 +419,28 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
       any_message->Clear();
     }
   }
+  const bool max_depth_exceeded = max_depth_ > 0 && current_depth_ > max_depth_;
   for (int oneof_index = 0; oneof_index < descriptor->oneof_decl_count(); ++oneof_index) {
     const Protobuf::OneofDescriptor* oneof_desc = descriptor->oneof_decl(oneof_index);
-    if (oneof_desc->options().HasExtension(validate::required) &&
-        oneof_desc->options().GetExtension(validate::required) &&
-        !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index))) {
+    if (max_depth_exceeded || (oneof_desc->options().HasExtension(validate::required) &&
+                               oneof_desc->options().GetExtension(validate::required) &&
+                               !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index)))) {
       // No required member in one of set, so create one.
       for (int index = 0; index < oneof_desc->field_count(); ++index) {
         const std::string parents_class_name = parents.back()->GetDescriptor()->full_name();
         // Treat matchers special, because in their oneof they reference themselves, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.
-        if ((max_depth_ > 0 && current_depth_ > max_depth_) ||
-            ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
-              parents_class_name ==
-                  "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
-             (random_() % 200) > 0)) {
-          onField(msg, *oneof_desc->field(0), parents, true);
+        if ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
+             parents_class_name ==
+                 "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
+            (random_() % 200) > 0) {
+          onField(msg, *oneof_desc->field(0), parents, true, max_depth_exceeded);
         } else {
           // Do not use the first available alternative all the time, because of cyclic
           // dependencies.
           const int rnd_index = random_() % oneof_desc->field_count();
-          onField(msg, *oneof_desc->field(rnd_index), parents, true);
+          onField(msg, *oneof_desc->field(rnd_index), parents, true, max_depth_exceeded);
         }
         // Check if for the above field an entry could be created and quit the inner loop if so.
         // It might not be possible, when the datatype is not supported (yet).
@@ -451,7 +454,7 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
 
 void ValidatedInputGenerator::onLeaveMessage(Protobuf::Message&,
                                              absl::Span<const Protobuf::Message* const>, bool,
-                                             absl::string_view const&) {
+                                             absl::string_view) {
   message_path_.pop_back();
   --current_depth_;
 }
