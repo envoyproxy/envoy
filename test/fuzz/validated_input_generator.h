@@ -42,7 +42,7 @@ public:
                                const Protobuf::Reflection* reflection,
                                const validate::FieldRules& rules,
                                const absl::Span<const Protobuf::Message* const>& parents,
-                               const bool force_create);
+                               const bool force_create, const bool cut_off);
 
   // Handle all validation rules for intrinsic types like int, uint and string.
   // Messages are more complicated to handle and can not be handled here.
@@ -58,7 +58,8 @@ public:
                const absl::Span<const Protobuf::Message* const> parents) override;
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-               const absl::Span<const Protobuf::Message* const> parents, const bool force_create);
+               const absl::Span<const Protobuf::Message* const> parents, const bool force_create,
+               const bool cut_off);
 
   void onEnterMessage(Protobuf::Message& msg, absl::Span<const Protobuf::Message* const> parents,
                       bool, absl::string_view const& field_name) override;

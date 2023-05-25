@@ -16,7 +16,7 @@ namespace {
 void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
                               std::vector<const Protobuf::Message*>& parents,
                               bool was_any_or_top_level, bool recurse_into_any,
-                              absl::string_view const& field_name) {
+                              const absl::string_view& field_name) {
   visitor.onEnterMessage(message, parents, was_any_or_top_level, field_name);
   absl::Cleanup message_leaver = [&visitor, &parents, &message, was_any_or_top_level, field_name] {
     visitor.onLeaveMessage(message, parents, was_any_or_top_level, field_name);
