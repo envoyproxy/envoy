@@ -22,9 +22,9 @@ public:
   //                             Any before being unpacked for further recursion. The latter can
   //                             only be achieved by using recurse_into_any.
   virtual void onEnterMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
-                              bool was_any_or_top_level, const absl::string_view& field_name) PURE;
+                              bool was_any_or_top_level, const absl::string_view field_name) PURE;
   virtual void onLeaveMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
-                              bool was_any_or_top_level, const absl::string_view& field_name) PURE;
+                              bool was_any_or_top_level, const absl::string_view field_name) PURE;
 };
 
 void traverseMessage(ProtoVisitor& visitor, Protobuf::Message& message, bool recurse_into_any);
