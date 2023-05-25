@@ -62,10 +62,10 @@ public:
                const bool cut_off);
 
   void onEnterMessage(Protobuf::Message& msg, absl::Span<const Protobuf::Message* const> parents,
-                      bool, const absl::string_view field_name) override;
+                      bool, absl::string_view field_name) override;
 
   void onLeaveMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>, bool,
-                      const absl::string_view) override;
+                      absl::string_view) override;
 
 private:
   Mutator mutator_;

@@ -407,7 +407,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
 
 void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
                                              absl::Span<const Protobuf::Message* const> parents,
-                                             bool, const absl::string_view field_name) {
+                                             bool, absl::string_view field_name) {
   ++current_depth_;
   const Protobuf::Reflection* reflection = msg.GetReflection();
   const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
@@ -455,7 +455,7 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
 
 void ValidatedInputGenerator::onLeaveMessage(Protobuf::Message&,
                                              absl::Span<const Protobuf::Message* const>, bool,
-                                             const absl::string_view) {
+                                             absl::string_view) {
   message_path_.pop_back();
   --current_depth_;
 }
