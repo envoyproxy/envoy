@@ -29,7 +29,7 @@ class ReceiveDataTest {
       .build()
     val client = engine.streamClient()
 
-    // httpi
+    // http
     val headersExpectation2 = CountDownLatch(1)
     val dataExpectation2 = CountDownLatch(1)
 
@@ -90,12 +90,49 @@ class ReceiveDataTest {
 
     headersExpectation.await(10, TimeUnit.SECONDS)
     dataExpectation.await(10, TimeUnit.SECONDS)
-    engine.terminate()
 
     assertThat(headersExpectation.count).isEqualTo(0)
     assertThat(dataExpectation.count).isEqualTo(0)
 
     assertThat(status).isEqualTo(200)
     assertThat(status2).isEqualTo(200)
+
+    // http again
+    val headersExpectation3 = CountDownLatch(1)
+    val dataExpectation3 = CountDownLatch(1)
+
+    var status3: Int? = null
+
+    val requestHeaders3 = RequestHeadersBuilder(
+      method = RequestMethod.GET,
+      scheme = "http",
+      authority = "example.com",
+      path = "/"
+    )
+    .build()
+
+    client.newStreamPrototype()
+      .setOnResponseHeaders { responseHeaders, _, _ ->
+        status3 = responseHeaders.httpStatus
+        headersExpectation3.countDown()
+      }
+      .setOnResponseData { data, _, _ ->
+        dataExpectation3.countDown()
+      }
+      .setOnError { _, _ ->
+        fail("Unexpected error")
+      }
+      .start()
+      .sendHeaders(requestHeaders3, true)
+
+    headersExpectation3.await(10, TimeUnit.SECONDS)
+    dataExpectation3.await(10, TimeUnit.SECONDS)
+
+    assertThat(headersExpectation3.count).isEqualTo(0)
+    assertThat(dataExpectation3.count).isEqualTo(0)
+
+    assertThat(status3).isEqualTo(200)
+
+    engine.terminate()
   }
 }
