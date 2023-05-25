@@ -164,6 +164,16 @@ envoy_entry_point(
     script = "envoy.project",
 )
 
+envoy_entry_point(
+    name = "trigger",
+    args = [
+        "trigger",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
 ''')
 
 _envoy_repo = repository_rule(
@@ -473,6 +483,12 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
+        # Patch removes from CMakeLists.txt instructions to
+        # to create dynamic *.so library target. Linker fails when linking
+        # with boringssl_fips library. Envoy uses only static library
+        # anyways, so created dynamic library would not be used anyways.
+        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -1254,8 +1270,6 @@ filegroup(
     visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
 )
 """,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
@@ -1317,7 +1331,7 @@ filegroup(
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
 

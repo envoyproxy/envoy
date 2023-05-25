@@ -124,12 +124,13 @@ public:
     return dlb_create_ldb_port(domain, &args);
   }
 
-  static int createSchedDomain(dlb_hdl_t dlb, dlb_resources_t rsrcs, dlb_dev_cap_t cap) {
+  static int createSchedDomain(dlb_hdl_t dlb, dlb_resources_t rsrcs, dlb_dev_cap_t cap,
+                               uint32_t num_ldb_ports) {
     int p_rsrsc = 100;
     dlb_create_sched_domain_t args;
 
     args.num_ldb_queues = 1;
-    args.num_ldb_ports = 64;
+    args.num_ldb_ports = num_ldb_ports;
     args.num_dir_ports = 0;
     args.num_ldb_event_state_entries = 2 * args.num_ldb_ports * cq_depth;
     if (!cap.combined_credits) {

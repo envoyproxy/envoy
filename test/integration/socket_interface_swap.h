@@ -14,10 +14,13 @@ public:
   // Object of this class hold the state determining the IoHandle which
   // should return the supplied return from the `writev` or `sendmsg` calls.
   struct IoHandleMatcher {
+    explicit IoHandleMatcher(Network::Socket::Type type) : socket_type_(type) {}
+
     Network::IoSocketError* returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
       absl::MutexLock lock(&mutex_);
-      if (error_ && (io_handle->localAddress()->ip()->port() == src_port_ ||
-                     (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
+      if (socket_type_ == io_handle->getSocketType() && error_ &&
+          (io_handle->localAddress()->ip()->port() == src_port_ ||
+           (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
@@ -59,9 +62,10 @@ public:
     uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
     Network::IoSocketError* error_ ABSL_GUARDED_BY(mutex_) = nullptr;
     Network::TestIoSocketHandle* matched_iohandle_{};
+    Network::Socket::Type socket_type_;
   };
 
-  SocketInterfaceSwap();
+  explicit SocketInterfaceSwap(Network::Socket::Type socket_type);
 
   ~SocketInterfaceSwap() {
     test_socket_interface_loader_.reset();
@@ -70,7 +74,7 @@ public:
 
   Envoy::Network::SocketInterface* const previous_socket_interface_{
       Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> write_matcher_{std::make_shared<IoHandleMatcher>()};
+  std::shared_ptr<IoHandleMatcher> write_matcher_;
   std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
 };
 

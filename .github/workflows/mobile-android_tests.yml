@@ -7,12 +7,17 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    uses: ./.github/workflows/env.yml
+    secrets: inherit
+
   kotlintestsmac:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
+    needs: env
     # revert to //test/kotlin/... once fixed
     # https://github.com/envoyproxy/envoy-mobile/issues/1932
     name: kotlin_tests_mac
@@ -20,13 +25,7 @@ jobs:
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Java setup'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       with:
         java-version: '8'
@@ -34,10 +33,8 @@ jobs:
         architecture: x64
         distribution: zulu
     - name: 'Install dependencies'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && ./ci/mac_ci_setup.sh
     - name: 'Run Kotlin library tests'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -48,19 +45,14 @@ jobs:
             --define=signal_trace=disabled \
             //test/kotlin/io/...
   javatestsmac:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
+    needs: env
     name: java_tests_mac
     runs-on: macos-12
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Java setup'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       with:
         java-version: '8'
@@ -68,10 +60,8 @@ jobs:
         architecture: x64
         distribution: zulu
     - name: 'Install dependencies'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && ./ci/mac_ci_setup.sh
     - name: 'Run Java library tests'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -82,30 +72,26 @@ jobs:
             --define envoy_mobile_listener=enabled \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --define=signal_trace=disabled \
+            --define=system-helper=android \
             //test/java/...
   kotlintestslinux:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
+    needs: env
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.
     name: kotlin_tests_linux
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:mobile-321658b6b50abda6869f89fac275f59bf3b1e757
+      image: envoyproxy/envoy-build-ubuntu:mobile-41c5a05d708972d703661b702a63ef5060125c33
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run Kotlin library integration tests'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |

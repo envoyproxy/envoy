@@ -4,6 +4,7 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/event_service_config.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
@@ -13,6 +14,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -60,7 +62,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -366,9 +368,19 @@ message HealthCheck {
   // The default value for "healthy edge interval" is the same as the default interval.
   google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration = {gt {}}];
 
+  // .. attention::
+  // This field is deprecated in favor of the extension
+  // :ref:`event_logger <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>` and
+  // :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
+  // in the file sink extension.
+  //
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
-  // If empty, no event log will be written.
-  string event_log_path = 17;
+  string event_log_path = 17
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // A list of event log sinks to process the health check event.
+  // [#extension-category: envoy.health_check.event_sinks]
+  repeated TypedExtensionConfig event_logger = 25;
 
   // [#not-implemented-hide:]
   // The gRPC service for the health check event service.
