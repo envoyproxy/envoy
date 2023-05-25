@@ -114,7 +114,7 @@ public:
     EXPECT_CALL(mock_router_filter_, callbacks()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
         mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>(), false,
-        false));
+        false, false /*enable_tcp_tunneling*/));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
     tcp_upstream_ =

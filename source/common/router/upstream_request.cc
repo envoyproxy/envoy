@@ -81,7 +81,8 @@ public:
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
-                                 bool can_send_early_data, bool can_use_http3)
+                                 bool can_send_early_data, bool can_use_http3,
+                                 bool enable_tcp_tunneling)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -94,7 +95,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
+          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")),
+      enable_tcp_tunneling_(enable_tcp_tunneling) {
   if (parent_.config().start_child_span_) {
     if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
@@ -542,6 +544,9 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
+  if (enable_tcp_tunneling_) {
+    upstream_->enableTcpTunneling();
+  }
 
   if (parent_.requestVcluster()) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady

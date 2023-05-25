@@ -76,6 +76,7 @@ public:
   void encodeTrailers(const Envoy::Http::RequestTrailerMap& trailers) override {
     request_encoder_->encodeTrailers(trailers);
   }
+  void enableTcpTunneling() override { request_encoder_->enableTcpTunneling(); }
 
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 

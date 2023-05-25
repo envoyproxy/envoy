@@ -153,7 +153,6 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
   if (!request_encoder_) {
     return;
   }
-  ENVOY_LOG(debug, "http upstream resetting encoder");
   request_encoder_->getStream().removeCallbacks(*this);
   if (!write_half_closed_ || !read_half_closed_) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
@@ -358,8 +357,9 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    StreamInfo::StreamInfo& downstream_info,
                                    std::unique_ptr<Router::GenericConnPool>& conn_pool)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {
-  upstream_request_ = std::make_unique<UpstreamRequest>(
-      *this, std::move(conn_pool), /*can_send_early_data_=*/false, /*can_use_http3_=*/true);
+  upstream_request_ =
+      std::make_unique<UpstreamRequest>(*this, std::move(conn_pool), /*can_send_early_data_=*/false,
+                                        /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
 }
 CombinedUpstream::~CombinedUpstream() { upstream_request_->resetStream(); }
 

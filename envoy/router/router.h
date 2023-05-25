@@ -1488,6 +1488,10 @@ public:
    */
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
   /**
+   * Enable TCP Tunneling.
+   */
+  virtual void enableTcpTunneling() PURE;
+  /**
    * Enable/disable further data from this stream.
    */
   virtual void readDisable(bool disable) PURE;
