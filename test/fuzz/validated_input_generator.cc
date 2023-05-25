@@ -206,8 +206,7 @@ void ValidatedInputGenerator::handleAnyRules(
 void ValidatedInputGenerator::handleMessageTypedField(
     Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
     const Protobuf::Reflection* reflection, const validate::FieldRules& rules,
-    const absl::Span<const Protobuf::Message* const>& parents, const bool force_create,
-    const bool cut_off) {
+    const absl::Span<const Protobuf::Message* const>& parents, bool force_create, bool cut_off) {
 
   if (field.is_repeated()) {
     const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -268,7 +267,7 @@ void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
                                                         const Protobuf::FieldDescriptor& field,
                                                         const Protobuf::Reflection* reflection,
                                                         const validate::FieldRules& rules,
-                                                        const bool force) {
+                                                        bool force) {
 
   if (field.is_repeated()) {
     const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -324,7 +323,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
 void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                       const Protobuf::FieldDescriptor& field,
                                       const absl::Span<const Protobuf::Message* const> parents,
-                                      const bool force_create, const bool cut_off) {
+                                      bool force_create, bool cut_off) {
   const Protobuf::Reflection* reflection = msg.GetReflection();
 
   if (!field.options().HasExtension(validate::rules) && !force_create) {
