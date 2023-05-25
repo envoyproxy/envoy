@@ -27,12 +27,22 @@ minor_behavior_changes:
     The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: http1
   change: |
+    Allowing mixed case schemes in absolute urls (e.g. HtTp://www.google.com). Mixed case schemes will be normalized to
+    the lower cased equivalents before being forwarded upstream. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` to false.
+- area: http1
+  change: |
     The HTTP1 server-side codec no longer considers encoding 1xx headers as
     starting the response. This allows the codec to raise protocol errors,
     sending detailed local replies instead of just closing the connection. This
     behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers``
     to false.
+- area: dns
+  change: |
+    Changing the DNS cache to use host:port as the cache key rather than host. This allows a
+    downstream DFP filter to serve both secure and insecure clusters. This behavioral change
+    can be reverted by setting runtime flag ``envoy.reloadable_features.dfp_mixed_scheme`` to false.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
@@ -60,6 +70,10 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: router
+  change: |
+    Added check for existing metadata before setting metadata due to 'auto_sni', 'auto_san_validation', or
+    'override_auto_sni_header' to prevent triggering ENVOY_BUG when an earlier filter has set the metadata.
 - area: resource_monitors
   change: |
     Changed behavior of the fixed heap monitor to count unused mapped pages as
@@ -221,6 +235,11 @@ new_features:
     :ref:`is_optional <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>` field.
     A route/virtual host level per filter config can be marked as optional, which means that if
     the filter fails to load, the configuration will no be rejected.
+- area: upstream
+  change: |
+    Added :ref:`cluster provided extension
+    <envoy_v3_api_msg_extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided>`
+    to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: fault
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
@@ -228,7 +247,7 @@ new_features:
 - area: ext_proc
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
-    Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
+    Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
 
 deprecated:
 - area: access_log

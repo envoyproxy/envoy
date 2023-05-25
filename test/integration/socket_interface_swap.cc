@@ -4,7 +4,8 @@ namespace Envoy {
 
 void preserveIoError(Api::IoError*) {}
 
-SocketInterfaceSwap::SocketInterfaceSwap() {
+SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
+    : write_matcher_(std::make_shared<IoHandleMatcher>(socket_type)) {
   Envoy::Network::SocketInterfaceSingleton::clear();
   test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
       std::make_unique<Envoy::Network::TestSocketInterface>(
