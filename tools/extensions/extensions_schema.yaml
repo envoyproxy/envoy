@@ -66,6 +66,7 @@ categories:
 - envoy.compression.decompressor
 - envoy.config.validators
 - envoy.config_subscription
+- envoy.config_mux
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network
@@ -75,6 +76,7 @@ categories:
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.health_check.event_sinks
 - envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters

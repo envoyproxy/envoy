@@ -236,8 +236,9 @@ AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const st
   return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
+AssertionResult TestUtility::waitForNumHistogramSamplesGe(Stats::Store& store,
                                                           const std::string& name,
+                                                          uint64_t min_sample_count_required,
                                                           Event::TestTimeSystem& time_system,
                                                           Event::Dispatcher& main_dispatcher,
                                                           std::chrono::milliseconds timeout) {
@@ -246,7 +247,7 @@ AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
     auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
     if (histo) {
       uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
-      if (sample_count) {
+      if (sample_count >= min_sample_count_required) {
         break;
       }
     }
@@ -254,10 +255,19 @@ AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
 
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to have samples", name);
+      return AssertionFailure() << fmt::format("timed out waiting for {} to have {} samples", name,
+                                               min_sample_count_required);
     }
   }
   return AssertionSuccess();
+}
+
+AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
+                                                          const std::string& name,
+                                                          Event::TestTimeSystem& time_system,
+                                                          Event::Dispatcher& main_dispatcher,
+                                                          std::chrono::milliseconds timeout) {
+  return waitForNumHistogramSamplesGe(store, name, 1, time_system, main_dispatcher, timeout);
 }
 
 uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,

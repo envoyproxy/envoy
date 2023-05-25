@@ -225,27 +225,6 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~
-``addVirtualCluster``
-~~~~~~~~~~~~~~~~~~~~~
-
-Add a virtual cluster config for Envoy Mobile's configuration.
-The configuration is expected as a JSON object.
-This functionality is used for stat segmentation.
-
-.. attention::
-
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this project.
-    :issue:`#770 <770>` tracks enhancing this API.
-
-**Example**::
-
-  // Kotlin
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
-
-  // Swift
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableAdminInterface``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -346,20 +325,6 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
 
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
-
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``

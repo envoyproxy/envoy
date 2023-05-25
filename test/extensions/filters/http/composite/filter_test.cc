@@ -224,9 +224,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   EXPECT_CALL(*encode_filter, onDestroy());
   filter_.onDestroy();
 
-  EXPECT_CALL(*access_log_1, log(_, _, _, _));
-  EXPECT_CALL(*access_log_2, log(_, _, _, _));
-  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo());
+  EXPECT_CALL(*access_log_1, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_2, log(_, _, _, _, _));
+  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo(),
+              AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace

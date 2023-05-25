@@ -29,11 +29,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -713,11 +710,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), admin(), runtime(), stats_store_, thread_local_,
+      serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
+      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -959,10 +954,15 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  Config::GrpcMuxImpl::shutdownAll();
-  Config::NewGrpcMuxImpl::shutdownAll();
-  Config::XdsMux::GrpcMuxSotw::shutdownAll();
-  Config::XdsMux::GrpcMuxDelta::shutdownAll();
+  std::vector<std::string> muxes = {
+      "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
+      "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};
+  for (const auto& name : muxes) {
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (factory) {
+      factory->shutdownAll();
+    }
+  }
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -970,13 +970,6 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
-    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
-    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
-    // objects in the ApiListener destructor to reference any objects in thread local storage.
-    if (listener_manager_->apiListener().has_value()) {
-      listener_manager_->apiListener()->get().shutdown();
-    }
-
     listener_manager_->stopWorkers();
   }
 

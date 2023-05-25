@@ -61,27 +61,28 @@ public:
     datadog::tracing::Optional<datadog::tracing::Tracer> tracer;
   };
 
-  // Tracer::TracingDriver
+  // Tracing::Driver
 
   /**
    * Create a Datadog span from the specified \p trace_context, and having the
-   * specified \p operation_name, \p start_time and \p tracing_decision.
+   * specified \p operation_name, \p stream_info and \p tracing_decision.
    * If this tracer encountered an error during initialization, then return a
    * \c Tracing::NullSpan instead.
    * @param config this parameter is ignored
    * @param trace_context possibly contains information about an existing trace
    * that the returned span will be a part of; otherwise, the returned span is
    * the root of a new trace
+   * @param stream_info contains information about the stream.
    * @param operation_name the name of the operation representation by this
    * span, e.g. "handle.request"
-   * @param start_time when the span begins
    * @param tracing_decision the sampling decision made in advance by Envoy for
    * this trace. If the decision is to drop the trace, then this tracer will
    * honor that decision. If the decision is to keep the trace, then this tracer
    * will apply its own sampling logic, which might keep or drop the trace.
    */
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
-                             const std::string& operation_name, SystemTime start_time,
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
                              const Tracing::Decision tracing_decision) override;
 
 private:

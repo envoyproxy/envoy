@@ -75,7 +75,8 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
 // Tracer::TracingDriver
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, SystemTime start_time,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
                                    const Tracing::Decision tracing_decision) {
   ThreadLocalTracer& thread_local_tracer = **thread_local_slot_;
   if (!thread_local_tracer.tracer) {
@@ -86,7 +87,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   // so we will as well.
   datadog::tracing::SpanConfig span_config;
   span_config.name = operation_name;
-  span_config.start = estimateTime(start_time);
+  span_config.start = estimateTime(stream_info.startTime());
 
   datadog::tracing::Tracer& tracer = *thread_local_tracer.tracer;
   TraceContextReader reader{trace_context};

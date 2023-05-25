@@ -103,12 +103,13 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
-    filter_state->setData(ExtProcLoggingInfoName, std::make_shared<ExtProcLoggingInfo>(),
+  if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
+    filter_state->setData(callbacks.filterConfigName(),
+                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -126,12 +127,22 @@ Filter::StreamOpenState Filter::openStream() {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+    // have a proper implementation of streamInfo.
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
   if (stream_) {
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -168,7 +179,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, config_->headerMatchers(),
+                                *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
@@ -435,6 +447,16 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   }
 
   if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+    // If no gRPC stream yet, opens it before sending data.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
@@ -516,10 +538,22 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   stats_.stream_msgs_sent_.inc();
 }
 
+void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
+                              bool end_stream) {
+  if (state.hasBufferedData()) {
+    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
+  } else {
+    // If there is no buffered data, sends an empty body.
+    Buffer::OwnedImpl data("");
+    sendBodyChunk(state, data, new_state, end_stream);
+  }
+}
+
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, config_->headerMatchers(),
+                                *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
@@ -527,12 +561,20 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
+void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
+  const auto result = DurationUtil::durationToMillisecondsNoThrow(override_message_timeout);
+  if (!result.ok()) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of duration range. "
+                    "Ignoring the message.");
+    stats_.override_message_timeout_ignored_.inc();
+    return;
+  }
+  const auto message_timeout_ms = result.value();
   // The new timeout has to be >=1ms and <= max_message_timeout configured in filter.
-  const uint32_t min_timeout_ms = 1;
-  const uint32_t max_timeout_ms = config_->maxMessageTimeout();
+  const uint64_t min_timeout_ms = 1;
+  const uint64_t max_timeout_ms = config_->maxMessageTimeout();
   if (message_timeout_ms < min_timeout_ms || message_timeout_ms > max_timeout_ms) {
-    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of range. "
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of config range. "
                     "Ignoring the message.");
     stats_.override_message_timeout_ignored_.inc();
     return;
@@ -559,7 +601,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Check whether the server is asking to extend the timer.
   if (response->has_override_message_timeout()) {
-    onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
+    onNewTimeout(response->override_message_timeout());
     return;
   }
 
@@ -735,7 +777,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
-      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
+      if (!mut_status.ok()) {
+        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
+                              mut_status.message());
+      }
     }
   };
 

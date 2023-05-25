@@ -25,13 +25,12 @@ class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
-             const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
-             Event::Dispatcher& dispatcher, Stats::Scope& scope,
-             JitteredExponentialBackOffStrategyPtr backoff_strategy,
+             const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
+             Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
-        control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
+        control_plane_stats_(Utility::generateControlPlaneStats(scope)),
         time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
@@ -228,9 +227,8 @@ private:
 
   // Reestablishes the gRPC channel when necessary, with some backoff politeness.
   Event::TimerPtr retry_timer_;
-  Random::RandomGenerator& random_;
   TimeSource& time_source_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
+  BackOffStrategyPtr backoff_strategy_;
 
   // Prevents the Envoy from making too many requests.
   TokenBucketPtr limit_request_;
