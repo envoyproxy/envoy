@@ -112,6 +112,15 @@ public:
     }
   }
 
+  // TODO(tyxia) Important clean up.
+  void TearDown() override {
+    if (processor_connection_) {
+      ASSERT_TRUE(processor_connection_->close());
+      ASSERT_TRUE(processor_connection_->waitForDisconnect());
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
   void initializeConfig() {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
