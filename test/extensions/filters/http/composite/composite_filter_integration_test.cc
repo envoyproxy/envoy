@@ -177,7 +177,8 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
     )EOF");
-  addPerRouteResponseCodeFilter("composite", "/somepath", 402);
+  addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
+                                /*code=*/402);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
