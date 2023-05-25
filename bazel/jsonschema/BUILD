@@ -1,4 +1,3 @@
-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@com_github_chrusty_protoc_gen_jsonschema//:defs.bzl", "jsonschema_compile")
 
 # generated manually using: bazel query 'filter("@envoy_api:*", kind(proto_library, deps(@envoy_api//:all_protos) except @envoy_api//:*))'
