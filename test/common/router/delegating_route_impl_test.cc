@@ -88,6 +88,7 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(connectConfig);
   TEST_METHOD(routeName);
   TEST_METHOD(earlyDataPolicy);
+  TEST_METHOD(routeStatsContext);
 }
 
 } // namespace
