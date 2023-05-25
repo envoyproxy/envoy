@@ -87,7 +87,8 @@ public:
         });
   }
 
-  const absl::string_view filter_config_template_ = R"EOF(
+  void prependCompositeFilter(const std::string& name = "composite") {
+    config_helper_.prependFilter(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -114,7 +115,9 @@ public:
                         typed_config:
                           "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                           code: 403
-    )EOF";
+    )EOF",
+                                                 name));
+  }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
                                                                  {":path", "/somepath"},
@@ -130,7 +133,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
+  prependCompositeFilter();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -152,8 +155,9 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
 TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
-  addPerRouteResponseCodeFilter("composite", "/somepath", 401);
+  prependCompositeFilter();
+  addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
+                                /*code=*/401);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -183,11 +187,13 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
 
 // Test that the specified filters apply per route configs to requests.
 TEST_P(CompositeFilterIntegrationTest, TestPerRouteMultipleFilters) {
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite_2"));
-  config_helper_.prependFilter(absl::StrFormat(filter_config_template_, "composite"));
+  prependCompositeFilter(/*name=*/"composite_2");
+  prependCompositeFilter();
 
-  addPerRouteResponseCodeFilter("composite", "/somepath", 407, true);
-  addPerRouteResponseCodeFilter("composite_2", "/somepath", 402);
+  addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
+                                /*code=*/407, /*response_prefix=*/true);
+  addPerRouteResponseCodeFilter(/*filter_name=*/"composite_2", /*route_prefix=*/"/somepath",
+                                /*code=*/402);
 
   initialize();
   {
