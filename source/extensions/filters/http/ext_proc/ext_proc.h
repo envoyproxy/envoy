@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -13,6 +14,9 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/host_description.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
@@ -63,7 +67,23 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
+    if (cluster_info) {
+      cluster_info_ = cluster_info.value();
+    }
+  }
+  void setUpstreamHost(absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
+    if (upstream_host) {
+      upstream_host_ = upstream_host.value();
+    }
+  }
 
+  uint64_t bytesSent() const { return bytes_sent_; }
+  uint64_t bytesReceived() const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
@@ -72,6 +92,11 @@ private:
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // The following stats are populated for ext_proc filters using Envoy gRPC only.
+  // The bytes sent and received are for the entire stream.
+  uint64_t bytes_sent_{0}, bytes_received_{0};
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
 class FilterConfig {

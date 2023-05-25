@@ -1260,8 +1260,6 @@ filegroup(
     visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
 )
 """,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():

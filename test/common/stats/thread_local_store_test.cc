@@ -1149,6 +1149,72 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
   EXPECT_MEMORY_LE(mem_consumed, 3500000);
 }
 
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixExclusion) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster.");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("cluster.accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge =
+      scope_.gaugeFromString("cluster.hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "cluster.hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixInclusive) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_prefix(
+      "cluster.");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenExclusionRegex) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*"));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenInclusionRegex) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  // Create inclusion list to only accept names that have at least one capital letter.
+  stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*[A-Z].*"));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
 // Tests the logic for caching the stats-matcher results, and in particular the
 // private impl method checkAndRememberRejection(). That method behaves
 // differently depending on whether TLS is enabled or not, so we parameterize

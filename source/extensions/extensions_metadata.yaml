@@ -208,6 +208,7 @@ envoy.filters.http.aws_request_signing:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
 envoy.filters.http.bandwidth_limit:
   categories:
   - envoy.filters.http
@@ -1490,6 +1491,13 @@ envoy.load_balancing_policies.subset:
   - envoy.load_balancing_policies
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.load_balancing_policies.cluster_provided:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
