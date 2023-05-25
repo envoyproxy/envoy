@@ -49,6 +49,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -1083,6 +1084,8 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const std::string connection_pool_per_key_format_;
+  const Formatter::FormatterImpl connection_pool_per_key_formatter_;
 };
 
 /**

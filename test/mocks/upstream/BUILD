@@ -64,6 +64,7 @@ envoy_cc_mock(
     hdrs = ["load_balancer_context.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/formatter:substitution_formatter_lib",
     ],
 )
 

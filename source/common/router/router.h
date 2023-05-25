@@ -32,6 +32,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
@@ -516,6 +517,11 @@ public:
     downstream_set_cookies_.emplace_back(
         Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true));
     return cookie_value;
+  }
+
+  std::string connectionPoolKeyFormat(const Formatter::FormatterImpl& formatter) const override {
+    return formatter.format(*downstream_headers_, *Http::ResponseHeaderMapImpl::create(),
+                            *Http::ResponseTrailerMapImpl::create(), callbacks_->streamInfo(), "");
   }
 
   // RouterFilterInterface

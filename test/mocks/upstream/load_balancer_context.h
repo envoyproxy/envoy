@@ -1,9 +1,12 @@
 #pragma once
 #include "envoy/upstream/load_balancer.h"
 
+#include "source/common/formatter/substitution_formatter.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
+
 namespace Upstream {
 
 class MockLoadBalancerContext : public LoadBalancerContext {
@@ -24,6 +27,8 @@ public:
   MOCK_METHOD(Network::TransportSocketOptionsConstSharedPtr, upstreamTransportSocketOptions, (),
               (const));
   MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
+  MOCK_METHOD(std::string, connectionPoolKeyFormat, (const Formatter::FormatterImpl&),
+              (const, override));
 
 private:
   HealthyAndDegradedLoad priority_load_;

@@ -5983,6 +5983,58 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
                             EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
 
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerKeyFormat) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      connection_pool_per_key_format: "%REQ(:authority)%:%DYNAMIC_METADATA(my.namespace.key)%"
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  NiceMock<MockLoadBalancerContext> lb_context;
+  NiceMock<Network::MockConnection> downstream_connection;
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  ON_CALL(lb_context, downstreamConnection()).WillByDefault(Return(&downstream_connection));
+  ON_CALL(downstream_connection, socketOptions()).WillByDefault(ReturnRef(options_to_return));
+
+  std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
+  std::stringstream ss;
+  for (size_t i = 0; i < 3; ++i) {
+    ss.str("");
+    ss << "host:streaminfo:" << i;
+    conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
+    EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+        .WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(lb_context, connectionPoolKeyFormat).WillOnce(Return(ss.str()));
+    EXPECT_EQ(conn_pool_vector.back(),
+              HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                            ->httpConnPool(ResourcePriority::Default,
+                                                           Http::Protocol::Http11, &lb_context)));
+  }
+  // Check that the first entry is still in the pool map
+  ss.str("");
+  ss << "host:streaminfo:0";
+  EXPECT_CALL(lb_context, connectionPoolKeyFormat).WillOnce(Return(ss.str()));
+  EXPECT_EQ(conn_pool_vector.front(),
+            HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                          ->httpConnPool(ResourcePriority::Default,
+                                                         Http::Protocol::Http11, &lb_context)));
+}
+
 #ifdef WIN32
 TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
   const std::string yaml = fmt::format(R"EOF(

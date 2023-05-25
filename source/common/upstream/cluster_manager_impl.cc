@@ -1703,6 +1703,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     context->downstreamConnection()->hashKey(hash_key);
   }
 
+  if (!cluster_info_->connectionPoolPerDownstreamConnection() &&
+      cluster_info_->connectionPoolPerKeyFormat() && context) {
+    auto key_format =
+        context->connectionPoolKeyFormat(cluster_info_->connectionPoolPerKeyFormatter());
+    if (!key_format.empty()) {
+      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(key_format), hash_key);
+    }
+  }
+
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this

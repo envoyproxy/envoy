@@ -37,7 +37,9 @@ namespace Envoy {
 namespace Http {
 class FilterChainManager;
 }
-
+namespace Formatter {
+class FormatterImpl;
+}
 namespace Upstream {
 
 /**

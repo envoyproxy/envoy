@@ -15,6 +15,11 @@ namespace ConnectionPool {
 class ConnectionLifetimeCallbacks;
 } // namespace ConnectionPool
 } // namespace Http
+
+namespace Formatter {
+class FormatterImpl;
+}
+
 namespace Upstream {
 
 /**
@@ -96,6 +101,11 @@ public:
    * and return the corresponding host directly.
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+
+  /**
+   * Returns the string key computed by formatter input argument.
+   */
+  virtual std::string connectionPoolKeyFormat(const Formatter::FormatterImpl& formatter) const PURE;
 };
 
 /**

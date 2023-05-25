@@ -240,6 +240,8 @@ public:
   }
 
   absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
+
+  std::string connectionPoolKeyFormat(const Formatter::FormatterImpl&) const override { return {}; }
 };
 
 /**
