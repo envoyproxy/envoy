@@ -552,6 +552,8 @@ public:
     absl::optional<absl::string_view> upstreamOverrideHost() const override {
       return absl::nullopt;
     }
+    absl::string_view filterConfigName() const override { return ""; }
+
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override {
       DUMP_STATE_UNIMPLEMENTED(HttpStreamDecoderFilterCallbacks);
