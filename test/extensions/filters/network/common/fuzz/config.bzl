@@ -10,6 +10,10 @@ READFILTER_FUZZ_FILTERS = [
     "envoy.filters.network.local_ratelimit",
     "envoy.filters.network.ratelimit",
     "envoy.filters.network.rbac",
+]
+
+# These are marked as robust to downstream, but not currently fuzzed
+READFILTER_NOFUZZ_FILTERS = [
     # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-    # "envoy.filters.network.tcp_proxy",
+    "envoy.filters.network.tcp_proxy",
 ]

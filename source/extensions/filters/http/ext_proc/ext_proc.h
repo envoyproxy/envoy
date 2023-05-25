@@ -19,6 +19,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -111,7 +112,8 @@ public:
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
         filter_metadata_(config.filter_metadata()),
-        allow_mode_override_(config.allow_mode_override()) {}
+        allow_mode_override_(config.allow_mode_override()),
+        header_matchers_(initHeaderMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -133,6 +135,8 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
+  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
+
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
@@ -140,6 +144,16 @@ private:
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+    std::vector<Matchers::StringMatcherPtr> header_matchers;
+    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+      header_matchers.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+    }
+    return header_matchers;
   }
 
   const bool failure_mode_allow_;
@@ -153,6 +167,8 @@ private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
+  // Empty header_matchers_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

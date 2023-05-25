@@ -795,6 +795,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_check.event_sinks.file:
+  categories:
+  - envoy.health_check.event_sinks
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection

@@ -27,9 +27,9 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
         fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
   }
 
-  const int num = context.options().concurrency();
+  const uint32_t worker_num = context.options().concurrency();
 
-  if (num > 32) {
+  if (worker_num > 32) {
     ExceptionUtil::throwEnvoyException(
         "Dlb connection balanncer only supports up to 32 worker threads, "
         "please decrease the number of threads by `--concurrency`");
@@ -67,21 +67,20 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   }
 
   ENVOY_LOG(debug,
-            "dlb available resources: {}, domains: {}, LDB queues: {}, LDB ports: {}, SN slots: {} "
-            "{}, ES entries: {}, Contig ES entries: {}, LDB credits: {}, Contig LDB cred: {}, LDB "
-            "credit pls: {}",
+            "dlb available resources: domains: {}, LDB queues: {}, LDB ports: {}, "
+            "ES entries: {}, Contig ES entries: {}, LDB credits: {}, Config LDB credits: {}, LDB "
+            "credit pools: {}",
             rsrcs.num_sched_domains, rsrcs.num_ldb_queues, rsrcs.num_ldb_ports,
-            rsrcs.num_sn_slots[0], rsrcs.num_sn_slots[1], rsrcs.num_ldb_event_state_entries,
-            rsrcs.max_contiguous_ldb_event_state_entries, rsrcs.num_ldb_credits,
-            rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
+            rsrcs.num_ldb_event_state_entries, rsrcs.max_contiguous_ldb_event_state_entries,
+            rsrcs.num_ldb_credits, rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
 
-  uint num_seq_numbers;
-  if (dlb_get_ldb_sequence_number_allocation(dlb, 0, &num_seq_numbers)) {
+  if (rsrcs.num_ldb_ports < 2 * worker_num) {
     ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_get_ldb_sequence_number_allocation {}", errorDetails(errno)));
+        fmt::format("no available dlb port resources, request: {}, available: {}", 2 * worker_num,
+                    rsrcs.num_ldb_ports));
   }
 
-  domain_id = createSchedDomain(dlb, rsrcs, cap);
+  domain_id = createSchedDomain(dlb, rsrcs, cap, 2 * worker_num);
   if (domain_id == -1) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
@@ -127,7 +126,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ExceptionUtil::throwEnvoyException(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
   }
 
-  for (int i = 0; i < num; i++) {
+  for (uint i = 0; i < worker_num; i++) {
     int tx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (tx_port_id == -1) {
       ExceptionUtil::throwEnvoyException(
