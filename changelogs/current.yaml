@@ -86,8 +86,8 @@ minor_behavior_changes:
 - area: ext_authz
   change: |
     forward :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
-    :ref:`typed_metadata_context_namespaces <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>`
-    and :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` selected by
+    ``typed_metadata_context_namespaces`` and :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+    selected by
     :ref:`metadata_context_namespaces <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.metadata_context_namespaces>`
     from connection metadata to external auth service. This is addition to the current behavior of forwarding request metadata.
     In the event of both connection and request metadata containing the requested metadata the request value will be provided.
