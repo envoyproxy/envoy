@@ -24,13 +24,22 @@ using Stats::Counter;
 using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::HeaderMutation;
 
-void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
-                                   envoy::config::core::v3::HeaderMap& proto_out) {
-  headers_in.iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    auto* new_header = proto_out.add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+bool MutationUtils::headerInAllowList(
+    absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
+  return std::any_of(header_matchers.begin(), header_matchers.end(),
+                     [&key](auto& matcher) { return matcher->match(key); });
+}
 
+void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
+                                   const std::vector<Matchers::StringMatcherPtr>& header_matchers,
+                                   envoy::config::core::v3::HeaderMap& proto_out) {
+  headers_in.iterate([&proto_out,
+                      &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+    if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
+      auto* new_header = proto_out.add_headers();
+      new_header->set_key(std::string(e.key().getStringView()));
+      new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+    }
     return Http::HeaderMap::Iterate::Continue;
   });
 }

@@ -179,7 +179,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, config_->headerMatchers(),
+                                *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
@@ -551,7 +552,8 @@ void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackSta
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, config_->headerMatchers(),
+                                *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
