@@ -3,7 +3,6 @@ name: Check dependencies
 on:
   schedule:
     - cron: '0 8 * * *'
-
   workflow_dispatch:
 
 permissions: read-all
@@ -11,7 +10,12 @@ permissions: read-all
 jobs:
   build:
     runs-on: ubuntu-20.04
-    if: github.repository == 'envoyproxy/envoy'
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
     permissions:
       contents: read # to fetch code (actions/checkout)
       issues: write # required to open/close dependency issues
