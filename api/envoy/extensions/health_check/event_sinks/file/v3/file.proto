@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.health_check.event_sinks.file.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.health_check.event_sinks.file.v3";
+option java_outer_classname = "FileProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/health_check/event_sinks/file/v3;filev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Health Check Log File Sink]
+// [#extension: envoy.health_check.event_sinks.file]
+
+// Health check event file sink.
+// The health check event will be converted to JSON.
+message HealthCheckEventFileSink {
+  // Specifies the path to the health check event log.
+  string event_log_path = 1 [(validate.rules).string = {min_len: 1}];
+}
