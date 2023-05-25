@@ -14,7 +14,8 @@ public:
   quic::WriteResult WritePacket(const char* buffer, size_t buf_len,
                                 const quic::QuicIpAddress& self_address,
                                 const quic::QuicSocketAddress& peer_address,
-                                quic::PerPacketOptions* options) override;
+                                quic::PerPacketOptions* options,
+                                const quic::QuicPacketWriterParams& params) override;
 
   // quic::QuicPacketWriter
   bool IsWriteBlocked() const override { return envoy_udp_packet_writer_->isWriteBlocked(); }
