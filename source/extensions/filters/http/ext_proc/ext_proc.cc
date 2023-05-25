@@ -127,12 +127,22 @@ Filter::StreamOpenState Filter::openStream() {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+    // have a proper implementation of streamInfo.
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
   if (stream_) {
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -169,7 +179,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, config_->headerMatchers(),
+                                *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
@@ -541,7 +552,8 @@ void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackSta
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, config_->headerMatchers(),
+                                *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
@@ -765,7 +777,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
-      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
+      if (!mut_status.ok()) {
+        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
+                              mut_status.message());
+      }
     }
   };
 

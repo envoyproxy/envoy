@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -13,8 +14,12 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/host_description.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -63,7 +68,23 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
+    if (cluster_info) {
+      cluster_info_ = cluster_info.value();
+    }
+  }
+  void setUpstreamHost(absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
+    if (upstream_host) {
+      upstream_host_ = upstream_host.value();
+    }
+  }
 
+  uint64_t bytesSent() const { return bytes_sent_; }
+  uint64_t bytesReceived() const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
@@ -72,6 +93,11 @@ private:
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // The following stats are populated for ext_proc filters using Envoy gRPC only.
+  // The bytes sent and received are for the entire stream.
+  uint64_t bytes_sent_{0}, bytes_received_{0};
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
 class FilterConfig {
@@ -85,7 +111,7 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        filter_metadata_(config.filter_metadata()) {}
+        filter_metadata_(config.filter_metadata()), header_matchers_(initHeaderMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -105,6 +131,8 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
+  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
+
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
@@ -112,6 +140,16 @@ private:
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+    std::vector<Matchers::StringMatcherPtr> header_matchers;
+    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+      header_matchers.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+    }
+    return header_matchers;
   }
 
   const bool failure_mode_allow_;
@@ -123,6 +161,8 @@ private:
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // Empty header_matchers_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

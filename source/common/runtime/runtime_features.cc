@@ -29,6 +29,7 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_allow_absolute_url_with_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);

@@ -48,6 +48,7 @@ public:
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
   NiceMock<Buffer::OwnedImpl>* buffer_ptr_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -100,6 +101,8 @@ DEFINE_PROTO_FUZZER(
                               input.response());
                       filter->onReceiveMessage(std::move(response));
                     }));
+            EXPECT_CALL(*stream, streamInfo())
+                .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
             ON_CALL(*stream, close()).WillByDefault(Return(false));
             return stream;
           }));
