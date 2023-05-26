@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "google/protobuf/wrappers.proto";
+
+// Structured input for server_codec_diff_fuzz_test.
+
+message ServerCodecDiffFuzzTestCase {
+  message Configuration {
+    bool normalize_path = 1;
+  }
+
+  message HttpHeader {
+    bytes key = 1;
+    bytes value = 2;
+  }
+
+  message Request {
+    google.protobuf.BytesValue scheme = 1;
+    google.protobuf.BytesValue method = 2;
+    google.protobuf.BytesValue path = 3;
+    google.protobuf.BytesValue authority = 4;
+    repeated HttpHeader headers = 5;
+  }
+
+  Configuration configuration = 1;
+  Request request = 2;
+}

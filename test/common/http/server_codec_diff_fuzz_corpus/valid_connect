@@ -1,0 +1,17 @@
+configuration {
+    normalize_path: true
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "CONNECT" }
+    path { value: "foo.bar.com:80" }
+    headers {
+        key: "foo"
+        value: "bar"
+    }
+    headers {
+        key: "baz"
+        value: "fuz"
+    }
+}

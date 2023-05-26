@@ -582,3 +582,43 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_proto_library(
+    name = "server_codec_diff_fuzz_proto",
+    srcs = ["server_codec_diff_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "server_codec_diff_fuzz_test",
+    srcs = ["server_codec_diff_fuzz_test.cc"],
+    corpus = "server_codec_diff_fuzz_corpus",
+    deps = [
+        ":server_codec_diff_fuzz_proto_cc_proto",
+        "//source/common/common:empty_string",
+        "//source/common/http:conn_manager_lib",
+        "//source/common/http:context_lib",
+        "//source/common/http:date_provider_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//source/server:drain_manager_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
