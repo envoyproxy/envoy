@@ -1499,7 +1499,9 @@ bool Utility::isValidRefererValue(absl::string_view value) {
 }
 
 void Utility::RedactSensitiveHeaderInfo::dumpState(std::ostream& os) const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.debug_redact_sensitive")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.debug_include_sensitive_data")) {
+    os << headers_;
+  } else {
     headers_.iterate([&os](const HeaderEntry& header) -> HeaderMap::Iterate {
       os << "'" << header.key().getStringView() << "', '";
       if (header.key() == Http::Headers::get().Path) {
@@ -1514,8 +1516,6 @@ void Utility::RedactSensitiveHeaderInfo::dumpState(std::ostream& os) const {
       os << "'\n";
       return HeaderMap::Iterate::Continue;
     });
-  } else {
-    os << headers_;
   }
 }
 
