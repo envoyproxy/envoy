@@ -82,7 +82,7 @@ void Filter::encodeComplete() {
   }
 }
 
-void Filter::onMatchCallback(const Matcher::Action& action) {
+Matcher::MatchCallbackStatus Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
   FactoryCallbacksWrapper wrapper(*this, dispatcher_);
@@ -93,7 +93,8 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     ENVOY_LOG(debug, "failed to create delegated filter {}",
               accumulateToString<absl::Status>(
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
-    return;
+
+    return Matcher::MatchCallbackStatus::StopAndFailStream;
   }
 
   if (wrapper.filter_to_inject_.has_value()) {
@@ -115,10 +116,11 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     // Size should be small, so a copy should be fine.
     access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
                            wrapper.access_loggers_.end());
+
+    return Matcher::MatchCallbackStatus::Continue;
   }
 
-  // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
-  // either directly or via some return status.
+  return Matcher::MatchCallbackStatus::StopAndFailStream;
 }
 
 Http::FilterHeadersStatus

@@ -64,7 +64,7 @@ public:
     }
   }
 
-  void onMatchCallback(const Matcher::Action& action) override;
+  Matcher::MatchCallbackStatus onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
   void log(const Http::RequestHeaderMap* request_headers,
