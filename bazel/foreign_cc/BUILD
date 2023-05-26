@@ -55,7 +55,7 @@ cc_library(
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
