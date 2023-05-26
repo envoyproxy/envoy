@@ -56,7 +56,9 @@ class Http2FloodMitigationTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
       public Http2RawFrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
+  Http2FloodMitigationTest()
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
     // This test tracks the number of buffers created, and the tag extraction check uses some
     // buffers, so disable it in this test.
     skip_tag_extraction_rule_check_ = true;

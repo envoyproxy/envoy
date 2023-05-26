@@ -7,6 +7,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -54,6 +55,7 @@ public:
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_.streamInfo(); }
 
 private:
   ExternalProcessorCallbacks& callbacks_;
