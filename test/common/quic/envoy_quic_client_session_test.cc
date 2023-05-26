@@ -91,7 +91,7 @@ public:
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
 
     time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-    ON_CALL(writer_, WritePacket(_, _, _, _, _))
+    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
   }
 

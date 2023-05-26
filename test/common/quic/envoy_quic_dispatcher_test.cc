@@ -79,7 +79,7 @@ public:
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
-    EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
+    EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
         .WillRepeatedly(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
         .WillRepeatedly(ReturnRef(transport_socket_factory_));
