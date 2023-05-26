@@ -396,33 +396,33 @@ DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input
   hcm_under_test_2.filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   hcm_under_test_2.filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  ASSERT_TRUE((hcm_under_test_1.config_->request_headers_ != nullptr &&
+  FUZZ_ASSERT((hcm_under_test_1.config_->request_headers_ != nullptr &&
                hcm_under_test_2.config_->request_headers_ != nullptr) ||
               (hcm_under_test_1.config_->request_headers_ == nullptr &&
                hcm_under_test_2.config_->request_headers_ == nullptr));
 
-  ASSERT_TRUE((hcm_under_test_1.config_->response_headers_ != nullptr &&
+  FUZZ_ASSERT((hcm_under_test_1.config_->response_headers_ != nullptr &&
                hcm_under_test_2.config_->response_headers_ != nullptr) ||
               (hcm_under_test_1.config_->response_headers_ == nullptr &&
                hcm_under_test_2.config_->response_headers_ == nullptr));
 
-  ASSERT_EQ(hcm_under_test_1.config_->request_end_stream_,
-            hcm_under_test_2.config_->request_end_stream_);
-  ASSERT_EQ(hcm_under_test_1.config_->response_end_stream_,
-            hcm_under_test_2.config_->response_end_stream_);
+  FUZZ_ASSERT(hcm_under_test_1.config_->request_end_stream_ ==
+              hcm_under_test_2.config_->request_end_stream_);
+  FUZZ_ASSERT(hcm_under_test_1.config_->response_end_stream_ ==
+              hcm_under_test_2.config_->response_end_stream_);
   if (hcm_under_test_1.config_->request_headers_ != nullptr) {
-    ASSERT_EQ(*hcm_under_test_1.config_->request_headers_,
-              *hcm_under_test_2.config_->request_headers_);
+    FUZZ_ASSERT(*hcm_under_test_1.config_->request_headers_ ==
+                *hcm_under_test_2.config_->request_headers_);
   }
 
   if (hcm_under_test_1.config_->response_headers_ != nullptr) {
-    ASSERT_EQ(*hcm_under_test_1.config_->response_headers_,
-              *hcm_under_test_2.config_->response_headers_);
+    FUZZ_ASSERT(*hcm_under_test_1.config_->response_headers_ ==
+                *hcm_under_test_2.config_->response_headers_);
   }
 
-  ASSERT_EQ(hcm_under_test_1.connection_alive_, hcm_under_test_2.connection_alive_);
-  ASSERT_EQ(hcm_under_test_1.out_end_stream_, hcm_under_test_2.out_end_stream_);
-  ASSERT_EQ(hcm_under_test_1.written_wire_bytes_, hcm_under_test_2.written_wire_bytes_);
+  FUZZ_ASSERT(hcm_under_test_1.connection_alive_ == hcm_under_test_2.connection_alive_);
+  FUZZ_ASSERT(hcm_under_test_1.out_end_stream_ == hcm_under_test_2.out_end_stream_);
+  FUZZ_ASSERT(hcm_under_test_1.written_wire_bytes_ == hcm_under_test_2.written_wire_bytes_);
 }
 
 } // namespace Http

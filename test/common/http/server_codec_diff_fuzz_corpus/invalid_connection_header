@@ -1,0 +1,29 @@
+configuration {
+  normalize_path: true
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "GET"
+  }
+  path {
+    value: "/websocket/endpoint"
+  }
+  authority {
+    value: "foo.bar.com"
+  }
+  headers {
+    key: "Conne\350tion"
+    value: "upgrade, keep-alive"
+  }
+  headers {
+    key: "upgrade"
+    value: "websocket"
+  }
+  headers {
+    key: "baz"
+    value: "fuz"
+  }
+}
