@@ -1,0 +1,18 @@
+configuration {
+    normalize_path: true
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "GET" }
+    path { value: "/some/path/../with/..various%7Fstuff\\in%20it//./and?more" }
+    authority { value: "foo.bar.com" }
+    headers {
+        key: "foo"
+        value: "bar"
+    }
+    headers {
+        key: "baz"
+        value: "fuz"
+    }
+}

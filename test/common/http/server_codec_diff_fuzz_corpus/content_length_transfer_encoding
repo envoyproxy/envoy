@@ -1,0 +1,22 @@
+configuration {
+    normalize_path: true
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "GET" }
+    path { value: "/" }
+    authority { value: "foo.bar.com" }
+    headers {
+        key: "content-length"
+        value: "10"
+    }
+    headers {
+        key: "transfer-encoding"
+        value: "chunked"
+    }
+    headers {
+        key: "baz"
+        value: "fuz"
+    }
+}
