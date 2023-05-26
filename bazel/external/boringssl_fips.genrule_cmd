@@ -2,6 +2,9 @@
 
 set -e
 
+export CXXFLAGS=''
+export LDFLAGS=''
+
 # BoringSSL build as described in the Security Policy for BoringCrypto module (2022-05-06):
 # https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4407.pdf
 
@@ -76,12 +79,11 @@ fi
 # Ninja
 VERSION=1.10.2
 SHA256=ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed
-
 curl -sLO https://github.com/ninja-build/ninja/archive/refs/tags/v"$VERSION".tar.gz \
   && echo "$SHA256" v"$VERSION".tar.gz | sha256sum --check
-tar xf v"$VERSION".tar.gz
+tar -xvf v"$VERSION".tar.gz
 cd ninja-"$VERSION"
-CC=clang-$ClangV CXX=clang++ ./configure.py --bootstrap
+python3 ./configure.py --bootstrap
 
 export PATH="$PWD:$PATH"
 
