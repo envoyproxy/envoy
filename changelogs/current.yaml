@@ -206,6 +206,15 @@ new_features:
 - area: ext_proc
   change: |
     added new configuration field
+    :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+    If set to true, the filter config
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    can be overridden by the
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    in the response message from the external processing server.
+    If not set, the ``mode_override`` API in the response message will be ignored.
+- area: ext_proc
+  change: |
     :ref:`forward_rules <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.forward_rules>`
     to only allow headers matchinging the forward rules to be forwarded to the external processing server.
 - area: redis_proxy
