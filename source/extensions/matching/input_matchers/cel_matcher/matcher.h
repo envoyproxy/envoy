@@ -8,6 +8,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/matching/http/cel_input/cel_input.h"
 
 #include "absl/types/variant.h"
 #include "xds/type/matcher/v3/cel.pb.h"
@@ -18,28 +19,22 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
+using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
 using ::Envoy::Matcher::InputMatcher;
 using ::Envoy::Matcher::InputMatcherFactoryCb;
 using ::Envoy::Matcher::MatchingDataType;
-
-using xds::type::v3::CelExpression;
+using ::xds::type::v3::CelExpression;
 
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
 using CompiledExpressionPtr = std::unique_ptr<google::api::expr::runtime::CelExpression>;
 using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
-
-// CEL matcher specific matching data
-class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
-public:
-  explicit CelMatchData(BaseActivationPtr activation) : activation_(std::move(activation)) {}
-  BaseActivationPtr activation_;
-};
+using CelMatcherSharedPtr = std::shared_ptr<::xds::type::matcher::v3::CelMatcher>;
 
 class CelInputMatcher : public InputMatcher, public Logger::Loggable<Logger::Id::matcher> {
 public:
-  CelInputMatcher(const CelExpression& input_expr);
+  CelInputMatcher(CelMatcherSharedPtr cel_matcher, Builder& builder);
 
   bool match(const MatchingDataType& input) override;
 
@@ -49,8 +44,8 @@ public:
   }
 
 private:
-  // Expression builder must not be destroyed before the compiled expression.
-  BuilderPtr expr_builder_;
+  // Expression proto must outlive the compiled expression.
+  CelMatcherSharedPtr cel_matcher_;
   CompiledExpressionPtr compiled_expr_;
 };
 

@@ -20,7 +20,6 @@ envoy_cc_extension(
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "//source/extensions/matching/input_matchers/cel_matcher:cel_matcher_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

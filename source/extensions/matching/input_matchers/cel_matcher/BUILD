@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/matcher:matcher_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/matching/http/cel_input:cel_input_lib",
     ],
 )
 

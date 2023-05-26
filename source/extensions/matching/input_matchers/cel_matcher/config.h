@@ -21,10 +21,17 @@ public:
   InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
                               Server::Configuration::ServerFactoryContext&) override {
-    const auto& cel_matcher = dynamic_cast<const ::xds::type::matcher::v3::CelMatcher&>(config);
+    if (expr_builder_ == nullptr) {
+      expr_builder_ = Extensions::Filters::Common::Expr::createBuilder(nullptr);
+    }
 
-    return [cel_matcher = std::move(cel_matcher)] {
-      return std::make_unique<CelInputMatcher>(cel_matcher.expr_match());
+    const auto& cel_matcher_config =
+        dynamic_cast<const ::xds::type::matcher::v3::CelMatcher&>(config);
+    CelMatcherSharedPtr cel_matcher =
+        std::make_shared<::xds::type::matcher::v3::CelMatcher>(cel_matcher_config);
+
+    return [cel_matcher = std::move(cel_matcher), this] {
+      return std::make_unique<CelInputMatcher>(cel_matcher, *expr_builder_);
     };
   }
 
@@ -33,6 +40,10 @@ public:
   }
 
   std::string name() const override { return "envoy.matching.matchers.cel_matcher"; }
+
+private:
+  // Expression builder must outlive the compiled expression.
+  BuilderPtr expr_builder_;
 };
 
 } // namespace CelMatcher

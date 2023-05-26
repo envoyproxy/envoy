@@ -6,16 +6,17 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
-CelInputMatcher::CelInputMatcher(const CelExpression& input_expr) {
-  expr_builder_ = Extensions::Filters::Common::Expr::createBuilder(nullptr);
+CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher, Builder& builder)
+    : cel_matcher_(std::move(cel_matcher)) {
+  const CelExpression& input_expr = cel_matcher_->expr_match();
   switch (input_expr.expr_specifier_case()) {
   case CelExpression::ExprSpecifierCase::kParsedExpr:
     compiled_expr_ =
-        Filters::Common::Expr::createExpression(*expr_builder_, input_expr.parsed_expr().expr());
+        Filters::Common::Expr::createExpression(builder, input_expr.parsed_expr().expr());
     return;
   case CelExpression::ExprSpecifierCase::kCheckedExpr:
     compiled_expr_ =
-        Filters::Common::Expr::createExpression(*expr_builder_, input_expr.checked_expr().expr());
+        Filters::Common::Expr::createExpression(builder, input_expr.checked_expr().expr());
     return;
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;

@@ -9,7 +9,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
 
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
@@ -23,7 +22,14 @@ using ::Envoy::Http::RequestHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseTrailerMapOptConstRef;
 
-using ::Envoy::Extensions::Matching::InputMatchers::CelMatcher::CelMatchData;
+using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
+
+// CEL matcher specific matching data
+class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
+public:
+  explicit CelMatchData(BaseActivationPtr activation) : activation_(std::move(activation)) {}
+  BaseActivationPtr activation_;
+};
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
 public:
