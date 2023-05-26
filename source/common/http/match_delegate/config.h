@@ -28,6 +28,7 @@ public:
 
     void evaluateMatchTree(MatchDataUpdateFunc data_update_func);
     bool skipFilter() const { return skip_filter_; }
+    Matcher::MatchCallbackStatus callbackStatus() const { return callback_status_; }
     void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
       if (has_match_tree_ && matching_data_ == nullptr) {
         matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
@@ -36,6 +37,7 @@ public:
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
   private:
+    Matcher::MatchCallbackStatus callback_status_;
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
     const bool has_match_tree_{};
     Envoy::Http::StreamFilterBase* base_filter_{};
@@ -52,8 +54,8 @@ public:
   // Envoy::Http::StreamFilterBase
   void onStreamComplete() override { base_filter_->onStreamComplete(); }
   void onDestroy() override { base_filter_->onDestroy(); }
-  void onMatchCallback(const Matcher::Action& action) override {
-    base_filter_->onMatchCallback(action);
+  Matcher::MatchCallbackStatus onMatchCallback(const Matcher::Action& action) override {
+    return base_filter_->onMatchCallback(action);
   }
   Envoy::Http::LocalErrorStatus onLocalReply(const LocalReplyData& data) override {
     return base_filter_->onLocalReply(data);

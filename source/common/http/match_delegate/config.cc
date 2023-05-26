@@ -113,7 +113,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
       skip_filter_ = true;
     } else {
       ASSERT(base_filter_ != nullptr);
-      base_filter_->onMatchCallback(*result);
+      callback_status_ = base_filter_->onMatchCallback(*result);
     }
   }
 }
@@ -141,6 +141,16 @@ DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   if (match_state_.skipFilter()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
+
+  if (match_state_.callbackStatus() != Matcher::MatchCallbackStatus::Continue) {
+    // Something went wrong, send local reply and stop iteration of the filter chain
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
+                                       "Stream failed due to match callback error", nullptr,
+                                       absl::nullopt, "");
+
+    return Envoy::Http::FilterHeadersStatus::StopIteration;
+  }
+
   return decoder_filter_->decodeHeaders(headers, end_stream);
 }
 
