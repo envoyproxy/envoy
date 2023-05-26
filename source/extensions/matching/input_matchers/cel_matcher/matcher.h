@@ -19,11 +19,9 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
-using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
 using ::Envoy::Matcher::InputMatcher;
 using ::Envoy::Matcher::InputMatcherFactoryCb;
 using ::Envoy::Matcher::MatchingDataType;
-using ::xds::type::v3::CelExpression;
 
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
 using CompiledExpressionPtr = std::unique_ptr<google::api::expr::runtime::CelExpression>;

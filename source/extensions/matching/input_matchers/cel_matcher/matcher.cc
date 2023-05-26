@@ -6,6 +6,9 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
+using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
+using ::xds::type::v3::CelExpression;
+
 CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher, Builder& builder)
     : cel_matcher_(std::move(cel_matcher)) {
   const CelExpression& input_expr = cel_matcher_->expr_match();
