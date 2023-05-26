@@ -208,6 +208,7 @@ envoy.filters.http.aws_request_signing:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
 envoy.filters.http.bandwidth_limit:
   categories:
   - envoy.filters.http
@@ -794,6 +795,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_check.event_sinks.file:
+  categories:
+  - envoy.health_check.event_sinks
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection

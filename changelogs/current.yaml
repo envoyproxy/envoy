@@ -27,6 +27,11 @@ minor_behavior_changes:
     The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: http1
   change: |
+    Allowing mixed case schemes in absolute urls (e.g. HtTp://www.google.com). Mixed case schemes will be normalized to
+    the lower cased equivalents before being forwarded upstream. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` to false.
+- area: http1
+  change: |
     The HTTP1 server-side codec no longer considers encoding 1xx headers as
     starting the response. This allows the codec to raise protocol errors,
     sending detailed local replies instead of just closing the connection. This
@@ -198,6 +203,11 @@ new_features:
     :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
     to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
     clear_route_cache_disabled stat.
+- area: ext_proc
+  change: |
+    added new configuration field
+    :ref:`forward_rules <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.forward_rules>`
+    to only allow headers matchinging the forward rules to be forwarded to the external processing server.
 - area: redis_proxy
   change: |
     added new field :ref:`connection_rate_limit
@@ -235,3 +245,7 @@ deprecated:
   change: |
     deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
     in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
+- area: health_check
+  change: |
+    deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
+    :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.

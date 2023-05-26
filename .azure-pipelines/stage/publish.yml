@@ -241,6 +241,8 @@ jobs:
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
       stepsPost:
 
       - script: |
@@ -301,8 +303,43 @@ jobs:
         displayName: "Publish release docs"
         workingDirectory: $(Build.SourcesDirectory)
 
+- job: signed_release
+  displayName: Signed binaries
+  dependsOn:
+  - package_x64
+  - package_arm64
+  condition: |
+    and(succeeded(),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: "ubuntu-20.04"
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/**/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.distribution"
+      itemPattern: "bazel.distribution/**/packages.*.tar.gz"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: release.signed
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
 - job: success
-  dependsOn: ["docker", "package_x64", "package_arm64", "docs"]
+  dependsOn: ["docker", "docs", "signed_release"]
   displayName: Success (linux artefacts)
   pool:
     vmImage: "ubuntu-20.04"
@@ -313,9 +350,8 @@ jobs:
   condition: |
     and(
       in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+      in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.signed_release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none
   - bash: |
@@ -323,39 +359,22 @@ jobs:
 
 - job: github
   displayName: Publish release tag
-  dependsOn: ["docs"]
+  dependsOn: ["success"]
   condition: |
     and(not(canceled()),
         eq(${{ parameters.publishGithubRelease }}, 'true'))
   pool:
     vmImage: "ubuntu-20.04"
   steps:
-
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release"
-      itemPattern: "bazel.release/bin/*"
+      artifactName: "release.signed"
+      itemPattern: "release.signed/release.signed.tar.zst"
       targetPath: $(Build.StagingDirectory)
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "bazel.release.arm64"
-      itemPattern: "bazel.release.arm64/bin/*"
-      targetPath: $(Build.StagingDirectory)
-  - template: ../gpg.yml
+  - template: ../bazel.yml
     parameters:
-      authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
-      authGPGPath: ${{ parameters.authGPGPath }}
-      authGPGKey: ${{ parameters.authGPGKey }}
-      pathGPGConfiguredHome: /build/.gnupg
-      pathGPGHome: $(Build.StagingDirectory)/.gnupg
-  - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
-    displayName: "Publish release to Github"
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      GITHUB_TOKEN: ${{ parameters.authGithub }}
-  - bash: |
-      set -e
-      rm -rf $(Build.StagingDirectory)/.gnupg
+      ciTarget: publish
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
