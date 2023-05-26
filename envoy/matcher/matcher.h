@@ -139,6 +139,21 @@ enum class MatchState {
 };
 
 /**
+ * Status enum for Match Callback.
+ */
+enum class MatchCallbackStatus {
+  /**
+   * Continue filter chain iteration as normal.
+   */
+  Continue,
+  /**
+   * Stop filter chain iteration and attempt to issue a local reply indicating that the stream
+   * failed.
+   */
+  StopAndFailStream
+};
+
+/**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
  */
 template <class DataType> class MatchTree {
