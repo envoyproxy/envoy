@@ -344,7 +344,6 @@ envoy_cmake(
         "LLVM_ENABLE_LIBXML2": "off",
         "LLVM_ENABLE_TERMINFO": "off",
         "LLVM_ENABLE_ZLIB": "off",
-        "LLVM_ENABLE_ZSTD": "off",
         "LLVM_TARGETS_TO_BUILD": "X86",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         # Workaround for the issue with statically linked libstdc++
