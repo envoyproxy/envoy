@@ -1371,6 +1371,28 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE",
     ),
+    rules_proto_grpc = dict(
+        project_name = "rules_proto_grpc",
+        project_desc = "Bazel rules for building Protobuf and gRPC code and libraries from proto_library targets ",
+        project_url = "https://github.com/rules-proto-grpc/rules_proto_grpc",
+        version = "4.4.0",
+        sha256 = "928e4205f701b7798ce32f3d2171c1918b363e9a600390a25c876f075f1efc0a",
+        strip_prefix = "rules_proto_grpc-{version}",
+        urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/{version}/rules_proto_grpc-{version}.tar.gz"],
+        use_category = ["build"],
+        release_date = "2023-05-03",
+    ),
+    com_github_chrusty_protoc_gen_jsonschema = dict(
+        project_name = "protoc-gen-jsonschema",
+        project_desc = "Protobuf to JSON-Schema compiler",
+        project_url = "https://github.com/norbjd/protoc-gen-jsonschema",
+        strip_prefix = "protoc-gen-jsonschema-{version}",
+        sha256 = "1a839e8157aa647a69e5b6db76acd63c4f618805f8b76548655807631b163c10",
+        version = "b336b0b270ef8798f8504c3fb01e09d633ddc818",
+        urls = ["https://github.com/norbjd/protoc-gen-jsonschema/archive/{version}.zip"],
+        use_category = ["build"],
+        release_date = "2023-05-25",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

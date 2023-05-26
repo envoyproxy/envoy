@@ -24,10 +24,6 @@ load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
 
-load("//bazel:jsonschema_imports.bzl", "envoy_jsonschema_imports")
-
-envoy_jsonschema_imports()
-
 # TODO: could these be moved into a dedicated file to avoid bloating the WORKSPACE?
 load("//bazel/jsonschema:com_github_chrusty_protoc_gen_jsonschema_deps.bzl", "go_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
