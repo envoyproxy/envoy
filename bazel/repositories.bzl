@@ -313,9 +313,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
 
-    _rules_proto_grpc()
-    _com_github_chrusty_protoc_gen_jsonschema()
-
     # TODO(keith): Remove patch when we update rules_pkg
     external_http_archive(
         "rules_pkg",
@@ -1337,12 +1334,6 @@ def _com_github_fdio_vpp_vcl():
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
-
-def _rules_proto_grpc():
-    external_http_archive("rules_proto_grpc")
-
-def _com_github_chrusty_protoc_gen_jsonschema():
-    external_http_archive(name = "com_github_chrusty_protoc_gen_jsonschema")
 
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")
