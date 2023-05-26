@@ -370,6 +370,10 @@ void ProcessorState::clearRouteCache(const CommonResponse& common_response) {
   if (filter_.config().disableClearRouteCache()) {
     filter_.stats().clear_route_cache_disabled_.inc();
     ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
+  } else if (trafficDirection() == envoy::config::core::v3::TrafficDirection::OUTBOUND ) {
+    // Do not clear the route cache for outbound response traffic.
+    filter_.stats().clear_route_cache_not_outbound_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache for OUTBOUND response traffic");
   } else if (common_response.has_header_mutation()) {
     ENVOY_LOG(debug, "clearing route cache");
     filter_callbacks_->downstreamCallbacks()->clearRouteCache();
