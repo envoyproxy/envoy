@@ -146,7 +146,8 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       filter_.callbacks_->dispatcher().timeSource());
 
   if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
-      Http::Utility::getResponseStatus(*headers) == 200) {
+      ((Http::Utility::getResponseStatus(*headers) == 200) ||
+       (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
   }

@@ -64,6 +64,7 @@ public:
   ~HttpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value() || generic_conn_pool_; }
+  Http::CodecType codecType() const { return type_; }
   std::unique_ptr<Router::GenericConnPool> createConnPool(Upstream::ThreadLocalCluster&,
                                                           Upstream::LoadBalancerContext* context,
                                                           absl::optional<Http::Protocol> protocol);
@@ -426,8 +427,10 @@ protected:
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
-  UpstreamRequestPtr upstream_request_;
+  // UpstreamRequestPtr upstream_request_;
+  std::list<UpstreamRequestPtr> upstream_requests_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  HttpConnPool& parent_;
 
 private:
   // Router::RouterFilterInterface
@@ -470,14 +473,13 @@ private:
   }
   const Router::Route* route() const override { return route_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
-    static const std::list<UpstreamRequestPtr> requests;
-    return requests;
+    // static const std::list<UpstreamRequestPtr> requests;
+    return upstream_requests_;
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
   TimeSource& timeSource() override { return config().timeSource(); }
 
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  HttpConnPool& parent_;
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
   Router::Route* route_;
   class DecoderShim : public Http::ResponseDecoder {
@@ -565,6 +567,7 @@ public:
   void setRequestEncoder(Http::RequestEncoder&, bool) override {}
   bool isValidResponse(const Http::ResponseHeaderMap&) override;
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true) override;
+  bool readDisable(bool disable) override;
 };
 
 } // namespace TcpProxy

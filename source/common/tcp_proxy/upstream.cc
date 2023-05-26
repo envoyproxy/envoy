@@ -374,11 +374,12 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    StreamInfo::StreamInfo& downstream_info,
                                    std::unique_ptr<Router::GenericConnPool>& conn_pool)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {
-  upstream_request_ =
+  UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(conn_pool), /*can_send_early_data_=*/false,
                                         /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
 }
-CombinedUpstream::~CombinedUpstream() { upstream_request_->resetStream(); }
+CombinedUpstream::~CombinedUpstream() { upstream_requests_.front()->resetStream(); }
 
 void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
   auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
@@ -400,37 +401,53 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
                                                 : *downstream_info_.getRequestHeaders(),
                                             *Http::StaticEmptyHeaders::get().response_headers,
                                             downstream_info_);
-  upstream_request_->acceptHeadersFromRouter(false);
+  upstream_requests_.front()->acceptHeadersFromRouter(false);
 }
 
 void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  upstream_request_->acceptDataFromRouter(data, end_stream);
+  upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
   if (end_stream) {
     doneWriting();
   }
+}
+
+bool CombinedUpstream::readDisable(bool disable) {
+  if (disable) {
+    upstream_requests_.front()->onAboveWriteBufferHighWatermark();
+  }
+  return disable;
 }
 
 Tcp::ConnectionPool::ConnectionData*
 CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    upstream_request_->resetStream();
+    upstream_requests_.front()->resetStream();
   }
   return nullptr;
 }
 
 bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  if (Http::Utility::getResponseStatus(headers) != 200) {
+  switch (parent_.codecType()) {
+  case Http::CodecType::HTTP1:
+    // According to RFC7231 any 2xx response indicates that the connection is
+    // established.
+    // Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
+    // https://tools.ietf.org/html/rfc7231#section-4.3.6
+    return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
+  case Http::CodecType::HTTP2:
+    if (Http::Utility::getResponseStatus(headers) != 200) {
+      return false;
+    }
+  default:
     return false;
   }
-
-  return true;
 }
 
 void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    upstream_request_->resetStream();
+    upstream_requests_.front()->resetStream();
   }
   onResetEncoder(event, inform_downstream);
 }
