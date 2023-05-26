@@ -121,6 +121,7 @@ public class MainActivity extends Activity {
           Log.d("MainActivity", message);
           if ((scheme == REQUEST_SCHEME_HTTP && status == 301) ||
               (scheme == REQUEST_SCHEME_HTTPS && status == 200)) {
+            // The server returns 301 to http request and 200 to https request.
             String serverHeaderField = responseHeaders.value(ENVOY_SERVER_HEADER).get(0);
             recyclerView.post(() -> viewAdapter.add(new Success(message, headerText)));
           } else {
