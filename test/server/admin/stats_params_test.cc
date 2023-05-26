@@ -53,6 +53,21 @@ TEST(StatsParamsTest, ParseParamsFormat) {
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=bogus", response));
 }
 
+TEST(StatsParamsTest, ParseParamsHidden) {
+  Buffer::OwnedImpl response;
+  StatsParams params;
+
+  EXPECT_EQ(HiddenFlag::Exclude, params.hidden_);
+
+  ASSERT_EQ(Http::Code::OK, params.parse("?hidden=include", response));
+  EXPECT_EQ(HiddenFlag::Include, params.hidden_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?hidden=only", response));
+  EXPECT_EQ(HiddenFlag::ShowOnly, params.hidden_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?hidden=exclude", response));
+  EXPECT_EQ(HiddenFlag::Exclude, params.hidden_);
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?hidden=foo", response));
+}
+
 TEST(StatsParamsTest, ParseParamsFilter) {
   Buffer::OwnedImpl response;
 

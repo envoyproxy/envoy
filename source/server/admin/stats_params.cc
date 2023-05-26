@@ -56,8 +56,11 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
       hidden_ = HiddenFlag::Include;
     } else if (hidden_value.value() == "only") {
       hidden_ = HiddenFlag::ShowOnly;
-    } else {
+    } else if (hidden_value.value() == "exclude") {
       hidden_ = HiddenFlag::Exclude;
+    } else {
+      response.add("usage: /stats?hidden=(include|only|exclude)\n\n");
+      return Http::Code::BadRequest;
     }
   }
 
