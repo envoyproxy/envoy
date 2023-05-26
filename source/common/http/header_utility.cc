@@ -20,6 +20,15 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+
+const Regex::CompiledGoogleReMatcher& connectUdpPathMatcher() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, R"(/\.well-known/masque/udp/(.+)/(.+)/)",
+                         false);
+}
+
+} // namespace
+
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
   const absl::string_view ConnectUnsupported = "http.connect_not_supported";
@@ -253,6 +262,16 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
   return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
+}
+
+bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
+  absl::string_view path = headers.getPathValue();
+  std::string new_host = connectUdpPathMatcher().replaceAll(path, "\\1:\\2");
+  if (new_host == path) {
+    return false;
+  }
+  headers.setHost(new_host);
+  return true;
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

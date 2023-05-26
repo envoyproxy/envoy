@@ -54,28 +54,19 @@ public:
     EXPECT_EQ(downstream_received_data, response_->body());
   }
 
+  // The Envoy HTTP/2 and HTTP/3 clients expect the request header map to be in the form of HTTP/1
+  // upgrade to issue an extended CONNECT request.
   Http::TestRequestHeaderMapImpl connect_udp_headers_{
-      {":method", "CONNECT"},
-      {":path", "/.well-known/masque/udp/foo.lyft.com/80/"},
-      {":protocol", "connect-udp"},
-      {":scheme", "https"},
-      {":authority", "example.org"}};
+      {":method", "GET"},         {":path", "/.well-known/masque/udp/foo.lyft.com/80/"},
+      {"upgrade", "connect-udp"}, {"connection", "upgrade"},
+      {":scheme", "https"},       {":authority", "example.org"},
+      {"capsule-protocol", "?1"}};
 
   IntegrationStreamDecoderPtr response_;
 };
 
 TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
   initialize();
-  connect_udp_headers_.clear();
-  // The client H/2 codec expects the request header map to be in the form of H/1
-  // upgrade to issue an extended CONNECT request
-  connect_udp_headers_.copyFrom(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/.well-known/masque/udp/foo.lyft.com/80/"},
-                                     {"upgrade", "connect-udp"},
-                                     {"connection", "upgrade"},
-                                     {":scheme", "https"},
-                                     {":authority", "example.org"}});
   setUpConnection();
   std::string sent_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
@@ -92,6 +83,27 @@ TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
                         absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
 }
 
+TEST_P(ConnectUdpTerminationIntegrationTest, BasicWithoutCapsuleProtocolHeader) {
+  initialize();
+  connect_udp_headers_.remove(Envoy::Http::Headers::get().CapsuleProtocol);
+  setUpConnection();
+  std::string sent_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  std::string received_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+      );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+}
+
+
+/*
 TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
 }
 
@@ -103,13 +115,37 @@ TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
 
 TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
 }
+*/
 
 TEST_P(ConnectUdpTerminationIntegrationTest, PathWithInvalidUriTemplate) {
+  initialize();
+  connect_udp_headers_.setPath("/masque/udp/foo.lyft.com/80/");
+  setUpConnection();
+  EXPECT_EQ("400", response_->headers().getStatusValue());
 }
 
-TEST_P(ConnectUdpTerminationIntegrationTest, InvalidCapsulesSent) {
-}
+TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
+  initialize();
+  setUpConnection();
+  Network::UdpRecvData request_datagram;
+  std::string unknown_capsule_fragment =
+      absl::HexStringToBytes("01"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  codec_client_->sendData(*request_encoder_, unknown_capsule_fragment, false);
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
 
+  std::string unknown_context_id =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "01a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  codec_client_->sendData(*request_encoder_, unknown_context_id, false);
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
+}
 
 INSTANTIATE_TEST_SUITE_P(HttpVersions, ConnectUdpTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

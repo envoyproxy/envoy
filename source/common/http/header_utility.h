@@ -182,6 +182,12 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
+  /**
+   * @brief Rewrites the authority header field by parsing the path using the default CONNECT-UDP
+   * URI template. Returns true if the parsing was successful, otherwise returns false.
+   */
+  static bool rewriteAuthorityForConnectUdp(RequestHeaderMap& headers);
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   /**
    * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the

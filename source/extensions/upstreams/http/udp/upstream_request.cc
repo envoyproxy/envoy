@@ -49,10 +49,7 @@ UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_request, Network
 }
 
 void UdpUpstream::encodeData(Buffer::Instance& data, bool /*end_stream*/) {
-  // TODO: If the data is in the Capsule format, parses it and extracts the UDP proxying payload.
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-    ENVOY_LOG_MISC(trace, absl::BytesToHexString(absl::string_view(
-                              reinterpret_cast<const char*>(slice.mem_), slice.len_)));
     absl::string_view mem_slice(static_cast<const char*>(slice.mem_), slice.len_);
     if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
       ENVOY_LOG_MISC(error, "Capsule ingestion error occured: slice = {}", mem_slice);
@@ -66,13 +63,14 @@ Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool /*end_stream*/) {
   Api::SysCallIntResult rc = socket_->connect(host_->address());
   if (SOCKET_FAILURE(rc.return_value_)) {
-    //TODO: statistics.
+    // TODO: statistics.
     return absl::InternalError("Upstream socket connect failure.");
   }
   // Synthesize the 200 response headers downstream to complete the CONNECT-UDP handshake.
   Envoy::Http::ResponseHeaderMapPtr headers{
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
-          {{Envoy::Http::Headers::get().Status, "200"}})};
+          {{Envoy::Http::Headers::get().Status, "200"},
+           {Envoy::Http::Headers::get().CapsuleProtocol, "?1"}})};
   upstream_request_->decodeHeaders(std::move(headers), false);
   return Envoy::Http::okStatus();
 }
