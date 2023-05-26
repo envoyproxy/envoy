@@ -418,6 +418,7 @@ protected:
                Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void virtual resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+  void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
   Http::RequestEncoder* request_encoder_{};
@@ -435,7 +436,7 @@ private:
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                       bool end_stream) override;
   void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&&, UpstreamRequest&) override {}
-  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&&, UpstreamRequest&) override {}
+  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&&, UpstreamRequest&) override;
   void onUpstreamMetadata(Http::MetadataMapPtr&&) override {}
   void onUpstreamReset(Http::StreamResetReason stream_reset_reason,
                        absl::string_view transport_failure_reason, UpstreamRequest&) override;
@@ -490,11 +491,6 @@ private:
                                                parent_.downstream_info_.filterState());
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
-        // If we did not receive a valid CONNECT response yet we treat this as a pool
-        // failure, otherwise we forward the event downstream.
-        if (parent_.conn_pool_callbacks_ != nullptr) {
-          parent_.conn_pool_callbacks_->onFailure();
-        }
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();

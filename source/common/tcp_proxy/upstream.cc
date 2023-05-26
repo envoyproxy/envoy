@@ -165,6 +165,16 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
+  onResetEncoder(event, inform_downstream);
+}
+
+void HttpUpstream::onResetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
+  // If we did not receive a valid CONNECT response yet we treat this as a pool
+  // failure, otherwise we forward the event downstream.
+  if (conn_pool_callbacks_ != nullptr) {
+    conn_pool_callbacks_->onFailure();
+    return;
+  }
 
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
@@ -198,6 +208,11 @@ void HttpUpstream::onUpstreamData(Buffer::Instance& data,
                                   bool end_stream) {
   responseDecoder().decodeData(data, end_stream);
 }
+
+void HttpUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers, UpstreamRequest&) {
+  responseDecoder().decodeTrailers(std::move(trailers));
+}
+
 Http::RequestHeaderMap* HttpUpstream::downstreamHeaders() { return downstream_headers_.get(); }
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -390,6 +405,9 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
 
 void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_request_->acceptDataFromRouter(data, end_stream);
+  if (end_stream) {
+    doneWriting();
+  }
 }
 
 Tcp::ConnectionPool::ConnectionData*
@@ -409,11 +427,12 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   return true;
 }
 
-void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool) {
+void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     upstream_request_->resetStream();
   }
+  onResetEncoder(event, inform_downstream);
 }
 
 Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
