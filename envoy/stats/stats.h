@@ -140,7 +140,6 @@ public:
     Uninitialized, // Gauge was discovered during hot-restart transfer.
     NeverImport,   // On hot-restart, each process starts with gauge at 0.
     Accumulate,    // Transfers gauge state on hot-restart.
-    // TODO(Diazalan): Add functionality for Hidden to be ignored by admin/stats-sink
     HiddenAccumulate, // Will be transferred on hot-restart and ignored by admin/stats-sink
   };
 
