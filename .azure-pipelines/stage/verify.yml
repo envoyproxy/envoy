@@ -1,68 +1,13 @@
 
 parameters:
 
-- name: bucketGCP
-  type: string
-  default: ""
-
 # Auth
 - name: authGCP
   type: string
   default: ""
-- name: authGithubWorkflow
-  type: string
-  default: ""
-- name: authGithubWorkflowAppId
-  type: string
-  default: ""
-- name: authGithubWorkflowInstallId
-  type: string
-  default: ""
-
-- name: runDocker
-  displayName: "Run Docker"
-  type: string
-  default: true
 
 
-# TODO(phlax): improve docker publishing job and move this there
 jobs:
-- job: examples
-  displayName: Examples (Docker/x64)
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.runDocker }}, 'true'))
-  timeoutInMinutes: 120
-  pool:
-    vmImage: "ubuntu-20.04"
-  steps:
-  - task: DownloadSecureFile@1
-    name: WorkflowTriggerKey
-    displayName: 'Download workflow trigger key'
-    inputs:
-      secureFile: '${{ parameters.authGithubWorkflow }}'
-
-  - bash: |
-      set -e
-      KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
-      echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
-    name: key
-
-  - template: ../bazel.yml
-    parameters:
-      ciTarget: verify.trigger
-      authGithub: "$(key.value)"
-      # Please see `ci/do_ci.sh` for notes on required vars.
-      env:
-        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-          ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
-          ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
-          ENVOY_HEAD_REF: "$(Build.SourceBranch)"
-        ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-          ENVOY_BRANCH: "$(Build.SourceBranch)"
-        GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
-        GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
-
 - job: packages_x64
   displayName: Debs (x64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -114,7 +59,7 @@ jobs:
 
 - job: verified
   displayName: Verification complete
-  dependsOn: ["examples", "packages_x64", "packages_arm64"]
+  dependsOn: ["packages_x64", "packages_arm64"]
   pool:
     vmImage: "ubuntu-20.04"
   # This condition ensures that this (required) check passes if all of
@@ -124,7 +69,6 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:

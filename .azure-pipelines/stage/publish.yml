@@ -24,6 +24,15 @@ parameters:
 - name: authGithub
   type: string
   default: ""
+- name: authGithubWorkflow
+  type: string
+  default: ""
+- name: authGithubWorkflowAppId
+  type: string
+  default: ""
+- name: authGithubWorkflowInstallId
+  type: string
+  default: ""
 - name: authGPGPassphrase
   type: string
   default: ""
@@ -93,70 +102,91 @@ jobs:
   pool:
     vmImage: "ubuntu-20.04"
   steps:
-  - template: ../cached.yml
-    parameters:
-      name: publish_docker
-      # VERSION.txt is included to refresh Docker images for release
-      key: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
-      version: "$(cacheKeyDockerBuild)"
-      path: ""
-  - bash: |
-      echo "disk space at beginning of build:"
-      df -h
-    displayName: "Check disk space at beginning"
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
       artifactName: "bazel.release"
       itemPattern: "bazel.release/**/bin/*"
       targetPath: $(Build.StagingDirectory)
-  - bash: |
-      set -e
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: docker-upload
+      # cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+      # VERSION.txt is included to refresh Docker images for release
+      cacheKeyDocker: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
+      cacheKeyDockerName: publish_docker
+      cacheKeyDockerTmpDir: /var/azpcache
+      cacheKeyDockerPath: ""
+      cacheKeyDockerVersion: "$(cacheKeyDockerBuild)"
+      env:
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          echo "disk space at beginning of Docker build:"
+          df -h
+        displayName: "Check disk space before Docker build"
+      - bash: |
+          set -e
 
-      mkdir -p linux/amd64 linux/arm64
+          mkdir -p linux/amd64 linux/arm64
 
-      # x64
-      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
-      cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
+          # x64
+          cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
+          cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
 
-      # arm64
-      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
-      cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
+          # arm64
+          cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
+          cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
 
-      # Debug what files appear to have been downloaded
-      find linux -type f -name "*" | xargs ls -l
+          # Debug what files appear to have been downloaded
+          find linux -type f -name "*" | xargs ls -l
 
-      ci/docker_ci.sh
-    timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      AZP_SHA1: $(Build.SourceVersion)
-      DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
-      DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
-      DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
-
-  - bash: |
-      echo "disk space at end of build:"
-      df -h
-    displayName: "Check disk space at end"
-    condition: not(canceled())
-
-  # Publish docker
-  - script: |
-      ci/run_envoy_docker.sh 'ci/do_ci.sh docker-upload'
-    displayName: "Upload Docker to GCS"
-    env:
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_RBE: "1"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-
-  - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
-    displayName: "Cache/save (publish_docker)"
+          ci/docker_ci.sh
+        displayName: Build Docker images
+        timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          AZP_BRANCH: $(Build.SourceBranch)
+          AZP_SHA1: $(Build.SourceVersion)
+          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+          DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
+      stepsPost:
+      - task: DownloadSecureFile@1
+        name: WorkflowTriggerKey
+        displayName: 'Download workflow trigger key'
+        inputs:
+          secureFile: '${{ parameters.authGithubWorkflow }}'
+      - bash: |
+          set -e
+          KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+          echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+        name: key
+      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify.trigger' || echo "trigger not ready yet ..."
+        # Please see `ci/do_ci.sh` for notes on required vars.
+        env:
+          ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+            ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
+            ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
+            ENVOY_HEAD_REF: "$(Build.SourceBranch)"
+          ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+            ENVOY_BRANCH: "$(Build.SourceBranch)"
+          # github auth
+          GITHUB_TOKEN: "$(key.value)"
+          GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
+          GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
+          # rbe env
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_RBE: "1"
+      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache
+        displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
   displayName: Linux debs (x64)
