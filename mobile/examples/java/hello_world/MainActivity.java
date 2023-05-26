@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
                    Log.d("MainActivity", "Envoy async internal setup completed");
                    return null;
                  })
-                 // .enablePlatformCertificatesValidation(true)
+                 .enablePlatformCertificatesValidation(true)
                  .build();
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
