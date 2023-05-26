@@ -114,6 +114,9 @@ bug_fixes:
 - area: boringssl
   change: |
     Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+- area: wasm
+  change: |
+    Apply canary configuration on xDS thread once per distinct plugin config instead of once per instance of a Wasm filter.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
