@@ -133,6 +133,9 @@ stages:
       authDockerPassword: $(DockerPassword)
       authGCP: $(GcpServiceAccountKey)
       authGithub: $(GitHubPublicRepoOnlyAccessToken)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
@@ -160,11 +163,6 @@ stages:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
-      bucketGCP: $(GcsArtifactBucket)
-      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
-      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
-      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
-      runDocker: variables['RUN_DOCKER']
 
 - stage: macos
   displayName: macOS
