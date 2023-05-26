@@ -26,18 +26,10 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     ON_CALL(decoder_callbacks_, addDecodedTrailers()).WillByDefault(ReturnRef(request_trailers_));
     ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(response_trailers_));
-    ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Return());
-    ON_CALL(encoder_callbacks_, addEncodedData(_, _)).WillByDefault(Return());
-    ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(buffer_ptr_ = &buffer_));
-    ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(buffer_ptr_ = &buffer_));
-    ON_CALL(decoder_callbacks_, continueDecoding()).WillByDefault(Return());
-    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault(Return());
-    ON_CALL(decoder_callbacks_, modifyDecodingBuffer(_)).WillByDefault(Return());
-    ON_CALL(encoder_callbacks_, modifyEncodingBuffer(_)).WillByDefault(Return());
+    ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(&buffer_));
+    ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
-    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).WillByDefault(Return());
-    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _)).WillByDefault(Return());
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -47,7 +39,6 @@ public:
   NiceMock<Http::TestRequestTrailerMapImpl> request_trailers_;
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
-  NiceMock<Buffer::OwnedImpl>* buffer_ptr_;
   testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
 };
 
@@ -87,8 +78,8 @@ DEFINE_PROTO_FUZZER(
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
-  ON_CALL(*client, start(_, _, _))
-      .WillByDefault(Invoke(
+  EXPECT_CALL(*client, start(_, _, _))
+      .WillRepeatedly(Invoke(
           [&](ExternalProcessing::ExternalProcessorCallbacks&,
               const envoy::config::core::v3::GrpcService&,
               const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
@@ -103,7 +94,7 @@ DEFINE_PROTO_FUZZER(
                     }));
             EXPECT_CALL(*stream, streamInfo())
                 .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
-            ON_CALL(*stream, close()).WillByDefault(Return(false));
+            EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
             return stream;
           }));
 
