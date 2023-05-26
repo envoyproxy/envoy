@@ -88,19 +88,16 @@ are available in some contexts:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
 
-
-CEL Matching
-************
-
-`Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching.
+* `Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching
 
 .. _extension_envoy.matching.inputs.cel_data_input:
 
-* CEL matching data input: :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
+  * CEL matching data input: :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
 
 .. _extension_envoy.matching.matchers.cel_matcher:
 
-* CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
+  * CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
+
 
 Matching actions
 ################
