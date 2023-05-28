@@ -6,12 +6,6 @@ parameters:
 - name: authSSHKeyPassphrase
   type: string
   default: ""
-- name: authSSHDataPlaneApiKey
-  type: string
-  default: ""
-- name: authSSHDataPlaneApiKeyPublic
-  type: string
-  default: ""
 - name: authSSHGoControlPlaneKey
   type: string
   default: ""
@@ -43,26 +37,6 @@ jobs:
       sshKeySecureFile: "${{ parameters.authSSHFilterExampleKey }}"
   - bash: ci/filter_example_mirror.sh
     displayName: "Sync envoy-filter-example"
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-
-- job: data_plane_api
-  dependsOn: []
-  pool:
-    vmImage: "ubuntu-20.04"
-  steps:
-  - checkout: self
-    fetchDepth: 0
-    fetchTags: true
-  - task: InstallSSHKey@0
-    inputs:
-      hostName: $(authGithubSSHKeyPublic)
-      sshPublicKey: "${{ parameters.authSSHDataPlaneApiKeyPublic }}"
-      sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
-      sshKeySecureFile: "${{ parameters.authSSHDataPlaneApiKey }}"
-  - bash: ci/api_mirror.sh
-    displayName: "Sync data-plane-api"
     workingDirectory: $(Build.SourcesDirectory)
     env:
       AZP_BRANCH: $(Build.SourceBranch)
