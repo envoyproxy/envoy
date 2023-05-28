@@ -96,7 +96,7 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::Continue, filter_.onMatchCallback(action));
 
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
@@ -115,7 +115,7 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::Continue, filter_.onMatchCallback(action));
 
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
@@ -135,7 +135,7 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
   ExecuteFilterAction action(factory_callback);
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::Continue, filter_.onMatchCallback(action));
 
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
@@ -156,7 +156,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
 
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::StopAndFailStream, filter_.onMatchCallback(action));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -174,7 +174,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
 
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::StopAndFailStream, filter_.onMatchCallback(action));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -192,7 +192,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
 
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::StopAndFailStream, filter_.onMatchCallback(action));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -215,7 +215,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(*encode_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
+  EXPECT_EQ(Matcher::MatchCallbackStatus::Continue, filter_.onMatchCallback(action));
 
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*encode_filter);

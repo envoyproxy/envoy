@@ -390,7 +390,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(Matcher::MatchCallbackStatus, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter
@@ -417,7 +417,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(Matcher::MatchCallbackStatus, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::MockStreamEncoderFilter
@@ -440,7 +440,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(Matcher::MatchCallbackStatus, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter
