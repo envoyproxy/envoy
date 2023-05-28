@@ -11,7 +11,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/server/backtrace.h"
 #include "source/common/http/utility.h"
 
 #include "matching/data_impl.h"
