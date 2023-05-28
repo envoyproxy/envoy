@@ -518,6 +518,10 @@ public:
    * Returns a handle to the downstream callbacks, if available.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
+  /**
+   * Returns if tcp tunneling is enabled for this stream.
+   */
+  virtual bool isTcpTunnelingEnabled() PURE;
 };
 
 /**

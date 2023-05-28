@@ -369,7 +369,7 @@ public:
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
-
+  bool isTcpTunnelingEnabled() override { return upstream_request_.enable_tcp_tunneling_; }
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;
   Http::ResponseHeaderMapPtr response_headers_;

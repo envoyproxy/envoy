@@ -436,11 +436,13 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
     // https://tools.ietf.org/html/rfc7231#section-4.3.6
     return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
   case Http::CodecType::HTTP2:
+  case Http::CodecType::HTTP3:
     if (Http::Utility::getResponseStatus(headers) != 200) {
       return false;
     }
+    return true;
   default:
-    return false;
+    return true;
   }
 }
 

@@ -11,6 +11,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/server/backtrace.h"
 #include "source/common/http/utility.h"
 
 #include "matching/data_impl.h"
@@ -836,11 +837,14 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
                                   FilterIterationStartState filter_iteration_start_state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
+  ENVOY_STREAM_LOG(trace, "end_stream: {}, tcp_tunneling_enabled: {}", *this, end_stream,
+                   filter_manager_callbacks_.isTcpTunnelingEnabled());
   if (filter == nullptr) {
-    if (streamInfo().responseCodeDetails().value() !=
-        StreamInfo::ResponseCodeDetails::get().ViaUpstream) {
+    if (end_stream && !filter_manager_callbacks_.isTcpTunnelingEnabled()) {
       ASSERT(!state_.local_complete_);
-      state_.local_complete_ = end_stream;
+      state_.local_complete_ = true;
+    } else {
+      state_.local_complete_ = false;
     }
     return encoder_filters_.begin();
   }

@@ -289,6 +289,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
+    bool isTcpTunnelingEnabled() override { return false; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
