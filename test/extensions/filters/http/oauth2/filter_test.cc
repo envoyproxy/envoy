@@ -1229,10 +1229,11 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=10;version=1;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=accessToken;version=1;path=/;Max-Age=10;secure"},
-      {Http::Headers::get().SetCookie.get(), "IdToken=idToken;version=1;path=/;Max-Age=10;secure"},
+       "BearerToken=accessToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;version=1;path=/;Max-Age=10;secure"},
+       "IdToken=idToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refreshToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
@@ -1551,7 +1552,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
@@ -1741,7 +1743,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessToken) {
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
   };
 
   EXPECT_EQ(response_headers, expected_response_headers);
@@ -1790,7 +1793,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessTokenWithBasicAuth) {
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
   };
 
   EXPECT_EQ(response_headers, expected_response_headers);
