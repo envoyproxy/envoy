@@ -48,6 +48,8 @@ type HttpCAPI interface {
 	HttpLog(level LogType, message string)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+
+	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 }
 
 type NetworkCAPI interface {

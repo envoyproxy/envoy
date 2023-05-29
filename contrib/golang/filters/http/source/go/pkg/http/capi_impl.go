@@ -266,3 +266,8 @@ var cAPI api.HttpCAPI = &httpCApiImpl{}
 func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
 }
+
+func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	handleCApiStatus(res)
+}
