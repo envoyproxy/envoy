@@ -12,6 +12,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -1498,28 +1499,7 @@ bool Utility::isValidRefererValue(absl::string_view value) {
   return true;
 }
 
-void Utility::RedactSensitiveHeaderInfo::dumpState(std::ostream& os) const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.debug_include_sensitive_data")) {
-    os << headers_;
-  } else {
-    headers_.iterate([&os](const HeaderEntry& header) -> HeaderMap::Iterate {
-      os << "'" << header.key().getStringView() << "', '";
-      if (header.key() == Http::Headers::get().Path) {
-        handlePath(os, header.value());
-      } else if (header.key() == Http::Headers::get().Cookie) {
-        handleCookie(os, header.value());
-      } else if (header.key() == Http::CustomHeaders::get().Authorization) {
-        os << "[redacted]";
-      } else {
-        os << header.value().getStringView();
-      }
-      os << "'\n";
-      return HeaderMap::Iterate::Continue;
-    });
-  }
-}
-
-void Utility::RedactSensitiveHeaderInfo::handlePath(std::ostream& os, const HeaderString& value) {
+void handlePath(std::ostream& os, const HeaderString& value) {
   std::string stripped = Utility::stripQueryString(value);
   if (stripped != value.getStringView()) {
     os << stripped << "?[redacted]";
@@ -1528,7 +1508,7 @@ void Utility::RedactSensitiveHeaderInfo::handlePath(std::ostream& os, const Head
   }
 }
 
-void Utility::RedactSensitiveHeaderInfo::handleCookie(std::ostream& os, const HeaderString& value) {
+void handleCookie(std::ostream& os, const HeaderString& value) {
   bool first = true;
   forEachCookie(value.getStringView(),
                 [&os, &first](absl::string_view k, absl::string_view) -> bool {
@@ -1542,6 +1522,33 @@ void Utility::RedactSensitiveHeaderInfo::handleCookie(std::ostream& os, const He
                   // continue iterating until all cookies are processed.
                   return true;
                 });
+}
+
+void Utility::dumpHeaderMap(std::ostream& os, const HeaderMap& headers, int indent_level) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.debug_include_sensitive_data")) {
+    headers.iterate([&os, spaces = spacesForLevel(indent_level)](
+                        const HeaderEntry& header) -> HeaderMap::Iterate {
+      os << spaces << "'" << header.key().getStringView() << "', '"
+         << header.value().getStringView() << "'\n";
+      return HeaderMap::Iterate::Continue;
+    });
+  } else {
+    headers.iterate([&os, spaces = spacesForLevel(indent_level)](
+                        const HeaderEntry& header) -> HeaderMap::Iterate {
+      os << spaces << "'" << header.key().getStringView() << "', '";
+      if (header.key() == Http::Headers::get().Path) {
+        handlePath(os, header.value());
+      } else if (header.key() == Http::Headers::get().Cookie) {
+        handleCookie(os, header.value());
+      } else if (header.key() == Http::CustomHeaders::get().Authorization) {
+        os << "[redacted]";
+      } else {
+        os << header.value().getStringView();
+      }
+      os << "'\n";
+      return HeaderMap::Iterate::Continue;
+    });
+  }
 }
 
 } // namespace Http

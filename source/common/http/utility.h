@@ -752,48 +752,13 @@ std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
                    const Http::RequestHeaderMap& headers);
 
 /**
- * Helper class for printing Http::HeaderMap while redacting sensitive information.
+ * Helper for printing Http::HeaderMap while redacting sensitive information.
+ * @param os supplies the ostream to print to.
+ * @param headers the headers to print.
+ * @param indent_level indentation level for the output.
  */
-class RedactSensitiveHeaderInfo {
-public:
-  RedactSensitiveHeaderInfo(const Http::HeaderMap& headers) : headers_(headers) {}
-  friend std::ostream& operator<<(std::ostream& os, const RedactSensitiveHeaderInfo& redactor) {
-    redactor.dumpState(os);
-    return os;
-  }
-
-private:
-  /**
-   * Print key/value pairs.
-   * @param os supplies the ostream to print to.
-   * @param headers the headers to print.
-   */
-  void dumpState(std::ostream& os) const;
-
-  /**
-   * Redact query string from request path.
-   * @param os supplies the ostream to print to.
-   * @param value the value part of the pat.
-   */
-  static void handlePath(std::ostream& os, const HeaderString& value);
-
-  /**
-   * Redact cookie values from Cookie header.
-   * @param os supplies the ostream to print to.
-   * @param value value of the cookie header.
-   */
-  static void handleCookie(std::ostream& os, const HeaderString& value);
-
-  const Http::HeaderMap& headers_;
-};
+void dumpHeaderMap(std::ostream& os, const HeaderMap& headers, int indent_level);
 
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
-
-// NOLINT(namespace-envoy)
-namespace fmt {
-// Allow fmtlib to format RedactSensitiveHeaderInfo
-template <>
-struct formatter<Envoy::Http::Utility::RedactSensitiveHeaderInfo> : ostream_formatter {};
-} // namespace fmt

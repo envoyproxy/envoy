@@ -441,13 +441,13 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   });
 }
 
+// Forward declaration.
+namespace Utility {
+void dumpHeaderMap(std::ostream& os, const HeaderMap& headers, int indent_level);
+}
+
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
-  iterate([&os,
-           spaces = spacesForLevel(indent_level)](const HeaderEntry& header) -> HeaderMap::Iterate {
-    os << spaces << "'" << header.key().getStringView() << "', '" << header.value().getStringView()
-       << "'\n";
-    return HeaderMap::Iterate::Continue;
-  });
+  Utility::dumpHeaderMap(os, dynamic_cast<const HeaderMap&>(*this), indent_level);
 }
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
