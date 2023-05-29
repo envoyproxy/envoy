@@ -144,12 +144,7 @@ async function nextTest(index) {
     test = testList[index];
     ++index;
     const name_index = test.name + '(' + index + '/' + testList.length + ')';
-    if (test.url) {
-      await runAsyncTest(test.url, name_index, test.testFunction).then(() => { nextTest(index); });
-    } else {
-      runBlockingTest(name_index, test.testFunction);
-      nextTest(index);
-    }
+    await runAsyncTest(test.url, name_index, test.testFunction).then(() => { nextTest(index); });
   }
 }
 

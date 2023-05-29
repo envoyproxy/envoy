@@ -304,7 +304,7 @@ class Painter {
 
     this.graphics = makeElement(div, 'div', 'histogram-graphics');
     this.labels = makeElement(div, 'div', 'histogram-labels');
-    this.annotationsDiv = makeElement(div, 'div', 'histogram-percentiles');
+    this.annotationsDiv = makeElement(div, 'div', 'histogram-annotations');
 
     // We have business logic to ensure only be one popup div is visible at a
     // time.  However, we need a separate popup div for each histogram

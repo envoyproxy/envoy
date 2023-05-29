@@ -60,7 +60,7 @@
    */
 }
 
-.histogram-percentiles {
+.histogram-annotations {
   height: 40px;
   position: relative;
   margin-bottom: 10px;
@@ -108,7 +108,7 @@
   border-color: black;
   visibility: hidden;
   z-index: 3;
-  top: 55px;
+  top: 70px;
   padding: 3px;
   /*Imargin-left: -1%;*/
 }

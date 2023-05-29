@@ -73,6 +73,24 @@ async function testRenderHistogram(iframe) {
   assertEq(4, popup.children.length);
   assertEq('[200, 210)', popup.children[0].textContent);
   buckets[1].dispatchEvent(new Event('mouseout'));
+
+  // There's exactly one annotations bucket.
+  assertEq(1, idoc.getElementsByClassName('histogram-annotations').length);
+
+  // There are 10 percentiles rendered each one to the right of the previous one.
+  const percentiles = idoc.getElementsByClassName('histogram-percentile');
+  assertEq(10, percentiles.length);
+  let prevPercent = 0;
+  for (percentile of percentiles) {
+    const left = parseFloat(percentile.style.left);
+    assertLt(prevPercent, left);
+    prevPercent = left;
+  }
+
+  // There are 2 intervals rendered each one to the right of the previous one.
+  const intervals = idoc.getElementsByClassName('histogram-interval');
+  assertEq(2, intervals.length);
+  assertLt(parseFloat(intervals[0].style.left), parseFloat(intervals[1].style.left));
 }
 
 addTest('?file=histograms_test.html', 'renderHistogram', testRenderHistogram);
