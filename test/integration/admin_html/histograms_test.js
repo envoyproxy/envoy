@@ -1,3 +1,5 @@
+// Make a histogram with the specified values so we can test that all the
+// features of this are rendered graphically.
 const histogramJson = {"stats": [{
   "histograms": {
     "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
