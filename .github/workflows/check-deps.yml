@@ -3,7 +3,6 @@ name: Check dependencies
 on:
   schedule:
     - cron: '0 8 * * *'
-
   workflow_dispatch:
 
 permissions: read-all
@@ -11,7 +10,12 @@ permissions: read-all
 jobs:
   build:
     runs-on: ubuntu-20.04
-    if: github.repository == 'envoyproxy/envoy'
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
     permissions:
       contents: read # to fetch code (actions/checkout)
       issues: write # required to open/close dependency issues
@@ -21,7 +25,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
       - name: Set up Python (3.10)
-        uses: actions/setup-python@57ded4d7d5e986d7296eab16560982c6dd7c923b
+        uses: actions/setup-python@bd6b4b6205c4dbad673328db7b31b7fab9e241c0
         with:
           python-version: "3.10"
 
