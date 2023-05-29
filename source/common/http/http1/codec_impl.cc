@@ -303,9 +303,7 @@ void StreamEncoderImpl::endEncode() {
   notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
-  if (connect_request_ || is_tcp_tunneling_ ||
-      (is_response_to_connect_request_ &&
-       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
+  if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
@@ -1134,8 +1132,13 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    headers.setScheme(absolute_url.scheme());
-    if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
+      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
+    } else {
+      headers.setScheme(absolute_url.scheme());
+    }
+    if (!HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");
     }

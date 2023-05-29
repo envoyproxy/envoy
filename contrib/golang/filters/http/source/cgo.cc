@@ -149,6 +149,13 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value, headerAc
       });
 }
 
+CAPIStatus envoyGoFilterHttpRemoveTrailer(void* r, void* key) {
+  return envoyGoFilterHandlerWrapper(r, [key](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    auto key_str = referGoString(key);
+    return filter->removeTrailer(key_str);
+  });
+}
+
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value) {
   return envoyGoFilterHandlerWrapper(r, [id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     auto value_str = reinterpret_cast<GoString*>(value);
@@ -191,6 +198,19 @@ CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
     // Since this is only used for logs we don't need to deep copy.
     return filter->sendPanicReply(referGoString(details));
   });
+}
+
+CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
+                                                 int life_span, int stream_sharing) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value, state_type, life_span, stream_sharing](
+                                         std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = referGoString(key);
+                                       auto value_str = referGoString(value);
+                                       return filter->setStringFilterState(key_str, value_str,
+                                                                           state_type, life_span,
+                                                                           stream_sharing);
+                                     });
 }
 
 #ifdef __cplusplus

@@ -7,12 +7,30 @@ parameters:
   displayName: "Suffix of artifact"
   type: string
   default: ""
+
+# caching
+- name: cacheKeyDocker
+  type: string
+  default: ".devcontainer/Dockerfile"
+- name: cacheKeyDockerVersion
+  type: string
+  default: $(cacheKeyBuildImage)
+- name: cacheKeyDockerName
+  type: string
+  default: envoy_build_image
+- name: cacheKeyDockerPath
+  type: string
+  default: /mnt/docker
+- name: cacheKeyDockerTmpDir
+  type: string
+  default: /mnt/docker_cache
 - name: cacheKey
   type: string
   default: $(cacheKeyBazelFiles)
 - name: cacheVersion
   type: string
   default: $(cacheKeyBazel)
+
 - name: rbe
   displayName: "Enable RBE"
   type: boolean
@@ -58,6 +76,9 @@ parameters:
   type: stepList
   default: []
 
+- name: env
+  type: object
+  default: {}
 
 steps:
 - checkout: self
@@ -125,7 +146,11 @@ steps:
   condition: and(not(canceled()), eq(variables.BAZEL_CACHE_RESTORED, 'true'))
 - template: cached.yml
   parameters:
-    version: "$(cacheKeyBuildImage)"
+    key: "${{ parameters.cacheKeyDocker }}"
+    version: "${{ parameters.cacheKeyDockerVersion }}"
+    name: "${{ parameters.cacheKeyDockerName }}"
+    path: "${{ parameters.cacheKeyDockerPath }}"
+    tmpDirectory: "${{ parameters.cacheKeyDockerTmpDir }}"
     arch: "${{ parameters.artifactSuffix }}"
 
 - ${{ each step in parameters.stepsPre }}:
@@ -179,6 +204,8 @@ steps:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
+    ${{ each var in parameters.env }}:
+      ${{ var.key }}: ${{ var.value }}
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |

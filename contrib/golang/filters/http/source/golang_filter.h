@@ -177,9 +177,12 @@ public:
                              bufferAction action);
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus removeTrailer(absl::string_view key);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
+  CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing);
 
 private:
   bool hasDestroyed() {
@@ -256,6 +259,15 @@ public:
   FilterLogger() = default;
 
   void log(uint32_t level, absl::string_view message) const;
+};
+
+class GoStringFilterState : public StreamInfo::FilterState::Object {
+public:
+  GoStringFilterState(absl::string_view value) : value_(value) {}
+  const std::string& value() const { return value_; }
+
+private:
+  const std::string value_;
 };
 
 } // namespace Golang

@@ -1,34 +1,28 @@
 import Envoy
+import EnvoyTestServer
+import Foundation
 import TestExtensions
 import XCTest
 
-final class DirectResponseExactHeadersMatchIntegrationTest: XCTestCase {
+final class EndToEndNetworkingTest: XCTestCase {
   override static func setUp() {
     super.setUp()
     register_test_extensions()
   }
 
-  func testDirectResponseWithExactHeadersMatch() {
+  func testNetworkRequestReturnsHeadersAndData() {
+    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.setHeadersAndData(
+      "x-response-foo", header_value: "aaa", response_body: "hello world")
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
-
+    let port = String(EnvoyTestServer.getEnvoyPort())
     let requestHeaders = RequestHeadersBuilder(
-      method: .get, authority: "127.0.0.1", path: "/v1/abc"
+      method: .get, scheme: "http", authority: "localhost:" + port, path: "/"
     )
-    .add(name: "x-foo", value: "123")
     .build()
 
-    let engine = TestEngineBuilder()
-      .addDirectResponse(
-        .init(
-          matcher: RouteMatcher(
-            fullPath: "/v1/abc", headers: [
-              .init(name: "x-foo", value: "123", mode: .exact),
-            ]
-          ),
-          status: 200, body: "hello world", headers: ["x-response-foo": "aaa"]
-        )
-      )
+    let engine = EngineBuilder()
       .build()
 
     var responseBuffer = Data()
@@ -55,5 +49,6 @@ final class DirectResponseExactHeadersMatchIntegrationTest: XCTestCase {
     XCTAssertEqual(.completed, XCTWaiter().wait(for: expectations, timeout: 10, enforceOrder: true))
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
   }
 }
