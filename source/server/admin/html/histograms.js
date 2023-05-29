@@ -192,16 +192,32 @@ function makeElement(parent, type, className) {
   return element;
 }
 
+/**
+ * Assigns percentils and intervals to buckets. We do not expect percentils or
+ * intervals. If any occur, they will be assigned to the first or last bucket.
+ *
+ * We will only consider the lower_bound of interval-buckets and will ignore the
+ * width of those buckets.
+ *
+ * We will assign intervals and percentiles to the bucket with the highest
+ * lower-bound that is not greater than the interval lower_bound or percentile
+ * value.
+ */
 function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles) {
   let maxCount = 0;
-  let prevBucket = null;
   let percentileIndex = 0;
   let intervalIndex = 0;
   const percentile_values = histogram.percentiles;
+  let nextBucket = histogram.totals[0];
 
-  for (bucket of histogram.totals) {
+  for (let i = 0; i < histogram.totals.length; ++i) {
+    const bucket = nextBucket;
+    if (i < histogram.totals.length - 1) {
+      nextBucket = histogram.totals[i + 1];
+    } else {
+      nextBucket = null;
+    }
     maxCount = Math.max(maxCount, bucket.count);
-    const upper_bound = bucket.lower_bound + bucket.width;
     bucket.annotations = [];
 
     // Attach percentile records with values between the previous bucket and
@@ -209,36 +225,32 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supported_percentiles
     // bucket starting with the second one will have a 'percentiles' property
     // with pairs of [percentile, value], which can then be used while
     // rendering the bucket.
-    if (prevBucket != null) {
-      for (; percentileIndex < percentile_values.length; ++percentileIndex) {
-        const percentileValue = percentile_values[percentileIndex].cumulative;
-        if (percentileValue >= upper_bound) {
-          break; // do not increment index; re-consider percentile for next bucket.
-        }
-        bucket.annotations.push(new Percentile(
-            percentileValue, supported_percentiles[percentileIndex]));
+    for (; percentileIndex < percentile_values.length; ++percentileIndex) {
+      const percentileValue = percentile_values[percentileIndex].cumulative;
+      if (nextBucket && percentileValue >= nextBucket.lower_bound) {
+        break; // do not increment index; re-consider percentile for next bucket.
       }
-
-      for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
-        const interval = histogram.intervals[intervalIndex];
-        //const interval_upper_bound = interval.lower_bound + interval.width;
-        if (interval.lower_bound >= upper_bound) {
-          break; // do not increment index; re-consider interval for next bucket.
-        }
-        bucket.annotations.push(new Interval(interval.lower_bound, interval.width, interval.count));
-        //console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
-        //interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
-
-        // It's unlikely that an interval bucket value will increase the overall maxCount
-        // but just to be sure we'll scan through them.
-        maxCount = Math.max(maxCount, interval.count);
-      }
-
-      if (bucket.annotations.length > 0) {
-        bucket.annotations.sort((a, b) => a.value < b.value);
-      }
+      bucket.annotations.push(new Percentile(
+          percentileValue, supported_percentiles[percentileIndex]));
     }
-    prevBucket = bucket;
+
+    for (; intervalIndex < histogram.intervals.length; ++intervalIndex) {
+      const interval = histogram.intervals[intervalIndex];
+      if (nextBucket && interval.lower_bound >= nextBucket.lower_bound) {
+        break; // do not increment index; re-consider interval for next bucket.
+      }
+      bucket.annotations.push(new Interval(interval.lower_bound, interval.width, interval.count));
+      //console.log(histogram.name + ': adding interval to bucket lower_bound=' + bucket.lower_bound + ' lb=' +
+      //interval.lower_bound + ' width=' + interval.width + ' count=' + interval.count);
+
+      // It's unlikely that an interval bucket value will increase the overall maxCount
+      // but just to be sure we'll scan through them.
+      maxCount = Math.max(maxCount, interval.count);
+    }
+
+    if (bucket.annotations.length > 0) {
+      bucket.annotations.sort((a, b) => a.value < b.value);
+    }
   }
   return maxCount;
 }
@@ -284,8 +296,6 @@ class Painter {
     this.numBuckets = numBuckets;
     this.maxCount = maxCount;
     this.leftVpx = constants.marginWidthVpx;
-    this.prevVpx = this.leftVpx;
-    this.prevBucket = null;
     this.bucketWidthVpx = computeBucketWidthVpx(numBuckets);
     this.widthVpx = (numBuckets * this.bucketWidthVpx + (numBuckets + 1) * constants.marginWidthVpx)
         * (1 + 2*constants.outerMarginFraction);
@@ -306,21 +316,22 @@ class Painter {
     this.textInterval = Math.ceil(numBuckets / constants.maxBucketsWithText);
   }
 
-  drawAnnotation(bucket, annotation) {
-    if (!this.prevBucket) {
-      alert('unexpected call of annotation from first bucket');
-    }
-
+  drawAnnotation(bucket, nextBucket, annotation) {
     // Find the ideal place to draw the percentile bar, by linearly
     // interpolating between the current bucket and the previous bucket.
     // We know that the next bucket does not come into play because
     // the percentiles held underneath a bucket are based on a value that
     // is at most as large as the current bucket.
     let percentileVpx = this.leftVpx;
-    const bucketDelta = bucket.lower_bound - this.prevBucket.lower_bound;
+    const bucketDelta = nextBucket ? (nextBucket.lower_bound - bucket.lower_bound) : bucket.width;
     if (bucketDelta > 0) {
-      const weight = (bucket.lower_bound - annotation.value) / bucketDelta;
-      percentileVpx = weight * this.prevVpx + (1 - weight) * this.leftVpx;
+      let widthVpx = this.bucketWidthVpx;
+      if (nextBucket) {
+        widthVpx += constants.marginWidthVpx;
+      }
+      const nextVpx = this.leftVpx + widthVpx;
+      const weight = (bucket.lower_bound + bucketDelta - annotation.value) / bucketDelta;
+      percentileVpx = weight * this.leftVpx + (1 - weight) * nextVpx;
     }
 
     // We always put the marker proportionally between this bucket and
@@ -365,7 +376,7 @@ class Painter {
       this.drawBucketLabels(bucket, heightPercent);
     }
 
-    const bucketOnLeftSide = index <= this.numBuckets / 2;
+    const bucketOnLeftSide = true; //index <= this.numBuckets / 2;
     const bucketPosVpx = bucketOnLeftSide ? this.leftVpx :
           (this.widthVpx - (this.leftVpx + 2*this.bucketWidthVpx));
 
@@ -375,14 +386,7 @@ class Painter {
 
     bucketSpan.addEventListener('mouseout', timeoutFn(this.detailPopup));
 
-    this.prevVpx = this.leftVpx;
     this.leftVpx += this.bucketWidthVpx + constants.marginWidthVpx;
-
-    // First we can over the detailed bucket value and count info, and determine
-    // some limits so we can scale the histogram data to (for now) consume
-    // the desired width and height, which we'll express as percentages, so
-    // the graphics stretch when the user stretches the window.
-    this.prevBucket = bucket;
   }
 
   drawBucketLabels(bucket, heightPercent) {
@@ -437,8 +441,9 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
   for (let i = 0; i < numBuckets; ++i) {
     const bucket = histogram.totals[i];
+    const nextBucket = (i < histogram.totals.length - 1) ? histogram.totals[i + 1] : null;
     for (annotation of bucket.annotations) {
-      painter.drawAnnotation(bucket, annotation);
+      painter.drawAnnotation(bucket, nextBucket, annotation);
     }
     painter.drawBucket(bucket, i);
   }

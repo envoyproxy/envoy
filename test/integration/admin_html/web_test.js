@@ -6,6 +6,8 @@
 //
 // Linted with https://validatejavascript.com/, 'Google' settings, long-line
 // checking disabled, indent-checking disabled.
+//
+// See source/server/admin/javascript.md for background info.
 
 
 /**
@@ -19,6 +21,8 @@ const testList = [];
  * Adds a new test to the test-list. These will be run after all test scripts
  * load, from admin.html's call to runAllTests().
  *
+ * TODO(jmarantz): rename to runAsyncTest.
+ *
  * @param {string} url
  * @param {string} name
  * @param {function(!HTMLElement): Promise} testFunction
@@ -26,6 +30,18 @@ const testList = [];
  */
 function addTest(url, name, testFunction) { // eslint-disable-line no-unused-vars
   testList.push({'url': url, 'name': name, 'testFunction': testFunction});
+}
+
+/**
+ * Adds a new test to the test-list. These will be run directly. A test
+ * passes if it doesn't throw.
+ *
+ * @param {string} name
+ * @param {function()} testFunction
+ * exported addTest
+ */
+function addBlockingTest(name, testFunction) { // eslint-disable-line no-unused-vars
+  testList.push({'name': name, 'testFunction': testFunction});
 }
 
 /**
@@ -42,6 +58,14 @@ function waitForOnload(iframe) {
   });
 }
 
+function makeFrame(type) {
+  const frame = document.createElement(type);
+  frame.width = 800;
+  frame.height = 1000;
+  document.body.appendChild(frame);
+  return frame;
+}
+
 /**
  * Renders a URL, and after 3 seconds delay, runs the 'tester' function.
  * Log whether that function failed (threw exception) or passed. Either
@@ -53,14 +77,11 @@ function waitForOnload(iframe) {
  * @param {function(!HTMLElement): !Promise} tester
  * @return {!Promise}
  */
-async function runTest(url, name, tester) {
+async function runAsyncTest(url, name, tester) {
   const results = document.getElementById('test-results');
   results.textContent += name + ' ...';
-  const iframe = document.createElement('iframe');
-  iframe.width = 800;
-  iframe.height = 1000;
+  const iframe = makeFrame('iframe');
   iframe.src = url;
-  document.body.appendChild(iframe);
   await waitForOnload(iframe);
   try {
     await tester(iframe);
@@ -68,9 +89,28 @@ async function runTest(url, name, tester) {
   } catch (err) {
     results.textContent += 'FAILED: ' + err + '\n';
   }
-  iframe.parentElement.removeChild(iframe);
+  //iframe.parentElement.removeChild(iframe);
 }
 
+
+/**
+ * @param {string} name
+ * @param {function(!HTMLElement)} tester
+ */
+/*async function runBlockingTest(url, name, tester) {
+  const results = document.getElementById('test-results');
+  results.textContent += name + ' ...';
+  const iframe = makeFrame('iframe');
+  iframe.src = url;
+  await waitForOnload(iframe);
+  try {
+    await tester(div);
+    results.textContent += 'passed\n';
+    div.parentElement.removeChild(div);
+  } catch (err) {
+    results.textContent += 'FAILED: ' + err + '\n';
+  }
+}*/
 
 /**
  * Checks for a condition, throwing an exception with a comment if it fails.
@@ -95,22 +135,26 @@ function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
   assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
 }
 
+async function nextTest(index) {
+  if (index < testList.length) {
+    test = testList[index];
+    ++index;
+    const name_index = test.name + '(' + index + '/' + testList.length + ')';
+    if (test.url) {
+      await runAsyncTest(test.url, name_index, test.testFunction).then(() => { nextTest(index); });
+    } else {
+      runBlockingTest(name_index, test.testFunction);
+      nextTest(index);
+    }
+  }
+}
+
 
 /**
  * Runs all tests added via addTest() above.
  */
-function runAllTests() {
-  const next = (index) => {
-    if (index < testList.length) {
-      test = testList[index];
-      ++index;
-      runTest(test.url, test.name + '(' + index + '/' + testList.length + ')',
-              test.testFunction).then(() => {
-                next(index);
-              });
-    }
-  };
-  next(0);
+async function runAllTests() {
+  nextTest(0);
 }
 
 // Trigger the tests once all JS is loaded.

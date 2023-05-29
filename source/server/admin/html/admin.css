@@ -110,7 +110,7 @@
   z-index: 3;
   top: 55px;
   padding: 3px;
-  margin-left: -1%;
+  /*Imargin-left: -1%;*/
 }
 
 .histogram-popup div {

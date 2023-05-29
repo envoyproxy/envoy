@@ -1,9 +1,3 @@
-// This file contains helper functions for writing JavaScript unit tests, in the
-// style of Google's Closure Compiler, but without taking on a large dependency
-// or build infrastructure.
-//
-// See source/server/admin/javascript.md for background info.
-
 /**
  * Utility to count the number of separated items, e.g. lines.
  * A blank final line does not count.
