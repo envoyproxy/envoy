@@ -89,7 +89,7 @@ async function runAsyncTest(url, name, tester) {
   } catch (err) {
     results.textContent += 'FAILED: ' + err + '\n';
   }
-  //iframe.parentElement.removeChild(iframe);
+  iframe.parentElement.removeChild(iframe);
 }
 
 
@@ -135,6 +135,10 @@ function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
   assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
 }
 
+function assertLt(a, b) { // eslint-disable-line no-unused-vars
+  assertTrue(a < b, 'assertLt mismatch: ' + a + ' < ' + b);
+}
+
 async function nextTest(index) {
   if (index < testList.length) {
     test = testList[index];
@@ -147,6 +151,14 @@ async function nextTest(index) {
       nextTest(index);
     }
   }
+}
+
+
+/**
+ * Async version of windows.setTimeout.
+ */
+function asyncTimeout(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
 
