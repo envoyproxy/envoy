@@ -87,8 +87,8 @@ python3 ./configure.py --bootstrap
 
 export PATH="$PWD:$PATH"
 
-if [[ `ninja --version` != "$VERSION" ]];
-then echo "ERROR: Ninja version doesn't match."
+if [[ `ninja --version` != "$VERSION" ]]; then
+  echo "ERROR: Ninja version doesn't match."
   exit 1
 fi
 cd ..
