@@ -97,33 +97,33 @@ The following counters are available:
   getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
   close_resp, Counter, Number of close responses
   watch_event, Counter, Number of watch events fired by the server
-  connect_resp_fast, Counter, Number of connect responses faster than the threshold
-  ping_resp_fast, Counter, Number of ping responses faster than the threshold
-  auth_resp_fast, Counter, Number of auth responses faster than the threshold
-  getdata_resp_fast, Counter, Number of getdata responses faster than the threshold
-  create_resp_fast, Counter, Number of create responses faster than the threshold
-  create2_resp_fast, Counter, Number of create2 responses faster than the threshold
-  createcontainer_resp_fast, Counter, Number of createcontainer responses faster than the threshold
-  createttl_resp_fast, Counter, Number of createttl responses faster than the threshold
-  setdata_resp_fast, Counter, Number of setdata responses faster than the threshold
-  getchildren_resp_fast, Counter, Number of getchildren responses faster than the threshold
-  getchildren2_resp_fast, Counter, Number of getchildren2 responses faster than the threshold
-  delete_resp_fast, Counter, Number of delete responses faster than the threshold
-  exists_resp_fast, Counter, Number of exists responses faster than the threshold
-  getacl_resp_fast, Counter, Number of getacl responses faster than the threshold
-  setacl_resp_fast, Counter, Number of setacl responses faster than the threshold
-  sync_resp_fast, Counter, Number of sync responses faster than the threshold
-  check_resp_fast, Counter, Number of check responses faster than the threshold
-  multi_resp_fast, Counter, Number of multi responses faster than the threshold
-  reconfig_resp_fast, Counter, Number of reconfig responses faster than the threshold
-  setauth_resp_fast, Counter, Number of setauth responses faster than the threshold
-  setwatches_resp_fast, Counter, Number of setwatches responses faster than the threshold
-  setwatches2_resp_fast, Counter, Number of setwatches2 responses faster than the threshold
-  checkwatches_resp_fast, Counter, Number of checkwatches responses faster than the threshold
-  removewatches_resp_fast, Counter, Number of removewatches responses faster than the threshold
-  getephemerals_resp_fast, Counter, Number of getephemerals responses faster than the threshold
-  getallchildrennumber_resp_fast, Counter, Number of getallchildrennumber responses faster than the threshold
-  close_resp_fast, Counter, Number of close responses faster than the threshold
+  connect_resp_fast, Counter, Number of connect responses faster than or equal to the threshold
+  ping_resp_fast, Counter, Number of ping responses faster than or equal to the threshold
+  auth_resp_fast, Counter, Number of auth responses faster than or equal to the threshold
+  getdata_resp_fast, Counter, Number of getdata responses faster than or equal to the threshold
+  create_resp_fast, Counter, Number of create responses faster than or equal to the threshold
+  create2_resp_fast, Counter, Number of create2 responses faster than or equal to the threshold
+  createcontainer_resp_fast, Counter, Number of createcontainer responses faster than or equal to the threshold
+  createttl_resp_fast, Counter, Number of createttl responses faster than or equal to the threshold
+  setdata_resp_fast, Counter, Number of setdata responses faster than or equal to the threshold
+  getchildren_resp_fast, Counter, Number of getchildren responses faster than or equal to the threshold
+  getchildren2_resp_fast, Counter, Number of getchildren2 responses faster than or equal to the threshold
+  delete_resp_fast, Counter, Number of delete responses faster than or equal to the threshold
+  exists_resp_fast, Counter, Number of exists responses faster than or equal to the threshold
+  getacl_resp_fast, Counter, Number of getacl responses faster than or equal to the threshold
+  setacl_resp_fast, Counter, Number of setacl responses faster than or equal to the threshold
+  sync_resp_fast, Counter, Number of sync responses faster than or equal to the threshold
+  check_resp_fast, Counter, Number of check responses faster than or equal to the threshold
+  multi_resp_fast, Counter, Number of multi responses faster than or equal to the threshold
+  reconfig_resp_fast, Counter, Number of reconfig responses faster than or equal to the threshold
+  setauth_resp_fast, Counter, Number of setauth responses faster than or equal to the threshold
+  setwatches_resp_fast, Counter, Number of setwatches responses faster than or equal to the threshold
+  setwatches2_resp_fast, Counter, Number of setwatches2 responses faster than or equal to the threshold
+  checkwatches_resp_fast, Counter, Number of checkwatches responses faster than or equal to the threshold
+  removewatches_resp_fast, Counter, Number of removewatches responses faster than or equal to the threshold
+  getephemerals_resp_fast, Counter, Number of getephemerals responses faster than or equal to the threshold
+  getallchildrennumber_resp_fast, Counter, Number of getallchildrennumber responses faster than or equal to the threshold
+  close_resp_fast, Counter, Number of close responses faster than or equal to the threshold
   connect_resp_slow, Counter, Number of connect responses slower than the threshold
   ping_resp_slow, Counter, Number of ping responses slower than the threshold
   auth_resp_slow, Counter, Number of auth responses slower than the threshold
