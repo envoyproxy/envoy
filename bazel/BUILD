@@ -399,7 +399,6 @@ config_setting(
     name = "boringssl_fips",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )
