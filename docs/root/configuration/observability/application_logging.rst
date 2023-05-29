@@ -23,3 +23,17 @@ with the following :ref:`command line options <operations_cli>`:
 * The ``--log-level`` flag can be set to control the log severity logged to Stackdriver.
 
 `Reference documentation <https://cloud.google.com/run/docs/logging#container-logs>`_ for Stackdriver on GKE.
+
+Redacting sensitive information from debug logs
+-----------------------------------------------
+
+Sometimes it may be necessary to enable ``debug`` level logs to troubleshoot issues in production environments.
+This introduces a risk of exposing sensitive user information, such as:
+
+* Authorization header values with tokens or passwords.
+* Cookie headers with sensitive cookies.
+* Query parameters with sensitive information.
+
+By default header values are logged at in clear.
+Envoy can be configured to redact the above header values by disabling runtime feature
+``envoy.reloadable_features.debug_include_sensitive_data``.
