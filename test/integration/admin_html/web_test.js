@@ -77,7 +77,7 @@ function makeFrame(type) {
  * @param {function(!HTMLElement): !Promise} tester
  * @return {!Promise}
  */
-async function runAsyncTest(url, name, tester) {
+async function runTest(url, name, tester) {
   const results = document.getElementById('test-results');
   results.textContent += name + ' ...';
   const iframe = makeFrame('iframe');
@@ -92,25 +92,6 @@ async function runAsyncTest(url, name, tester) {
   iframe.parentElement.removeChild(iframe);
 }
 
-
-/**
- * @param {string} name
- * @param {function(!HTMLElement)} tester
- */
-/*async function runBlockingTest(url, name, tester) {
-  const results = document.getElementById('test-results');
-  results.textContent += name + ' ...';
-  const iframe = makeFrame('iframe');
-  iframe.src = url;
-  await waitForOnload(iframe);
-  try {
-    await tester(div);
-    results.textContent += 'passed\n';
-    div.parentElement.removeChild(div);
-  } catch (err) {
-    results.textContent += 'FAILED: ' + err + '\n';
-  }
-}*/
 
 /**
  * Checks for a condition, throwing an exception with a comment if it fails.
@@ -135,17 +116,15 @@ function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
   assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
 }
 
+
+/**
+ * Checks for less-than, throwing an exception with a comment if it fails.
+ *
+ * @param {Object} expected
+ * @param {Object} actual
+ */
 function assertLt(a, b) { // eslint-disable-line no-unused-vars
   assertTrue(a < b, 'assertLt mismatch: ' + a + ' < ' + b);
-}
-
-async function nextTest(index) {
-  if (index < testList.length) {
-    test = testList[index];
-    ++index;
-    const name_index = test.name + '(' + index + '/' + testList.length + ')';
-    await runAsyncTest(test.url, name_index, test.testFunction).then(() => { nextTest(index); });
-  }
 }
 
 
@@ -160,9 +139,20 @@ function asyncTimeout(ms) {
 /**
  * Runs all tests added via addTest() above.
  */
-async function runAllTests() {
-  nextTest(0);
+function runAllTests() {
+  const next = (index) => {
+    if (index < testList.length) {
+      test = testList[index];
+      ++index;
+      runTest(test.url, test.name + '(' + index + '/' + testList.length + ')',
+              test.testFunction).then(() => {
+                next(index);
+              });
+    }
+  };
+  next(0);
 }
+
 
 // Trigger the tests once all JS is loaded.
 window.addEventListener('DOMContentLoaded', runAllTests);

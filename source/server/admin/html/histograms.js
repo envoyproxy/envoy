@@ -193,7 +193,7 @@ function makeElement(parent, type, className) {
 }
 
 /**
- * Assigns percentils and intervals to buckets. We do not expect percentils or
+ * Assigns percentiles and intervals to buckets. We do not expect percentiles or
  * intervals. If any occur, they will be assigned to the first or last bucket.
  *
  * We will only consider the lower_bound of interval-buckets and will ignore the
