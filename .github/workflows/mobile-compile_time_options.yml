@@ -34,6 +34,7 @@ jobs:
       run: |
       # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
       # HTTP Datagrams are disabled works.
+      # As well as an Envoy Mobile build which verifies that the build configuration where YAML is disabled.
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --define=signal_trace=disabled \
@@ -43,9 +44,8 @@ jobs:
             --define=google_grpc=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/cc/... \
-      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
-        && ./bazelw test \
+            //test/cc/... && \
+           ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --config=ci \
             --fat_apk_cpu=x86_64 \
