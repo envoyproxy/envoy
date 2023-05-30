@@ -27,21 +27,22 @@ namespace Http {
 namespace Udp {
 
 void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
-  Router::UpstreamToDownstream& upstream_request = callbacks->upstreamToDownstream();
-  ASSERT(upstream_request.connection().has_value());
+  Router::UpstreamToDownstream& upstream_to_downstream = callbacks->upstreamToDownstream();
   Network::SocketPtr socket = createSocket(host_);
   const Network::ConnectionInfoProvider& connection_info_provider =
       socket->connectionInfoProvider();
-  Event::Dispatcher& dispatcher = upstream_request.connection()->dispatcher();
+  ASSERT(upstream_to_downstream.connection().has_value());
+  Event::Dispatcher& dispatcher = upstream_to_downstream.connection()->dispatcher();
   auto upstream =
-      std::make_unique<UdpUpstream>(&upstream_request, std::move(socket), host_, dispatcher);
+      std::make_unique<UdpUpstream>(&upstream_to_downstream, std::move(socket), host_, dispatcher);
   StreamInfo::StreamInfoImpl stream_info(dispatcher.timeSource(), nullptr);
   callbacks->onPoolReady(std::move(upstream), host_, connection_info_provider, stream_info, {});
 }
 
-UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_request, Network::SocketPtr socket,
-                         Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher)
-    : upstream_request_(upstream_request), socket_(std::move(socket)), host_(host),
+UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_to_downstream,
+                         Network::SocketPtr socket, Upstream::HostConstSharedPtr host,
+                         Event::Dispatcher& dispatcher)
+    : upstream_to_downstream_(upstream_to_downstream), socket_(std::move(socket)), host_(host),
       dispatcher_(dispatcher) {
   socket_->ioHandle().initializeFileEvent(
       dispatcher_, [this](uint32_t) { onSocketReadReady(); }, Event::PlatformDefaultTriggerType,
@@ -63,7 +64,6 @@ Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool /*end_stream*/) {
   Api::SysCallIntResult rc = socket_->connect(host_->address());
   if (SOCKET_FAILURE(rc.return_value_)) {
-    // TODO: statistics.
     return absl::InternalError("Upstream socket connect failure.");
   }
   // Synthesize the 200 response headers downstream to complete the CONNECT-UDP handshake.
@@ -71,11 +71,11 @@ Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"},
            {Envoy::Http::Headers::get().CapsuleProtocol, "?1"}})};
-  upstream_request_->decodeHeaders(std::move(headers), false);
+  upstream_to_downstream_->decodeHeaders(std::move(headers), false);
   return Envoy::Http::okStatus();
 }
 
-void UdpUpstream::resetStream() { upstream_request_ = nullptr; }
+void UdpUpstream::resetStream() { upstream_to_downstream_ = nullptr; }
 
 void UdpUpstream::onSocketReadReady() {
   uint32_t packets_dropped = 0;
@@ -86,16 +86,11 @@ void UdpUpstream::onSocketReadReady() {
     socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;
   }
-  if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-    // TODO: Increment receive error count
-  }
-
-  // TODO: Check with mattklein if flushing is necessary.
 }
 
-void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr,
-                                Network::Address::InstanceConstSharedPtr,
-                                Buffer::InstancePtr buffer, MonotonicTime) {
+void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local_address*/,
+                                Network::Address::InstanceConstSharedPtr /*peer_address*/,
+                                Buffer::InstancePtr buffer, MonotonicTime /*receive_time*/) {
   std::string data = buffer->toString();
   quiche::QuicheBuffer serialized_capsule =
       SerializeCapsule(quiche::Capsule::Datagram(data), &capsule_buffer_allocator_);
@@ -103,7 +98,7 @@ void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr,
   Buffer::InstancePtr capsule_data = std::make_unique<Buffer::OwnedImpl>();
   capsule_data->add(serialized_capsule.AsStringView());
   bytes_meter_->addWireBytesReceived(capsule_data->length());
-  upstream_request_->decodeData(*capsule_data, false);
+  upstream_to_downstream_->decodeData(*capsule_data, false);
 }
 
 bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
@@ -131,12 +126,12 @@ bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
   bytes_meter_->addWireBytesSent(buffer->length());
   Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
       socket_->ioHandle(), *buffer, /*local_ip=*/nullptr, *host_->address());
-  // TODO: Error Statistics
   return true;
 }
 
 void UdpUpstream::OnCapsuleParseFailure(absl::string_view error_message) {
-  upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ProtocolError, error_message);
+  upstream_to_downstream_->onResetStream(Envoy::Http::StreamResetReason::ProtocolError,
+                                         error_message);
 }
 
 } // namespace Udp

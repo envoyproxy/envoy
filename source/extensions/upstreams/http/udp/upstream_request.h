@@ -30,9 +30,14 @@ public:
               Upstream::LoadBalancerContext* ctx)
       : host_(thread_local_cluster.loadBalancer().chooseHost(ctx)) {}
 
+  // Creates a UDPUpstream object for a new stream.
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
 
-  bool cancelAnyPendingStream() override { return false; }
+  bool cancelAnyPendingStream() override {
+    // Unlike TCP, UDP Upstreams do not have any pending streams because the upstream connection is
+    // created immediately without a handshake.
+    return false;
+  }
 
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
@@ -51,7 +56,7 @@ class UdpUpstream : public Router::GenericUpstream,
                     public Network::UdpPacketProcessor,
                     public quiche::CapsuleParser::Visitor {
 public:
-  UdpUpstream(Router::UpstreamToDownstream* upstream_request, Network::SocketPtr socket,
+  UdpUpstream(Router::UpstreamToDownstream* upstream_to_downstream, Network::SocketPtr socket,
               Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // GenericUpstream
@@ -65,29 +70,26 @@ public:
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   // Network::UdpPacketProcessor
+  // Handles data received from the UDP Upstream.
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
-  uint64_t maxDatagramSize() const override {
-    // TODO: Make it configurable
-    return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
-  }
-  void onDatagramsDropped(uint32_t) override {
-    // TODO: Maintain stats.
+  uint64_t maxDatagramSize() const override { return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE; }
+  void onDatagramsDropped(uint32_t dropped) override {
+    ENVOY_LOG_MISC(warn, "{} UDP datagrams were dropped.", dropped);
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
 
   // quiche::CapsuleParser::Visitor
-  // Converts a given Capsule to a HTTP/3 Datagrams and send it.
   bool OnCapsule(const quiche::Capsule& capsule) override;
   void OnCapsuleParseFailure(absl::string_view error_message) override;
 
 private:
   void onSocketReadReady();
 
-  Router::UpstreamToDownstream* upstream_request_;
+  Router::UpstreamToDownstream* upstream_to_downstream_;
   const Network::SocketPtr socket_;
   Upstream::HostConstSharedPtr host_;
   Event::Dispatcher& dispatcher_;

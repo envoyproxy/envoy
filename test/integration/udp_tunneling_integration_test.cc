@@ -107,8 +107,6 @@ TEST_P(ConnectUdpTerminationIntegrationTest, BasicWithoutCapsuleProtocolHeader) 
                         absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
 }
 
-
-
 TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
   initialize();
 
@@ -140,7 +138,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
   initialize();
 
   setUpConnection();
-    std::string sent_capsule_fragment =
+  std::string sent_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
                              "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
@@ -158,8 +156,6 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
   codec_client_->sendReset(*request_encoder_);
 }
 
-
-
 TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
   enable_timeout_ = true;
   initialize();
@@ -168,8 +164,6 @@ TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
   // Wait for the timeout to close the connection.
   ASSERT_TRUE(response_->waitForReset());
 }
-
-
 
 TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
   setUpstreamProtocol(upstreamProtocol());
@@ -185,15 +179,15 @@ TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
   initialize();
   setUpConnection();
   std::string sent_capsule_fragment =
-  absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                          "08"               // capsule length
-                          "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
-  );
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
   std::string received_capsule_fragment =
-  absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                          "08"               // capsule length
-                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-  );
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+      );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
                         absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);

@@ -261,10 +261,12 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
       Http::HeaderUtility::isConnectUdp(*headers)) {
     useCapsuleProtocol();
   }
+#endif
 
   request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
   ConsumeHeaderList();

@@ -65,7 +65,11 @@ public:
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
     return quic::HttpDatagramSupport::kRfc;
+#else
+    return quic::HttpDatagramSupport::kNone;
+#endif
   }
 
   // quic::QuicSpdyClientSessionBase
