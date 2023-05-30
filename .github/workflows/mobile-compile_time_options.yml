@@ -19,7 +19,7 @@ jobs:
   cc_test:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
-    name: cc_test
+    name: linux_builds
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
