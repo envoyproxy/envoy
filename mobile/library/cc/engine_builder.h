@@ -78,7 +78,8 @@ public:
   EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,
                                                std::string jwt_token = "",
                                                int jwt_token_lifetime_seconds = 0,
-                                               std::string ssl_root_certs = "");
+                                               std::string ssl_root_certs = "",
+                                               std::string api_key = "");
   // Adds an RTDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0);
   // Adds a CDS layer to default config. Requires that ADS be configured via
@@ -163,6 +164,7 @@ private:
   std::string ads_address_ = ""; // make absl:optional?
   int ads_port_;
   std::string ads_jwt_token_;
+  std::string ads_api_key_;
   int ads_jwt_token_lifetime_seconds_;
   std::string ads_ssl_root_certs_;
   std::string cds_resources_locator_;
