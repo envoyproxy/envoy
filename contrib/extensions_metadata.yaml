@@ -58,6 +58,11 @@ envoy.filters.sip.router:
   - envoy.sip_proxy.filters
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.network.smtp_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.tls.key_providers.cryptomb:
   categories:
   - envoy.tls.key_providers

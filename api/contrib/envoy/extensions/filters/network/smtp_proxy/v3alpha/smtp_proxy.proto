@@ -25,8 +25,13 @@ message SmtpProxy {
 
     ENABLE = 1;
 
-    // Establish upstream SSL connection to the server. If the server does not
-    // accept the request for SSL connection, the session is terminated.
+    // Upstream: if the server does not advertise the STARTTLS
+    // extension or rejects the request for SSL connection, the
+    // session is terminated.
+    // Downstream: if the SMTP command following EHLO is not STARTTLS,
+    // terminate the session.
+    // In either case, REQUIRE must only be used with well-known peers
+    // that always implement STARTTLS.
     REQUIRE = 2;
   }
 
