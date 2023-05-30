@@ -20,7 +20,8 @@ void register_test_extensions() {
   Envoy::Extensions::HttpFilters::TestEventTracker::forceRegisterTestEventTrackerFilterFactory();
   Envoy::Extensions::HttpFilters::TestKeyValueStore::forceRegisterTestKeyValueStoreFilterFactory();
   Envoy::Extensions::HttpFilters::TestLogger::forceRegisterFactory();
-  Envoy::Extensions::HttpFilters::TestRemoteResponse::forceRegisterTestRemoteResponseFilterFactory();
+  Envoy::Extensions::HttpFilters::TestRemoteResponse::
+      forceRegisterTestRemoteResponseFilterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
 }
