@@ -59,8 +59,6 @@ LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
     Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source) {
   switch (lb_type_) {
   case Upstream::LoadBalancerType::LeastRequest: {
-    // The cluster info will has longer lifetime than the lb load balancer, so it is safe to
-    // capture the reference here.
     Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::LeastRequestLoadBalancer>(
         child_priority_set, local_priority_set, stats, runtime, random, common_config_,
         lbLeastRequestConfig(), time_source);
