@@ -970,13 +970,6 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
-    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
-    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
-    // objects in the ApiListener destructor to reference any objects in thread local storage.
-    if (listener_manager_->apiListener().has_value()) {
-      listener_manager_->apiListener()->get().shutdown();
-    }
-
     listener_manager_->stopWorkers();
   }
 

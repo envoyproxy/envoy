@@ -139,6 +139,23 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
 }
 
+TEST_F(AllocatorImplTest, HiddenGauge) {
+  GaugeSharedPtr hidden_gauge =
+      alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_TRUE(hidden_gauge->hidden());
+
+  GaugeSharedPtr non_hidden_gauge =
+      alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
+  EXPECT_NE(non_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_FALSE(non_hidden_gauge->hidden());
+
+  GaugeSharedPtr never_import_hidden_gauge = alloc_.makeGauge(
+      makeStat("never_import_hidden"), StatName(), {}, Gauge::ImportMode::NeverImport);
+  EXPECT_NE(never_import_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_FALSE(never_import_hidden_gauge->hidden());
+}
+
 TEST_F(AllocatorImplTest, ForEachCounter) {
   StatNameHashSet stat_names;
   std::vector<CounterSharedPtr> counters;

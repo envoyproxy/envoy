@@ -111,6 +111,9 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		md.Set("filter.go", "foo", "bar")
 	}
 
+	fs := f.callbacks.StreamInfo().FilterState()
+	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
@@ -191,6 +194,7 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 
 	trailers.Add("existed-trailer", "bar")
 	trailers.Set("x-test-trailer-0", "bar")
+	trailers.Del("x-test-trailer-1")
 
 	if f.panic == "decode-trailer" {
 		badcode()
