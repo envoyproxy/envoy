@@ -215,10 +215,4 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	f.OnDestroy(v)
 
 	Requests.DeleteReq(r)
-
-	// no one is using req now, we can remove it manually, for better performance.
-	if v == api.Normal {
-		runtime.SetFinalizer(req, nil)
-		req.Finalize(api.GCFinalize)
-	}
 }
