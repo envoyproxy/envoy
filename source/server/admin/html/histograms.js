@@ -136,7 +136,7 @@ function formatRange(lowerBound, width) {
  *
  * @param {!Element} detailPopup the popup div for this histogram.
  * @param {string} bucketPosPercent The bucket position, expressed as a string percentage.
- * @param {!Object} bucket the bucket record from JSON, augmented ith an annotations list
+ * @param {!Object} bucket the bucket record from JSON, augmented with an annotations list
  * @param {!Element} bucketSpan a span element for the bucket; used to color it yellow.
  * @param {boolean} showingCount whether the the count is shown on the histogram itself,
  *                  which dictates whether we will also show it in the popup.
@@ -552,19 +552,19 @@ class Painter {
   }
 
   /**
-   * @param {number} vpx the number of virtual pixels.
+   * @param {number} virtualPixels the number of virtual pixels.
    * @return {number} the x-position as a percent, including an offset.
    */
-  vpxToPosition(vpx) {
-    return this.vpxToWidth(vpx) + constants.outerMarginFraction;
+  vpxToPosition(virtualPixels) {
+    return this.vpxToWidth(virtualPixels) + constants.outerMarginFraction;
   }
 
   /**
-   * @param {number} vpx tthe
+   * @param {number} virtualPixels the number of virtual pixels.
    * @return {number} the x-position as a numeric percent.
    */
-  vpxToWidth(vpx) {
-    return vpx / this.widthVpx;
+  vpxToWidth(virtualPixels) {
+    return virtualPixels / this.widthVpx;
   }
 }
 

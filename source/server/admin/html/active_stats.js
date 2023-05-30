@@ -191,7 +191,7 @@ function renderStats(data) {
   // of code, and compel us to do a better job writing tests.
   sortedStats.sort(compareStatRecords);
 
-  const max = loadSeattingOrUseDefault('active-max-display-count', 50);
+  const max = loadSettingOrUseDefault('active-max-display-count', 50);
   let index = 0;
   let text = '';
   for (const statRecord of sortedStats) {
