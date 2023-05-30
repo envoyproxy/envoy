@@ -227,6 +227,7 @@ TEST(MatchWrapper, WithNoMatcher) {
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 
   const auto config =
@@ -238,9 +239,8 @@ extension_config:
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
-  EXPECT_THROW_WITH_REGEX(
-      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context),
-      EnvoyException, "one of `matcher` and `matcher_tree` must be set.");
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  EXPECT_TRUE(cb);
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {
