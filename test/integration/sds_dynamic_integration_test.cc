@@ -113,7 +113,7 @@ public:
   Grpc::ClientType clientType() const override { return GetParam().sds_grpc_type; }
   virtual std::unique_ptr<FakeUpstream>& sdsUpstream() { return fake_upstreams_[0]; }
   // Index in fake_upstreams_ vector of the data plane upstream.
-  int upstreamIndex() { return 1; }
+  int dataPlaneUpstreamIndex() { return 1; }
 
 protected:
   void createSdsStream(FakeUpstream&) {
@@ -407,7 +407,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
     return makeSslClientConnection();
   };
   // First request with server{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
   cleanupUpstreamAndDownstream();
   // Rotate.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
@@ -418,7 +418,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // First request with server_ecdsa{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
 // Validate that rotating to a directory with missing certs is handled.
@@ -440,7 +440,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
     return makeSslClientConnection();
   };
   // First request with server{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
   cleanupUpstreamAndDownstream();
 
   // Rotate to an empty directory, this should fail.
@@ -453,7 +453,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // Requests continue to work with key/cert pair.
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
 // A test that SDS server send a good server secret for a static listener.
@@ -468,7 +468,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -493,7 +493,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   cleanupUpstreamAndDownstream();
   client_ssl_ctx_ = createClientSslTransportSocketFactory(
@@ -501,7 +501,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -607,7 +607,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -655,7 +655,7 @@ public:
       upstream_tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
       auto* upstream_transport_socket = bootstrap.mutable_static_resources()
-                                            ->mutable_clusters(upstreamIndex())
+                                            ->mutable_clusters(dataPlaneUpstreamIndex())
                                             ->mutable_transport_socket();
       upstream_transport_socket->set_name("envoy.transport_sockets.tls");
       upstream_transport_socket->mutable_typed_config()->PackFrom(upstream_tls_context);
@@ -750,7 +750,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -771,7 +771,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationCont
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -797,7 +797,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicWithSharedSecret) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -824,7 +824,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -859,7 +859,7 @@ public:
 
       // change the first cluster with ssl and sds.
       auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_clusters(upstreamIndex())
+                                   ->mutable_clusters(dataPlaneUpstreamIndex())
                                    ->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       tls_context.set_sni("lyft.com");
@@ -925,7 +925,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
@@ -951,7 +951,8 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   // Wait for the raw TCP connection with bad credentials and close it.
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     FakeRawConnectionPtr fake_upstream_connection;
-    ASSERT_TRUE(fake_upstreams_[upstreamIndex()]->waitForRawConnection(fake_upstream_connection));
+    ASSERT_TRUE(
+        fake_upstreams_[dataPlaneUpstreamIndex()]->waitForRawConnection(fake_upstream_connection));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
@@ -966,7 +967,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 
   // Verify the update succeeded.
-  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, dataPlaneUpstreamIndex());
 }
 
 // Test CDS with SDS. A cluster provided by CDS raises new SDS request for upstream cert.
@@ -1175,7 +1176,7 @@ TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator, upstreamIndex());
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   cleanupUpstreamAndDownstream();
 }
