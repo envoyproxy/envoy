@@ -7,7 +7,7 @@ namespace InputMatchers {
 namespace CelMatcher {
 
 // Compiled CEL expression string: request.headers['authenticated_user'] == 'staging'
-inline constexpr char RequestHeadeCelExprString[] = R"pb(
+inline constexpr char RequestHeaderCelExprString[] = R"pb(
   expr {
     id: 8
     call_expr {
@@ -266,34 +266,6 @@ inline constexpr char ReponseTrailerCelExprString[] = R"pb(
       }
     }
   }
-  source_info {
-    location: "<input>"
-    line_offsets: 50
-    positions {
-      key: 1
-      value: 0
-    }
-    positions {
-      key: 2
-      value: 8
-    }
-    positions {
-      key: 3
-      value: 17
-    }
-    positions {
-      key: 4
-      value: 18
-    }
-    positions {
-      key: 5
-      value: 38
-    }
-    positions {
-      key: 6
-      value: 40
-    }
-  }
 )pb";
 
 // Compiled CEL expression string: request.path == '/foo' || request.headers['user'] ==
@@ -363,54 +335,6 @@ inline constexpr char RequestHeaderOrPathCelString[] = R"pb(
           }
         }
       }
-    }
-  }
-  source_info {
-    location: "<input>"
-    line_offsets: 57
-    positions {
-      key: 1
-      value: 0
-    }
-    positions {
-      key: 2
-      value: 7
-    }
-    positions {
-      key: 3
-      value: 12
-    }
-    positions {
-      key: 4
-      value: 14
-    }
-    positions {
-      key: 5
-      value: 22
-    }
-    positions {
-      key: 6
-      value: 29
-    }
-    positions {
-      key: 7
-      value: 37
-    }
-    positions {
-      key: 8
-      value: 38
-    }
-    positions {
-      key: 9
-      value: 45
-    }
-    positions {
-      key: 10
-      value: 47
-    }
-    positions {
-      key: 11
-      value: 20
     }
   }
 )pb";

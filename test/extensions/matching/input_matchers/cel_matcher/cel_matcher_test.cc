@@ -125,7 +125,7 @@ public:
 };
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
-  auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
+  auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
 
   TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
@@ -140,7 +140,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
-  auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
+  auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
 
   // Build header with request header value field mismatched case.
   TestRequestHeaderMapImpl request_headers = default_headers_;
@@ -165,7 +165,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherNoRequestAttributes) {
-  auto matcher_tree = buildMatcherTree(RequestHeadeCelExprString);
+  auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
 
   // No request attributes added to matching data.
   const auto result = matcher_tree->match(data_);
@@ -390,7 +390,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
 }
 
 TEST_F(CelMatcherTest, NoCelExpression) {
-  EXPECT_DEATH(buildMatcherTree(RequestHeadeCelExprString, ExpressionType::NoExpression),
+  EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
                ".*panic: unset oneof.*");
 }
 
