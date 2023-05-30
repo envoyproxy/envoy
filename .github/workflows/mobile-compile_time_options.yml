@@ -31,10 +31,10 @@ jobs:
     - name: 'Build C++ library'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Envoy Mobile builds which verify
+      # 1) that the build configuration where HTTP/3 is enabled and HTTP Datagrams are disabled works.
+      # 2) that the no-YAML build works and supported mobile e2e tests run.
       run: |
-      # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
-      # HTTP Datagrams are disabled works.
-      # As well as an Envoy Mobile build which verifies that the build configuration where YAML is disabled.
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --define=signal_trace=disabled \
@@ -45,7 +45,7 @@ jobs:
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //test/cc/... && \
-           ./bazelw test \
+            ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --config=ci \
             --fat_apk_cpu=x86_64 \
@@ -57,7 +57,7 @@ jobs:
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //test/java/integration:android_engine_socket_tag_test \
             //test/java/integration:android_engine_start_test \
-            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests
+            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests \
             //test/common/integration:client_integration_test
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
