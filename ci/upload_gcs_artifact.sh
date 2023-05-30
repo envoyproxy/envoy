@@ -38,9 +38,9 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
     exit 1
 fi
 
-if [[ "$BUILD_REASON" == "PullRequest" ]] || [[ "$TARGET_SUFFIX" == "docs" ]]; then
+if [[ "$BUILD_REASON" == "PullRequest" ]] || [[ "$TARGET_SUFFIX" == "docs" ]] || [[ "$TARGET_SUFFIX" == "docker" ]]; then
     # upload to the last commit sha (first 7 chars), either
-    # - docs build on main
+    # - docs/docker build on main, eg docs
     #      -> https://storage.googleapis.com/envoy-postsubmit/$UPLOAD_PATH/docs/envoy-docs-rst.tar.gz
     # - PR build (commit sha from the developers branch)
     #      -> https://storage.googleapis.com/envoy-pr/$UPLOAD_PATH/$TARGET_SUFFIX

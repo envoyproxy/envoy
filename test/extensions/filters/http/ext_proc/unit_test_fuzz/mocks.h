@@ -20,6 +20,7 @@ public:
   MOCK_METHOD(void, send,
               (envoy::service::ext_proc::v3::ProcessingRequest && request, bool end_stream));
   MOCK_METHOD(bool, close, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
 };
 
 class MockClient : public ExternalProcessing::ExternalProcessorClient {
