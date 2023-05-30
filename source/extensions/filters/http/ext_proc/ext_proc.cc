@@ -608,8 +608,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
-  // being invoked in line.
-  if (response->has_mode_override()) {
+  // being invoked in line. This only happens when filter has allow_mode_override
+  // set to true. Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());
