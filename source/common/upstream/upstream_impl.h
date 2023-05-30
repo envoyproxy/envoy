@@ -86,19 +86,10 @@ public:
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
 
 private:
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                            const envoy::config::core::v3::BindConfig bind_config);
   void parseBindConfig(const std::string cluster_name,
                        const envoy::config::core::v3::BindConfig& bind_config,
                        const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
                        const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
-  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
 
   Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
@@ -1313,5 +1304,17 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     Network::Address::InstanceConstSharedPtr host_address);
 
+/**
+ * Utility functions to create UpstreamLocalAddressSelector.
+ */
+Network::ConnectionSocket::OptionsSharedPtr
+buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                       const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+Network::ConnectionSocket::OptionsSharedPtr
+buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                          const envoy::config::core::v3::BindConfig& bind_config);
+Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
+    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
+    const Network::ConnectionSocket::OptionsSharedPtr& options);
 } // namespace Upstream
 } // namespace Envoy

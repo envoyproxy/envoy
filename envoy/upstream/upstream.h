@@ -13,6 +13,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter_factory.h"
@@ -50,7 +51,7 @@ public:
 };
 
 /**
- * Used to select upstream local address based on the endpoint address.
+ * Interface to select upstream local address based on the endpoint address.
  */
 class UpstreamLocalAddressSelector {
 public:
@@ -66,6 +67,19 @@ public:
   virtual UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address,
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
+};
+
+using UpstreamLocalAddressSelectorPtr = std::shared_ptr<UpstreamLocalAddressSelector>;
+
+class UpstreamLocalAddressSelectorFactory : public Config::UntypedFactory {
+public:
+  ~UpstreamLocalAddressSelectorFactory() override = default;
+
+  virtual UpstreamLocalAddressSelectorPtr createLocalAddressSelector(
+      const envoy::config::cluster::v3::Cluster& cluster_config,
+      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) const PURE;
+
+  std::string category() const override { return "envoy.local_address_selector"; }
 };
 
 /**

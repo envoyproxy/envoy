@@ -228,3 +228,8 @@ def envoy_proto_library(name, **kwargs):
         visibility = ["//visibility:public"],
         **kwargs
     )
+
+register_extension_info(
+    extension = envoy_cc_library,
+    label_regex_for_dep = "{extension_name}",
+)

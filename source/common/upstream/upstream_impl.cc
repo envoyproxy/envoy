@@ -35,6 +35,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "envoy/registry/registry.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -173,7 +174,47 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
 
+Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelector(
+    const envoy::config::cluster::v3::Cluster& cluster_config,
+    const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
+  const std::string empty;
+  UpstreamLocalAddressSelectorFactory* local_address_selector;
+  const std::string& local_address_selector_name =
+      cluster_config.has_upstream_bind_config() &&
+              !cluster_config.upstream_bind_config().local_address_selector_name().empty()
+          ? cluster_config.upstream_bind_config().local_address_selector_name()
+      : bootstrap_bind_config.has_value() ? bootstrap_bind_config->local_address_selector_name()
+                                          : empty;
+  if (local_address_selector_name.empty()) {
+    local_address_selector =
+        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
+            "envoy.default_local_address_selector");
+  } else {
+    local_address_selector =
+        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
+            local_address_selector_name);
+  }
+  if (local_address_selector == nullptr) {
+    throw EnvoyException(
+        fmt::format("Unknown local address selector: {}", local_address_selector_name));
+  }
+  return local_address_selector->createLocalAddressSelector(cluster_config, bootstrap_bind_config);
+}
+
 } // namespace
+
+class UpstreamLocalAddressSelectorImplFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  std::string name() const override { return "envoy.default_local_address_selector"; }
+
+  UpstreamLocalAddressSelectorPtr
+  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
+                             const absl::optional<envoy::config::core::v3::BindConfig>&
+                                 bootstrap_bind_config) const override {
+    return std::make_shared<UpstreamLocalAddressSelectorImpl>(cluster_config,
+                                                              bootstrap_bind_config);
+  }
+};
 
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
@@ -194,10 +235,9 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 }
 
-Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::combineConnectionSocketOptions(
+Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
     const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -246,10 +286,9 @@ UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
       combineConnectionSocketOptions(upstream_local_addresses_[0].socket_options_, socket_options)};
 }
 
-const Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
+Network::ConnectionSocket::OptionsSharedPtr
+buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                       const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr base_options =
       std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -275,10 +314,10 @@ UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
   return base_options;
 }
 
-const Network::ConnectionSocket::OptionsSharedPtr
+Network::ConnectionSocket::OptionsSharedPtr
 UpstreamLocalAddressSelectorImpl::buildClusterSocketOptions(
     const envoy::config::cluster::v3::Cluster& cluster_config,
-    const envoy::config::core::v3::BindConfig bind_config) {
+    const envoy::config::core::v3::BindConfig& bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
       std::make_shared<Network::ConnectionSocket::Options>();
   // Cluster socket_options trump cluster manager wide.
@@ -1051,8 +1090,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
-      upstream_local_address_selector_(
-          std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
+      upstream_local_address_selector_(createUpstreamLocalAddressSelector(config, bind_config)),
       lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
@@ -2251,6 +2289,10 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   }
   return health_check_address;
 }
+/**
+ * Static registration for the default local address selector. @see RegisterFactory.
+ */
+REGISTER_FACTORY(UpstreamLocalAddressSelectorImplFactory, UpstreamLocalAddressSelectorFactory);
 
 } // namespace Upstream
 } // namespace Envoy
