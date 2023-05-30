@@ -140,4 +140,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bufbuild/buf/blob/v{version}/LICENSE",
     ),
+    com_github_chrusty_protoc_gen_jsonschema = dict(
+        project_name = "protoc-gen-jsonschema",
+        project_desc = "Protobuf to JSON-Schema compiler",
+        project_url = "https://github.com/norbjd/protoc-gen-jsonschema",
+        strip_prefix = "protoc-gen-jsonschema-{version}",
+        sha256 = "ba3e313b10a1b50a6c1232d994c13f6e23d3669be4ae7fea13762f42bb3b2abc",
+        version = "7680e4998426e62b6896995ff73d4d91cc5fb13c",
+        urls = ["https://github.com/norbjd/protoc-gen-jsonschema/archive/{version}.zip"],
+        use_category = ["build"],
+        release_date = "2023-05-30",
+    ),
 )
