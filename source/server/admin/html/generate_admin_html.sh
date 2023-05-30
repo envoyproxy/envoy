@@ -17,7 +17,7 @@ echo ')EOF";'
 # constant, so generate the histograms implementation in two chunks. These will
 # be combined in source/server/admin/admin_html_util.cc when constructing
 # BuiltinResourceProvider. We do this even when not on Windows for consistency.
-lines=$(cat "$5" | wc -l)
+lines=$(wc -l < "$5")
 first_lines=$((lines / 2))
 next_lines=$((first_lines + 1))
 
