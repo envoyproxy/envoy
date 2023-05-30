@@ -358,8 +358,8 @@ TEST_F(OAuth2ClientTest, NetworkErrorDoubleCallStateInvalid) {
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
-    EXPECT_THROW(callback->onFailure(request, Http::AsyncClient::FailureReason::Reset),
-                 EnvoyException);
+    EXPECT_DEATH(callback->onFailure(request, Http::AsyncClient::FailureReason::Reset),
+                 "Malformed oauth client state");
   }));
 }
 

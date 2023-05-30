@@ -192,7 +192,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 }
 
 bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
-  return token_ != EMPTY_STRING && refresh_token_ != EMPTY_STRING;
+  return (!token_.empty() && !refresh_token_.empty());
 }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
@@ -569,9 +569,8 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
     setBearerToken(*request_headers_, access_token_);
   }
 
-  // At this point we add set-cookie headers to the temporary object of the response
-  // The temporary response will populate the response from upstream in the encodeHeaders method
-  // Eventually set-cookie headers will be send to the user agent (browser)
+  // At this point we add set-cookie headers to the temporary object
+  // The response will be populated from this object in the encodeHeaders method
   response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
   addResponseCookies(*response_headers_to_add_, getEncodedToken());
 

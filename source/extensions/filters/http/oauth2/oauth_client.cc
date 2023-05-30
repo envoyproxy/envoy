@@ -136,7 +136,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
       parent_->onUpdateAccessTokenFailure();
       break;
     default:
-      throw EnvoyException("Malformed oauth client state");
+      PANIC("Malformed oauth client state");
     }
     return;
   }
@@ -175,7 +175,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     parent_->onRefreshAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
     break;
   default:
-    throw EnvoyException("Malformed oauth client state");
+    PANIC("Malformed oauth client state");
   }
 }
 
@@ -194,7 +194,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     parent_->onUpdateAccessTokenFailure();
     break;
   default:
-    throw EnvoyException("Malformed oauth client state");
+    PANIC("Malformed oauth client state");
   }
 }
 
