@@ -275,6 +275,7 @@ private:
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
   using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
 
+public:
   class LoadBalancerContextWrapper : public LoadBalancerContext {
   public:
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
@@ -321,6 +322,7 @@ private:
     Router::MetadataMatchCriteriaConstPtr metadata_match_;
   };
 
+private:
   struct SubsetSelectorFallbackParams {
     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
         LbSubsetSelectorFallbackPolicy fallback_policy_;
