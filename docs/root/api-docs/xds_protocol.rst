@@ -237,12 +237,12 @@ how to contact the ADS server, which will be used whenever a :ref:`ConfigSource
 management server) contains an :ref:`AggregatedConfigSource
 <envoy_v3_api_msg_config.core.v3.AggregatedConfigSource>` message.
 
-A current limimtation in Envoy is that any xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources
+A current limitation in Envoy is that any xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources
 must be specified first in the `static_resources` field of the Bootstrap configuration prior to any static
 :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources that depend on the xDS cluster. For example,
 if a cluster depends on an xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` for SDS to configure the
 secrets on a transport socket, the xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` should be specified
-first in the `static_resources` field.
+first in the `static_resources` field, before the cluster with the transport socket secret is specified.
 
 In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of
 the ADS server, which will be used for all resources. The :ref:`ConfigSource
