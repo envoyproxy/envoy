@@ -103,19 +103,131 @@ TEST_P(ConnectUdpTerminationIntegrationTest, BasicWithoutCapsuleProtocolHeader) 
 }
 
 
-/*
+
 TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
+  initialize();
+
+  setUpConnection();
+
+  std::string sent_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  std::string received_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+      );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+
+  // Tear down by closing the client connection.
+  codec_client_->close();
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    // Resetting an individual stream requires HTTP/2 or later.
+    return;
+  }
+  initialize();
+
+  setUpConnection();
+    std::string sent_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      );
+  std::string received_capsule_fragment =
+      absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                             "08"               // capsule length
+                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+      );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+
+  // Tear down by resetting the client stream.
+  codec_client_->sendReset(*request_encoder_);
 }
 
+
+/*
 TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
-}
+  setUpstreamProtocol(upstreamProtocol());
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* idle_time_out = protocol_options.mutable_common_http_protocol_options()
+        ->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(1000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  initialize();
+  setUpConnection();
+  std::string sent_capsule_fragment =
+  absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                          "08"               // capsule length
+                          "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+  );
+  std::string received_capsule_fragment =
+  absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                          "08"               // capsule length
+                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+  );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+
+  // wait for time out
+  // TODO figure out the equivalent of waitForDisconnect for this
+  ASSERT_TRUE(fake_upstreams_[0]->waitForDisconnect());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+}*/
+
+
 
 TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
+  setUpstreamProtocol(upstreamProtocol());
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_stream_duration()
+        ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  initialize();
+  setUpConnection();
+  std::string sent_capsule_fragment =
+  absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                          "08"               // capsule length
+                          "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+  );
+  std::string received_capsule_fragment =
+  absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                          "08"               // capsule length
+                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+  );
+
+  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
+                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForReset());
+    codec_client_->close();
+  }
 }
-*/
 
 TEST_P(ConnectUdpTerminationIntegrationTest, PathWithInvalidUriTemplate) {
   initialize();
