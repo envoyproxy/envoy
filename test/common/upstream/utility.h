@@ -57,10 +57,11 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 inline envoy::config::bootstrap::v3::Bootstrap
 parseBootstrapFromV3Json(const std::string& json_string) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  // TODO(alyssawilk) rename to JSON
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromJson(json_string, bootstrap);
 #else
-  PANIC("Cannot parse " + json_string);
+  PANIC("JSON compiled out: cannot parse " + json_string);
 #endif
   return bootstrap;
 }
@@ -70,7 +71,7 @@ inline envoy::config::cluster::v3::Cluster parseClusterFromV3Json(const std::str
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromJson(json_string, cluster);
 #else
-  PANIC("Cannot parse " + json_string);
+  PANIC("JSON compiled out: cannot parse " + json_string);
 #endif
   return cluster;
 }
@@ -80,7 +81,7 @@ inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::str
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(yaml, cluster);
 #else
-  PANIC("Cannot parse " + yaml);
+  PANIC("JSON compiled out: cannot parse " + yaml);
 #endif
   return cluster;
 }
@@ -89,7 +90,7 @@ inline envoy::config::cluster::v3::Cluster defaultStaticCluster(const std::strin
 #ifdef ENVOY_ENABLE_YAML
   return parseClusterFromV3Json(defaultStaticClusterJson(name));
 #else
-  PANIC("Cannot parse " + name);
+  PANIC("JSON compiled out: cannot parse " + name);
 #endif
 }
 
@@ -186,7 +187,7 @@ parseHealthCheckFromV3Yaml(const std::string& yaml_string) {
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
 #else
-  PANIC("Cannot parse " + yaml_string);
+  PANIC("JSON compiled out: cannot parse " + yaml_string);
 #endif
   return health_check;
 }

@@ -36,7 +36,7 @@ envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& con
   return bootstrap;
 #else
   UNREFERENCED_PARAMETER(config);
-  PANIC("Can't parse YAML");
+  PANIC("YAML support compiled out: can't parse YAML");
 #endif
 }
 
@@ -136,7 +136,7 @@ void BaseIntegrationTest::initialize() {
 Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  std::string rundir = TestEnvironment::runfilesDirectory();
+  const std::string rundir = TestEnvironment::runfilesDirectory();
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
@@ -228,7 +228,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     TestEnvironment::writeStringToFileForTest(
         lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
 #else
-    PANIC("Can't parse YAML");
+    PANIC("YAML support compiled out: can't parse YAML");
 #endif
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.

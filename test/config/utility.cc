@@ -38,7 +38,7 @@ basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const std::st
 #else
   UNREFERENCED_PARAMETER(config);
   UNREFERENCED_PARAMETER(bootstrap);
-  PANIC("can't load config");
+  PANIC("JSON compiled out: can't load config");
 #endif
   return bootstrap;
 }
