@@ -135,6 +135,9 @@ new_features:
 - area: access_log
   change: |
     added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: access_log
+  change: |
+    (QUIC only) Added support for %BYTES_RETRANSMITTED% and %PACKETS_RETRANSMITTED%.
 - area: dynamic_forward_proxy
   change: |
     added :ref:`sub_clusters_config
