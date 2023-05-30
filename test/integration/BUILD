@@ -2216,7 +2216,7 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "large",
+    size = "eternal",
     srcs = select({
         "//bazel:disable_http3": [],
         "//bazel:disable_admin_functionality": [],
