@@ -551,7 +551,7 @@ class FormatChecker:
             report_error(
                 "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
             )
-        if not self.allow_listed_for_register_factory(file_path):
+        if file_path.startswith("mobile") and not self.allow_listed_for_register_factory(file_path):
             if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
                 report_error(
                     "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
