@@ -65,13 +65,21 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 
   callback(event);
+  for (const auto& event_sink : event_sinks_) {
+    event_sink->log(event);
+  }
+
 #ifdef ENVOY_ENABLE_YAML
+  if (file_ == nullptr) {
+    return;
+  }
 
   // Make sure the type enums make it into the JSON
   const auto json =
       MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
                                                    /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
+
 #endif
 }
 } // namespace Upstream

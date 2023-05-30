@@ -83,12 +83,14 @@ public:
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     addFakeUpstream(upstream_codec_type_);
     addFakeUpstream(upstream_codec_type_);
-    cluster1_ = cluster_creator_(
-        ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
-    cluster2_ = cluster_creator_(
-        ClusterName2, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+    cluster1_ = cluster_creator_(ClusterName1,
+                                 fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
+                                 Network::Test::getLoopbackAddressString(ipVersion()),
+                                 envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    cluster2_ = cluster_creator_(ClusterName2,
+                                 fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
+                                 Network::Test::getLoopbackAddressString(ipVersion()),
+                                 envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
     // Let Envoy establish its connection to the CDS server.
     acceptXdsConnection();
@@ -136,8 +138,9 @@ public:
   // True if we decided not to run the test after all.
   bool test_skipped_{true};
   Http::CodecType upstream_codec_type_{Http::CodecType::HTTP2};
-  std::function<envoy::config::cluster::v3::Cluster(const std::string&, int, const std::string&,
-                                                    const std::string&)>
+  std::function<envoy::config::cluster::v3::Cluster(
+      const std::string&, int, const std::string&,
+      const envoy::config::cluster::v3::Cluster::LbPolicy)>
       cluster_creator_;
 };
 
@@ -239,7 +242,8 @@ TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   // Update cluster1_ to use MAGLEV load balancer policy.
   cluster1_ = ConfigHelper::buildStaticCluster(
       ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
-      Network::Test::getLoopbackAddressString(ipVersion()), "MAGLEV");
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      envoy::config::cluster::v3::Cluster::MAGLEV);
 
   // Cyclically add and remove cluster with ThreadAwareLb.
   for (int i = 42; i < 142; i += 2) {
