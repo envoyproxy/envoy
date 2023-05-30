@@ -110,6 +110,7 @@ void* envoyGoFilterUpstreamConnect(void* library_id, void* addr) {
   std::string id = copyGoString(library_id);
   auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
   UpstreamConnPtr conn_ptr = std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib);
+  // the upstream connect wrapper will be deleted by envoyGoFilterUpstreamFinalize
   UpstreamConnWrapper* wrapper = new UpstreamConnWrapper(conn_ptr);
   conn_ptr->setWrapper(wrapper);
 

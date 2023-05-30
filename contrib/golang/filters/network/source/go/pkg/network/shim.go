@@ -137,7 +137,11 @@ func envoyGoFilterOnDownstreamData(wrapper unsafe.Pointer, dataSize uint64, data
 //export envoyGoFilterOnDownstreamEvent
 func envoyGoFilterOnDownstreamEvent(wrapper unsafe.Pointer, event int) {
 	filter := DownstreamFilters.GetFilter(uint64(uintptr(wrapper)))
-	filter.OnEvent(api.ConnectionEvent(event))
+	e := api.ConnectionEvent(event)
+	filter.OnEvent(e)
+	if e == api.LocalClose || e == api.RemoteClose {
+		DownstreamFilters.DeleteFilter(uint64(uintptr(wrapper)))
+	}
 }
 
 //export envoyGoFilterOnDownstreamWrite
@@ -198,7 +202,11 @@ func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPt
 //export envoyGoFilterOnUpstreamEvent
 func envoyGoFilterOnUpstreamEvent(wrapper unsafe.Pointer, event int) {
 	filter := UpstreamFilters.GetFilter(uint64(uintptr(wrapper)))
-	filter.OnEvent(api.ConnectionEvent(event))
+	e := api.ConnectionEvent(event)
+	filter.OnEvent(e)
+	if e == api.LocalClose || e == api.RemoteClose {
+		UpstreamFilters.DeleteFilter(uint64(uintptr(wrapper)))
+	}
 }
 
 type DownstreamFilterMap struct {
