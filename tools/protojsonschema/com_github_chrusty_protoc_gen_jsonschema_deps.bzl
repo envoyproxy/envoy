@@ -1,5 +1,6 @@
 # Manually copied from @com_github_chrusty_protoc_gen_jsonschema//:deps.bzl, because I can't reference it automatically
 # Indeed, gazelle:repository_macro does not support labels in WORKSPACE (see https://github.com/bazelbuild/bazel-gazelle/issues/752)
+# Only "com_github_xeipuuv_gojsonreference" go_repository has been modified: build_external = "external" has been included
 
 load("@bazel_gazelle//:deps.bzl", "go_repository")
 
@@ -127,6 +128,7 @@ def go_dependencies():
         importpath = "github.com/xeipuuv/gojsonreference",
         sum = "h1:EzJWgHovont7NscjpAxXsDA8S8BMYve8Y5+7cuRE7R0=",
         version = "v0.0.0-20180127040603-bd5ef7bd5415",
+        build_external = "external",
     )
     go_repository(
         name = "com_github_xeipuuv_gojsonschema",

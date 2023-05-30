@@ -23,8 +23,3 @@ envoy_python_dependencies()
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
-
-load("//tools/protojsonschema:com_github_chrusty_protoc_gen_jsonschema_deps.bzl", "go_dependencies")
-
-# gazelle:repository_macro //tools/protojsonschema/com_github_chrusty_protoc_gen_jsonschema_deps.bzl%go_dependencies
-go_dependencies()
