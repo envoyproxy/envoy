@@ -50,6 +50,11 @@ var (
 
 //export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
+	if !api.CgoCheckDisabled() {
+		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
+		return 0
+	}
+
 	buf := utils.BytesToSlice(configPtr, configLen)
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
