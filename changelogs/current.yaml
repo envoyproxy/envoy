@@ -70,6 +70,13 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: overload manager
+  change: |
+    Changed behavior of the overload manager to error on unknown overload
+    manager actions. Prior it would silently fail.  This change can be reverted
+    temporarily by setting the runtime guard
+    ``envoy.reloadable_features.overload_manager_error_unknown_action`` to
+    false.
 - area: router
   change: |
     Added check for existing metadata before setting metadata due to 'auto_sni', 'auto_san_validation', or
