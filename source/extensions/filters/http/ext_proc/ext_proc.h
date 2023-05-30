@@ -111,7 +111,9 @@ public:
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
-        filter_metadata_(config.filter_metadata()), header_matchers_(initHeaderMatchers(config)) {}
+        filter_metadata_(config.filter_metadata()),
+        allow_mode_override_(config.allow_mode_override()),
+        header_matchers_(initHeaderMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -124,6 +126,8 @@ public:
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
     return processing_mode_;
   }
+
+  bool allowModeOverride() const { return allow_mode_override_; }
 
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
@@ -161,6 +165,8 @@ private:
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // If set to true, allow the processing mode to be modified by the ext_proc response.
+  const bool allow_mode_override_;
   // Empty header_matchers_ means allow all.
   const std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
