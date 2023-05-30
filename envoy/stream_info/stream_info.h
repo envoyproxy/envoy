@@ -375,20 +375,80 @@ private:
 
 // Measure the number of bytes sent and received for a stream.
 struct BytesMeter {
+  BytesMeter() = default;
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
   uint64_t headerBytesReceived() const { return header_bytes_received_; }
+
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
+  struct BytesSnapshot {
+    SystemTime snapshot_time;
+    uint64_t header_bytes_sent{};
+    uint64_t header_bytes_received{};
+    uint64_t wire_bytes_sent{};
+    uint64_t wire_bytes_received{};
+  };
+  void takeDownstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    downstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  void takeUpstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    upstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  const BytesSnapshot* bytesAtLastDownstreamPeriodicLog() const {
+    return downstream_periodic_logging_bytes_snapshot_.get();
+  }
+  const BytesSnapshot* bytesAtLastUpstreamPeriodicLog() const {
+    return upstream_periodic_logging_bytes_snapshot_.get();
+  }
+  // Adds the bytes from `existing` to `this`.
+  // Additionally, captures periodic bytes meters from `existing`, adds them to `this`, and merges
+  // bytes from `this` into the periodic bytes meters. This is because the existing periodic bytes
+  // meter (especially the downstream periodic meter) may already have bytes accumulated and a
+  // create_time_ set on it.
+  void captureExistingBytesMeter(BytesMeter& existing) {
+    // Add bytes accumulated on `this` to the pre-existing periodic bytes collectors.
+    if (existing.downstream_periodic_logging_bytes_snapshot_) {
+      downstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.downstream_periodic_logging_bytes_snapshot_);
+      existing.downstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+    if (existing.upstream_periodic_logging_bytes_snapshot_) {
+      upstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.upstream_periodic_logging_bytes_snapshot_);
+      existing.upstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+
+    // Accumulate existing bytes.
+    header_bytes_sent_ += existing.header_bytes_sent_;
+    header_bytes_received_ += existing.header_bytes_received_;
+    wire_bytes_sent_ += existing.wire_bytes_sent_;
+    wire_bytes_received_ += existing.wire_bytes_received_;
+  }
 
 private:
   uint64_t header_bytes_sent_{};
   uint64_t header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
+  std::unique_ptr<BytesSnapshot> downstream_periodic_logging_bytes_snapshot_;
+  std::unique_ptr<BytesSnapshot> upstream_periodic_logging_bytes_snapshot_;
 };
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;

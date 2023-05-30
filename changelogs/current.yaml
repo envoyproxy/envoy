@@ -235,6 +235,11 @@ new_features:
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
+- area: access_log
+  change: |
+    added bytes snapshotting for upstream and downstream logging that will be reset after every periodic log. Downstream
+    periodic loggers should read BytesMeter::bytesAtLastDownstreamPeriodicLog(), and upstream periodic loggers should read
+    BytesMeter::bytesAtLastUpstreamPeriodicLog().
 
 deprecated:
 - area: access_log

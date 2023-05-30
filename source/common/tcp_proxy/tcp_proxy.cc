@@ -850,6 +850,11 @@ void Filter::onAccessLogFlushInterval() {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
                     AccessLog::AccessLogType::TcpPeriodic);
   }
+  const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
+  getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
+  if (getStreamInfo().getUpstreamBytesMeter()) {
+    getStreamInfo().getUpstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
+  }
   resetAccessLogFlushTimer();
 }
 
