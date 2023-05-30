@@ -126,6 +126,13 @@ bug_fixes:
 - area: boringssl
   change: |
     Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+- area: oauth2
+  change: |
+    The httpOnly attribute for Set-Cookie for tokens in HTTP response header was missing,
+    causing tokens to be accessible from the JavaScript making the apps vulnerable.
+    This was fixed now by marking the cookie as httpOnly.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -215,6 +222,20 @@ new_features:
     :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
     to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
     clear_route_cache_disabled stat.
+- area: ext_proc
+  change: |
+    added new configuration field
+    :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+    If set to true, the filter config
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    can be overridden by the
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    in the response message from the external processing server.
+    If not set, the ``mode_override`` API in the response message will be ignored.
+- area: ext_proc
+  change: |
+    :ref:`forward_rules <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.forward_rules>`
+    to only allow headers matchinging the forward rules to be forwarded to the external processing server.
 - area: redis_proxy
   change: |
     added new field :ref:`connection_rate_limit
@@ -254,3 +275,7 @@ deprecated:
   change: |
     deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
     in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
+- area: health_check
+  change: |
+    deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
+    :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.

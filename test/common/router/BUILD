@@ -490,6 +490,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "delegating_route_impl_test",
+    srcs = ["delegating_route_impl_test.cc"],
+    deps = [
+        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
 envoy_proto_library(
     name = "router_fuzz_proto",
     srcs = ["router_fuzz.proto"],

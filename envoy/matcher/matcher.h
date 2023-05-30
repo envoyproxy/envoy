@@ -25,7 +25,16 @@ class ServerFactoryContext;
 
 namespace Matcher {
 
-using MatchingDataType = absl::variant<absl::monostate, std::string>;
+// Abstract interface for custom matching data.
+// Overrides this interface to provide custom matcher specific implementation.
+class CustomMatchData {
+public:
+  virtual ~CustomMatchData() = default;
+};
+
+using MatchingDataType =
+    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
+
 inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
