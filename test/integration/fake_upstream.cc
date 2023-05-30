@@ -53,12 +53,6 @@ void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool e
   if (header_validator_) {
     header_validator_->transformRequestHeaders(*headers_);
   }
-  headers_->iterate(
-    [](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      std::cout << "Header: " << header.key().getStringView() << " = " << header.value().getStringView() << std::endl;
-      return Http::HeaderMap::Iterate::Continue;
-    }
-  );
   setEndStream(end_stream);
 }
 
