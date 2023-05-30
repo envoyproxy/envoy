@@ -180,7 +180,9 @@ func (h *requestOrResponseTrailerMapImpl) initTrailers() {
 }
 
 func (h *requestOrResponseTrailerMapImpl) GetRaw(key string) string {
-	panic("unsupported yet")
+	var value string
+	cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), &key, &value)
+	return value
 }
 
 func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
