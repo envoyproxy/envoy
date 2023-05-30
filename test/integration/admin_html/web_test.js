@@ -21,8 +21,6 @@ const testList = [];
  * Adds a new test to the test-list. These will be run after all test scripts
  * load, from admin.html's call to runAllTests().
  *
- * TODO(jmarantz): rename to runAsyncTest.
- *
  * @param {string} url
  * @param {string} name
  * @param {function(!HTMLElement): Promise} testFunction
@@ -32,17 +30,6 @@ function addTest(url, name, testFunction) { // eslint-disable-line no-unused-var
   testList.push({'url': url, 'name': name, 'testFunction': testFunction});
 }
 
-/**
- * Adds a new test to the test-list. These will be run directly. A test
- * passes if it doesn't throw.
- *
- * @param {string} name
- * @param {function()} testFunction
- * exported addTest
- */
-function addBlockingTest(name, testFunction) { // eslint-disable-line no-unused-vars
-  testList.push({'name': name, 'testFunction': testFunction});
-}
 
 /**
  * Provides an async version of the `onload` event.
@@ -58,13 +45,6 @@ function waitForOnload(iframe) {
   });
 }
 
-function makeFrame(type) {
-  const frame = document.createElement(type);
-  frame.width = 800;
-  frame.height = 1000;
-  document.body.appendChild(frame);
-  return frame;
-}
 
 /**
  * Renders a URL, and after 3 seconds delay, runs the 'tester' function.
@@ -80,8 +60,11 @@ function makeFrame(type) {
 async function runTest(url, name, tester) {
   const results = document.getElementById('test-results');
   results.textContent += name + ' ...';
-  const iframe = makeFrame('iframe');
+  const iframe = document.createElement('iframe');
+  iframe.width = 800;
+  iframe.height = 1000;
   iframe.src = url;
+  document.body.appendChild(iframe);
   await waitForOnload(iframe);
   try {
     await tester(iframe);
@@ -120,8 +103,8 @@ function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
 /**
  * Checks for less-than, throwing an exception with a comment if it fails.
  *
- * @param {Object} expected
- * @param {Object} actual
+ * @param {Object} a
+ * @param {Object} b
  */
 function assertLt(a, b) { // eslint-disable-line no-unused-vars
   assertTrue(a < b, 'assertLt mismatch: ' + a + ' < ' + b);
@@ -130,9 +113,12 @@ function assertLt(a, b) { // eslint-disable-line no-unused-vars
 
 /**
  * Async version of windows.setTimeout.
+ *
+ * @param {!number} timeoutMs Timeout in milliseconds.
+ * @return {!Promise} a promise that will be resolved when the timeout follows.
  */
-function asyncTimeout(ms) {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
+function asyncTimeout(timeoutMs) { // eslint-disable-line no-unused-vars
+  return new Promise((resolve) => window.setTimeout(resolve, timeoutMs));
 }
 
 
