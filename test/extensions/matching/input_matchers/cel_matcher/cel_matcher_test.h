@@ -43,7 +43,7 @@ inline constexpr char RequestHeaderCelExprString[] = R"pb(
 )pb";
 
 // Compiled CEL expression string: request.path == '/foo'
-inline constexpr char RequestHeadePathCelExprString[] = R"pb(
+inline constexpr char RequestHeaderPathCelExprString[] = R"pb(
   expr {
     id: 3
     call_expr {
@@ -71,7 +71,7 @@ inline constexpr char RequestHeadePathCelExprString[] = R"pb(
 )pb";
 
 // Compiled CEL expression string: response.headers['content-type'] == 'text/plain'
-inline constexpr char ReponseHeadeCelExprString[] = R"pb(
+inline constexpr char ReponseHeaderCelExprString[] = R"pb(
   expr {
       id: 8
       call_expr {
