@@ -72,6 +72,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }

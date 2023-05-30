@@ -717,6 +717,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     bool expect_node) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
+
   // Verify all we care about node.
   if (expect_node &&
       (!request.has_node() || request.node().id().empty() || request.node().cluster().empty())) {
