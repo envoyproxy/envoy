@@ -45,9 +45,9 @@ namespace Tls {
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
     : config_(config), stats_(stats), context_(context),
-      auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
+      auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false), scope_(scope) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
@@ -590,6 +590,16 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
 }
 
+void DefaultCertValidator::refreshCertStatsWithExpirationTime() {
+  auto seconds_until_expiration = Utility::getSecondsUntilExpiration(ca_cert_.get(), time_source_);
+  if (seconds_until_expiration.has_value()) {
+    if (!cert_stats_) {
+      cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope_, config_->caCertName()));
+    }
+    cert_stats_->seconds_until_cert_expiring_.set(seconds_until_expiration.value());
+  }
+}
+
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
@@ -598,8 +608,8 @@ class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<DefaultCertValidator>(config, stats, context);
+                      Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, context, scope);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.default"; }

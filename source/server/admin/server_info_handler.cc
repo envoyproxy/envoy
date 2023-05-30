@@ -18,17 +18,18 @@ Http::Code ServerInfoHandler::handlerCerts(Http::ResponseHeaderMap& response_hea
   // using the same cert.
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v3::Certificates certificates;
-  server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-    envoy::admin::v3::Certificate& certificate = *certificates.add_certificates();
-    if (context.getCaCertInformation() != nullptr) {
-      envoy::admin::v3::CertificateDetails* ca_certificate = certificate.add_ca_cert();
-      *ca_certificate = *context.getCaCertInformation();
-    }
-    for (const auto& cert_details : context.getCertChainInformation()) {
-      envoy::admin::v3::CertificateDetails* cert_chain = certificate.add_cert_chain();
-      *cert_chain = *cert_details;
-    }
-  });
+  server_.sslContextManager().iterateContexts(static_cast<std::function<void(const Ssl::Context&)>>(
+      [&](const Ssl::Context& context) -> void {
+        envoy::admin::v3::Certificate& certificate = *certificates.add_certificates();
+        if (context.getCaCertInformation() != nullptr) {
+          envoy::admin::v3::CertificateDetails* ca_certificate = certificate.add_ca_cert();
+          *ca_certificate = *context.getCaCertInformation();
+        }
+        for (const auto& cert_details : context.getCertChainInformation()) {
+          envoy::admin::v3::CertificateDetails* cert_chain = certificate.add_cert_chain();
+          *cert_chain = *cert_details;
+        }
+      }));
   response.add(MessageUtil::getJsonStringFromMessageOrError(certificates, true, true));
   return Http::Code::OK;
 }

@@ -78,5 +78,15 @@ using GenericSecretConfigProvider =
     SecretProvider<envoy::extensions::transport_sockets::tls::v3::GenericSecret>;
 using GenericSecretConfigProviderSharedPtr = std::shared_ptr<GenericSecretConfigProvider>;
 
+struct TlsCertificateConfigProviderWithName {
+  const std::string certificate_name;
+  TlsCertificateConfigProviderSharedPtr provider;
+};
+
+struct CertificateValidationContextConfigProviderWithName {
+  const std::string certificate_name;
+  CertificateValidationContextConfigProviderSharedPtr provider;
+};
+
 } // namespace Secret
 } // namespace Envoy

@@ -1,11 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/stats/store.h"
 
 #include "absl/types/optional.h"
 
@@ -14,12 +16,22 @@ namespace Ssl {
 
 using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
+struct CertificateNameExpiration {
+  std::string name;
+  std::chrono::duration<uint64_t> expiration;
+};
+
 /**
  * SSL Context is used as a template for SSL connection configuration.
  */
 class Context {
 public:
   virtual ~Context() = default;
+
+  /**
+   * @brief Updates the certificate stats for this context.
+   */
+  virtual void updateCertStats() PURE;
 
   /**
    * @return the number of days in this context until the next certificate will expire, the value is

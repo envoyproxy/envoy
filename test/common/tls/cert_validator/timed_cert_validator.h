@@ -19,8 +19,9 @@ public:
   TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,
                      const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                      Server::Configuration::CommonFactoryContext& context,
-                     absl::optional<std::string> expected_host_name)
-      : DefaultCertValidator(config, stats, context),
+                     absl::optional<std::string> expected_host_name,
+                     Stats::Scope& scope)
+      : DefaultCertValidator(config, stats, context, scope),
         validation_time_out_ms_(validation_time_out_ms), expected_host_name_(expected_host_name) {}
 
   ValidationResults
@@ -52,9 +53,10 @@ class TimedCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) override {
     auto validator = std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats,
-                                                          context, expected_host_name_);
+                                                          context, expected_host_name_, scope);
     if (expected_peer_address_.has_value()) {
       validator->setExpectedPeerAddress(expected_peer_address_.value());
     }

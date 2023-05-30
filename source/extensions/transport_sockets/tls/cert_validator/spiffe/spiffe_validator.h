@@ -39,11 +39,11 @@ struct SpiffeData {
 
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
 public:
-  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
+  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
-        time_source_(context.timeSource()) {};
+        time_source_(context.timeSource()), scope_(scope) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  Server::Configuration::CommonFactoryContext& context);
+                  Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
 
   ~SPIFFEValidator() override = default;
 
@@ -62,7 +62,7 @@ public:
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
-
+  void refreshCertStatsWithExpirationTime() override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_name_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -117,9 +117,12 @@ private:
   std::shared_ptr<SpiffeData> spiffe_data_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
+  absl::flat_hash_map<std::string, CertStatsPtr> cert_stats_map_;
   Api::Api& api_;
+  const std::string cert_name_;
   SslStats& stats_;
   TimeSource& time_source_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Tls

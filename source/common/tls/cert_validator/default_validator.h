@@ -35,7 +35,7 @@ namespace Tls {
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                       SslStats& stats, Server::Configuration::CommonFactoryContext& context);
+                       SslStats& stats, Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
 
   ~DefaultCertValidator() override = default;
 
@@ -53,7 +53,7 @@ public:
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
-
+  void refreshCertStatsWithExpirationTime() override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -111,10 +111,12 @@ private:
                                  Envoy::Ssl::ClientValidationStatus& detailed_status,
                                  std::string* error_details, uint8_t* out_alert);
 
+  const std::string cert_name_;
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
-
+  Stats::Scope& scope_;
+  CertStatsPtr cert_stats_;
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;

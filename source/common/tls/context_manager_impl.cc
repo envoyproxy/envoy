@@ -92,6 +92,14 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
   }
 }
 
+void ContextManagerImpl::iterateContexts(std::function<void(Envoy::Ssl::Context&)> callback) {
+  for (const auto& context : contexts_) {
+    if (context) {
+      callback(*context);
+    }
+  }
+}
+
 void ContextManagerImpl::removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) {
   if (old_context != nullptr) {
     auto erased = contexts_.erase(old_context);

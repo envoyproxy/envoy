@@ -111,6 +111,7 @@ new_features:
     for more details.
 - area: load_balancing
   change: |
+<<<<<<< HEAD
     Added Override Host Load Balancing policy. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 - area: lua
@@ -138,6 +139,7 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+<<<<<<< HEAD
 - area: rbac filter
   change: |
     allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
@@ -149,5 +151,15 @@ new_features:
     added :ref:`enable_ja4_fingerprinting
     <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
     a JA4 fingerprint hash from the Client Hello message.
+=======
+=======
+    Added support for the getdel command.
+- area: tls
+  change: |
+    Added new metric for emitting seconds until expirations of TLS & CA certificates.
+    They are rooted at cluster.<cluster_name>.ssl.certificate.<cert_name>.
+    and at listener.<address>.ssl.certificate.<cert_name>. namespace.
+>>>>>>> e3b2fc9d67 (Emit metric for seconds left until expiration for loaded certs)
+>>>>>>> a188c64f2d (Emit metric for seconds left until expiration for loaded certs)
 
 deprecated:

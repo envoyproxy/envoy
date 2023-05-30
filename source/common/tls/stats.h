@@ -32,6 +32,16 @@ struct SslStats {
 
 SslStats generateSslStats(Stats::Scope& store);
 
+#define ALL_CERT_STATS(GAUGE) GAUGE(seconds_until_cert_expiring, NeverImport)
+
+struct CertStats {
+  ALL_CERT_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+CertStats generateCertStats(Stats::Scope& scope, std::string cert_name);
+
+using CertStatsPtr = std::unique_ptr<CertStats>;
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

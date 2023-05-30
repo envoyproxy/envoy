@@ -48,12 +48,14 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
+  std::string cert_name_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
   // We initialize the curve name variable to EC_CURVE_INVALID_NID which is used as a sentinel value
   // for "not an ECDSA context".
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
+  CertStatsPtr cert_stats_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -72,6 +74,8 @@ struct TlsContext {
                           const std::string& password, bool fips_mode);
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
                                bool fips_mode);
+  absl::Status createCertStats(Stats::Scope& scope, std::string cert_name);
+  absl::Status setExpirationOnCertStats(std::chrono::duration<uint64_t> duration);
 };
 } // namespace Ssl
 
@@ -102,6 +106,7 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
+  void updateCertStats() override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;

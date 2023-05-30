@@ -419,6 +419,21 @@ Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
 }
 
+absl::optional<uint64_t> Utility::getSecondsUntilExpiration(const X509* cert,
+                                                            TimeSource& time_source) {
+  if (cert == nullptr) {
+    return absl::nullopt;
+  }
+  int days, seconds;
+  if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
+                     X509_get0_notAfter(cert))) {
+    if (days >= 0 && seconds >= 0) {
+      return absl::make_optional(days * 24.L * 60.L * 60.L + seconds);
+    }
+  }
+  return 0.L;
+}
+
 absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
                                                          TimeSource& time_source) {
   if (cert == nullptr) {

@@ -40,6 +40,15 @@ The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
 
+.. _config_listener_stats_certs:
+
+TLS & CA certificates
+---------------------
+
+TLS & CA certificate statistics are rooted in the *listener.<address>.ssl.certificate.<cert_name>.*:
+
+.. include:: ../../_include/cert_stats.rst
+
 .. _config_listener_stats_tcp:
 
 TCP statistics

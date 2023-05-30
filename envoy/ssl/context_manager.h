@@ -55,6 +55,11 @@ public:
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
 
   /**
+   * Iterates through the contexts currently attached to a listener.
+   */
+  virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
+
+  /**
    * Access the private key operations manager, which is part of SSL
    * context manager.
    */

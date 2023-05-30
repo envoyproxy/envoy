@@ -20,10 +20,11 @@ static const std::string INLINE_STRING = "<inline>";
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
     std::string ca_cert, std::string certificate_revocation_list,
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-    bool auto_sni_san_match, Api::Api& api)
+    bool auto_sni_san_match, Api::Api& api, const std::string& ca_cert_name)
     : ca_cert_(ca_cert),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
+      ca_cert_name_(ca_cert_name),
       certificate_revocation_list_(certificate_revocation_list),
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
@@ -49,14 +50,14 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
-    bool auto_sni_san_match, Api::Api& api) {
+    bool auto_sni_san_match, Api::Api& api, const std::string& name) {
   auto ca_or_error = Config::DataSource::read(context.trusted_ca(), true, api);
   RETURN_IF_NOT_OK_REF(ca_or_error.status());
   auto list_or_error = Config::DataSource::read(context.crl(), true, api);
   RETURN_IF_NOT_OK_REF(list_or_error.status());
   auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
       new CertificateValidationContextConfigImpl(*ca_or_error, *list_or_error, context,
-                                                 auto_sni_san_match, api));
+                                                 auto_sni_san_match, api, name));
   absl::Status status = config->initialize();
   if (status.ok()) {
     return config;

@@ -117,6 +117,14 @@ std::vector<std::string> getCertificateExtensionOids(X509& cert);
 absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view extension_name);
 
 /**
+ * Returns the seconds until this certificate is valid.
+ * @param cert the certificate
+ * @param time_source the time source to use for current time calculation.
+ * @return the number of seconds till this certificate is valid, the value is set when not expired.
+ */
+absl::optional<uint64_t> getSecondsUntilExpiration(const X509* cert, TimeSource& time_source);
+
+/**
  * Returns the days until this certificate is valid.
  * @param cert the certificate
  * @param time_source the time source to use for current time calculation.

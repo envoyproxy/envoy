@@ -516,6 +516,15 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {proxy_protocol_version});
   regex_tester.testRegex("proxy_proto.test_stat_prefix.versions.v2.error", "proxy_proto.error",
                          {proxy_protocol_prefix, proxy_protocol_version});
+
+  // TLS certificates
+  Tag certificate_name;
+  certificate_name.name_ = tag_names.TLS_CERTIFICATE;
+  certificate_name.value_ = "server_cert";
+
+  listener_address.value_ = "0.0.0.0_0";
+  regex_tester.testRegex("listener.0.0.0.0_0.ssl.certificate.server_cert",
+                         "listener.ssl.certificate", {listener_address, certificate_name});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

@@ -35,6 +35,7 @@ public:
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
+  MOCK_METHOD(void, iterateContexts, (std::function<void(Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
   MOCK_METHOD(void, removeContext, (const Envoy::Ssl::ContextSharedPtr& old_context));
 };
@@ -86,6 +87,7 @@ public:
   MockClientContext();
   ~MockClientContext() override;
 
+  MOCK_METHOD(void, updateCertStats, (), ());
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
@@ -190,6 +192,7 @@ public:
 
   MOCK_METHOD(const std::string&, certificateChain, (), (const));
   MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
+  MOCK_METHOD(const std::string&, certificateName, (), (const));
   MOCK_METHOD(const std::string&, pkcs12, (), (const));
   MOCK_METHOD(const std::string&, pkcs12Path, (), (const));
   MOCK_METHOD(const std::string&, privateKey, (), (const));
@@ -205,6 +208,7 @@ class MockCertificateValidationContextConfig : public CertificateValidationConte
 public:
   MOCK_METHOD(const std::string&, caCert, (), (const));
   MOCK_METHOD(const std::string&, caCertPath, (), (const));
+  MOCK_METHOD(const std::string&, caCertName, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationList, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationListPath, (), (const));
   MOCK_METHOD(
