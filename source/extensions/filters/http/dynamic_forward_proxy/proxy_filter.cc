@@ -73,7 +73,9 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
   std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
       cluster->createSubClusterConfig(cluster_name, host, port);
 
-  ENVOY_LOG(debug, "alyssa is adding a new log line");
+  if (cluster_name == "thisisaveryunlikelyclustername") {
+    ENVOY_LOG(debug, "alyssa is adding a new log line that should not be covered");
+  }
   if (!sub_cluster_pair.first) {
     ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation", cluster_name);
     return nullptr;
