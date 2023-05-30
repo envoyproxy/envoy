@@ -1404,7 +1404,9 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
 
   // For 500ms, prevent server from writing packets (i.e. to respond to downstream)
   // to simulate packet loss and trigger retransmissions.
-  SocketInterfaceSwap socket_swap;
+  SocketInterfaceSwap socket_swap(upstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
