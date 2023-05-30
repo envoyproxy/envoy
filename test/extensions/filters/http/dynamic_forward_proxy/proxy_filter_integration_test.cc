@@ -493,24 +493,25 @@ TEST_P(ProxyFilterIntegrationTest, CacheSansPort) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority", "localhost"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "localhost"}};
 
   // Send a request to localhost, with no port specified. The cluster will
   // default to localhost:443, and the connection will fail.
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("upstream_reset_before_response_started"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started"));
 
   // Now try a second request and make sure it encounters the same error.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("503", response2->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("upstream_reset_before_response_started"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("upstream_reset_before_response_started"));
 }
 
 // Verify that `override_auto_sni_header` can be used along with auto_sni to set
