@@ -222,10 +222,12 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
-                                                            std::string ssl_root_certs) {
+                                                            std::string ssl_root_certs,
+                                                            std::string api_key) {
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
+  ads_api_key_ = std::move(api_key);
   ads_jwt_token_lifetime_seconds_ =
       jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
@@ -831,6 +833,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       jwt.set_json_key(ads_jwt_token_);
       jwt.set_token_lifetime_seconds(ads_jwt_token_lifetime_seconds_);
     }
+    if (!ads_api_key_.empty()) {
+      auto& header_value = *grpc_service.add_initial_metadata();
+      header_value.set_key("x-api-key");
+      header_value.set_value(ads_api_key_);
+    }
   }
   if (enable_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
@@ -868,7 +875,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     listener_manager->mutable_typed_config()->PackFrom(api);
     listener_manager->set_name("envoy.listener_manager_impl.api");
   }
-
+  // std::cout << bootstrap->DebugString() << std::endl;
   return bootstrap;
 }
 

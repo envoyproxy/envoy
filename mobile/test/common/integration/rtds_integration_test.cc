@@ -19,7 +19,8 @@ public:
   }
   void createEnvoy() override {
     builder_.setAggregatedDiscoveryService(Network::Test::getLoopbackAddressUrlString(ipVersion()),
-                                           fake_upstreams_[1]->localAddress()->ip()->port());
+                                           fake_upstreams_[1]->localAddress()->ip()->port(), "", 0,
+                                           "", "fake_api_key");
     // Add the layered runtime config, which includes the RTDS layer.
     builder_.addRtdsLayer("some_rtds_layer", 1);
     XdsIntegrationTest::createEnvoy();
@@ -42,7 +43,10 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   // Send a request on the data plane.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();
-
+  auto xds_stream = xds_stream_.get();
+  EXPECT_TRUE(xds_stream->waitForHeadersComplete());
+  EXPECT_EQ(xds_stream->headers().get(Envoy::Http::LowerCaseString("x-api-key"))[0]->value(),
+            "fake_api_key");
   EXPECT_EQ(cc_.on_headers_calls, 1);
   EXPECT_EQ(cc_.status, "200");
   EXPECT_EQ(cc_.on_data_calls, 2);
@@ -68,7 +72,6 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
-
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }

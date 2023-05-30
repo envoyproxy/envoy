@@ -49,6 +49,29 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ads_integration_test",
+    # The test relies on the Google gRPC library.
+    srcs = envoy_select_google_grpc(
+        ["ads_integration_test.cc"],
+        "@envoy",
+    ),
+    exec_properties = {
+        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    external_deps = [
+        "abseil_strings",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":xds_integration_test_lib",
+        "@envoy//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cds_integration_test",
     # The test relies on the Google gRPC library.
     srcs = envoy_select_google_grpc(
