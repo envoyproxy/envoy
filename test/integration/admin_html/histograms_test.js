@@ -1,29 +1,34 @@
 // Make a histogram with the specified values so we can test that all the
 // features of this are rendered graphically.
-const histogramJson = {"stats": [{
-  "histograms": {
-    "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
-    "details": [{
-      "name": "h1",
-      "percentiles": [
-        {"cumulative": 200, "interval": 200},
-        {"cumulative": 207.5, "interval": 207.5},
-        {"cumulative": 302.5, "interval": 302.5},
-        {"cumulative": 306.25, "interval": 306.25},
-        {"cumulative": 308.5, "interval": 308.5},
-        {"cumulative": 309.25, "interval": 309.25},
-        {"cumulative": 309.85, "interval": 309.85},
-        {"cumulative": 309.925, "interval": 309.925},
-        {"cumulative": 309.985, "interval": 309.985},
-        {"cumulative": 310, "interval": 310}
+const histogramJson = {'stats': [{
+  'histograms': {
+    'supported_percentiles': [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+    'details': [{
+      'name': 'h1',
+      'percentiles': [
+        {'cumulative': 200, 'interval': 200},
+        {'cumulative': 207.5, 'interval': 207.5},
+        {'cumulative': 302.5, 'interval': 302.5},
+        {'cumulative': 306.25, 'interval': 306.25},
+        {'cumulative': 308.5, 'interval': 308.5},
+        {'cumulative': 309.25, 'interval': 309.25},
+        {'cumulative': 309.85, 'interval': 309.85},
+        {'cumulative': 309.925, 'interval': 309.925},
+        {'cumulative': 309.985, 'interval': 309.985},
+        {'cumulative': 310, 'interval': 310},
       ],
-      "totals": [
-        {"lower_bound": 200, "width": 10, "count": 1},
-        {"lower_bound": 300, "width": 10, "count": 2}],
-      "intervals":[
-        {"lower_bound": 200, "width": 10, "count": 1},
-        {"lower_bound": 300, "width": 10, "count": 2}]}]}}]};
+      'totals': [
+        {'lower_bound': 200, 'width': 10, 'count': 1},
+        {'lower_bound': 300, 'width': 10, 'count': 2}],
+      'intervals': [
+        {'lower_bound': 200, 'width': 10, 'count': 1},
+        {'lower_bound': 300, 'width': 10, 'count': 2}]}]}}]};
 
+/**
+ * Tests the rendering of histograms.
+ *
+ * @param {!Element} iframe the iframe we can use for rendering.
+ */
 async function testRenderHistogram(iframe) {
   const idoc = iframe.contentWindow.document;
   renderHistograms(idoc.body, histogramJson);
@@ -38,7 +43,7 @@ async function testRenderHistogram(iframe) {
   assertLt(parseFloat(buckets[0].style.height), 75);
 
   // The second bucket as a 100% height.
-  assertEq("100%", buckets[1].style.height);
+  assertEq('100%', buckets[1].style.height);
 
   // There is one popup div and it is not visible initially.
   const popups = idoc.getElementsByClassName('histogram-popup');

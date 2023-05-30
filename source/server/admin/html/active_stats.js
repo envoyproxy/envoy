@@ -88,12 +88,12 @@ async function loadStats() {
 
   // Compute the fetch URL prefix based on the current URL, so that the admin
   // site can be hosted underneath a site-specific URL structure.
-  const stats_pos = href.indexOf('/stats?');
-  if (stats_pos == -1) {
+  const statsPos = href.indexOf('/stats?');
+  if (statsPos == -1) {
     statusDiv.textContent = 'Cannot find /stats? in ' + href;
     return;
   }
-  const prefix = href.substring(0, stats_pos);
+  const prefix = href.substring(0, statsPos);
   const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
         params.map(makeQueryParam).join('&');
 
@@ -191,7 +191,7 @@ function renderStats(data) {
   // of code, and compel us to do a better job writing tests.
   sortedStats.sort(compareStatRecords);
 
-  const max = loadSettingOrUseDefault('active-max-display-count', 50);
+  const max = loadSeattingOrUseDefault('active-max-display-count', 50);
   let index = 0;
   let text = '';
   for (const statRecord of sortedStats) {
