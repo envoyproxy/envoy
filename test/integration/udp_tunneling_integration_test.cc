@@ -23,6 +23,10 @@ public:
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           hcm.mutable_delayed_close_timeout()->set_seconds(1);
+          if (enable_timeout_) {
+            hcm.mutable_stream_idle_timeout()->set_seconds(0);
+            hcm.mutable_stream_idle_timeout()->set_nanos(200 * 1000 * 1000);
+          }
           ConfigHelper::setConnectUdpConfig(hcm, true,
                                             downstream_protocol_ == Http::CodecType::HTTP3);
         });
@@ -63,6 +67,7 @@ public:
       {"capsule-protocol", "?1"}};
 
   IntegrationStreamDecoderPtr response_;
+  bool enable_timeout_{};
 };
 
 TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
@@ -154,41 +159,15 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
 }
 
 
-/*
-TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
-  setUpstreamProtocol(upstreamProtocol());
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    auto* idle_time_out = protocol_options.mutable_common_http_protocol_options()
-        ->mutable_idle_timeout();
-    std::chrono::milliseconds timeout(1000);
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
-    idle_time_out->set_seconds(seconds.count());
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
 
+TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
+  enable_timeout_ = true;
   initialize();
   setUpConnection();
-  std::string sent_capsule_fragment =
-  absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                          "08"               // capsule length
-                          "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
-  );
-  std::string received_capsule_fragment =
-  absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                          "08"               // capsule length
-                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-  );
 
-  sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
-
-  // wait for time out
-  // TODO figure out the equivalent of waitForDisconnect for this
-  ASSERT_TRUE(fake_upstreams_[0]->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
-}*/
+  // Wait for the timeout to close the connection.
+  ASSERT_TRUE(response_->waitForReset());
+}
 
 
 
