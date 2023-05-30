@@ -2179,7 +2179,8 @@ PerFilterConfigs::PerFilterConfigs(
                                                     filter_config);
 
       if (!filter_config.has_config()) {
-        continue;
+        throw EnvoyException(
+            fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
       }
 
       config = createRouteSpecificFilterConfig(name, filter_config.config(),
