@@ -162,12 +162,12 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
   }
 
   // When numerator > denominator condition is always evaluates to TRUE
-  // It becomes hard to debug why configuration does not work in case of wrong numerator.
-  // Log debug message that numerator is invalid.
+  // It becomes hard to error why configuration does not work in case of wrong numerator.
+  // Log error message that numerator is invalid.
   uint64_t denominator_value =
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
   if (percent.numerator() > denominator_value) {
-    ENVOY_LOG(debug,
+    ENVOY_LOG(error,
               "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
               "evaluates to true",
               key, percent.numerator(), denominator_value);
@@ -253,14 +253,17 @@ void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& v
 
 void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
   entry.double_value_ = value;
+  ENVOY_LOG_MISC(error, fmt::format("set double {}", entry.double_value_.value()));
   if (value < std::numeric_limits<int>::max() && value == static_cast<int>(value)) {
     entry.bool_value_ = value != 0;
+    ENVOY_LOG_MISC(error, fmt::format("set boolean {}", entry.bool_value_.value()));
   }
   if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
     // Valid uint values will always be parseable as doubles, so we assign the value to both the
     // uint and double fields. In cases where the value is something like "3.1", we will floor the
     // number by casting it to a uint and assigning the uint value.
     entry.uint_value_ = entry.double_value_;
+    ENVOY_LOG_MISC(error, fmt::format("set uint {}", entry.uint_value_.value()));
   }
 }
 
@@ -295,15 +298,18 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   converted_fractional_percent.set_numerator(numerator);
   entry.fractional_percent_value_ = converted_fractional_percent;
+  ENVOY_LOG_MISC(error, fmt::format("special case percent: {}", numerator));
 
   if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
     return;
   }
   if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
+   ENVOY_LOG_MISC(error, fmt::format("special case percent: TEN THOUSAND"));
     entry.fractional_percent_value_->set_denominator(
         envoy::type::v3::FractionalPercent::TEN_THOUSAND);
   }
   if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
+   ENVOY_LOG_MISC(error, fmt::format("special case percent: MILLION"));
     entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   }
 }
@@ -314,8 +320,10 @@ void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
   stripped = absl::StripAsciiWhitespace(stripped);
 
   if (absl::EqualsIgnoreCase(stripped, "true")) {
+    ENVOY_LOG_MISC(error, fmt::format("special case boolean true"));
     entry.bool_value_ = true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    ENVOY_LOG_MISC(error, fmt::format("special case boolean false"));
     entry.bool_value_ = false;
   }
 }
@@ -323,18 +331,20 @@ void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
                                               absl::string_view raw_string) {
   Entry entry;
+  entry.raw_string_value_ = value.string_value();
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
     break;
   case ProtobufWkt::Value::kBoolValue:
+    ENVOY_LOG(error, "setting boolean");
     entry.bool_value_ = value.bool_value();
     break;
   case ProtobufWkt::Value::kStructValue:
     parseFractionValue(entry, value.struct_value());
     break;
   case ProtobufWkt::Value::kStringValue:
-    entry.raw_string_value_ = value.string_value();
+    ENVOY_LOG(error, fmt::format("setting string: {}", entry.raw_string_value_));
     parseEntryDoubleValue(entry);
     // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
     // functions and see if we can remove the special casing.
@@ -355,6 +365,7 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
+      ENVOY_LOG_MISC(error, fmt::format("adding admin: {} {}", kv.first, kv.second));
       values_.emplace(kv.first,
                       SnapshotImpl::createEntry(ValueUtil::loadFromYaml(kv.second), kv.second));
     }
@@ -377,7 +388,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   // Maximum recursion depth for walkDirectory().
   static constexpr uint32_t MaxWalkDepth = 16;
 
-  ENVOY_LOG(debug, "walking directory: {}", path);
+  ENVOY_LOG(error, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
     throw EnvoyException(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
@@ -403,12 +414,15 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
-      ENVOY_LOG(debug, "reading file: {}", full_path);
+      ENVOY_LOG(error, "reading file: {}", full_path);
       std::string value;
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+
+      ENVOY_LOG(error, "file contents: {}", text_file);
+
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
@@ -425,6 +439,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
 #ifdef ENVOY_ENABLE_YAML
+      ENVOY_LOG(error, fmt::format("adding file: {} {}", full_prefix, value));
       values_.insert(
           {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
 #else
@@ -438,6 +453,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
     : OverrideLayerImpl{name} {
+  ENVOY_LOG(error, "proto layer: {}", proto.DebugString());
   for (const auto& f : proto.fields()) {
     walkProtoValue(f.second, f.first);
   }
@@ -451,21 +467,26 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
+    ENVOY_LOG(error, fmt::format("adding: {} {}", prefix, v.DebugString()));
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
+      ENVOY_LOG(error, "adding bool or number value");
     if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
     }
+    ENVOY_LOG(error, fmt::format("adding: {} {}", prefix, v.DebugString()));
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kStructValue: {
+      ENVOY_LOG(error, "parsing struct value");
     const ProtobufWkt::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
+      ENVOY_LOG(error, fmt::format("adding: {} {}", prefix, v.DebugString()));
       values_.emplace(prefix, SnapshotImpl::createEntry(v));
       break;
     }
@@ -487,6 +508,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
   absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
+    ENVOY_LOG(error, "Loading layer " + layer.DebugString());
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
@@ -565,7 +587,7 @@ void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceR
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
   }
-  ENVOY_LOG(debug, "Reloading RTDS snapshot for onConfigUpdate");
+  ENVOY_LOG(error, "Reloading RTDS snapshot for onConfigUpdate");
   proto_.CopyFrom(runtime.layer());
   parent_.loadNewSnapshot();
   init_target_.ready();
@@ -612,7 +634,7 @@ void RtdsSubscription::onConfigRemoved(
         fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
                     removed_resources[0], resource_name_));
   }
-  ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
+  ENVOY_LOG(error, "Clear RTDS snapshot for onConfigUpdate");
   proto_.Clear();
   parent_.loadNewSnapshot();
   init_target_.ready();
@@ -694,7 +716,7 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
-          ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
+          ENVOY_LOG(error, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
         }
       }
