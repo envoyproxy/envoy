@@ -1,3 +1,7 @@
+// This file uses unit-test helper functions defined in web_test.js.
+//
+// See source/server/admin/javascript.md for background info.
+
 /**
  * Utility to count the number of separated items, e.g. lines.
  * A blank final line does not count.

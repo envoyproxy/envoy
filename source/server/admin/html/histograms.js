@@ -13,7 +13,8 @@
 //   1. Need to write graphics layout code, and think about coordinate systems, resulting
 //      in several hundred lines of JavaScript.
 //   2. Some risk of having the text look garbled in some scenarios. This appears to
-//      be rare enough that it's likely not worth investing time to fix at the moment.
+//      to be mitigated with heuristics and use of popup elements when more than one
+//      percentile or interval-data falls within a bucket.
 
 const constants = {
   // Horizontal spacing between buckets, expressed in `VPX` (Virtual Pixels) in a
@@ -309,7 +310,22 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supportedPercentiles)
     }
 
     if (bucket.annotations.length > 0) {
-      bucket.annotations.sort((a, b) => a.value < b.value);
+      bucket.annotations.sort((a, b) => {
+        if (a.value == b.value) {
+          if (a.cssClass() == b.cssClass()) {
+            return 0;
+          }
+          if (a.cssClass() == 'histogram-percentile') {
+            return -1;
+          }
+          return 1;
+        }
+        return a.value - b.value;
+      });
+      let aa = 0;
+      for (a of bucket.annotations) {
+        console.log('[' + aa++ + ']: ' + a.value + ' (' + a.cssClass() + ')');
+      }
     }
   }
   return maxCount;
@@ -379,7 +395,7 @@ class Percentile extends Annotation {
    * @return {string} detailed for popup.
    */
   detail() {
-    return 'P' + this.percentile + ': ' + format(this.value);
+    return `P${this.percentile}: ${format(this.value)}`;
   }
 }
 

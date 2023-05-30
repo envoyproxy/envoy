@@ -58,8 +58,8 @@ async function testRenderHistogram(iframe) {
   assertEq(4, popup.children.length);
   assertEq('[200, 210)', popup.children[0].textContent);
   assertEq('P0: 200', popup.children[1].textContent);
-  assertEq('P25: 207.5', popup.children[2].textContent);
-  assertEq('Interval [200, 210): 1', popup.children[3].textContent);
+  assertEq('Interval [200, 210): 1', popup.children[2].textContent);
+  assertEq('P25: 207.5', popup.children[3].textContent);
 
   // 2 seconds after the mouse leaves, that area, the popup will be made invisible.
   buckets[0].dispatchEvent(new Event('mouseout'));
@@ -71,7 +71,7 @@ async function testRenderHistogram(iframe) {
   assertEq('visible', getComputedStyle(popup).visibility);
   assertEq(10, popup.children.length);
   assertEq('[300, 310)', popup.children[0].textContent);
-  assertEq('P50: 302.5', popup.children[1].textContent);
+  assertEq('Interval [300, 310): 2', popup.children[1].textContent);
   buckets[1].dispatchEvent(new Event('mouseout'));
 
   // Re-enter the first bucket. The popup will immediately move to that with no delay.
