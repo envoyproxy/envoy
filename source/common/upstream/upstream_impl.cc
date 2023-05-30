@@ -315,9 +315,8 @@ buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config
 }
 
 Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::buildClusterSocketOptions(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const envoy::config::core::v3::BindConfig& bind_config) {
+buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                          const envoy::config::core::v3::BindConfig& bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
       std::make_shared<Network::ConnectionSocket::Options>();
   // Cluster socket_options trump cluster manager wide.
