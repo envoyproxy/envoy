@@ -114,6 +114,13 @@ bug_fixes:
 - area: boringssl
   change: |
     Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+- area: oauth2
+  change: |
+    The httpOnly attribute for Set-Cookie for tokens in HTTP response header was missing,
+    causing tokens to be accessible from the JavaScript making the apps vulnerable.
+    This was fixed now by marking the cookie as httpOnly.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -206,6 +213,15 @@ new_features:
 - area: ext_proc
   change: |
     added new configuration field
+    :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+    If set to true, the filter config
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    can be overridden by the
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    in the response message from the external processing server.
+    If not set, the ``mode_override`` API in the response message will be ignored.
+- area: ext_proc
+  change: |
     :ref:`forward_rules <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.forward_rules>`
     to only allow headers matchinging the forward rules to be forwarded to the external processing server.
 - area: redis_proxy
@@ -235,6 +251,10 @@ new_features:
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
+- area: matching
+  change: |
+    added CEL(Common Expression Language) matcher support :ref:`CEL data input <extension_envoy.matching.inputs.cel_data_input>`
+    and :ref:`CEL input matcher <extension_envoy.matching.matchers.cel_matcher>`.
 - area: access_log
   change: |
     added bytes snapshotting for upstream and downstream logging that will be reset after every periodic log. Downstream
