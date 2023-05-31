@@ -104,7 +104,7 @@ EXTENSIONS = {
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
 
     #
-    # CEL Matching Data Input
+    # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
 
