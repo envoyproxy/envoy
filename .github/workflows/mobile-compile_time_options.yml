@@ -32,8 +32,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-      # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
-      # HTTP Datagrams are disabled works.
+        # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
+        # HTTP Datagrams are disabled works.
         cd mobile
         ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
