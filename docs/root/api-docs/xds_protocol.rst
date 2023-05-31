@@ -162,27 +162,42 @@ Each of these RPC services can provide a method for each of the SotW and Increme
 variants. Here are the RPC services and methods for each resource type:
 
 -  Listener: Listener Discovery Service (LDS)
+
    -  SotW: ListenerDiscoveryService.StreamListeners
    -  Incremental: ListenerDiscoveryService.DeltaListeners
+
 -  RouteConfiguration: Route Discovery Service (RDS)
+
    -  SotW: RouteDiscoveryService.StreamRoutes
    -  Incremental: RouteDiscoveryService.DeltaRoutes
+
 -  ScopedRouteConfiguration: Scoped Route Discovery Service (SRDS)
+
    -  SotW: ScopedRouteDiscoveryService.StreamScopedRoutes
    -  Incremental: ScopedRouteDiscoveryService.DeltaScopedRoutes
+
 -  VirtualHost: Virtual Host Discovery Service (VHDS)
+
    -  SotW: N/A
    -  Incremental: VirtualHostDiscoveryService.DeltaVirtualHosts
+
 -  Cluster: Cluster Discovery Service (CDS)
+
    -  SotW: ClusterDiscoveryService.StreamClusters
    -  Incremental: ClusterDiscoveryService.DeltaClusters
+
 -  ClusterLoadAssignment: Endpoint Discovery Service (EDS)
+
    -  SotW: EndpointDiscoveryService.StreamEndpoints
    -  Incremental: EndpointDiscoveryService.DeltaEndpoints
+
 -  Secret: Secret Discovery Service (SDS)
+
    -  SotW: SecretDiscoveryService.StreamSecrets
    -  Incremental: SecretDiscoveryService.DeltaSecrets
+
 -  Runtime: Runtime Discovery Service (RTDS)
+
    -  SotW: RuntimeDiscoveryService.StreamRuntime
    -  Incremental: RuntimeDiscoveryService.DeltaRuntime
 
