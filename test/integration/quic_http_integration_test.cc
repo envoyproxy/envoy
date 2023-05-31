@@ -1402,7 +1402,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
 
-  // For 500ms, prevent server from writing packets (i.e. to respond to downstream)
+  // Temporarily prevent server from writing packets (i.e. to respond to downstream)
   // to simulate packet loss and trigger retransmissions.
   SocketInterfaceSwap socket_swap(upstreamProtocol() == Http::CodecType::HTTP3
                                       ? Network::Socket::Type::Datagram
@@ -1411,8 +1411,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
   socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  absl::SleepFor(absl::Milliseconds(500));
-  // After 500ms, stop failing packet writes and allow the response to be sent downstream.
+  absl::SleepFor(absl::Milliseconds(500 * TSAN_TIMEOUT_FACTOR));
+  // Allow the response to be sent downstream again.
   socket_swap.write_matcher_->setWriteOverride(nullptr);
 
   ASSERT_TRUE(response->waitForEndStream());
