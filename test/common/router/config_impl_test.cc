@@ -10514,6 +10514,8 @@ typed_per_filter_config:
   filter.unknown:
     "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
     is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.BoolValue
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -10524,14 +10526,38 @@ virtual_hosts:
           filter.unknown:
             "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
             is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.BoolValue
     typed_per_filter_config:
       filter.unknown:
         "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
         is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, FilterConfigWithoutConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, false),
+      EnvoyException,
+      "Empty route/virtual host per filter configuration for filter.unknown filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
