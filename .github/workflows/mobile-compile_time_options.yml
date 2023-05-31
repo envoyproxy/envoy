@@ -37,8 +37,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
             --define=envoy_yaml=disabled \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/common/integration:client_integration_test --test_output=all
+            //test/common/integration:client_integration_test
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
