@@ -282,7 +282,7 @@ private:
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
-  Http::ResponseHeaderMapPtr response_headers_to_add_;
+  bool wasRefreshTokenFlow_;
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;

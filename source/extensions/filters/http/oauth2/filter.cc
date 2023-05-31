@@ -220,8 +220,8 @@ bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampI
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
     : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)),
-      time_source_(time_source) {
+      wasRefreshTokenFlow_(false), oauth_client_(std::move(oauth_client)),
+      config_(std::move(config)), time_source_(time_source) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -373,9 +373,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 }
 
 Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  if (response_headers_to_add_) {
-    Http::HeaderMapImpl::copyFrom(headers, *response_headers_to_add_);
-    response_headers_to_add_.reset();
+  if (wasRefreshTokenFlow_) {
+    addResponseCookies(headers, getEncodedToken());
+    wasRefreshTokenFlow_ = false;
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -569,10 +569,7 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
     setBearerToken(*request_headers_, access_token_);
   }
 
-  // At this point we add set-cookie headers to the temporary object
-  // The response will be populated from this object in the encodeHeaders method
-  response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
-  addResponseCookies(*response_headers_to_add_, getEncodedToken());
+  wasRefreshTokenFlow_ = true;
 
   config_->stats().oauth_refreshtoken_success_.inc();
   config_->stats().oauth_success_.inc();
