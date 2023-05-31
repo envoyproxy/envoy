@@ -23,6 +23,19 @@ constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
 
+// Allowed characters for field names according to Section 5.1
+// and for methods according to Section 9.1 of RFC 9110:
+// https://www.rfc-editor.org/rfc/rfc9110.html
+constexpr char kValidCharacters[] = {
+    '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '0', '1', '2', '3', '4', '5',
+    '6', '7', '8', '9', 'A', 'B',  'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
+    'M', 'N', 'O', 'P', 'Q', 'R',  'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_',
+    '`', 'a', 'b', 'c', 'd', 'e',  'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+    'p', 'q', 'r', 's', 't', 'u',  'v', 'w', 'x', 'y', 'z', '|', '~'};
+constexpr const char* kValidCharactersBegin = &kValidCharacters[0];
+constexpr const char* kValidCharactersEnd =
+    &kValidCharacters[ABSL_ARRAYSIZE(kValidCharacters) - 1] + 1;
+
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -36,20 +49,9 @@ bool isFirstCharacterOfValidMethod(char c) {
 // enabled.
 bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
   if (allow_custom_methods) {
-    // Allowed characters in method according to RFC 9110,
-    // https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1.
-    static constexpr char kValidCharacters[] = {
-        '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '0', '1', '2', '3', '4', '5',
-        '6', '7', '8', '9', 'A', 'B',  'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
-        'M', 'N', 'O', 'P', 'Q', 'R',  'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_',
-        '`', 'a', 'b', 'c', 'd', 'e',  'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-        'p', 'q', 'r', 's', 't', 'u',  'v', 'w', 'x', 'y', 'z', '|', '~'};
-    const auto* begin = &kValidCharacters[0];
-    const auto* end = &kValidCharacters[ABSL_ARRAYSIZE(kValidCharacters) - 1] + 1;
-
     return !method.empty() &&
-           std::all_of(method.begin(), method.end(), [begin, end](absl::string_view::value_type c) {
-             return std::binary_search(begin, end, c);
+           std::all_of(method.begin(), method.end(), [](absl::string_view::value_type c) {
+             return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
            });
   }
 
@@ -136,6 +138,12 @@ bool isVersionValid(absl::string_view version_input) {
   }();
 
   return regex->match(version_input);
+}
+
+bool isHeaderNameValid(absl::string_view name) {
+  return std::all_of(name.begin(), name.end(), [](absl::string_view::value_type c) {
+    return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
+  });
 }
 
 } // anonymous namespace
@@ -394,8 +402,13 @@ void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& heade
     }
 
     absl::string_view key = key_value.first;
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+    if (!isHeaderNameValid(key)) {
+      status_ = ParserStatus::Error;
+      error_message_ = "HPE_INVALID_HEADER_TOKEN";
+      return;
+    }
 
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
     if (status_ == ParserStatus::Error) {
       return;
     }

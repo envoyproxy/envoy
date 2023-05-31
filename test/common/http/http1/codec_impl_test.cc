@@ -4599,5 +4599,150 @@ TEST_P(Http1ServerConnectionImplTest, Http10Rejected) {
   EXPECT_THAT(status.message(), StartsWith("Upgrade required"));
 }
 
+TEST_P(Http1ClientConnectionImplTest, SeparatorInHeaderName) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "fo[o: bar\r\n"
+                             "\r\n");
+  auto status = codec_->dispatch(response);
+
+  EXPECT_FALSE(status.ok());
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, SeparatorInHeaderName) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "fo[o: bar\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_FALSE(status.ok());
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+// BalsaParser always rejects a header name with space. HttpParser only rejects
+// it in strict mode, which is disabled when ENVOY_ENABLE_UHV is defined.
+TEST_P(Http1ClientConnectionImplTest, SpaceInHeaderName) {
+  bool accept = parser_impl_ == Http1ParserImpl::HttpParser;
+#ifndef ENVOY_ENABLE_UHV
+  accept = false;
+#endif
+
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  if (accept) {
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  }
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "fo o: bar\r\n"
+                             "\r\n");
+  auto status = codec_->dispatch(response);
+
+  if (accept) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_FALSE(status.ok());
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+    } else {
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+    }
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, SpaceInHeaderName) {
+  bool accept = parser_impl_ == Http1ParserImpl::HttpParser;
+#ifndef ENVOY_ENABLE_UHV
+  accept = false;
+#endif
+
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  if (accept) {
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  } else {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "fo o: bar\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  if (accept) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_FALSE(status.ok());
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+    } else {
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+    }
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ExtendedAsciiInHeaderName) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "föö: bar\r\n"
+                             "\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+}
+
+TEST_P(Http1ServerConnectionImplTest, ExtendedAsciiInHeaderName) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "föö: bar\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+}
+
 } // namespace Http
 } // namespace Envoy
