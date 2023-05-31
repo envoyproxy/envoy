@@ -942,7 +942,8 @@ void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view v
   } else if (value == "false") {
     (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
   } else {
-    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
   }
 }
 

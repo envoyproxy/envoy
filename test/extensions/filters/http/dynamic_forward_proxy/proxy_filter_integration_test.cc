@@ -589,8 +589,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
 
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_multiple_dns_addresses",
-                                    "true");
   use_cache_file_ = true;
   // Prepend a bad address
   if (GetParam() == Network::Address::IpVersion::v4) {

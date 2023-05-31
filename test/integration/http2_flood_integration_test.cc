@@ -31,17 +31,15 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 
-bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> params) {
-  return std::get<2>(params);
+bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool> params) {
+  return std::get<1>(params);
 }
 
 } // namespace
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
-  const bool http2_new_codec_wrapper = std::get<1>(params.param);
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
                       deferredProcessing(params.param) ? "WithDeferredProcessing"
                                                        : "NoDeferredProcessing");
 }
@@ -53,7 +51,7 @@ std::string testParamsToString(
 // Http2FrameIntegrationTest destructor completes.
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public Http2RawFrameIntegrationTest {
 public:
   Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
@@ -65,9 +63,6 @@ public:
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
     config_helper_.addConfigModifier(configureProxyStatus());
-    const bool enable_new_wrapper = std::get<1>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      enable_new_wrapper ? "true" : "false");
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       deferredProcessing(GetParam()) ? "true" : "false");
   }
@@ -90,8 +85,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2FloodMitigationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), ::testing::Bool(),
-                     ::testing::Bool()),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), ::testing::Bool()),
     testParamsToString);
 
 void Http2FloodMitigationTest::initializeUpstreamFloodTest() {
