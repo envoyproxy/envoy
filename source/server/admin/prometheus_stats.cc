@@ -45,7 +45,7 @@ std::string sanitizeValue(const absl::string_view value) {
 
 /*
  * Determine whether a metric has never been emitted and choose to
- * not show it if we only wanted used metrics.
+ * not show it if we only wanted used or hidden metrics.
  */
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
@@ -53,6 +53,12 @@ static bool shouldShowMetric(const StatType& metric, const StatsParams& params) 
   // in one subtle way: in Prometheus we only use metric.name() for filtering,
   // not rendering, so we only construct the name if there's a filter.
   if (params.used_only_ && !metric.used()) {
+    return false;
+  }
+  if (params.hidden_ == HiddenFlag::ShowOnly && !metric.hidden()) {
+    return false;
+  }
+  if (params.hidden_ == HiddenFlag::Exclude && metric.hidden()) {
     return false;
   }
   if (params.re2_filter_ != nullptr &&

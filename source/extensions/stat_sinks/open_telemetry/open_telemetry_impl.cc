@@ -51,19 +51,19 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
                                  .count();
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (predicate_(gauge)) {
+    if (predicate_(gauge) && !gauge.get().hidden()) {
       flushGauge(*scope_metrics->add_metrics(), gauge, snapshot_time_ns);
     }
   }
 
   for (const auto& counter : snapshot.counters()) {
-    if (predicate_(counter.counter_)) {
+    if (predicate_(counter.counter_) && !counter.counter_.get().hidden()) {
       flushCounter(*scope_metrics->add_metrics(), counter, snapshot_time_ns);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
-    if (predicate_(histogram)) {
+    if (predicate_(histogram) && !histogram.get().hidden()) {
       flushHistogram(*scope_metrics->add_metrics(), histogram, snapshot_time_ns);
     }
   }

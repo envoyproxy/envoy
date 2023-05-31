@@ -50,7 +50,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
-  const absl::optional<std::string> hidden_value = Utility::hiddenParam(query_);
+  const absl::optional<std::string> hidden_value = Utility::queryParam(query_, "hidden");
   if (hidden_value.has_value()) {
     if (hidden_value.value() == "include") {
       hidden_ = HiddenFlag::Include;

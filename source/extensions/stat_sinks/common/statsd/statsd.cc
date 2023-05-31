@@ -61,14 +61,14 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Buffer::OwnedImpl buffer;
 
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (counter.counter_.get().used() && !counter.counter_.get().hidden()) {
       const std::string counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
       writeBuffer(buffer, writer, counter_str);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (gauge.get().used() && !gauge.get().hidden()) {
       const std::string gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
       writeBuffer(buffer, writer, gauge_str);
     }
@@ -196,13 +196,13 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (counter.counter_.get().used() && !counter.counter_.get().hidden()) {
       tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (gauge.get().used() && !gauge.get().hidden()) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }

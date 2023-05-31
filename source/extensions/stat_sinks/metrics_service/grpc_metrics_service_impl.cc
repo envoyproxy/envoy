@@ -56,19 +56,19 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
   for (const auto& counter : snapshot.counters()) {
-    if (predicate_(counter.counter_.get())) {
+    if (predicate_(counter.counter_.get()) && !counter.counter_.get().hidden()) {
       flushCounter(*metrics->Add(), counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (predicate_(gauge)) {
+    if (predicate_(gauge) && !gauge.get().hidden()) {
       flushGauge(*metrics->Add(), gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
-    if (predicate_(histogram.get())) {
+    if (predicate_(histogram.get()) && !histogram.get().hidden()) {
       if (emit_summary_) {
         flushSummary(*metrics->Add(), histogram.get(), snapshot_time_ms);
       }

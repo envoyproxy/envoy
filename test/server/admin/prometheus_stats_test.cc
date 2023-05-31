@@ -53,12 +53,12 @@ protected:
                                            tag_extracted_name_storage.statName(), cluster_tags));
   }
 
-  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
+                Stats::Gauge::ImportMode import_mode) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
-                                       tag_extracted_name_storage.statName(), cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+    gauges_.push_back(alloc_.makeGauge(
+        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
@@ -187,9 +187,11 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
   addCounter("cluster.test_cluster_1.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
@@ -209,9 +211,11 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   addCounter("cluster.test_cluster_2.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addGauge("cluster.test_cluster_3.upstream_cx_total",
-           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   addGauge("cluster.test_cluster_4.upstream_cx_total",
-           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
@@ -437,12 +441,16 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addCounter("promtest.myapp.test.foo", {{makeStat("tag_name"), makeStat("tag-value")}});
   addGauge("cluster.test_3.upstream_cx_total",
-           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   addGauge("cluster.test_4.upstream_cx_total",
-           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
-  addGauge("promtest.MYAPP.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
+  addGauge("promtest.MYAPP.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   // Metric with invalid prometheus namespace in the custom metric must be excluded in the output.
-  addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
+  addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
@@ -505,7 +513,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
 
   addCounter("cluster.upstream_cx_total_count", {{makeStat("cluster"), makeStat("c1")}});
-  addGauge("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+  addGauge("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}},
+           Stats::Gauge::ImportMode::Accumulate);
   // Text readouts that should be returned in gauge format.
   addTextReadout("control_plane.identifier", "CP-1", {{makeStat("cluster"), makeStat("c1")}});
   addTextReadout("invalid_tag_values", "test",
@@ -549,8 +558,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
     const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
     addCounter("cluster.upstream_cx_total", tags);
     addCounter("cluster.upstream_cx_connect_fail", tags);
-    addGauge("cluster.upstream_cx_active", tags);
-    addGauge("cluster.upstream_rq_active", tags);
+    addGauge("cluster.upstream_cx_active", tags, Stats::Gauge::ImportMode::Accumulate);
+    addGauge("cluster.upstream_rq_active", tags, Stats::Gauge::ImportMode::Accumulate);
 
     for (const char* hist_name : {"cluster.upstream_rq_time", "cluster.upstream_response_time"}) {
       auto histogram1 = makeHistogram(hist_name, tags);
@@ -728,9 +737,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   addCounter("cluster.test_2.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addGauge("cluster.test_3.upstream_cx_total",
-           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   addGauge("cluster.test_4.upstream_cx_total",
-           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
@@ -779,6 +790,57 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
   EXPECT_EQ(expected_output, response.toString());
 }
 
+TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::HiddenAccumulate);
+
+  StatsParams params;
+
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Exclude;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::ShowOnly;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Include;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+}
+
 TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   const std::vector<uint64_t> h1_values = {};
@@ -822,9 +884,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   addCounter("cluster.test_2.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
   addGauge("cluster.test_3.upstream_cx_total",
-           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
   addGauge("cluster.test_4.upstream_cx_total",
-           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::Accumulate);
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;

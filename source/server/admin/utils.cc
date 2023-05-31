@@ -51,11 +51,6 @@ absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params
   return queryParam(params, "format");
 }
 
-// Helper method to get the hidden parameter.
-absl::optional<std::string> hiddenParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "hidden");
-}
-
 // Helper method to get a query parameter.
 absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
                                        const std::string& key) {

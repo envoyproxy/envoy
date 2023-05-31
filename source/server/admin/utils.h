@@ -25,8 +25,6 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);
 
-absl::optional<std::string> hiddenParam(const Http::Utility::QueryParams& params);
-
 absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
                                        const std::string& key);
 
