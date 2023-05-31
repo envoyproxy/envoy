@@ -43,7 +43,7 @@ inline constexpr char RequestHeaderCelExprString[] = R"pb(
 )pb";
 
 // Compiled CEL expression string: request.path == '/foo'
-inline constexpr char RequestHeaderPathCelExprString[] = R"pb(
+inline constexpr char RequestPathCelExprString[] = R"pb(
   expr {
     id: 3
     call_expr {

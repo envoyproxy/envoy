@@ -175,7 +175,7 @@ TEST_F(CelMatcherTest, CelMatcherNoRequestAttributes) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
-  auto matcher_tree = buildMatcherTree(RequestHeaderPathCelExprString);
+  auto matcher_tree = buildMatcherTree(RequestPathCelExprString);
 
   TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{":path", "/foo"}}, request_headers);
@@ -189,7 +189,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
-  auto matcher_tree = buildMatcherTree(RequestHeaderPathCelExprString);
+  auto matcher_tree = buildMatcherTree(RequestPathCelExprString);
 
   TestRequestHeaderMapImpl request_headers = default_headers_;
   // The matching condition is: request.path == '/foo'.
