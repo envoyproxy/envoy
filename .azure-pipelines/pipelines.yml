@@ -519,6 +519,7 @@ stages:
         artifactName: "docker"
         itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
+    - bash: ./.azure-pipelines/cleanup.sh
     - bash: ./ci/do_ci.sh verify_examples
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
