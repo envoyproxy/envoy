@@ -356,6 +356,8 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    bytes_retransmitted_ = info.bytesRetransmitted();
+    packets_retransmitted_ = info.packetsRetransmitted();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
