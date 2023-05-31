@@ -28,7 +28,7 @@ jobs:
     - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Build C++ library'
+    - name: 'Building C++ library'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
