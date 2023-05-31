@@ -1,0 +1,43 @@
+name: mobile_traffic_director
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/env.yml
+    secrets: inherit
+
+  cc_test:
+    if: ${{ needs.env.outputs.mobile_traffic_director == 'true' }}
+    needs: env
+    name: cc_test
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run GcpTrafficDirectorIntegrationTest'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GCP_SERVICE_ACCOUNT_JWT_TOKEN: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=ci \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            //test/common/integration:client_integration_test --test_output=all
