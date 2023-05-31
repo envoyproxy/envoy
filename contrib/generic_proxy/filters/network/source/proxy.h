@@ -130,6 +130,7 @@ public:
     absl::optional<ExtendedOptions> responseOptions() const override {
       return parent_.local_or_upstream_response_options_;
     }
+    const Network::Connection* connection() const override;
 
     bool isDualFilter() const { return is_dual_; }
 
