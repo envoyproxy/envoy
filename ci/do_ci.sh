@@ -163,7 +163,7 @@ function run_ci_verify () {
     # by a strong umask (ie only group readable by default).
     umask 027
     chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}" || exit
+    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}"
 }
 
 CI_TARGET=$1
