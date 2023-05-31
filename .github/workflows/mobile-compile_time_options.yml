@@ -34,7 +34,8 @@ jobs:
       run: |
       # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
       # HTTP Datagrams are disabled works.
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --define=signal_trace=disabled \
             --define=admin_html=enabled \
@@ -43,9 +44,9 @@ jobs:
             --define=google_grpc=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/cc/... \
-      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
-        && ./bazelw test \
+            //test/cc/...
+        # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
+        ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --config=ci \
             --fat_apk_cpu=x86_64 \
@@ -57,7 +58,7 @@ jobs:
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //test/java/integration:android_engine_socket_tag_test \
             //test/java/integration:android_engine_start_test \
-            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests
+            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests \
             //test/common/integration:client_integration_test
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
