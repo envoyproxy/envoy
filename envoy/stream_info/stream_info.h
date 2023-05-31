@@ -418,10 +418,7 @@ struct BytesMeter {
     return upstream_periodic_logging_bytes_snapshot_.get();
   }
   // Adds the bytes from `existing` to `this`.
-  // Additionally, captures periodic bytes meters from `existing`, adds them to `this`, and merges
-  // bytes from `this` into the periodic bytes meters. This is because the existing periodic bytes
-  // meter (especially the downstream periodic meter) may already have bytes accumulated and a
-  // create_time_ set on it.
+  // Additionally, captures the snapshots on `existing` and adds them to `this`.
   void captureExistingBytesMeter(BytesMeter& existing) {
     // Add bytes accumulated on `this` to the pre-existing periodic bytes collectors.
     if (existing.downstream_periodic_logging_bytes_snapshot_) {
