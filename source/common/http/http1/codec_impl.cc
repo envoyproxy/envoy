@@ -303,9 +303,7 @@ void StreamEncoderImpl::endEncode() {
   notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
-  if (connect_request_ || is_tcp_tunneling_ ||
-      (is_response_to_connect_request_ &&
-       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
+  if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
@@ -442,11 +440,16 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
 
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+#ifndef ENVOY_ENABLE_UHV
+  // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
+  // when UHV is enabled.
+  //
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+#endif
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -835,7 +838,7 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
 StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
-  ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
+  ENVOY_CONN_LOG(trace, "onHeadersCompleteImpl", connection_);
   RETURN_IF_ERROR(completeCurrentHeader());
 
   if (!parser_->isHttp11()) {
@@ -910,7 +913,6 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
   }
-#endif
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
@@ -925,6 +927,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
       return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
+#endif
 
   auto statusor = onHeadersCompleteBase();
   if (!statusor.ok()) {
@@ -1129,8 +1132,13 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    headers.setScheme(absolute_url.scheme());
-    if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
+      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
+    } else {
+      headers.setScheme(absolute_url.scheme());
+    }
+    if (!HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");
     }
@@ -1146,6 +1154,27 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
     headers.setPath(absolute_url.pathAndQueryParams());
   }
   active_request_->request_url_.clear();
+  return okStatus();
+}
+
+Status ServerConnectionImpl::checkProtocolVersion(RequestHeaderMap& headers) {
+  if (protocol() == Protocol::Http10) {
+    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
+    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
+    // HTTP/1.1.
+    //
+    // The protocol may have shifted in the HTTP/1.0 case so reset it.
+    if (!codec_settings_.accept_http_10_) {
+      // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
+      error_code_ = Http::Code::UpgradeRequired;
+      RETURN_IF_ERROR(sendProtocolError(StreamInfo::ResponseCodeDetails::get().LowVersion));
+      return codecProtocolError("Upgrade required for HTTP/1.0 or HTTP/0.9");
+    }
+    if (!headers.Host() && !codec_settings_.default_host_for_http_10_.empty()) {
+      // Add a default host if configured to do so.
+      headers.setHost(codec_settings_.default_host_for_http_10_);
+    }
+  }
   return okStatus();
 }
 
@@ -1182,6 +1211,7 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
     ASSERT(active_request_->request_url_.empty());
 
     headers->setMethod(parser_->methodName());
+    RETURN_IF_ERROR(checkProtocolVersion(*headers));
 
     // Make sure the host is valid.
     auto details = HeaderUtility::requestHeadersValid(*headers);

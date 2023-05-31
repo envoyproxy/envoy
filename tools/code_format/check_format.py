@@ -329,8 +329,8 @@ class FormatChecker:
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
-
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
+        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) \
+            or (file_path.endswith('.cc') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/") and not file_path in self.config.paths["exception"]["include"]) \
             or self.is_in_subdir(file_path, 'tools/testdata')
 
     def allow_listed_for_build_urls(self, file_path):
@@ -551,7 +551,7 @@ class FormatChecker:
             report_error(
                 "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
             )
-        if not self.allow_listed_for_register_factory(file_path):
+        if file_path.startswith("mobile") and not self.allow_listed_for_register_factory(file_path):
             if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
                 report_error(
                     "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "

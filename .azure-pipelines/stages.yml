@@ -137,7 +137,10 @@ stages:
     RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
-    PUBLISH_NETLIFY: $[stageDependencies.env.repo.outputs['publish.netlify']]
+    PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
+    PUBLISH_DOCS: $[stageDependencies.env.repo.outputs['publish.docs']]
+    PUBLISH_DOCS_LATEST: $[stageDependencies.env.repo.outputs['publish.docsLatest']]
+    PUBLISH_DOCS_RELEASE: $[stageDependencies.env.repo.outputs['publish.docsRelease']]
   jobs:
   - template: stage/publish.yml
     parameters:
@@ -145,6 +148,9 @@ stages:
       authDockerPassword: $(DockerPassword)
       authGCP: $(GcpServiceAccountKey)
       authGithub: $(GitHubPublicRepoOnlyAccessToken)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
@@ -157,12 +163,17 @@ stages:
       timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
       runDocker: variables['RUN_DOCKER']
       runPackaging: variables['RUN_PACKAGING']
-      publishNetlify: variables['PUBLISH_NETLIFY']
+      publishDocs: variables['PUBLISH_DOCS']
+      publishDocsLatest: variables['PUBLISH_DOCS_LATEST']
+      publishDocsRelease: variables['PUBLISH_DOCS_RELEASE']
+      publishDockerhub: variables['PUBLISH_DOCKERHUB']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
 
 - stage: verify
   displayName: Verify
   dependsOn: ["env", "publish"]
+  variables:
+    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
   jobs:
   - template: stage/verify.yml
     parameters:

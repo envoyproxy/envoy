@@ -198,6 +198,25 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   EXPECT_EQ(true, config.useUnsignedPayload());
 }
 
+// Verify filter functionality when a host rewrite happens on route-level config.
+TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
+  setup();
+  filter_config_->host_rewrite_ = "original-host";
+
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+
+  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
+                                    "overridden-host", false);
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&per_route_config));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ("overridden-host", headers.getHostValue());
+}
+
 } // namespace
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters

@@ -189,5 +189,9 @@ const EarlyDataPolicy& DelegatingRouteEntry::earlyDataPolicy() const {
   return base_route_->routeEntry()->earlyDataPolicy();
 }
 
+const RouteStatsContextOptRef DelegatingRouteEntry::routeStatsContext() const {
+  return base_route_->routeEntry()->routeStatsContext();
+}
+
 } // namespace Router
 } // namespace Envoy

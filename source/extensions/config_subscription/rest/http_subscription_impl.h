@@ -8,7 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/rest_api_fetcher.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 
 namespace Envoy {
 namespace Config {

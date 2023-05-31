@@ -354,7 +354,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v4)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
@@ -364,7 +364,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Non-transparent socket fails to get original dst while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v4)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
@@ -383,7 +383,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v6)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
@@ -393,7 +393,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Non-transparent socket fails to get original dst while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v6)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));

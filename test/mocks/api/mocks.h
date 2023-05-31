@@ -124,7 +124,7 @@ public:
   MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, EnvoyTcpInfo* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
-  MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsIpTransparent, (Network::Address::IpVersion version), (const));
   MOCK_METHOD(bool, supportsMptcp, (), (const));
   MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
   MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));

@@ -156,7 +156,7 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
-        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
@@ -485,6 +485,17 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "delegating_route_impl_test",
+    srcs = ["delegating_route_impl_test.cc"],
+    deps = [
+        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 
