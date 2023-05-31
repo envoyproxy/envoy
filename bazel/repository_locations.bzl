@@ -1110,7 +1110,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     com_github_google_flatbuffers = dict(
         project_name = "FlatBuffers",
-        project_desc = "Cross platform serialization library architected for maximum memory efficiency",
+        project_desc = "FlatBuffers is a cross platform serialization library architected for maximum memory efficiency",
         project_url = "https://github.com/google/flatbuffers",
         version = "23.3.3",
         sha256 = "8aff985da30aaab37edf8e5b02fda33ed4cbdd962699a8e2af98fdef306f4e4d",
