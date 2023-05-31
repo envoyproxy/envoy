@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/histogram.h"
 
 #include "source/common/common/logger.h"
 
@@ -19,20 +20,21 @@ namespace TlsInspector {
 /**
  * All stats for the TLS inspector. @see stats_macros.h
  */
-#define ALL_TLS_INSPECTOR_STATS(COUNTER)                                                           \
+#define ALL_TLS_INSPECTOR_STATS(COUNTER, HISTOGRAM)                                                \
   COUNTER(client_hello_too_large)                                                                  \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
   COUNTER(alpn_found)                                                                              \
   COUNTER(alpn_not_found)                                                                          \
   COUNTER(sni_found)                                                                               \
-  COUNTER(sni_not_found)
+  COUNTER(sni_not_found)                                                                           \
+  HISTOGRAM(client_hello_size, Bytes)
 
 /**
  * Definition of all stats for the TLS inspector. @see stats_macros.h
  */
 struct TlsInspectorStats {
-  ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 enum class ParseState {
@@ -83,7 +85,7 @@ public:
   size_t maxReadBytes() const override { return config_->maxClientHelloSize(); }
 
 private:
-  ParseState parseClientHello(const void* data, size_t len);
+  ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
   ParseState onRead();
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);

@@ -9,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/common/stats/stat_test_utility.h"
 
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
@@ -21,7 +22,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -83,7 +83,7 @@ public:
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   ConfigSharedPtr cfg_;
   std::unique_ptr<Filter> filter_;
   Network::MockListenerFilterCallbacks cb_;
@@ -145,10 +145,15 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
+
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_not_found_.value());
   EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
+  const std::vector<uint64_t> client_hello_size =
+      store_.histogramValues("tls_inspector.client_hello_size", false);
+  ASSERT_EQ(1, client_hello_size.size());
+  EXPECT_EQ(client_hello.size(), client_hello_size[0]);
 }
 
 // Test with the ClientHello spread over multiple socket reads.
@@ -208,6 +213,10 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_found_.value());
   EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
+  const std::vector<uint64_t> client_hello_size =
+      store_.histogramValues("tls_inspector.client_hello_size", false);
+  ASSERT_EQ(1, client_hello_size.size());
+  EXPECT_EQ(client_hello.size(), client_hello_size[0]);
 }
 
 // Test that the filter correctly handles a ClientHello with no extensions present.
@@ -276,6 +285,10 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
+  const std::vector<uint64_t> client_hello_size =
+      store_.histogramValues("tls_inspector.client_hello_size", false);
+  ASSERT_EQ(1, client_hello_size.size());
+  EXPECT_EQ(50, client_hello_size[0]);
 }
 
 // Test that the filter sets the `JA3` hash
@@ -397,6 +410,10 @@ TEST_P(TlsInspectorTest, NotSsl) {
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> client_hello_size =
+      store_.histogramValues("tls_inspector.client_hello_size", false);
+  ASSERT_EQ(1, client_hello_size.size());
+  EXPECT_EQ(5, client_hello_size[0]);
 }
 
 } // namespace

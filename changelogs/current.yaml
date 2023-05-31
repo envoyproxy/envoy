@@ -200,6 +200,13 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: tls_inspector
+  change: |
+    added histogram ``client_hello_size`` which records the number of bytes of
+    the tls_inspector processed while analyzing for tls usage. In cases where
+    the connection is uses tls this records the tls client hello size. In cases
+    where the connection doesn't use tls this records the amount of bytes the
+    tls_inspector processed until it realized the connection was not tls.
 - area: access_log
   change: |
     added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
