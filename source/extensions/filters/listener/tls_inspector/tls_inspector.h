@@ -4,9 +4,9 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/stats/histogram.h"
 
 #include "source/common/common/logger.h"
 

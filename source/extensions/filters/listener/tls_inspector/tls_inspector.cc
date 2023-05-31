@@ -166,7 +166,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
 
 ParseState Filter::parseClientHello(const void* data, size_t len,
                                     uint64_t bytes_already_processed) {
-  // Ownership remains here though we pass a reference to it in SSL_set0_rbio().
+  // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
   // Make the mem-BIO return that there is more data
