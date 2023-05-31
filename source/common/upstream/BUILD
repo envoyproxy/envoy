@@ -102,7 +102,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
-        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
@@ -210,8 +209,14 @@ envoy_cc_library(
     srcs = ["health_checker_event_logger.cc"],
     hdrs = ["health_checker_event_logger.h"],
     deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:health_checker_config_interface",
+        "//envoy/upstream:health_check_event_sink_interface",
         "//envoy/upstream:health_checker_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
@@ -232,6 +237,7 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         # TODO(dio): Remove dependency to server.
         "//envoy/server:health_checker_config_interface",
+        "//envoy/server:factory_context_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/router:router_lib",
         "//source/common/http:codec_client_lib",
@@ -446,6 +452,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         ":resource_manager_lib",
+        ":upstream_http_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",

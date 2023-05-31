@@ -29,12 +29,13 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_allow_absolute_url_with_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
-RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
+RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
@@ -54,6 +55,7 @@ RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
+RUNTIME_GUARD(envoy_reloadable_features_oauth_make_token_cookie_httponly);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_standard_max_age_value);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
@@ -104,8 +106,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
 // Android.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
-// TODO(alyssawilk) remove in Q2.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 

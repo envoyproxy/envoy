@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -240,8 +242,8 @@ typed_config:
     codec_client_->sendData(request_encoder, "helloworld", false);
     codec_client_->sendData(request_encoder, "", false);
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer-0", "foo"},
-                                                     {"existed-trailer", "foo"}};
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
     codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
@@ -290,6 +292,15 @@ typed_config:
 
     // check trailer value which set in golang: x-test-trailer-0
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_EQ(
+        true,
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
     EXPECT_EQ("bar", entries[0]->value().getStringView());
 
     Http::TestResponseHeaderMapImpl response_headers{

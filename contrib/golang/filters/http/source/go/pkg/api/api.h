@@ -56,6 +56,7 @@ CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buff
 
 CAPIStatus envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
 CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value, headerAction action);
+CAPIStatus envoyGoFilterHttpRemoveTrailer(void* r, void* key);
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
@@ -66,6 +67,9 @@ CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, v
 void envoyGoFilterHttpLog(uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
+
+CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
+                                                 int life_span, int stream_sharing);
 
 #ifdef __cplusplus
 } // extern "C"

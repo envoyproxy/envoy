@@ -1406,6 +1406,7 @@ TEST_P(IntegrationTest, PipelineInline) {
 }
 
 TEST_P(IntegrationTest, NoHost) {
+  disable_client_header_validation_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1535,6 +1536,36 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
       lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithMixedScheme) {
+  // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
+  // encountered via absolute URL with a port.
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithMixedSchemeLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme", "false");
+
+  // Mixed scheme requests will be rejected
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
@@ -2001,6 +2032,7 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -2200,6 +2232,7 @@ TEST_P(IntegrationTest, QuitQuitQuit) {
 // stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is left open on invalid
 // HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -2224,6 +2257,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIs
 // stream_error_on_invalid_http_message=true: test that HTTP/1.1 connection is left open on invalid
 // HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
@@ -2243,6 +2277,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNot
 // stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is terminated on
 // invalid HTTP message (missing :host header)
 TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {

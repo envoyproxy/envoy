@@ -248,8 +248,7 @@ protected:
     on_server_init_function_ = nullptr;
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
-    ConfigHelper helper(version_, *api_,
-                        MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+    ConfigHelper helper(version_, config_helper_.bootstrap());
 
     // Close the connection between Envoy and the xDS FakeUpstreams.
     closeConnection(sds_connection_);

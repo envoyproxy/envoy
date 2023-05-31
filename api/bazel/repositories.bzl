@@ -47,7 +47,10 @@ def api_dependencies():
     external_http_archive(
         name = "com_github_bufbuild_buf",
         build_file_content = BUF_BUILD_CONTENT,
-        tags = ["manual"],
+    )
+
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """

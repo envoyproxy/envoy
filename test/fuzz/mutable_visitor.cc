@@ -5,6 +5,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/protobuf/visitor_helper.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
@@ -15,8 +16,11 @@ namespace {
 void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
                               std::vector<const Protobuf::Message*>& parents,
                               bool was_any_or_top_level, bool recurse_into_any,
-                              absl::string_view const& field_name) {
+                              absl::string_view field_name) {
   visitor.onEnterMessage(message, parents, was_any_or_top_level, field_name);
+  absl::Cleanup message_leaver = [&visitor, &parents, &message, was_any_or_top_level, field_name] {
+    visitor.onLeaveMessage(message, parents, was_any_or_top_level, field_name);
+  };
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {
@@ -71,7 +75,6 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
       }
     }
   }
-  visitor.onLeaveMessage(message, parents, was_any_or_top_level, field_name);
 }
 
 } // namespace
