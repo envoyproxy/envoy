@@ -885,6 +885,13 @@ envoy.matching.matchers.runtime_fraction:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction
+envoy.matching.matchers.cel_matcher:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - xds.type.matcher.v3.CelMatcher
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1349,6 +1356,13 @@ envoy.matching.inputs.query_params:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.cel_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - xds.type.matcher.v3.HttpAttributesCelMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input
