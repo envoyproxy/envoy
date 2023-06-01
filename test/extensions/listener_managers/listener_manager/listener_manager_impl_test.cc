@@ -784,10 +784,10 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "listener foo: has different socket type. The listener only "
-                            "support same socket type for all the addresses.");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "listener foo: has different socket type. The listener only "
+      "support same socket type for all the addresses.");
 }
 
 TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
@@ -797,9 +797,9 @@ TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
       exact_balance: {}
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': address is necessary");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "error adding listener named 'foo': address is necessary");
 }
 
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
@@ -819,10 +819,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 
   const std::string yaml2 = R"EOF(
     name: "foo"
@@ -842,10 +842,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 
   const std::string yaml3 = R"EOF(
     name: "foo"
@@ -862,10 +862,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {

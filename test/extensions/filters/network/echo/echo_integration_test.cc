@@ -66,8 +66,11 @@ filter_chains:
   test_server_->setOnWorkerListenerAddedCb(
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
-    EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromV3Yaml(json), "", true));
+    EXPECT_TRUE(test_server_->server()
+                    .listenerManager()
+                    .addOrUpdateListener(Server::parseListenerFromV3Yaml(json), "", true)
+                    .status()
+                    .ok());
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();
