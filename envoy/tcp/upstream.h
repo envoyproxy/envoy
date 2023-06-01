@@ -58,7 +58,8 @@ public:
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
 
 // An API for wrapping either a TCP or an HTTP connection pool.
-class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
+class GenericConnPool : public Event::DeferredDeletable,
+                        public Logger::Loggable<Logger::Id::router> {
 public:
   virtual ~GenericConnPool() = default;
 
