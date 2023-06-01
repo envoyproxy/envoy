@@ -38,8 +38,9 @@ static void errorCallbackTest(Address::IpVersion version) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version));
   Network::MockTcpListenerCallbacks listener_callbacks;
+  NiceMock<Network::MockListenerConfig> listener_config;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, listener_callbacks, runtime, true, false);
+      dispatcher->createListener(socket, listener_callbacks, runtime, listener_config);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -72,8 +73,16 @@ public:
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
                       bool bind_to_port, bool ignore_global_conn_limit)
+      : TestTcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb,
+                            bind_to_port, ignore_global_conn_limit,
+                            Network::DefaultMaxConnectionsToAcceptPerSocketEvent) {}
+
+  TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
+                      Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
+                      bool bind_to_port, bool ignore_global_conn_limit,
+                      uint32_t max_connections_to_accept_per_socket_event)
       : TcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb, bind_to_port,
-                        ignore_global_conn_limit) {}
+                        ignore_global_conn_limit, max_connections_to_accept_per_socket_event) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -129,8 +138,9 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, false);
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Network::ListenerPtr listener = dispatcher_->createListener(
+      socket, listener_callbacks, scoped_runtime.loader(), listener_config);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -194,8 +204,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, true);
+  NiceMock<Network::MockListenerConfig> listener_config;
+  EXPECT_CALL(listener_config, ignoreGlobalConnLimit()).WillOnce(Return(true));
+  Network::ListenerPtr listener = dispatcher_->createListener(
+      socket, listener_callbacks, scoped_runtime.loader(), listener_config);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -593,6 +605,55 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
 
   // Clear client_connection1.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredPerSocketEvent) {
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+  const uint32_t max_connections_to_accept_per_socket_event = 1;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, true, false,
+                               max_connections_to_accept_per_socket_event);
+
+  // Create two client connections, they should get accepted.
+  MockConnectionCallbacks connection_callbacks1;
+  ClientConnectionPtr client_connection1 = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
+  client_connection1->addConnectionCallbacks(connection_callbacks1);
+  client_connection1->connect();
+
+  MockConnectionCallbacks connection_callbacks2;
+  ClientConnectionPtr client_connection2 = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
+  client_connection2->addConnectionCallbacks(connection_callbacks2);
+  client_connection2->connect();
+
+  EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::Connected));
+  // Save the sever sockets so the connections do not close after being
+  // accepted.
+  std::vector<Network::ConnectionSocketPtr> server_sockets;
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillRepeatedly(
+          Invoke([this, &server_sockets](Network::ConnectionSocketPtr& server_socket) -> void {
+            server_sockets.push_back(std::move(server_socket));
+            if (server_sockets.size() == 2) {
+              dispatcher_->exit();
+            }
+          }));
+  //  Check the logs that they are accepted at different socket events
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 1 new connections", 2,
+                              { dispatcher_->run(Event::Dispatcher::RunType::Block); });
+
+  EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::LocalClose));
+  client_connection1->close(ConnectionCloseType::NoFlush);
+  EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::LocalClose));
+  client_connection2->close(ConnectionCloseType::NoFlush);
 }
 
 } // namespace

@@ -201,6 +201,14 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: listeners
+  change: |
+    added :ref:`max_connections_to_accept_per_socket_event
+    <envoy_v3_api_field_config.listener.v3.Listener.max_connections_to_accept_per_socket_event>`
+    that sets the maximum number of new connections to be accepted per socket
+    event on a listener. If there are more connections to be accepted beyond
+    the maximum, the remaining connections would be processed in later
+    dispatcher loop iterations.
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams

@@ -158,7 +158,9 @@ protected:
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(address);
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
+    NiceMock<Network::MockListenerConfig> listener_config;
+    listener_ =
+        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
         createTransportSocket(), socket_options_, transport_socket_options_);
@@ -1426,7 +1428,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
+  NiceMock<Network::MockListenerConfig> listener_config;
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -2913,7 +2916,9 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
+    NiceMock<Network::MockListenerConfig> listener_config;
+    listener_ =
+        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->connectionInfoProvider().localAddress(),

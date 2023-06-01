@@ -25,6 +25,9 @@
 namespace Envoy {
 namespace Network {
 
+// Set this to the maximum value which effectively accepts all connections.
+const uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = -1;
+
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
 
@@ -239,6 +242,11 @@ public:
    * @return pending connection backlog for TCP listeners.
    */
   virtual uint32_t tcpBacklogSize() const PURE;
+
+  /**
+   * @return the maximum number of connections that will be accepted for a given socket event.
+   */
+  virtual uint32_t maxConnectionsToAcceptPerSocketEvent() const PURE;
 
   /**
    * @return init manager of the listener.

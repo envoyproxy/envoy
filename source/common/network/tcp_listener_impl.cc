@@ -40,8 +40,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
-  // TODO(fcoras): Add limit on number of accepted calls per wakeup
-  while (1) {
+  uint32_t connections_accepted_count = 0;
+  for (; connections_accepted_count < max_connections_to_accept_per_socket_event_;
+       ++connections_accepted_count) {
     if (!socket_->ioHandle().isOpen()) {
       PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
     }
@@ -90,18 +91,24 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
   }
+
+  ENVOY_LOG_MISC(trace, "TcpListener {} accepted {} new connections.",
+                 socket_->ioHandle().localAddress()->asStringView(), connections_accepted_count);
 }
 
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
-                                 bool ignore_global_conn_limit)
+                                 bool ignore_global_conn_limit,
+                                 uint32_t max_connections_to_accept_per_socket_event)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
       bind_to_port_(bind_to_port), reject_fraction_(0.0),
-      ignore_global_conn_limit_(ignore_global_conn_limit) {
+      ignore_global_conn_limit_(ignore_global_conn_limit),
+      max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event) {
   if (bind_to_port) {
-    // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
-    // loss of the trigger due to transient accept errors.
+    // Use level triggered mode to avoid potential loss of the trigger due to
+    // transient accept errors or early termination due to accepting
+    // max_connections_to_accept_per_socket_event connections.
     socket_->ioHandle().initializeFileEvent(
         dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
         Event::FileTriggerType::Level, Event::FileReadyType::Read);

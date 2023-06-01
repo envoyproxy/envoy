@@ -191,14 +191,15 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, file_system_)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::TcpListenerCallbacks& cb,
-                                                    Runtime::Loader& runtime, bool bind_to_port,
-                                                    bool ignore_global_conn_limit) {
+Network::ListenerPtr
+DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                               Runtime::Loader& runtime,
+                               const Network::ListenerConfig& listener_config) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, random_generator_, runtime,
-                                                    std::move(socket), cb, bind_to_port,
-                                                    ignore_global_conn_limit);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, random_generator_, runtime, std::move(socket), cb, listener_config.bindToPort(),
+      listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent());
 }
 
 Network::UdpListenerPtr

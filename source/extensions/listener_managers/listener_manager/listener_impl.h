@@ -377,6 +377,9 @@ public:
     return access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return max_connections_to_accept_per_socket_event_;
+  }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
@@ -485,6 +488,7 @@ private:
   const bool workers_started_;
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
+  const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
 
