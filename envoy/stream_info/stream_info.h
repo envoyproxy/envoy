@@ -586,7 +586,7 @@ public:
   virtual void addBytesRetransmitted(uint64_t bytes_retransmitted) PURE;
 
   /**
-   * @return the number of body bytes retransmitted by the stream.
+   * @return the number of bytes retransmitted by the stream.
    */
   virtual uint64_t bytesRetransmitted() const PURE;
 
