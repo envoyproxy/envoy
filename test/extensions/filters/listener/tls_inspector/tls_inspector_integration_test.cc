@@ -188,8 +188,18 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
                    /*ssl_options=*/ssl_options, /*curves_list=*/"P-256",
                    /*enable_`ja3`_fingerprinting=*/true);
   client_->close(Network::ConnectionCloseType::NoFlush);
+
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
+
+  test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
+  auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
+  EXPECT_EQ(
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      1);
+  EXPECT_EQ(
+      TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      115);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,

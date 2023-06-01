@@ -28,7 +28,7 @@ namespace TlsInspector {
   COUNTER(alpn_not_found)                                                                          \
   COUNTER(sni_found)                                                                               \
   COUNTER(sni_not_found)                                                                           \
-  HISTOGRAM(client_hello_size, Bytes)
+  HISTOGRAM(bytes_processed, Bytes)
 
 /**
  * Definition of all stats for the TLS inspector. @see stats_macros.h

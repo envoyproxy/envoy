@@ -34,7 +34,7 @@ uint64_t computeClientHelloSize(const BIO* bio, uint64_t prior_bytes_read,
   size_t remaining_bytes;
   const int rc = BIO_mem_contents(bio, &remaining_buffer, &remaining_bytes);
   ASSERT(rc == 1);
-  ASSERT(original_bio_length > remaining_bytes);
+  ASSERT(original_bio_length >= remaining_bytes);
   const size_t processed_bio_bytes = original_bio_length - remaining_bytes;
   return processed_bio_bytes + prior_bytes_read;
 }
@@ -187,7 +187,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
       // indicate failure.
       config_->stats().client_hello_too_large_.inc();
       // Record client_hello size as we're done processing.
-      config_->stats().client_hello_size_.recordValue(
+      config_->stats().bytes_processed_.recordValue(
           computeClientHelloSize(bio.get(), bytes_already_processed, len));
       return ParseState::Error;
     }
@@ -205,7 +205,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
       config_->stats().tls_not_found_.inc();
     }
     // Record client_hello size as we're done processing.
-    config_->stats().client_hello_size_.recordValue(
+    config_->stats().bytes_processed_.recordValue(
         computeClientHelloSize(bio.get(), bytes_already_processed, len));
     return ParseState::Done;
   default:
