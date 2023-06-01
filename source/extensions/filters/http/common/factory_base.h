@@ -89,6 +89,8 @@ public:
   virtual Envoy::Http::FilterFactoryCb
   createFilterServerFactoryFromProtoTyped(const ConfigProto&, const std::string&,
                                           Server::Configuration::ServerFactoryContext&) {
+    ExceptionUtil::throwEnvoyException(
+        "Creating filter factory from server factory context is not supported");
     return nullptr;
   }
 };
