@@ -41,7 +41,7 @@ Step 2: Start all of our containers
 Start all the containers.
 
 .. warning::
-  The Envoy Golang filter is designed to be run with the `GODEBUG=cgocheck=0` environment variable set.
+  The Envoy Golang filter is designed to be run with the ``GODEBUG=cgocheck=0`` environment variable set.
 
   This disables the cgo pointer check.
 
