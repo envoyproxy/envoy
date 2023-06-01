@@ -513,18 +513,12 @@ public:
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
-    Http::ResponseHeaderMapOptRef informationalHeaders() const override {
-      return Http::ResponseHeaderMapOptRef();
-    }
+    Http::ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
-    Http::ResponseHeaderMapOptRef responseHeaders() const override {
-      return Http::ResponseHeaderMapOptRef();
-    }
+    Http::ResponseHeaderMapOptRef responseHeaders() const override { return {}; }
     void encodeData(Buffer::Instance&, bool) override {}
     void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
-    Http::ResponseTrailerMapOptRef responseTrailers() const override {
-      return Http::ResponseTrailerMapOptRef();
-    }
+    Http::ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
     void encodeMetadata(Http::MetadataMapPtr&&) override {}
     void onDecoderFilterAboveWriteBufferHighWatermark() override {}
     void onDecoderFilterBelowWriteBufferLowWatermark() override {}

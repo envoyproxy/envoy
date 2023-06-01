@@ -175,7 +175,7 @@ public:
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     absl::optional<std::string>
     currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
-      return absl::optional<std::string>();
+      return {};
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
@@ -457,9 +457,7 @@ private:
   Router::FilterConfig& config() override {
     return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());
   }
-  Router::FilterUtility::TimeoutData timeout() override {
-    return Router::FilterUtility::TimeoutData();
-  }
+  Router::FilterUtility::TimeoutData timeout() override { return {}; }
   absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
     return absl::nullopt;
   }

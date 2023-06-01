@@ -229,6 +229,8 @@ void UpstreamRequest::cleanUp() {
   // The upstream filter chain callbacks own headers/trailers while they are traversing the filter
   // chain. Make sure to not delete them immediately when the stream ends, as the stream often
   // ends during filter chain processing and it causes use-after-free violations.
+  ENVOY_STREAM_LOG(debug, "************************* MOVING CALLBACKS IN CLEANUP",
+                   *parent_.callbacks());
   parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
 }
 

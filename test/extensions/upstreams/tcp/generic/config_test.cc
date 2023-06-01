@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;

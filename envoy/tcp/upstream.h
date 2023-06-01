@@ -61,7 +61,7 @@ using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
 class GenericConnPool : public Event::DeferredDeletable,
                         public Logger::Loggable<Logger::Id::router> {
 public:
-  virtual ~GenericConnPool() = default;
+  ~GenericConnPool() override = default;
 
   /**
    * Called to create a TCP connection or HTTP stream for "CONNECT" streams.
@@ -113,7 +113,7 @@ public:
 // upstream.
 class GenericUpstream : public Event::DeferredDeletable {
 public:
-  virtual ~GenericUpstream() = default;
+  ~GenericUpstream() override = default;
 
   /**
    * Enable/disable further data from this stream.
