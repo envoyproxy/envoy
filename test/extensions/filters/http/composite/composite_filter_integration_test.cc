@@ -98,6 +98,7 @@ using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
+// Integration test that has ext_proc filter as the delegated filter.
 class CompositeFilterWithExtProcIntegrationTest
     : public HttpIntegrationTest,
       public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
@@ -113,7 +114,6 @@ public:
     }
   }
 
-  // TODO(tyxia) Important clean up.
   void TearDown() override {
     if (processor_connection_) {
       ASSERT_TRUE(processor_connection_->close());
@@ -154,6 +154,31 @@ public:
   }
 
   void addFilter() {
+    // Add the filter to the loaded hcm.
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    config_helper_.loadHttpConnectionManager(hcm_config);
+    auto* match_delegate_filter = hcm_config.add_http_filters();
+    match_delegate_filter->set_name("envoy.filters.http.match_delegate");
+
+    // Build extension config with composite filter inside.
+    envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;
+    extension_config.mutable_extension_config()->set_name("composite");
+    envoy::extensions::filters::http::composite::v3::Composite composite_config;
+    extension_config.mutable_extension_config()->mutable_typed_config()->PackFrom(composite_config);
+    auto* matcher_tree = extension_config.mutable_xds_matcher()->mutable_matcher_tree();
+
+    // Set up the match input.
+    auto* matcher_input = matcher_tree->mutable_input();
+    matcher_input->set_name("request-headers");
+    envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_header_match_input;
+    request_header_match_input.set_header_name("match-header");
+    matcher_input->mutable_typed_config()->PackFrom(request_header_match_input);
+
+    // Set up the match action with ext_proc filter as the delegated filter.
+    auto* exact_match_map = matcher_tree->mutable_exact_match_map()->mutable_map();
+    envoy::extensions::filters::http::composite::v3::ExecuteFilterAction ext_proc_filter_action;
+    ext_proc_filter_action.mutable_typed_config()->set_name("envoy.filters.http.ext_proc");
     // Set up ext_proc processing mode.
     proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
     proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
@@ -161,31 +186,6 @@ public:
     proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::NONE);
     proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
     proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SKIP);
-
-    // Add filter to the loaded hcm.
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-        hcm_config;
-    config_helper_.loadHttpConnectionManager(hcm_config);
-    auto* match_delegate_filter = hcm_config.add_http_filters();
-    match_delegate_filter->set_name("envoy.filters.http.match_delegate");
-
-    // Build extension config.
-    envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;
-    extension_config.mutable_extension_config()->set_name("composite");
-    envoy::extensions::filters::http::composite::v3::Composite composite_config;
-    extension_config.mutable_extension_config()->mutable_typed_config()->PackFrom(composite_config);
-    auto* matcher_tree = extension_config.mutable_xds_matcher()->mutable_matcher_tree();
-    // Set up match input.
-    auto* matcher_input = matcher_tree->mutable_input();
-    matcher_input->set_name("request-headers");
-    envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_header_match_input;
-    request_header_match_input.set_header_name("match-header");
-    matcher_input->mutable_typed_config()->PackFrom(request_header_match_input);
-
-    // Set up match action.
-    auto* exact_match_map = matcher_tree->mutable_exact_match_map()->mutable_map();
-    envoy::extensions::filters::http::composite::v3::ExecuteFilterAction ext_proc_filter_action;
-    ext_proc_filter_action.mutable_typed_config()->set_name("envoy.filters.http.ext_proc");
     ext_proc_filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(proto_config_);
 
     ::xds::type::matcher::v3::Matcher_OnMatch on_match;
@@ -195,9 +195,10 @@ public:
 
     (*exact_match_map)["match"] = on_match;
 
+    // Finish up the construction of match_delegate_filter.
     match_delegate_filter->mutable_typed_config()->PackFrom(extension_config);
 
-    // Now move the built to the front.
+    // Now move the built filter to the front.
     for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
       hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
     }

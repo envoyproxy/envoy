@@ -48,7 +48,7 @@ public:
             *message, context.stat_prefix_, context.server_factory_context_.value());
       }
     } catch (EnvoyException& e) {
-      // Rather than causing the crash, we gracefully catch the exception, log the error and
+      // Instead of causing the crash, the exception is handled gracefully: log the error and
       // fallback to creating the filter from factory context.
       ENVOY_LOG(debug,
                 absl::StrCat(e.what(), ", fallback to creating the filter from factory context."));
@@ -56,7 +56,7 @@ public:
 
     if (callback == nullptr) {
       RELEASE_ASSERT(context.factory_context_.has_value(),
-                     "The factory context must exist here for creating the delegate filter");
+                     "The factory context must exist here to create the delegated filter");
       callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
                                                       context.factory_context_.value());
     }
