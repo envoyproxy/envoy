@@ -4,9 +4,9 @@
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/xds_source_id.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/container/node_hash_set.h"
