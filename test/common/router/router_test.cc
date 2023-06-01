@@ -3504,56 +3504,6 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
-// The router filter is responsible for not propagating 100-continue headers after the initial 100.
-// TODO(alyssawilk) remove coalescing with old code deprecation.
-TEST_F(RouterTest, Coalesce1xxHeaders) {
-  // Setup.
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  // Initial 100-continue, this is processed normally.
-  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
-  {
-    Http::ResponseHeaderMapPtr continue_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    response_decoder->decode1xxHeaders(std::move(continue_headers));
-  }
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-
-  // No encode1xxHeaders() invocation for the second 100-continue (but we continue to track
-  // stats from upstream).
-  EXPECT_CALL(callbacks_, encode1xxHeaders_(_)).Times(0);
-  {
-    Http::ResponseHeaderMapPtr continue_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    response_decoder->decode1xxHeaders(std::move(continue_headers));
-  }
-  // With the filter manager coalescing, the router only sees 1 100.
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-
-  // Reset stream and cleanup.
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-  EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-}
-
 TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
