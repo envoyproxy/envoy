@@ -34,4 +34,10 @@ message Dlb {
   // Maximum number of retries when sending to DLB device fails.
   // No retry as default.
   uint32 max_retries = 2;
+
+  // The fallback policy if any error occurs:
+  // The `true` means fall back to Exact Connection Balance.
+  // The `false` means fall back to Nop Connection Balance.
+  // The default value is false.
+  bool is_exact_fallback = 3;
 }

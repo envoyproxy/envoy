@@ -16,29 +16,42 @@ namespace Extensions {
 namespace Dlb {
 
 Envoy::Network::ConnectionBalancerSharedPtr
+DlbConnectionBalanceFactory::fallback(const bool is_exact_fallback, const std::string& message) {
+  if (is_exact_fallback) {
+    ENVOY_LOG(warn, fmt::format("error: {}, fallback to Exact Connection Balance", message));
+    return std::make_shared<Network::ExactConnectionBalancerImpl>();
+  } else {
+    ENVOY_LOG(warn, fmt::format("error: {}, fallback to Nop Connection Balance", message));
+    return std::make_shared<Network::NopConnectionBalancerImpl>();
+  }
+}
+
+Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
   const auto& typed_config =
       dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(config);
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
   auto status = Envoy::MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb_config);
+  bool is_exact_fallback = false;
   if (!status.ok()) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
+    fallback(is_exact_fallback,
+             fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
   }
+
+  is_exact_fallback = dlb_config.is_exact_fallback();
 
   const uint32_t worker_num = context.options().concurrency();
 
   if (worker_num > 32) {
-    ExceptionUtil::throwEnvoyException(
-        "Dlb connection balanncer only supports up to 32 worker threads, "
-        "please decrease the number of threads by `--concurrency`");
+    fallback(is_exact_fallback, "Dlb connection balanncer only supports up to 32 worker threads, "
+                                "please decrease the number of threads by `--concurrency`");
   }
 
   const uint& config_id = dlb_config.id();
   const auto& result = detectDlbDevice(config_id, "/dev");
   if (!result.has_value()) {
-    ExceptionUtil::throwEnvoyException("no available dlb hardware");
+    fallback(is_exact_fallback, "no available dlb hardware");
   }
 
   const uint& device_id = result.value();
@@ -54,16 +67,14 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 
   dlb_resources_t rsrcs;
   if (dlb_open(device_id, &dlb) == -1) {
-    ExceptionUtil::throwEnvoyException(fmt::format("dlb_open {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_open {}", errorDetails(errno)));
   }
   if (dlb_get_dev_capabilities(dlb, &cap)) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_get_dev_capabilities {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_get_dev_capabilities {}", errorDetails(errno)));
   }
 
   if (dlb_get_num_resources(dlb, &rsrcs)) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_get_num_resources {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_get_num_resources {}", errorDetails(errno)));
   }
 
   ENVOY_LOG(debug,
@@ -75,21 +86,19 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
             rsrcs.num_ldb_credits, rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
 
   if (rsrcs.num_ldb_ports < 2 * worker_num) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("no available dlb port resources, request: {}, available: {}", 2 * worker_num,
-                    rsrcs.num_ldb_ports));
+    fallback(is_exact_fallback,
+             fmt::format("no available dlb port resources, request: {}, available: {}",
+                         2 * worker_num, rsrcs.num_ldb_ports));
   }
 
   domain_id = createSchedDomain(dlb, rsrcs, cap, 2 * worker_num);
   if (domain_id == -1) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
   }
 
   domain = dlb_attach_sched_domain(dlb, domain_id);
   if (domain == nullptr) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_attach_sched_domain {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_attach_sched_domain {}", errorDetails(errno)));
   }
 
   const int partial_resources = 100;
@@ -100,15 +109,15 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ldb_pool_id = dlb_create_ldb_credit_pool(domain, max_ldb_credits);
 
     if (ldb_pool_id == -1) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("dlb_create_ldb_credit_pool {}", errorDetails(errno)));
+      fallback(is_exact_fallback,
+               fmt::format("dlb_create_ldb_credit_pool {}", errorDetails(errno)));
     }
 
     dir_pool_id = dlb_create_dir_credit_pool(domain, max_dir_credits);
 
     if (dir_pool_id == -1) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("dlb_create_dir_credit_pool {}", errorDetails(errno)));
+      fallback(is_exact_fallback,
+               fmt::format("dlb_create_dir_credit_pool {}", errorDetails(errno)));
     }
   } else {
     int max_credits = rsrcs.num_credits * partial_resources / 100;
@@ -116,66 +125,59 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ldb_pool_id = dlb_create_credit_pool(domain, max_credits);
 
     if (ldb_pool_id == -1) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("dlb_create_credit_pool {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("dlb_create_credit_pool {}", errorDetails(errno)));
     }
   }
 
   tx_queue_id = createLdbQueue(domain);
   if (tx_queue_id == -1) {
-    ExceptionUtil::throwEnvoyException(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
   }
 
   for (uint i = 0; i < worker_num; i++) {
     int tx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (tx_port_id == -1) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("tx dlb_create_ldb_port {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("tx dlb_create_ldb_port {}", errorDetails(errno)));
     }
 
     dlb_port_hdl_t tx_port = dlb_attach_ldb_port(domain, tx_port_id);
     if (tx_port == nullptr) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("tx dlb_attach_ldb_port {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("tx dlb_attach_ldb_port {}", errorDetails(errno)));
     }
     tx_ports.push_back(tx_port);
 
     int rx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (rx_port_id == -1) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("rx dlb_create_ldb_port {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("rx dlb_create_ldb_port {}", errorDetails(errno)));
     }
 
     dlb_port_hdl_t rx_port = dlb_attach_ldb_port(domain, rx_port_id);
     if (rx_port == nullptr) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("rx dlb_attach_ldb_port {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("rx dlb_attach_ldb_port {}", errorDetails(errno)));
     }
     rx_ports.push_back(rx_port);
 
     if (dlb_link_queue(rx_port, tx_queue_id, 0) == -1) {
-      ExceptionUtil::throwEnvoyException(fmt::format("dlb_link_queue {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("dlb_link_queue {}", errorDetails(errno)));
     }
 
     int efd = eventfd(0, EFD_NONBLOCK);
     if (efd < 0) {
-      ExceptionUtil::throwEnvoyException(fmt::format("dlb eventfd {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("dlb eventfd {}", errorDetails(errno)));
     }
     if (dlb_enable_cq_epoll(rx_port, true, efd)) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("dlb_enable_cq_epoll {}", errorDetails(errno)));
+      fallback(is_exact_fallback, fmt::format("dlb_enable_cq_epoll {}", errorDetails(errno)));
     }
     efds.push_back(efd);
   }
 
   if (dlb_launch_domain_alert_thread(domain, nullptr, nullptr)) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_launch_domain_alert_thread {}", errorDetails(errno)));
+    fallback(is_exact_fallback,
+             fmt::format("dlb_launch_domain_alert_thread {}", errorDetails(errno)));
   }
 
   if (dlb_start_sched_domain(domain)) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_start_sched_domain {}", errorDetails(errno)));
+    fallback(is_exact_fallback, fmt::format("dlb_start_sched_domain {}", errorDetails(errno)));
   }
 #endif
   DlbConnectionBalanceFactorySingleton::initialize(this);
