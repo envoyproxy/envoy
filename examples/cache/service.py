@@ -63,7 +63,7 @@ async def get(request):
     stored_response = yaml.safe_load(open('/etc/responses.yaml', 'r')).get(response_id)
 
     if stored_response is None:
-        raise aiohttp.web.HTTPNotFound(reason="No response found with the given id")
+        raise web.HTTPNotFound(reason="No response found with the given id")
 
     request_date = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
     response = web.Response(
