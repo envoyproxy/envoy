@@ -155,13 +155,13 @@ function formatRange(lowerBound, width) {
     highlightedBucket = bucketSpan;
 
     detailPopup.replaceChildren();
-    makeElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
+    appendNewElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
     if (!showingCount) {
-      makeElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
+      appendNewElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
     }
     if (bucket.annotations) {
       for (annotation of bucket.annotations) {
-        const span = makeElement(detailPopup, 'div');
+        const span = appendNewElement(detailPopup, 'div');
         span.textContent = annotation.detail();
       }
     }
@@ -241,7 +241,7 @@ function leavePopup() {
  * @param {?string} className optional CSS class name.
  * @return {!Element} the new element.
  */
-function makeElement(parent, type, className) {
+function appendNewElement(parent, type, className) {
   const element = document.createElement(type);
   if (className) {
     element.className = className;
@@ -456,16 +456,16 @@ class Painter {
     this.textIntervalIndex = 0;
     this.bucketWidthPercent = formatPercent(this.vpxToWidth(this.bucketWidthVpx));
 
-    this.graphics = makeElement(div, 'div', 'histogram-graphics');
-    this.labels = makeElement(div, 'div', 'histogram-labels');
-    this.annotationsDiv = makeElement(div, 'div', 'histogram-annotations');
+    this.graphics = appendNewElement(div, 'div', 'histogram-graphics');
+    this.labels = appendNewElement(div, 'div', 'histogram-labels');
+    this.annotationsDiv = appendNewElement(div, 'div', 'histogram-annotations');
 
     // We have business logic to ensure only be one popup div is visible at a
     // time.  However, we need a separate popup div for each histogram
     // so that they can be positioned relative to the histogram's graphics.
-    this.detailPopup = makeElement(this.graphics, 'div', 'histogram-popup');
-    this.detailPopup.addEventListener('mouseover', enterPopup);
-    this.detailPopup.addEventListener('mouseout', leavePopup);
+    this.detailPopup = appendNewElement(this.graphics, 'div', 'histogram-popup');
+    this.detailPopup.addEventListener('mouseenter', enterPopup);
+    this.detailPopup.addEventListener('mouseleave', leavePopup);
 
     this.textInterval = Math.ceil(numBuckets / constants.maxBucketsWithText);
   }
@@ -496,7 +496,7 @@ class Painter {
 
     // We always put the marker proportionally between this bucket and
     // the next one.
-    const span = makeElement(this.annotationsDiv, 'span', annotation.cssClass());
+    const span = appendNewElement(this.annotationsDiv, 'span', annotation.cssClass());
     const percentilePercent = formatPercent(this.vpxToPosition(percentileVpx));
     span.style.left = percentilePercent;
 
@@ -504,12 +504,12 @@ class Painter {
     // more than one: they'll just get garbled. The user can over over the
     // bucket to see the detail.
     if (bucket.annotations.length == 1) {
-      const percentilePLabel = makeElement(this.annotationsDiv, 'span', 'percentile-label');
+      const percentilePLabel = appendNewElement(this.annotationsDiv, 'span', 'percentile-label');
       percentilePLabel.style.bottom = 0;
       percentilePLabel.textContent = annotation.toString();
       percentilePLabel.style.left = percentilePercent;
 
-      const percentileVLabel = makeElement(this.annotationsDiv, 'span', 'percentile-label');
+      const percentileVLabel = appendNewElement(this.annotationsDiv, 'span', 'percentile-label');
       percentileVLabel.style.bottom = '30%';
       percentileVLabel.textContent = format(annotation.value);
       percentileVLabel.style.left = percentilePercent;
@@ -524,7 +524,7 @@ class Painter {
   drawBucket(bucket) {
     this.leftPercent = formatPercent(this.vpxToPosition(this.leftVpx));
 
-    const bucketSpan = makeElement(this.graphics, 'span', 'histogram-bucket');
+    const bucketSpan = appendNewElement(this.graphics, 'span', 'histogram-bucket');
     const heightPercent = this.maxCount == 0 ? 0 :
           formatPercent(constants.baseHeightFraction + (bucket.count / this.maxCount) *
                         (1 - constants.baseHeightFraction));
@@ -539,11 +539,11 @@ class Painter {
       this.drawBucketLabels(bucket, heightPercent);
     }
 
-    bucketSpan.addEventListener('mouseover', showPopupFn(
+    bucketSpan.addEventListener('mouseenter', showPopupFn(
         this.detailPopup, formatPercent(this.vpxToPosition(this.leftVpx)), bucket,
         bucketSpan, showingCount));
 
-    bucketSpan.addEventListener('mouseout', timeoutFn(this.detailPopup));
+    bucketSpan.addEventListener('mouseleave', timeoutFn(this.detailPopup));
 
     this.leftVpx += this.bucketWidthVpx + constants.marginWidthVpx;
   }
@@ -555,12 +555,12 @@ class Painter {
    * @param {string} heightPercent The height of the bucket, expressed as a percent.
    */
   drawBucketLabels(bucket, heightPercent) {
-    const lowerLabel = makeElement(this.labels, 'span');
+    const lowerLabel = appendNewElement(this.labels, 'span');
     lowerLabel.textContent = format(bucket.lower_bound);
     lowerLabel.style.left = this.leftPercent;
     lowerLabel.style.width = this.bucketWidthPercent;
 
-    const bucketLabel = makeElement(this.graphics, 'span', 'bucket-label');
+    const bucketLabel = appendNewElement(this.graphics, 'span', 'bucket-label');
     bucketLabel.textContent = format(bucket.count);
     bucketLabel.style.left = this.leftPercent;
     bucketLabel.style.width = this.bucketWidthPercent;
@@ -591,13 +591,13 @@ class Painter {
  * @param {?number} changeCount the number of times this histogram has changed value.
  */
 function renderHistogram(histogramDiv, supportedPercentiles, histogram, changeCount) {
-  const div = makeElement(histogramDiv, 'div');
-  const label = makeElement(div, 'span', 'histogram-name');
+  const div = appendNewElement(histogramDiv, 'div');
+  const label = appendNewElement(div, 'span', 'histogram-name');
   label.textContent = histogram.name + (changeCount == null ? '' : ' (' + changeCount + ')');
 
   const numBuckets = histogram.totals.length;
   if (numBuckets == 0) {
-    makeElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
+    appendNewElement(div, 'span', 'histogram-no-data').textContent = 'No recorded values';
     return;
   }
 

@@ -53,7 +53,7 @@ async function testRenderHistogram(iframe) {
 
   // When the mouse enters the first bucket it renders a visible popup with
   // associated annotations.
-  buckets[0].dispatchEvent(new Event('mouseover'));
+  buckets[0].dispatchEvent(new Event('mouseenter'));
   assertEq('visible', getComputedStyle(popup).visibility);
   assertEq(4, popup.children.length);
   assertEq('[200, 210)', popup.children[0].textContent);
@@ -62,24 +62,24 @@ async function testRenderHistogram(iframe) {
   assertEq('P25: 207.5', popup.children[3].textContent);
 
   // 2 seconds after the mouse leaves, that area, the popup will be made invisible.
-  buckets[0].dispatchEvent(new Event('mouseout'));
+  buckets[0].dispatchEvent(new Event('mouseleave'));
   await asyncTimeout(3000);
   assertEq('hidden', getComputedStyle(popup).visibility);
 
   // Now enter the other bucket. Just check the 1st 2 of 10 buckets.
-  buckets[1].dispatchEvent(new Event('mouseover'));
+  buckets[1].dispatchEvent(new Event('mouseenter'));
   assertEq('visible', getComputedStyle(popup).visibility);
   assertEq(10, popup.children.length);
   assertEq('[300, 310)', popup.children[0].textContent);
   assertEq('Interval [300, 310): 2', popup.children[1].textContent);
-  buckets[1].dispatchEvent(new Event('mouseout'));
+  buckets[1].dispatchEvent(new Event('mouseleave'));
 
   // Re-enter the first bucket. The popup will immediately move to that with no delay.
-  buckets[0].dispatchEvent(new Event('mouseover'));
+  buckets[0].dispatchEvent(new Event('mouseenter'));
   assertEq('visible', getComputedStyle(popup).visibility);
   assertEq(4, popup.children.length);
   assertEq('[200, 210)', popup.children[0].textContent);
-  buckets[1].dispatchEvent(new Event('mouseout'));
+  buckets[1].dispatchEvent(new Event('mouseleave'));
 
   // There's exactly one annotations bucket.
   assertEq(1, idoc.getElementsByClassName('histogram-annotations').length);
