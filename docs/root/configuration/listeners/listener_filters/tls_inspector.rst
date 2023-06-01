@@ -46,5 +46,5 @@ This filter has a statistics tree rooted at *tls_inspector* with the following s
   alpn_not_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ has failed
   sni_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was found
   sni_not_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was not found
-  client_hello_size, Histogram, Records sizes of the client hello if the connection uses TLS. If the connection does not use TLS, records the number of bytes processed until that was determined.
+  client_hello_size, Histogram, Records sizes of the client hello if the connection uses TLS. If the connection does not use TLS: records the number of bytes processed until that was determined.
 
