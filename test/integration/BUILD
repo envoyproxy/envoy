@@ -918,7 +918,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "idle_timeout_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
