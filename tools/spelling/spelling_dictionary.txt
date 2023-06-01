@@ -815,6 +815,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls

@@ -4720,9 +4720,11 @@ TEST_P(Http1ClientConnectionImplTest, ExtendedAsciiInHeaderName) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
                              "föö: bar\r\n"
                              "\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(response);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
@@ -4736,9 +4738,11 @@ TEST_P(Http1ServerConnectionImplTest, ExtendedAsciiInHeaderName) {
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
                            "föö: bar\r\n"
                            "\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
