@@ -112,9 +112,6 @@ protected:
    */
   static int sslContextIndex();
 
-  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
-  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
-
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 

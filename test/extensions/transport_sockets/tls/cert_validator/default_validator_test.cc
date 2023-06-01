@@ -180,12 +180,6 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
                                                  nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
-  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/store_ctx.get(),
-                                                            /*ssl_extended_info=*/nullptr,
-                                                            /*leaf_cert=*/*cert,
-                                                            /*transport_socket_options=*/nullptr),
-            0);
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   ASSERT_TRUE(bssl::PushToStack(cert_chain.get(), std::move(cert)));

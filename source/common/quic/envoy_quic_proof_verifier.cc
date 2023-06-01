@@ -43,16 +43,14 @@ public:
 
   void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
                               const std::string& error_details, uint8_t /*tls_alert*/) override {
-    if (!succeeded) {
-      std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
-      quic_callback_->Run(succeeded, error_details, &details);
-      return;
-    }
     std::string error;
-
-    std::unique_ptr<quic::CertificateView> cert_view =
-        quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-    succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
+    if (!succeeded) {
+      error = error_details;
+    } else {
+      std::unique_ptr<quic::CertificateView> cert_view =
+          quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+      succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
+    }
     std::unique_ptr<quic::ProofVerifyDetails> details =
         std::make_unique<CertVerifyResult>(succeeded);
     quic_callback_->Run(succeeded, error, &details);
