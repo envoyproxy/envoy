@@ -16,9 +16,9 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Golang]
+// [#protodoc-title: Golang http filter]
 //
-// For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
+// For an overview of the Golang http filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.filters.http.golang]
 
 // [#next-free-field: 6]
