@@ -6,7 +6,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.validate.h"
 
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"

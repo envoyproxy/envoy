@@ -7,7 +7,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api:82.6"
 "source/common/api/posix:81.3"
 "source/common/common/posix:92.7"
-"source/common/config:95.6"
+"source/common/config:94.8"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
@@ -17,7 +17,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.6"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:96.3"
-"source/common/quic:93.5"
+"source/common/quic:93.4"
 "source/common/router:96.6"
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
@@ -83,6 +83,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/config_subscription/rest:94.3"
 "source/extensions/config_subscription:94.8"
 "source/extensions/config_subscription/grpc:94.0"
+"source/extensions/matching/input_matchers/cel_matcher:90.7" #Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
