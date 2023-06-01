@@ -366,6 +366,7 @@ stages:
         ciTarget: $(CI_TARGET)
         repoFetchDepth: $(REPO_FETCH_DEPTH)
         repoFetchTags: $(REPO_FETCH_TAGS)
+        workaroundDiskspace: true
 
   - job: coverage
     displayName: "linux_x64"
