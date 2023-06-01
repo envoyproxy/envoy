@@ -285,7 +285,9 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
 class MockCertificateValidationContextConfig : public Ssl::CertificateValidationContextConfig {
 public:
-  MockCertificateValidationContextConfig() {
+  MockCertificateValidationContextConfig() : MockCertificateValidationContextConfig("") {}
+
+  explicit MockCertificateValidationContextConfig(const std::string& s) : s_(s) {
     auto matcher = envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher();
     matcher.set_san_type(
         static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType>(
@@ -332,6 +334,22 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
                           "Failed to create string SAN matcher of type.*");
+}
+
+TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
+  auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>(
+      "-----BEGIN CERTIFICATE-----\nincomplete payload");
+  EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
+      .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
+                                          CertificateValidationContext::ACCEPT_UNTRUSTED));
+
+  Stats::TestUtil::TestStore store;
+  auto ssl_stats = generateSslStats(*store.rootScope());
+  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
+                                                          Event::GlobalTimeSystem().timeSystem());
+  auto ctx = std::vector<SSL_CTX*>();
+  EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
+                          "Failed to load trusted CA certificates from.*");
 }
 
 } // namespace Tls
