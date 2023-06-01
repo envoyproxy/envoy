@@ -1,4 +1,4 @@
-#include "source/common/config/watch_map.h"
+#include "source/extensions/config_subscription/grpc/watch_map.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 

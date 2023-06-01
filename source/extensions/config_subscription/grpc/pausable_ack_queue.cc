@@ -1,4 +1,4 @@
-#include "source/common/config/pausable_ack_queue.h"
+#include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 
 #include <list>
 

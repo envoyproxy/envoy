@@ -32,22 +32,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "grpc_stream_test",
-    srcs = ["grpc_stream_test.cc"],
-    deps = [
-        "//source/common/config:grpc_stream_lib",
-        "//test/common/stats:stat_test_utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [
@@ -113,14 +97,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "pausable_ack_queue_test",
-    srcs = ["pausable_ack_queue_test.cc"],
-    deps = [
-        "//source/common/config:pausable_ack_queue_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     deps = [
@@ -179,20 +155,6 @@ envoy_cc_test(
         "//envoy/config:typed_config_interface",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "watch_map_test",
-    srcs = ["watch_map_test.cc"],
-    deps = [
-        "//envoy/config:xds_config_tracker_interface",
-        "//source/common/config:watch_map_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/config:custom_config_validators_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -287,13 +249,5 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "xds_source_id_test",
-    srcs = ["xds_source_id_test.cc"],
-    deps = [
-        "//source/common/config:xds_source_id_lib",
     ],
 )
