@@ -11,12 +11,6 @@ services:
         condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:10000"
-    environment:
-    # The Envoy Golang filter is designed to be run with the GODEBUG=cgocheck=0
-    # environment variable set.
-    # This disables the cgo pointer check.
-    # Failure to set this environment variable will cause Envoy to crash!
-    - GODEBUG=cgocheck=0
 
   helloworld_service:
     build:
