@@ -617,11 +617,12 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   initialize();
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_);
+  auto cvc_config =
+      Ssl::CertificateValidationContextConfigImpl::create(*sds_api.secret(), *api_).value();
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            cvc_config.caCert());
+            cvc_config->caCert());
 }
 
 class CvcValidationCallback {
@@ -693,31 +694,31 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext merged_cvc =
       default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_);
+  auto cvc_config = Ssl::CertificateValidationContextConfigImpl::create(merged_cvc, *api_).value();
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
-  EXPECT_TRUE(cvc_config.allowExpiredCertificate());
+  EXPECT_TRUE(cvc_config->allowExpiredCertificate());
   // Verify that singular fields are overwritten.
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            cvc_config.caCert());
+            cvc_config->caCert());
   // Verify that repeated fields are concatenated.
-  EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
-  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(2, cvc_config->subjectAltNameMatchers().size());
+  EXPECT_EQ("first san", cvc_config->subjectAltNameMatchers()[0].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
-            cvc_config.subjectAltNameMatchers()[0].san_type());
-  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+            cvc_config->subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("second san", cvc_config->subjectAltNameMatchers()[1].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
-            cvc_config.subjectAltNameMatchers()[1].san_type());
+            cvc_config->subjectAltNameMatchers()[1].san_type());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
-  EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());
-  EXPECT_EQ(default_verify_certificate_hash, cvc_config.verifyCertificateHashList()[0]);
+  EXPECT_EQ(1, cvc_config->verifyCertificateHashList().size());
+  EXPECT_EQ(default_verify_certificate_hash, cvc_config->verifyCertificateHashList()[0]);
   // Verify that if default CertificateValidationContext does not set certificate SPKI list, the new
   // secret contains SPKI list from dynamic CertificateValidationContext.
-  EXPECT_EQ(1, cvc_config.verifyCertificateSpkiList().size());
-  EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config.verifyCertificateSpkiList()[0]);
+  EXPECT_EQ(1, cvc_config->verifyCertificateSpkiList().size());
+  EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config->verifyCertificateSpkiList()[0]);
 }
 
 class GenericSecretValidationCallback {
