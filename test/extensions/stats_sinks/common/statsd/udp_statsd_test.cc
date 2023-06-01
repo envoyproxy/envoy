@@ -161,25 +161,6 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   tls_.shutdownThread();
 }
 
-TEST(UdpStatsdSinkTest, CheckHiddenStats) {
-  NiceMock<Stats::MockMetricSnapshot> snapshot;
-  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
-  writer_ptr->delegateBufferFake();
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), 1024);
-
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  gauge.value_ = 1;
-  gauge.used_ = true;
-  gauge.hidden_ = true;
-  snapshot.gauges_.push_back(gauge);
-
-  // Size should be zero since gauge is hidden.
-  sink.flush(snapshot);
-  EXPECT_EQ(writer_ptr->buffer_writes.size(), 0);
-}
-
 TEST(UdpStatsdSinkTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();

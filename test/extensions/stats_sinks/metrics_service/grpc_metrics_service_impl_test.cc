@@ -108,13 +108,11 @@ public:
 
     snapshot_.counters_.push_back({delta, *counter_storage_.back()});
   }
-  void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true,
-                          bool hidden = false) {
+  void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true) {
     gauge_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockGauge>>());
     gauge_storage_.back()->name_ = name;
     gauge_storage_.back()->value_ = value;
     gauge_storage_.back()->used_ = used;
-    gauge_storage_.back()->hidden_ = hidden;
 
     snapshot_.gauges_.push_back(*gauge_storage_.back());
   }
@@ -165,21 +163,6 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
 
   // Verify only newly added metrics come after endFlush call.
   gauge_storage_.back()->used_ = false;
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-    EXPECT_EQ(1, metrics->size());
-  }));
-  sink.flush(snapshot_);
-}
-
-TEST_F(MetricsServiceSinkTest, CheckHiddenStat) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                     envoy::service::metrics::v3::StreamMetricsResponse>
-      sink(streamer_, false, false,
-           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
-
-  addCounterToSnapshot("test_counter", 1, 100);
-  addGaugeToSnapshot("test_gauge", 1, 1, 1);
-
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
   }));

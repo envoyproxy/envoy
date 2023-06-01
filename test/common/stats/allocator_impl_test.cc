@@ -524,6 +524,28 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   EXPECT_EQ(num_iterations, 0);
 }
 
+TEST_F(AllocatorImplTest, ForEachSinkedGaugesHidden) {
+  std::vector<GaugeSharedPtr> sinked_gauges;
+  std::vector<GaugeSharedPtr> unsinked_gauges;
+
+  auto unhidden_stat_name = makeStat(absl::StrCat("unhidden.gauge"));
+  auto hidden_stat_name = makeStat(absl::StrCat("hidden.gauge"));
+
+  size_t num_gauges = 0;
+  size_t num_iterations = 0;
+
+  sinked_gauges.emplace_back(
+      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+
+  unsinked_gauges.emplace_back(
+      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate));
+
+  alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                            [&num_iterations](Gauge&) { ++num_iterations; });
+  EXPECT_EQ(num_gauges, 2);
+  EXPECT_EQ(num_iterations, 1);
+}
+
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();

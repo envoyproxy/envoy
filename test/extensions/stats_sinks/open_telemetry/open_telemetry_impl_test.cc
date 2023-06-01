@@ -62,14 +62,12 @@ public:
     snapshot_.counters_.push_back({delta, *counter_storage_.back()});
   }
 
-  void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true,
-                          bool hidden = false) {
+  void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true) {
     gauge_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockGauge>>());
     gauge_storage_.back()->name_ = name;
     gauge_storage_.back()->setTagExtractedName(getTagExtractedName(name));
     gauge_storage_.back()->value_ = value;
     gauge_storage_.back()->used_ = used;
-    gauge_storage_.back()->hidden_ = hidden;
     gauge_storage_.back()->setTags({{"gauge_key", "gauge_val"}});
 
     snapshot_.gauges_.push_back(*gauge_storage_.back());
@@ -286,17 +284,6 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
     expectHistogram(metric, getTagExtractedName("test_histogram"), false);
     expectNoAttributes(metric.histogram().data_points()[0].attributes());
   }
-}
-
-TEST_F(OtlpMetricsFlusherTests, HiddenGaugeMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions());
-
-  addGaugeToSnapshot("test_gauge1", 1, 1, 1);
-  addGaugeToSnapshot("test_gauge2", 2);
-
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 1);
-  expectGauge(metricAt(0, metrics), getTagExtractedName("test_gauge2"), 2);
 }
 
 TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
