@@ -46,6 +46,7 @@ type HttpCAPI interface {
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
 	HttpLog(level LogType, message string)
+	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
 

@@ -93,6 +93,7 @@ type FilterCallbacks interface {
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	Log(level LogType, msg string)
+	LogLevel() LogType
 	// TODO add more for filter callbacks
 }
 

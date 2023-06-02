@@ -255,6 +255,10 @@ func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.LogType(C.envoyGoFilterHttpLogLevel())
+}
+
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }

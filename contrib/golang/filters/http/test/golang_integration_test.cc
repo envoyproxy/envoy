@@ -386,6 +386,9 @@ typed_config:
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
 
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
+
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
 
