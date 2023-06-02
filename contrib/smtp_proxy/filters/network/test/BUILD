@@ -20,17 +20,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "smtp_message_tests",
-    srcs = [
-        "smtp_message_test.cc",
-    ],
-    deps = [
-        "//contrib/smtp_proxy/filters/network/source:filter",
-        "//source/common/buffer:buffer_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "smtp_filter_tests",
     srcs = [
         "smtp_filter_test.cc",
