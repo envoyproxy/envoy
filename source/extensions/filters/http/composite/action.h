@@ -48,9 +48,10 @@ public:
             *message, context.stat_prefix_, context.server_factory_context_.value());
       }
     } catch (EnvoyException& e) {
-      // Instead of causing the crash, the exception is handled gracefully: log the error and
-      // fallback to creating the filter from factory context.
-      ENVOY_LOG(debug,
+      // First, we try to create the delegated filter creation callback from server factory context.
+      // If it failed (i.e., the corresponding filter doesn't support this method), we log this
+      // message and fallback to creating the filter from factory context.
+      ENVOY_LOG(trace,
                 absl::StrCat(e.what(), ", fallback to creating the filter from factory context."));
     }
 
