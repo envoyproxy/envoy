@@ -114,8 +114,8 @@ message Bootstrap {
     }
 
     // Optional field to set the application logs format. If this field is set, it will override
-    // the default log format. In case the :option:`--log-format` command line option is used,
-    // it will override ``application_log_format`` configurations.
+    // the default log format. Setting both this field and :option:`--log-format` command line
+    // option is not allowed, and will cause a bootstrap error.
     LogFormat log_format = 1;
   }
 
