@@ -11,13 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/env.yml
+    secrets: inherit
+
   unittests:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs: env
     name: unit_tests
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
     - uses: actions/checkout@v3
     - name: Ensure no listener leaks

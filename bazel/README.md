@@ -122,7 +122,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget libtool go bazel clang-format autoconf aspell
+    brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 

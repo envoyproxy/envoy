@@ -109,8 +109,8 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0", "MAGLEV")}, {buildCluster("cluster_0", "MAGLEV")},
-      {}, "2");
+      cds_type_url, {buildCluster("cluster_0", envoy::config::cluster::v3::Cluster::MAGLEV)},
+      {buildCluster("cluster_0", envoy::config::cluster::v3::Cluster::MAGLEV)}, {}, "2");
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
@@ -190,9 +190,11 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url,
       {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
-       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+       buildCluster("cluster_0", envoy::config::cluster::v3::Cluster::MAGLEV),
+       buildCluster("cluster_1")},
       {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
-       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+       buildCluster("cluster_0", envoy::config::cluster::v3::Cluster::MAGLEV),
+       buildCluster("cluster_1")},
       {}, "2");
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0", "cluster_1"},
                                       {"cluster_0", "cluster_1"}, {}));

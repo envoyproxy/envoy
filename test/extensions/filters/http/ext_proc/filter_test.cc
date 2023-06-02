@@ -1395,6 +1395,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
     response_body_mode: "STREAMED"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
+  allow_mode_override: true
   )EOF");
 
   // Create synthetic HTTP request
@@ -1482,6 +1483,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
     response_body_mode: "STREAMED"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
+  allow_mode_override: true
   )EOF");
 
   // Create synthetic HTTP request
@@ -1885,8 +1887,9 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
+  allow_mode_override: true
   )EOF");
-
+  EXPECT_EQ(filter_->config().allowModeOverride(), true);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   processRequestHeaders(
@@ -1918,6 +1921,48 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Leaving the allow_mode_override in filter config to be default, which is false.
+// In such case, the mode_override in the response will be ignored.
+TEST_F(HttpFilterTest, DisableResponseModeOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+  )EOF");
+
+  EXPECT_EQ(filter_->config().allowModeOverride(), false);
+  EXPECT_EQ(filter_->config().processingMode().response_header_mode(), ProcessingMode::SEND);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  // When ext_proc server sends back the request header response, it contains the
+  // mode_override for the response_header_mode to be SKIP.
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
+        response.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+      });
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, true));
+
+  // Such mode_override is ignored. The response header is still sent to the ext_proc server.
+  processResponseHeaders(false,
+                         [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
+                           EXPECT_TRUE(header_resp.end_of_stream());
+                           Http::TestRequestHeaderMapImpl expected_response{
+                               {":status", "200"}, {"content-type", "text/plain"}};
+                           EXPECT_THAT(header_resp.headers(), HeaderProtosEqual(expected_response));
+                         });
+
+  Http::TestRequestHeaderMapImpl final_expected_response{{":status", "200"},
+                                                         {"content-type", "text/plain"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+  filter_->onDestroy();
 }
 
 // Using a processing mode, configure the filter to only send the response_headers

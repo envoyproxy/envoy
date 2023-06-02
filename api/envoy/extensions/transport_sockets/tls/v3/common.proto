@@ -505,6 +505,11 @@ message CertificateValidationContext {
   // from that chain. This default behavior can be altered by setting
   // :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>` to
   // true.
+  //
+  // If ``crl`` is a filesystem path, a watch will be added to the parent
+  // directory for any file moves to support rotation. This currently only
+  // applies to dynamic secrets, when the ``CertificateValidationContext`` is
+  // delivered via SDS.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.

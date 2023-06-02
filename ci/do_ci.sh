@@ -163,7 +163,7 @@ function run_ci_verify () {
     # by a strong umask (ie only group readable by default).
     umask 027
     chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}" || exit
+    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}"
 }
 
 CI_TARGET=$1
@@ -715,6 +715,39 @@ case $CI_TARGET in
 
     verify_examples)
         run_ci_verify "*" "win32-front-proxy|shared"
+        ;;
+
+    verify.trigger)
+        setup_clang_toolchain
+        WORKFLOW="envoy-verify.yml"
+        # * Note on vars *
+        # `ENVOY_REPO`: Should always be envoyproxy/envoy unless testing
+        # `ENVOY_BRANCH`: Target branch for PRs, source branch for others
+        # `COMMIT`: This may be a merge commit in a PR
+        # `ENVOY_COMMIT`: The actual last commit of branch/PR
+        # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
+        #   cancellation, and to discriminate from other branch CI
+        COMMIT="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        echo "Trigger workflow (${WORKFLOW})"
+        echo "  Repo: ${ENVOY_REPO}"
+        echo "  Branch: ${ENVOY_BRANCH}"
+        echo "  Ref: ${COMMIT}"
+        echo "  Inputs:"
+        echo "    sha: ${ENVOY_COMMIT}"
+        echo "    head_ref: ${ENVOY_HEAD_REF}"
+        GITHUB_APP_KEY="$(echo "$GITHUB_TOKEN" | base64 -d -w0)"
+        export GITHUB_APP_KEY
+        INPUTS="{\"ref\":\"$COMMIT\",\"sha\":\"$ENVOY_COMMIT\",\"head_ref\":\"$ENVOY_HEAD_REF\"}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:trigger \
+              -- --repo="$ENVOY_REPO" \
+                 --trigger-app-id="$GITHUB_APP_ID" \
+                 --trigger-installation-id="$GITHUB_INSTALL_ID" \
+                 --trigger-ref="$ENVOY_BRANCH" \
+                 --trigger-workflow="$WORKFLOW" \
+                 --trigger-inputs="$INPUTS"
         ;;
 
     *)
