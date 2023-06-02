@@ -430,7 +430,7 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
     return;
   }
   if (common_response.has_header_mutation()) {
-    filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     return;
   }
   filter_.stats().clear_route_cache_ignored_.inc();

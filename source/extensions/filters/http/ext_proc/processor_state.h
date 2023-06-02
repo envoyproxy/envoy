@@ -210,7 +210,7 @@ protected:
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
 private:
-  virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) PURE;
+  virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
 };
 
 class DecodingProcessorState : public ProcessorState {
@@ -352,8 +352,6 @@ public:
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
-
-  void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) override {}
 
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
