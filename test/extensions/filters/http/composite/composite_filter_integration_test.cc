@@ -187,9 +187,25 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
 }
 
 // Test that the specified filters apply per route configs to requests.
-TEST_P(CompositeFilterIntegrationTest, TestPerRouteMultipleFilters) {
-  prependCompositeFilter(/*name=*/"composite_2");
-  prependCompositeFilter();
+TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) {
+  config_helper_.prependFilter(R"EOF(
+      name: composite_2
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+    )EOF");
+  config_helper_.prependFilter(R"EOF(
+      name: composite
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+    )EOF");
 
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/407, /*response_prefix=*/true);
@@ -197,27 +213,10 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteMultipleFilters) {
                                 /*code=*/402);
 
   initialize();
-  {
-
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
-  }
-
-  cleanupUpstreamAndDownstream();
-
-  {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    const Http::TestRequestHeaderMapImpl custom_request_headers_ = {{":method", "POST"},
-                                                                    {":path", "/otherpath"},
-                                                                    {":scheme", "http"},
-                                                                    {"match-header", "match"},
-                                                                    {":authority", "blah"}};
-    auto response = codec_client_->makeRequestWithBody(custom_request_headers_, 1024);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
-  }
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
 } // namespace
 } // namespace Envoy
