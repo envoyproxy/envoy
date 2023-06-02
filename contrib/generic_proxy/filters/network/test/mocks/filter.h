@@ -115,6 +115,7 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(absl::optional<ExtendedOptions>, requestOptions, (), (const));
   MOCK_METHOD(absl::optional<ExtendedOptions>, responseOptions, (), (const));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const));
 };
 
 class MockUpstreamManager : public UpstreamManager {
