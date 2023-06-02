@@ -196,6 +196,10 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	trailers.Set("x-test-trailer-0", "bar")
 	trailers.Del("x-test-trailer-1")
 
+	if trailers.GetRaw("existed-trailer") == "foo" {
+		trailers.Add("x-test-trailer-2", "bar")
+	}
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}

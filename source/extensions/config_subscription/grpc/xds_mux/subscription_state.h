@@ -11,9 +11,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/ttl.h"
-#include "source/common/config/update_ack.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/config_subscription/grpc/update_ack.h"
 
 #include "absl/strings/string_view.h"
 
