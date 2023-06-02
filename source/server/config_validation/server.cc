@@ -85,7 +85,12 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  if (!options.logFormatSet() && bootstrap_.has_application_log_format() &&
+  if (options_.logFormatSet() && bootstrap_.has_application_log_format()) {
+    throw EnvoyException(
+        "Only one of application_log_format or CLI option --log-format can be specified.");
+  }
+
+  if (bootstrap_.has_application_log_format() &&
       bootstrap_.application_log_format().has_json_format()) {
     const auto status =
         Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
