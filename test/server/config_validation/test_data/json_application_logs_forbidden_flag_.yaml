@@ -1,7 +1,8 @@
 ---
-application_log_format:
-  json_format:
-    MessageFromProto: "%_"
+application_log_config:
+  log_format:
+    json_format:
+      MessageFromProto: "%_"
 
 admin:
   address:

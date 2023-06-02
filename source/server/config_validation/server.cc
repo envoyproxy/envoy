@@ -86,8 +86,10 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  Utility::assertExclusiveLogFormatMethod(options_, bootstrap_);
-  Utility::maybeSetApplicationLogFormat(bootstrap_);
+  if (bootstrap_.has_application_log_config()) {
+    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
+    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+  }
 
   // Inject regex engine to singleton.
   Regex::EnginePtr regex_engine = createRegexEngine(

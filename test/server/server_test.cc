@@ -1629,7 +1629,7 @@ TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
   EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/json_application_log.yaml"), EnvoyException,
-      "Only one of application_log_format or CLI option --log-format can be specified.");
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
 }
 
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {

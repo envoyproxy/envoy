@@ -261,7 +261,7 @@ TEST_P(JsonApplicationLogsValidationServerTest, BootstrapApplicationLogsAndCLITh
                                 access_log_lock, component_factory_, Thread::threadFactoryForTest(),
                                 Filesystem::fileSystemForTest()),
       EnvoyException,
-      "Only one of application_log_format or CLI option --log-format can be specified.");
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
 }
 
 TEST_P(JsonApplicationLogsValidationServerTest, JsonApplicationLogs) {

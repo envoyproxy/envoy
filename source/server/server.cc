@@ -422,8 +422,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
-  Utility::assertExclusiveLogFormatMethod(options_, bootstrap_);
-  Utility::maybeSetApplicationLogFormat(bootstrap_);
+  if (bootstrap_.has_application_log_config()) {
+    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
+    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+  }
 
 #ifdef ENVOY_PERFETTO
   perfetto::TracingInitArgs args;
