@@ -11,6 +11,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
+#include "xds/type/matcher/v3/http_inputs.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -35,9 +37,12 @@ public:
     // This ensure that trees are only allowed to match on request headers, avoiding configurations
     // where the matcher requires data that will be available too late for the delegation to work
     // correctly.
-    requirements->mutable_data_input_allow_list()->add_type_url(
-        TypeUtil::descriptorFullNameToTypeUrl(
-            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+    auto* allow_list = requirements->mutable_data_input_allow_list();
+    allow_list->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+    // CEL matcher and its input is also allowed.
+    allow_list->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+        xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name()));
 
     return requirements;
   }
