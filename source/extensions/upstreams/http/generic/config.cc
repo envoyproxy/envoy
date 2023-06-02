@@ -35,6 +35,8 @@ Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
     return (udp_conn_pool->valid() ? std::move(udp_conn_pool) : nullptr);
   }
   }
+
+  return nullptr;
 }
 
 REGISTER_FACTORY(GenericGenericConnPoolFactory, Router::GenericConnPoolFactory);

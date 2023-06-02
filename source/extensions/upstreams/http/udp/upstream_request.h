@@ -43,7 +43,8 @@ public:
 
   Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
     return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
-                                                 nullptr, Network::SocketCreationOptions{});
+                                                 /*remote_address=*/nullptr,
+                                                 Network::SocketCreationOptions{});
   }
 
   bool valid() { return host_ != nullptr; }
@@ -76,6 +77,8 @@ public:
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
   uint64_t maxDatagramSize() const override { return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE; }
   void onDatagramsDropped(uint32_t dropped) override {
+    // TODO(https://github.com/envoyproxy/envoy/issues/23564): Add statistics for CONNECT-UDP
+    // upstreams.
     ENVOY_LOG_MISC(warn, "{} UDP datagrams were dropped.", dropped);
   }
   size_t numPacketsExpectedPerEventLoop() const override {

@@ -81,11 +81,11 @@ TEST_P(ConnectUdpTerminationIntegrationTest, Basic) {
   std::string received_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+                             "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
       );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+                        absl::HexStringToBytes("b1b2b3b4b5b6b7"), received_capsule_fragment);
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, BasicWithoutCapsuleProtocolHeader) {
@@ -100,11 +100,11 @@ TEST_P(ConnectUdpTerminationIntegrationTest, BasicWithoutCapsuleProtocolHeader) 
   std::string received_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+                             "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
       );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+                        absl::HexStringToBytes("b1b2b3b4b5b6b7"), received_capsule_fragment);
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
@@ -120,11 +120,11 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
   std::string received_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+                             "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
       );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+                        absl::HexStringToBytes("b1b2b3b4b5b6b7"), received_capsule_fragment);
 
   // Tear down by closing the client connection.
   codec_client_->close();
@@ -146,11 +146,11 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
   std::string received_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+                             "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
       );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+                        absl::HexStringToBytes("b1b2b3b4b5b6b7"), received_capsule_fragment);
 
   // Tear down by resetting the client stream.
   codec_client_->sendReset(*request_encoder_);
@@ -186,11 +186,11 @@ TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
   std::string received_capsule_fragment =
       absl::HexStringToBytes("00"               // DATAGRAM capsule type
                              "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+                             "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
       );
 
   sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
-                        absl::HexStringToBytes("a1a2a3a4a5a6a7a8"), received_capsule_fragment);
+                        absl::HexStringToBytes("b1b2b3b4b5b6b7"), received_capsule_fragment);
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
@@ -206,7 +206,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, PathWithInvalidUriTemplate) {
   initialize();
   connect_udp_headers_.setPath("/masque/udp/foo.lyft.com/80/");
   setUpConnection();
-  EXPECT_EQ("400", response_->headers().getStatusValue());
+  EXPECT_EQ("404", response_->headers().getStatusValue());
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
@@ -232,7 +232,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
       fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
 }
 
-INSTANTIATE_TEST_SUITE_P(HttpVersions, ConnectUdpTerminationIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, ConnectUdpTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
                               Http::CodecType::HTTP3},

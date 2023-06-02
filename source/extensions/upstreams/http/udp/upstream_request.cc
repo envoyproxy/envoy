@@ -49,7 +49,7 @@ UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_to_downstream,
       Event::FileReadyType::Read);
 }
 
-void UdpUpstream::encodeData(Buffer::Instance& data, bool /*end_stream*/) {
+void UdpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     absl::string_view mem_slice(static_cast<const char*>(slice.mem_), slice.len_);
     if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
@@ -57,7 +57,9 @@ void UdpUpstream::encodeData(Buffer::Instance& data, bool /*end_stream*/) {
       break;
     }
   }
-  capsule_parser_.ErrorIfThereIsRemainingBufferedData();
+  if (end_stream) {
+    capsule_parser_.ErrorIfThereIsRemainingBufferedData();
+  }
 }
 
 Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
@@ -81,19 +83,22 @@ void UdpUpstream::onSocketReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this,
-      dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped);
+      dispatcher_.timeSource(), /*prefer_gro=*/true, packets_dropped);
   if (result == nullptr) {
     socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;
   }
 }
 
+// The local and peer addresses are not used in this method since the socket is already bound and
+// connected to the upstream server in the encodeHeaders method.
 void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local_address*/,
                                 Network::Address::InstanceConstSharedPtr /*peer_address*/,
                                 Buffer::InstancePtr buffer, MonotonicTime /*receive_time*/) {
   std::string data = buffer->toString();
+  quiche::ConnectUdpDatagramUdpPacketPayload payload(data);
   quiche::QuicheBuffer serialized_capsule =
-      SerializeCapsule(quiche::Capsule::Datagram(data), &capsule_buffer_allocator_);
+      SerializeCapsule(quiche::Capsule::Datagram(payload.Serialize()), &capsule_buffer_allocator_);
 
   Buffer::InstancePtr capsule_data = std::make_unique<Buffer::OwnedImpl>();
   capsule_data->add(serialized_capsule.AsStringView());
@@ -104,7 +109,7 @@ void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local
 bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
   quiche::CapsuleType capsule_type = capsule.capsule_type();
   if (capsule_type != quiche::CapsuleType::DATAGRAM) {
-    // Silently drops Datagram Capsules with an unknown type.
+    // Silently drops capsules with an unknown type.
     return true;
   }
 
@@ -126,6 +131,7 @@ bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
   bytes_meter_->addWireBytesSent(buffer->length());
   Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
       socket_->ioHandle(), *buffer, /*local_ip=*/nullptr, *host_->address());
+  // TODO(https://github.com/envoyproxy/envoy/issues/23564): Handle some socket errors here.
   return true;
 }
 

@@ -1170,7 +1170,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Rewrites the host of CONNECT-UDP requests.
   if (HeaderUtility::isConnectUdp(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
-    sendLocalReply(Code::BadRequest, "Invalid URI Template in the path", nullptr, absl::nullopt,
+    sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);
     return;
   }

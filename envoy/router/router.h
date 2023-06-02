@@ -1528,7 +1528,7 @@ public:
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        GenericConnPoolFactory::UpstreamProtocol is_connect,
+                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;
