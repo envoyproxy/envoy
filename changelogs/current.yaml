@@ -179,6 +179,9 @@ removed_config_or_runtime:
 - area: header_formatters
   change: |
     removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
+- area: tls
+  change: |
+    remove runtime key ``envoy.reloadable_features.tls_async_cert_validation`` and legacy code paths.
 - area: config
   change: |
     removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
