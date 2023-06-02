@@ -422,20 +422,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
-  if (options_.logFormatSet() && bootstrap_.has_application_log_format()) {
-    throw EnvoyException(
-        "Only one of application_log_format or CLI option --log-format can be specified.");
-  }
-
-  if (bootstrap_.has_application_log_format() &&
-      bootstrap_.application_log_format().has_json_format()) {
-    const auto status =
-        Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
-
-    if (!status.ok()) {
-      throw EnvoyException(fmt::format("setJsonLogFormat error: {}", status.ToString()));
-    }
-  }
+  Utility::assertExclusiveLogFormatMethod(options_, bootstrap_);
+  Utility::maybeSetApplicationLogFormat(bootstrap_);
 
 #ifdef ENVOY_PERFETTO
   perfetto::TracingInitArgs args;

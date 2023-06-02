@@ -208,6 +208,7 @@ paths:
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/server.cc
+    - source/server/utils.cc
     - source/server/configuration_impl.h
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc

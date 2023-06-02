@@ -15,6 +15,7 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -85,20 +86,8 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  if (options_.logFormatSet() && bootstrap_.has_application_log_format()) {
-    throw EnvoyException(
-        "Only one of application_log_format or CLI option --log-format can be specified.");
-  }
-
-  if (bootstrap_.has_application_log_format() &&
-      bootstrap_.application_log_format().has_json_format()) {
-    const auto status =
-        Logger::Registry::setJsonLogFormat(bootstrap_.application_log_format().json_format());
-
-    if (!status.ok()) {
-      throw EnvoyException(fmt::format("setJsonLogFormat error: {}", status.ToString()));
-    }
-  }
+  Utility::assertExclusiveLogFormatMethod(options_, bootstrap_);
+  Utility::maybeSetApplicationLogFormat(bootstrap_);
 
   // Inject regex engine to singleton.
   Regex::EnginePtr regex_engine = createRegexEngine(
