@@ -1668,7 +1668,7 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   });
 
   initialize();
-  quic::QuicTagVector connection_options{quic::kRVCM, quic::kSPAD};
+  quic::QuicTagVector connection_options{quic::kSPAD};
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetConnectionOptionsToSend(connection_options);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1731,7 +1731,7 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
   });
 
   initialize();
-  quic::QuicTagVector connection_options{quic::kRVCM, quic::kSPAD};
+  quic::QuicTagVector connection_options{quic::kSPAD};
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetConnectionOptionsToSend(connection_options);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
