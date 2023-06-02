@@ -8,7 +8,6 @@
 #include "test/mocks/network/mocks.h"
 
 #include "contrib/smtp_proxy/filters/network/source/smtp_filter.h"
-#include "contrib/smtp_proxy/filters/network/test/smtp_test_utils.h"
 
 using ConfigProto = envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy;
 
