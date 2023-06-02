@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 
 #include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
-#include "contrib/smtp_proxy/filters/network/test/smtp_test_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,7 +59,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   data_.add("eHlO example.com\r\n");
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
   data_.drain(data_.length());
-  EXPECT_EQ(17, command.wire_len);
+  EXPECT_EQ(18, command.wire_len);
   EXPECT_EQ(Decoder::Command::EHLO, command.verb);
   EXPECT_EQ("eHlO", command.raw_verb);
   EXPECT_EQ("example.com", command.rest);

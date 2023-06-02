@@ -135,9 +135,8 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     return Network::FilterStatus::StopIteration;
   }
   default:
-    ASSERT(0); // ABSL_UNREACHABLE();
+    ABSL_UNREACHABLE();
   }
-  ASSERT(0); // ABSL_UNREACHABLE();
 }
 
 void SmtpFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -265,9 +264,8 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     return Network::FilterStatus::StopIteration;
   }
   default:
-    ASSERT(0); // ABSL_UNREACHABLE();
+    ABSL_UNREACHABLE();
   }
-  ASSERT(0); // ABSL_UNREACHABLE();
 }
 
 DecoderPtr SmtpFilter::createDecoder() { return std::make_unique<DecoderImpl>(); }

@@ -68,7 +68,8 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
   }
   result.wire_len = line.size();
 
-  ASSERT(absl::ConsumeSuffix(&line, CRLF));
+  const bool trailing_crlf = absl::ConsumeSuffix(&line, CRLF);
+  ASSERT(trailing_crlf);
 
   ssize_t space = line.find(' ');
   if (space == -1) {
@@ -133,8 +134,9 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
       }
     }
     absl::string_view code_str = line.substr(0, 3);
-    int this_code;
-    ASSERT(absl::SimpleAtoi(code_str, &this_code));
+    int this_code = 0;
+    const bool atoi_result = absl::SimpleAtoi(code_str, &this_code);
+    ASSERT(atoi_result);
 
     if (code && this_code != *code) {
       return Result::Bad;
