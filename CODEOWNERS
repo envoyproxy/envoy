@@ -283,7 +283,7 @@ extensions/filters/http/oauth2 @derekargueta
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
-/*/extensions/filters/network/zookeeper_proxy @JuniorHsu
+/*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob
 # Custom response filter
 /*/extensions/filters/http/custom_response @pradeepcrao @yanavlasov
 /*/extensions/http/custom_response/redirect_policy @pradeepcrao @yanavlasov
@@ -310,9 +310,9 @@ extensions/filters/http/oauth2 @derekargueta
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
-/*/extensions/health_checkers/grpc @zuercher
-/*/extensions/health_checkers/http @zuercher
-/*/extensions/health_checkers/tcp @zuercher
+/*/extensions/health_checkers/grpc @zuercher @botengyao
+/*/extensions/health_checkers/http @zuercher @botengyao
+/*/extensions/health_checkers/tcp @zuercher @botengyao
 # Health check event sinks
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation
