@@ -140,7 +140,9 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.admin()->startHttpListener({}, "", nullptr, nullptr, nullptr);
 
   Network::MockTcpListenerCallbacks listener_callbacks;
-  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(), false, false);
+  Network::MockListenerConfig listener_config;
+  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(),
+                                     listener_config);
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
 }

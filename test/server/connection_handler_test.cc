@@ -319,15 +319,16 @@ public:
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->sockets_[0]));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-          .WillOnce(Invoke([listener, listener_callbacks](
-                               Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
-                               Runtime::Loader&, bool, bool) -> Network::Listener* {
-            if (listener_callbacks != nullptr) {
-              *listener_callbacks = &cb;
-            }
-            return listener;
-          }));
+      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+          .WillOnce(Invoke(
+              [listener, listener_callbacks](Network::SocketSharedPtr&&,
+                                             Network::TcpListenerCallbacks& cb, Runtime::Loader&,
+                                             const Network::ListenerConfig&) -> Network::Listener* {
+                if (listener_callbacks != nullptr) {
+                  *listener_callbacks = &cb;
+                }
+                return listener;
+              }));
     } else {
       EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
           .WillOnce(
@@ -387,11 +388,11 @@ public:
       test_listener_raw_ptr->sockets_[i]->connection_info_provider_->setLocalAddress(addresses[i]);
 
       if (socket_type == Network::Socket::Type::Stream) {
-        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
+        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
             .WillOnce(
                 Invoke([i, &mock_listeners, &listener_callbacks_map](
                            Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                           Runtime::Loader&, bool, bool) -> Network::Listener* {
+                           Runtime::Loader&, const Network::ListenerConfig&) -> Network::Listener* {
                   auto listener_callbacks_iter = listener_callbacks_map.find(
                       socket->connectionInfoProvider().localAddress()->asString());
                   EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
