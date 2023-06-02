@@ -12,6 +12,7 @@
 #include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Common {
@@ -154,7 +155,9 @@ DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   if (per_route_config != nullptr) {
     match_state_.setMatchTree(per_route_config->matchTree());
   } else {
-    ENVOY_LOG(debug, "No per route config found");
+    ENVOY_LOG(
+        trace,
+        "No per route config found, thus the matcher tree can not be built from per route config");
   }
 
   match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
@@ -327,10 +330,14 @@ FilterConfigPerRoute::createFilterMatchTree(
       std::make_unique<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name()));
   Server::Configuration::FactoryContext* context =
       reinterpret_cast<Server::Configuration::FactoryContext*>(&server_context);
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      server_context.scope().symbolTable().toString(server_context.scope().prefix()), *context};
+      fmt::format("http.{}.",
+                  server_context.scope().symbolTable().toString(server_context.scope().prefix())),
+      *context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,

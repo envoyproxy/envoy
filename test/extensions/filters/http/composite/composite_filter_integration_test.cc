@@ -43,6 +43,7 @@ public:
 
   ExtensionWithMatcherPerRoute createPerRouteConfig(
       std::function<void(envoy::config::core::v3::TypedExtensionConfig*)> base_action_function) {
+
     ExtensionWithMatcherPerRoute per_route_config;
     auto matcher_tree = per_route_config.mutable_xds_matcher()->mutable_matcher_tree();
 
