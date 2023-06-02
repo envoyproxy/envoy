@@ -359,27 +359,6 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
   return absl::FailedPreconditionError("spurious message");
 }
 
-void ProcessorState::clearRouteCache(const CommonResponse& common_response) {
-  if (!common_response.clear_route_cache()) {
-    return;
-  }
-  // No need to clear route cache for response traffic to the downstream client.
-  if (trafficDirection() == envoy::config::core::v3::TrafficDirection::OUTBOUND) {
-    return;
-  }
-  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
-  if (filter_.config().disableClearRouteCache()) {
-    filter_.stats().clear_route_cache_disabled_.inc();
-    return;
-  }
-  if (common_response.has_header_mutation()) {
-    filter_callbacks_->downstreamCallbacks()->clearRouteCache();
-    return;
-  }
-  filter_.stats().clear_route_cache_ignored_.inc();
-  ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
-}
-
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
                                            bool delivered) {
   chunk_queue_.push(data, end_stream, delivered);
@@ -439,6 +418,23 @@ void DecodingProcessorState::clearWatermark() {
     watermark_requested_ = false;
     decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
+}
+
+void DecodingProcessorState::clearRouteCache(const CommonResponse& common_response) {
+  if (!common_response.clear_route_cache()) {
+    return;
+  }
+  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+  if (filter_.config().disableClearRouteCache()) {
+    filter_.stats().clear_route_cache_disabled_.inc();
+    return;
+  }
+  if (common_response.has_header_mutation()) {
+    filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+    return;
+  }
+  filter_.stats().clear_route_cache_ignored_.inc();
+  ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
 }
 
 void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
