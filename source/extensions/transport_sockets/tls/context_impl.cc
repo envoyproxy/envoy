@@ -172,22 +172,17 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-          // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as
-          // a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail
-          // without trust anchors), save the result in the session ticket, but otherwise continue
-          // with the handshake. But Envoy actually wants it to accept all certificates. The
-          // disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy
-          // never queries but gets saved in session tickets, and tries to find an anchor that isn't
-          // there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't
-          // even request client certs. So, instead, we should configure a callback to skip
-          // validation and always supply the callback to boring SSL.
-          SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
-          SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
-        } else {
-          SSL_CTX_set_verify(ctx, verify_mode, nullptr);
-          SSL_CTX_set_cert_verify_callback(ctx, verifyCallback, this);
-        }
+        // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as
+        // a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail
+        // without trust anchors), save the result in the session ticket, but otherwise continue
+        // with the handshake. But Envoy actually wants it to accept all certificates. The
+        // disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy
+        // never queries but gets saved in session tickets, and tries to find an anchor that isn't
+        // there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't
+        // even request client certs. So, instead, we should configure a callback to skip
+        // validation and always supply the callback to boring SSL.
+        SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
+        SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
       }
     }
   }
@@ -467,23 +462,6 @@ ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options
   return ssl_con;
 }
 
-int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
-  ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
-  SSL* ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
-  auto transport_socket_options_shared_ptr_ptr =
-      static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
-  ASSERT(transport_socket_options_shared_ptr_ptr);
-  const Network::TransportSocketOptions* transport_socket_options =
-      (*transport_socket_options_shared_ptr_ptr).get();
-  return impl->cert_validator_->doSynchronousVerifyCertChain(
-      store_ctx,
-      reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
-      *cert, transport_socket_options);
-}
-
 enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* out_alert) {
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
@@ -525,7 +503,6 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
 ValidationResults ContextImpl::customVerifyCertChain(
     Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl) {
-  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(extended_socket_info);
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
   if (cert_chain == nullptr) {
@@ -1373,42 +1350,10 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
   return false;
 }
 
-bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates,
-                                  std::string& error_details) {
-  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
-
-  ASSERT(!tls_contexts_.empty());
-  // It doesn't matter which SSL context is used, because they share the same
-  // cert validation config.
-  const SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
-  X509_STORE* store = SSL_CTX_get_cert_store(ssl_ctx);
-  if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
-    error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
-    return false;
-  }
-  // Currently this method is only used to verify server certs, so hard-code "ssl_server" for now.
-  if (!X509_STORE_CTX_set_default(ctx.get(), "ssl_server") ||
-      !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
-                              SSL_CTX_get0_param(const_cast<SSL_CTX*>(ssl_ctx)))) {
-    error_details =
-        "Failed to verify certificate chain: fail to setup X509_STORE_CTX or its param.";
-    return false;
-  }
-
-  int res = cert_validator_->doSynchronousVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
-  // If |SSL_VERIFY_NONE|, the error is non-fatal, but we keep the error details.
-  if (res <= 0 && SSL_CTX_get_verify_mode(ssl_ctx) != SSL_VERIFY_NONE) {
-    error_details = Utility::getX509VerificationErrorInfo(ctx.get());
-    return false;
-  }
-  return true;
-}
-
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     const CertValidator::ExtraValidationContext& validation_context, const std::string& host_name) {
-  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same cert validation
   // config.
