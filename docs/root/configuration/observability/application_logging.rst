@@ -44,4 +44,4 @@ except for the ``%v`` and ``%_`` flags, as they may break the JSON structure log
         FixedValue: "SomeFixedValue"
 
 .. note::
-  Setting both ``application_log_config:log_format`` and CLI option ``--log-format`` is not allowed, and will cause a bootstrap error.
+  Setting both ``application_log_config.log_format`` and CLI option ``--log-format`` is not allowed, and will cause a bootstrap error.
