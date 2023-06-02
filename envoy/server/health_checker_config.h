@@ -46,6 +46,18 @@ public:
    * @return Api::Api& the API used by the server.
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /**
+   * Set the event logger to the context, nullptr is accepted since
+   * the default in the context is nullptr.
+   * @param event_logger the health check event logger.
+   */
+  virtual void setEventLogger(Upstream::HealthCheckEventLoggerPtr event_logger) PURE;
 };
 
 /**

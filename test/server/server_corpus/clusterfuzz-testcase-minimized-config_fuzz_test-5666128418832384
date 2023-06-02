@@ -85,7 +85,6 @@ node {   id: " "   cluster: "              "   build_version: " " } static_resou
         service_name: "0"
         use_http2: true
       }
-      event_log_path: "c"
     }
     tls_context {
       common_tls_context {
