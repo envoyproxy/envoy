@@ -1079,6 +1079,21 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithInvalidCharacter) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    hdr->mutable_header()->set_key("x-failure-reason\n");
+    hdr->mutable_header()->set_value("testing");
+  });
+
+  verifyDownstreamResponse(*response, 401);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by sending back an immediate_response message after the
@@ -2011,6 +2026,63 @@ TEST_P(ExtProcIntegrationTest, SendHeaderAndTrailerInBufferedMode) {
   processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the filter with header allow list configured and verify only the allowed headers
+// in request or response headers and trailers are sent to the ext_proc server.
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
+  auto* forward_rules = proto_config_.mutable_forward_rules();
+  auto* list = forward_rules->mutable_allowed_headers();
+  list->add_patterns()->set_exact(":method");
+  list->add_patterns()->set_exact(":authority");
+  list->add_patterns()->set_exact(":status");
+  list->add_patterns()->set_exact("x-test-trailers");
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":method", "GET"},
+                                                                {":authority", "host"}};
+        // Verify only allowed request headers is received by ext_proc server.
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+        return true;
+      });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false,
+                                [](const HttpTrailers& trailers, TrailersResponse&) {
+                                  // The request trailer header is not in the allow list.
+                                  EXPECT_EQ(trailers.trailers().headers_size(), 0);
+                                  return true;
+                                });
+  // Send back response with :status 200 and trailer header: x-test-trailers.
+  handleUpstreamRequestWithTrailer();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
+        // The response trailer header is in the allow list.
+        Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
+        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+        return true;
+      });
   verifyDownstreamResponse(*response, 200);
 }
 
