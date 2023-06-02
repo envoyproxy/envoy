@@ -427,9 +427,11 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
   // Only clear the route cache if there is a mutation to the header and clearing is allowed.
   if (filter_.config().disableClearRouteCache()) {
     filter_.stats().clear_route_cache_disabled_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
     return;
   }
   if (common_response.has_header_mutation()) {
+    ENVOY_LOG(debug, "clearing route cache");
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     return;
   }
