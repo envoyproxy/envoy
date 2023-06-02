@@ -921,25 +921,12 @@ TestUtilOptionsV2 createProtocolTestOptions(
 
 } // namespace
 
-std::string ipCustomCertValidationTestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
-  return fmt::format(
-      "{}_{}",
-      TestUtility::ipTestParamsToString(
-          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_custom_cert_validation" : "with_sync_cert_validation");
-}
-
-class SslSocketTest
-    : public SslCertsTest,
-      public testing::WithParamInterface<std::tuple<Network::Address::IpVersion, bool>> {
+class SslSocketTest : public SslCertsTest,
+                      public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
   SslSocketTest()
       : dispatcher_(api_->allocateDispatcher("test_thread")),
-        stream_info_(api_->timeSource(), nullptr), version_(std::get<0>(GetParam())) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation",
-                                  std::get<1>(GetParam()));
-  }
+        stream_info_(api_->timeSource(), nullptr), version_(GetParam()) {}
 
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
@@ -951,10 +938,9 @@ protected:
   Network::Address::IpVersion version_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, SslSocketTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipCustomCertValidationTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   Stats::TestUtil::TestStore server_stats_store;
@@ -2093,13 +2079,9 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(
-      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedClientCertUri("spiffe://lyft.com/test-team")
-          .setExpectedTransportFailureReasonContains(
-              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
-                  ? "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"
-                  : "SSLV3_ALERT_HANDSHAKE_FAILURE"));
+  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+                 .setExpectedClientCertUri("spiffe://lyft.com/test-team")
+                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 }
 
 // Allow expired certificates, but use the wrong CA so it should fail still.
@@ -2651,12 +2633,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(
-      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains(
-              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
-                  ? "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"
-                  : "SSLV3_ALERT_HANDSHAKE_FAILURE"));
+  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2689,12 +2667,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(
-      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains(
-              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
-                  ? "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"
-                  : "SSLV3_ALERT_HANDSHAKE_FAILURE"));
+  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2899,12 +2873,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(
-      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains(
-              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
-                  ? "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"
-                  : "SSLV3_ALERT_HANDSHAKE_FAILURE"));
+  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2938,12 +2908,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(
-      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains(
-              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
-                  ? "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"
-                  : "SSLV3_ALERT_HANDSHAKE_FAILURE"));
+  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -5983,10 +5949,9 @@ protected:
   Network::Address::InstanceConstSharedPtr source_address_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, SslReadBufferLimitTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipCustomCertValidationTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);
@@ -6948,10 +6913,6 @@ TEST_P(SslSocketTest, Sni) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -6995,10 +6956,6 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:

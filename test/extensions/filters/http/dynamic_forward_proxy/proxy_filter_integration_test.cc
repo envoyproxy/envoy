@@ -222,10 +222,12 @@ typed_config:
     ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
     ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
 
-    const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
-        dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-            fake_upstream_connection_->connection().ssl().get());
-    EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+    if (upstream_tls_) {
+      const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+          dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+              fake_upstream_connection_->connection().ssl().get());
+      EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+    }
   }
 
   void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config = "") {
@@ -256,7 +258,7 @@ typed_config:
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
-  EXPECT_FALSE(headers.get(Http::LowerCaseString(name)).empty());
+  EXPECT_FALSE(headers.get(Http::LowerCaseString(name)).empty()) << "Missing " << name;
   int64_t val;
   if (!headers.get(Http::LowerCaseString(name)).empty() &&
       absl::SimpleAtoi(headers.get(Http::LowerCaseString(name))[0]->value().getStringView(),
@@ -268,11 +270,11 @@ int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view
 
 void ProxyFilterIntegrationTest::testConnectionTiming(IntegrationStreamDecoderPtr& response,
                                                       bool cached_dns, int64_t original_usec) {
+  int64_t handshake_end;
   int64_t dns_start = getHeaderValue(response->headers(), "dns_start");
   int64_t dns_end = getHeaderValue(response->headers(), "dns_end");
   int64_t connect_start = getHeaderValue(response->headers(), "upstream_connect_start");
   int64_t connect_end = getHeaderValue(response->headers(), "upstream_connect_complete");
-  int64_t handshake_end = getHeaderValue(response->headers(), "upstream_handshake_complete");
   int64_t request_send_end = getHeaderValue(response->headers(), "request_send_end");
   int64_t response_begin = getHeaderValue(response->headers(), "response_begin");
   Event::DispatcherImpl dispatcher("foo", *api_, timeSystem());
@@ -284,11 +286,14 @@ void ProxyFilterIntegrationTest::testConnectionTiming(IntegrationStreamDecoderPt
   } else {
     ASSERT_LE(dns_end, connect_start);
   }
+  if (upstream_tls_) {
+    handshake_end = getHeaderValue(response->headers(), "upstream_handshake_complete");
+    ASSERT_LE(connect_end, handshake_end);
+    ASSERT_LE(handshake_end, request_send_end);
+    ASSERT_LT(handshake_end, timeSystem().monotonicTime().time_since_epoch().count());
+  }
   ASSERT_LE(connect_start, connect_end);
-  ASSERT_LE(connect_end, handshake_end);
-  ASSERT_LE(handshake_end, request_send_end);
   ASSERT_LE(request_send_end, response_begin);
-  ASSERT_LT(handshake_end, timeSystem().monotonicTime().time_since_epoch().count());
 }
 
 class ProxyFilterWithSimtimeIntegrationTest : public Event::TestUsingSimulatedTime,
@@ -304,6 +309,23 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 // A basic test where we pause a request to lookup localhost, and then do another request which
 // should hit the TLS cache.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) { requestWithBodyTest(); }
+
+TEST_P(ProxyFilterIntegrationTest, MultiPortTest) {
+  upstream_tls_ = false;
+  requestWithBodyTest();
+
+  // Create a second upstream, and send a request there.
+  // The second upstream is autonomous where the first was not so we'll only get a 200-ok if we hit
+  // the new port.
+  // this regression tests https://github.com/envoyproxy/envoy/issues/27331
+  autonomous_upstream_ = true;
+  createUpstream(Network::Test::getCanonicalLoopbackAddress(version_), upstreamConfig());
+  default_request_headers_.setHost(
+      fmt::format("localhost:{}", fake_upstreams_[1]->localAddress()->ip()->port()));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
@@ -448,7 +470,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
 
 // Verify that the filter works without TLS.
 TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
-  upstream_tls_ = true;
+  upstream_tls_ = false;
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -464,6 +486,34 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+// Regression test a bug where the host header was used for cache lookups rather than host:port key
+TEST_P(ProxyFilterIntegrationTest, CacheSansPort) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "localhost"}};
+
+  // Send a request to localhost, with no port specified. The cluster will
+  // default to localhost:443, and the connection will fail.
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started"));
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+
+  // Now try a second request and make sure it encounters the same error rather
+  // than dns_resolution_failure.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("upstream_reset_before_response_started"));
 }
 
 // Verify that `override_auto_sni_header` can be used along with auto_sni to set
