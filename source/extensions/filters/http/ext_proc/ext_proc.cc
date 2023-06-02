@@ -120,6 +120,7 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 Filter::StreamOpenState Filter::openStream() {
   // External processing already completes. Return IgnoreError so the filter will return Continue.
   if (processing_complete_) {
+    ENVOY_LOG(debug, "External processing already completed when trying to open the gRPC stream");
     return StreamOpenState::IgnoreError;
   }
   if (!stream_) {
