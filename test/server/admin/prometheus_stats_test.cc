@@ -81,6 +81,7 @@ protected:
     histogram->setTagExtractedName(name);
     histogram->setTags(cluster_tags);
     histogram->used_ = true;
+    histogram->hidden_ = false;
     return histogram;
   }
 
