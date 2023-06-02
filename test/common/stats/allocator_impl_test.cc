@@ -525,8 +525,8 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
-  std::vector<GaugeSharedPtr> sinked_gauges;
-  std::vector<GaugeSharedPtr> unsinked_gauges;
+  GaugeSharedPtr sinked_gauge;
+  GaugeSharedPtr unsinked_gauge;
 
   auto unhidden_stat_name = makeStat(absl::StrCat("unhidden.gauge"));
   auto hidden_stat_name = makeStat(absl::StrCat("hidden.gauge"));
@@ -534,11 +534,11 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
   size_t num_gauges = 0;
   size_t num_iterations = 0;
 
-  sinked_gauges.emplace_back(
-      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+  sinked_gauge =
+      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
-  unsinked_gauges.emplace_back(
-      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate));
+  unsinked_gauge =
+      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                             [&num_iterations](Gauge&) { ++num_iterations; });
@@ -550,8 +550,8 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
-  std::vector<GaugeSharedPtr> sinked_gauges;
-  std::vector<GaugeSharedPtr> unsinked_gauges;
+  GaugeSharedPtr sinked_gauge;
+  GaugeSharedPtr unsinked_gauge;
 
   alloc_.setSinkPredicates(std::move(moved_sink_predicates));
 
@@ -564,11 +564,11 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   size_t num_gauges = 0;
   size_t num_iterations = 0;
 
-  sinked_gauges.emplace_back(
-      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+  sinked_gauge =
+      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
-  unsinked_gauges.emplace_back(
-      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate));
+  unsinked_gauge =
+      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                             [&num_iterations](Gauge&) { ++num_iterations; });
