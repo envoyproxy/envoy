@@ -45,5 +45,10 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+        "//source/extensions/matching/http/cel_input:cel_input_lib",
+        "//source/extensions/matching/input_matchers/cel_matcher:cel_matcher_lib",
+        "//source/extensions/matching/input_matchers/cel_matcher:config",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
 )
