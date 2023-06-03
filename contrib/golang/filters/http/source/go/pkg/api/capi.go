@@ -23,6 +23,9 @@ type HttpCAPI interface {
 	HttpContinue(r unsafe.Pointer, status uint64)
 	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 
+	// Send a specialized reply that indicates that the filter has failed on the go side. Internally this is used for
+	// when unhandled panics are detected.
+	HttpSendPanicReply(r unsafe.Pointer, details string)
 	// experience api, memory unsafe
 	HttpGetHeader(r unsafe.Pointer, key *string, value *string)
 	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
@@ -33,15 +36,19 @@ type HttpCAPI interface {
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
+	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
+	HttpRemoveTrailer(r unsafe.Pointer, key *string)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
-	// HttpLog writes message to the registered logger during request processes.
-	// we are also consider adding MiscLog to write the misc logger during non-request
-	// processes in the future.
-	HttpLog(r unsafe.Pointer, level LogType, message string)
+	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
+	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
+
+	HttpLog(level LogType, message string)
+	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+
+	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 }

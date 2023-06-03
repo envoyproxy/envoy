@@ -197,16 +197,6 @@ The following command operators are supported:
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
-%STREAM_STATE%
-  HTTP/TCP
-    The state of the stream. Currently either *Started* *InProgress* *Ended*.
-    For TCP, the value will be 'Started', in case an upstream connection has been successfully made. The value will be 'InProgress' in case the stream has started, and it is active. The value will be 'Ended' in case the upstream stream has been terminated.
-    For HTTP, the value will be 'Started' in case downstream headers have been received. The value will be 'InProgress' in case an upstream connection was made, success status code has been returned and the request is active. The value will be 'Ended' in case the upstream request has been termindated.
-    In case the stream has not started yet, the value will be - 'null'.
-
-  UDP
-    Not implemented ("-").
-
 %UPSTREAM_PROTOCOL%
   HTTP
     Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -1060,6 +1050,24 @@ The following command operators are supported:
 
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+.. _config_access_log_format_access_log_type:
+
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

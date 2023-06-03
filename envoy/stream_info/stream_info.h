@@ -205,26 +205,6 @@ struct ResponseCodeDetailValues {
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
-struct StreamStateStringValues {
-  const std::string StreamStarted = "Started";
-  const std::string StreamInProgress = "InProgress";
-  const std::string StreamEnded = "Ended";
-};
-
-using StreamStateStrings = ConstSingleton<StreamStateStringValues>;
-
-/**
- * For TCP protocol, 'Started' means that an upstream connection has been
- * successfully established. For HTTP protocol, 'Started' means that downstream
- * request headers have been received by the HTTP connection manager, but it does
- * not indicate that a connection was made with the upstream.
- * For both TCP and HTTP protocols, 'InProgress' means that the stream has been
- * successfully establiahed with the upstream, and it is currently active.
- * For both protocols, 'Ended' means that the upstream stream has ended,
- * regardless if it was successful or not.
- */
-enum StreamState { Started = 0x1, InProgress = 0x2, Ended = 0x4 };
-
 /**
  * Constants for the locally closing a connection. This is used in response code
  * details field of StreamInfo for details sent by core (non-extension) code.
@@ -599,16 +579,6 @@ public:
    * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
-
-  /**
-   * @return the stream's state.
-   */
-  virtual absl::optional<StreamState> streamState() const PURE;
-
-  /**
-   * @param protocol the stream's state.
-   */
-  virtual void setStreamState(StreamState stream_state) PURE;
 
   /**
    * @return the protocol of the request.

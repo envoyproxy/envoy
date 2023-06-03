@@ -20,6 +20,7 @@ public:
                     bool end_stream) PURE;
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;

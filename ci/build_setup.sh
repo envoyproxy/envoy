@@ -2,7 +2,14 @@
 
 # Configure environment variables for Bazel build and test.
 
+# Note order is important in this file, we dont want to use bazel until
+# it has been properly configured, and we are in the correct env (eg filter example)
+
 set -e
+
+if [[ -n "$NO_BUILD_SETUP" ]]; then
+    exit
+fi
 
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
@@ -43,6 +50,8 @@ function setup_gcc_toolchain() {
   else
     BAZEL_BUILD_OPTIONS+=("--config=remote-gcc")
   fi
+  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+  export BAZEL_BUILD_OPTION_LIST
 }
 
 function setup_clang_toolchain() {
@@ -60,6 +69,9 @@ function setup_clang_toolchain() {
       BAZEL_BUILD_OPTIONS+=("--config=remote-clang")
     fi
   fi
+
+  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+  export BAZEL_BUILD_OPTION_LIST
   echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
@@ -71,7 +83,7 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
+export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
@@ -89,9 +101,22 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
+# NB: do not use bazel before here to ensure correct directories.
+_bazel="$(which bazel)"
 
-if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+BAZEL_STARTUP_OPTIONS=(
+    "--output_user_root=${BUILD_DIR}/bazel_root"
+    "--output_base=${BUILD_DIR}/bazel_root/base")
+
+bazel () {
+    # echo "RUNNING BAZEL (${PWD}): ${BAZEL_STARTUP_OPTIONS[*]} <> ${*}" >&2
+    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+}
+
+export _bazel
+export -f bazel
+
+if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
     VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
     # Use uncached test results for non-release commits to a branch.
     if [[ $VERSION_DEV == "dev" ]]; then
@@ -101,26 +126,51 @@ fi
 
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
+BAZEL_GLOBAL_OPTIONS=(
+  "--repository_cache=${BUILD_DIR}/repository_cache"
+  "--experimental_repository_cache_hardlinks")
 BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
+  "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
-  "--noshow_progress"
-  "--noshow_loading_progress"
-  "--repository_cache=${BUILD_DIR}/repository_cache"
-  "--experimental_repository_cache_hardlinks"
   "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
+
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
-[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
+if [[ -z "${ENVOY_RBE}" ]]; then
+    BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
+    echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
+fi
+
+BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+BAZEL_GLOBAL_OPTION_LIST="${BAZEL_GLOBAL_OPTIONS[*]}"
+export BAZEL_STARTUP_OPTION_LIST
+export BAZEL_BUILD_OPTION_LIST
+export BAZEL_GLOBAL_OPTION_LIST
+
+if [[ -e "${LLVM_ROOT}" ]]; then
+    "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+else
+    echo "LLVM_ROOT not found, not setting up llvm."
+fi
+
+[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
+
+if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+    ENVOY_BUILD_DIR="${BUILD_DIR}/envoy/x64"
+else
+    ENVOY_BUILD_DIR="${BUILD_DIR}/envoy/arm64"
+fi
 
 # Also setup some space for building Envoy standalone.
-export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
+export ENVOY_BUILD_DIR
 mkdir -p "${ENVOY_BUILD_DIR}"
 
 # This is where we copy build deliverables to.
@@ -144,10 +194,11 @@ mkdir -p "${ENVOY_BUILD_PROFILE}"
 export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
 export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
-
-if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]] && [[ "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
   . "$(dirname "$0")"/filter_example_setup.sh
 else
   echo "Skip setting up Envoy Filter Example."
 fi
+
+export NO_BUILD_SETUP=1

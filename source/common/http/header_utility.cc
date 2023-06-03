@@ -6,6 +6,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/character_set_validation.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -200,51 +201,6 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
                                                              http2::adapter::ObsTextOption::kAllow);
 }
 
-namespace {
-// TODO(yanavlasov): This code is copied from the default UHV. As the transition to UHV is
-// completed, replace it with the call to UHV.
-constexpr bool testChar(const std::array<uint32_t, 8>& table, char c) {
-  // CPU cache friendly version of a lookup in a bit table of size 256.
-  // The table is organized as 8 32 bit words.
-  // This function looks up a bit from the `table` at the index `c`.
-  // This function is used to test whether a character `c` is allowed
-  // or not based on the value of a bit at index `c`.
-  uint8_t tmp = static_cast<uint8_t>(c);
-  // The `tmp >> 5` determines which of the 8 uint32_t words has the bit at index `uc`.
-  // The `0x80000000 >> (tmp & 0x1f)` determines the index of the bit within the 32 bit word.
-  return (table[tmp >> 5] & (0x80000000 >> (tmp & 0x1f))) != 0;
-}
-
-// Header name character table.
-// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
-//
-// SPELLCHECKER(off)
-// header-field   = field-name ":" OWS field-value OWS
-// field-name     = token
-// token          = 1*tchar
-//
-// tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
-//                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
-//                / DIGIT / ALPHA
-// SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01011111001101101111111111000000,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b01111111111111111111111111100011,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b11111111111111111111111111101010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
-
-} // namespace
-
 bool HeaderUtility::headerNameIsValid(const absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
     // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
@@ -259,7 +215,7 @@ bool HeaderUtility::headerNameIsValid(const absl::string_view header_key) {
   // TODO(yanavlasov): make validation in HTTP/2 case stricter.
   bool is_valid = true;
   for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
-    is_valid &= testChar(kGenericHeaderNameCharTable, *iter);
+    is_valid &= testCharInTable(kGenericHeaderNameCharTable, *iter);
   }
   return is_valid;
 }
@@ -343,6 +299,19 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   if (host[dot_index + 1] == ':') {
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }
+}
+
+bool HeaderUtility::hostHasPort(absl::string_view original_host) {
+  const absl::string_view::size_type port_start = getPortStart(original_host);
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  if (port_start == absl::string_view::npos) {
+    return false;
+  }
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return false;
+  }
+  return true;
 }
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,

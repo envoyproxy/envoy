@@ -104,6 +104,16 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
+
+	_, found := header.Get("x-set-metadata")
+	if found {
+		md := f.callbacks.StreamInfo().DynamicMetadata()
+		md.Set("filter.go", "foo", "bar")
+	}
+
+	fs := f.callbacks.StreamInfo().FilterState()
+	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
@@ -133,6 +143,8 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("req-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("req-downstream-local-address", f.callbacks.StreamInfo().DownstreamLocalAddress())
+	header.Set("req-downstream-remote-address", f.callbacks.StreamInfo().DownstreamRemoteAddress())
 	if !endStream && strings.Contains(f.databuffer, "decode-header") {
 		return api.StopAndBuffer
 	}
@@ -180,6 +192,14 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 		return f.sendLocalReply("decode-trailer")
 	}
 
+	trailers.Add("existed-trailer", "bar")
+	trailers.Set("x-test-trailer-0", "bar")
+	trailers.Del("x-test-trailer-1")
+
+	if trailers.GetRaw("existed-trailer") == "foo" {
+		trailers.Add("x-test-trailer-2", "bar")
+	}
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}
@@ -202,6 +222,12 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	}
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
+	}
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+		header.Set("rsp-upstream-host", upstream_host_address)
+	}
+	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
+		header.Set("rsp-upstream-cluster", upstream_cluster_name)
 	}
 
 	origin, found := header.Get("x-test-header-0")
@@ -230,6 +256,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("test-method", f.method)
 	header.Set("test-path", f.path)
 	header.Set("test-host", f.host)
+	header.Set("test-log-level", f.callbacks.LogLevel().String())
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))

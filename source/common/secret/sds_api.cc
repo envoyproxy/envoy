@@ -195,11 +195,17 @@ std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
 
 std::vector<std::string> CertificateValidationContextSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
-  if (sds_certificate_validation_context_secrets_ &&
-      sds_certificate_validation_context_secrets_->has_trusted_ca() &&
-      sds_certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
-          envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(sds_certificate_validation_context_secrets_->trusted_ca().filename());
+  if (sds_certificate_validation_context_secrets_) {
+    if (sds_certificate_validation_context_secrets_->has_trusted_ca() &&
+        sds_certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
+            envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+      files.push_back(sds_certificate_validation_context_secrets_->trusted_ca().filename());
+    }
+    if (sds_certificate_validation_context_secrets_->has_crl() &&
+        sds_certificate_validation_context_secrets_->crl().specifier_case() ==
+            envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+      files.push_back(sds_certificate_validation_context_secrets_->crl().filename());
+    }
   }
   return files;
 }

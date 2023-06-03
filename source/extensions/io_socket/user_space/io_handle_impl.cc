@@ -43,7 +43,7 @@ uint64_t moveUpTo(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_len
     }
   }
   uint64_t res = std::min(max_length, src.length());
-  dst.move(src, res);
+  dst.move(src, res, /*reset_drain_trackers_and_accounting=*/true);
   return res;
 }
 } // namespace

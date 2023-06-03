@@ -30,7 +30,6 @@ open class EngineBuilder: NSObject {
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
-  private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
 #if ENVOY_ENABLE_QUIC
@@ -51,7 +50,6 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -61,7 +59,6 @@ open class EngineBuilder: NSObject {
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var runtimeGuards: [String: Bool] = [:]
-  private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var rtdsLayerName: String?
   private var rtdsTimeoutSeconds: UInt32 = 0
@@ -216,18 +213,6 @@ open class EngineBuilder: NSObject {
   public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
     self.enableDNSCache = enableDNSCache
     self.dnsCacheSaveIntervalSeconds = saveInterval
-    return self
-  }
-
-  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-  /// true.
-  ///
-  /// - parameter enableHappyEyeballs: whether to enable RFC 6555 handling for IPv4/IPv6.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableHappyEyeballs(_ enableHappyEyeballs: Bool) -> Self {
-    self.enableHappyEyeballs = enableHappyEyeballs
     return self
   }
 
@@ -546,27 +531,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add virtual cluster configuration.
-  ///
-  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualCluster(_ virtualCluster: String) -> Self {
-    self.virtualClusters.append(virtualCluster)
-    return self
-  }
-
-  /// Add virtual cluster configurations.
-  ///
-  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
-    self.virtualClusters.append(contentsOf: virtualClusters)
-    return self
-  }
 #if ENVOY_GOOGLE_GRPC
 
   /// Sets the node.id field in the Bootstrap configuration.
@@ -728,15 +692,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add a direct response to be used when configuring the engine.
-  /// This function is internal so it is not publicly exposed to production builders,
-  /// but is available for use by the `TestEngineBuilder`.
-  ///
-  /// - parameter directResponse: The response configuration to add.
-  func addDirectResponseInternal(_ directResponse: DirectResponse) {
-    self.directResponses.append(directResponse)
-  }
-
   func makeConfig() -> EnvoyConfiguration {
     EnvoyConfiguration(
       adminInterfaceEnabled: self.adminInterfaceEnabled,
@@ -750,7 +705,6 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
@@ -768,9 +722,7 @@ open class EngineBuilder: NSObject {
       perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
       appVersion: self.appVersion,
       appId: self.appId,
-      virtualClusters: self.virtualClusters,
       runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
@@ -805,7 +757,6 @@ open class EngineBuilder: NSObject {
   }
 }
 
-// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
@@ -826,7 +777,6 @@ private extension EngineBuilder {
     cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
     cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
     cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
-    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
 #endif
@@ -850,16 +800,9 @@ private extension EngineBuilder {
     cxxBuilder.setAppVersion(self.appVersion.toCXX())
     cxxBuilder.setAppId(self.appId.toCXX())
     cxxBuilder.setDeviceOs("iOS".toCXX())
-    for cluster in self.virtualClusters {
-      cxxBuilder.addVirtualCluster(cluster.toCXX())
-    }
 
     for (runtimeGuard, value) in self.runtimeGuards {
       cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for directResponse in self.directResponses {
-      cxxBuilder.addDirectResponse(directResponse.toCXX())
     }
 
     for filter in self.nativeFilterChain.reversed() {

@@ -1188,7 +1188,8 @@ message RouteAction {
   // :ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
   // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
   // causes the original value of the host header, if any, to be appended to the
-  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header if it is different to the last value appended.
+  // This can be disabled by setting the runtime guard `envoy_reloadable_features_append_xfh_idempotent` to false.
   bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1772,7 +1773,7 @@ message Tracing {
   // Target percentage of requests managed by this HTTP connection manager that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
   // header is set. This field is a direct analog for the runtime variable
-  // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+  // 'tracing.client_enabled' in the :ref:`HTTP Connection Manager
   // <config_http_conn_man_runtime>`.
   // Default: 100%
   type.v3.FractionalPercent client_sampling = 1;
@@ -2375,7 +2376,6 @@ message InternalRedirectPolicy {
 // :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`,
 // or :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
 // to add additional flags to the filter.
-// [#not-implemented-hide:]
 message FilterConfig {
   // The filter config.
   google.protobuf.Any config = 1;
@@ -2397,5 +2397,7 @@ message FilterConfig {
   //   created and it is too late to change the chain.
   //
   //   This field only make sense for the downstream HTTP filters for now.
+  //
+  // [#not-implemented-hide:]
   bool disabled = 3;
 }

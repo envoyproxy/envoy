@@ -17,6 +17,7 @@
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/udp_packet_writer_handler.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/interval_value.h"
@@ -412,6 +413,12 @@ public:
    * after being opened.
    */
   virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
+
+  /**
+   * Configures the LoadShedPoints for this listener.
+   */
+  virtual void
+  configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

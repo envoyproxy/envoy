@@ -38,15 +38,21 @@ import (
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
-	ValueRouteName           = 1
-	ValueFilterChainName     = 2
-	ValueProtocol            = 3
-	ValueResponseCode        = 4
-	ValueResponseCodeDetails = 5
-	ValueAttemptCount        = 6
+	ValueRouteName               = 1
+	ValueFilterChainName         = 2
+	ValueProtocol                = 3
+	ValueResponseCode            = 4
+	ValueResponseCodeDetails     = 5
+	ValueAttemptCount            = 6
+	ValueDownstreamLocalAddress  = 7
+	ValueDownstreamRemoteAddress = 8
+	ValueUpstreamHostAddress     = 9
+	ValueUpstreamClusterName     = 10
 )
 
 type httpCApiImpl struct{}
@@ -82,6 +88,11 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, b
 		strs = append(strs, k, v)
 	}
 	res := C.envoyGoFilterHttpSendLocalReply(r, C.int(response_code), unsafe.Pointer(&body_text), unsafe.Pointer(&strs), C.longlong(grpc_status), unsafe.Pointer(&details))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpSendPanicReply(r unsafe.Pointer, details string) {
+	res := C.envoyGoFilterHttpSendPanicReply(r, unsafe.Pointer(&details))
 	handleCApiStatus(res)
 }
 
@@ -188,8 +199,19 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
+	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(key))
 	handleCApiStatus(res)
 }
 
@@ -216,8 +238,25 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
-func (c *httpCApiImpl) HttpLog(r unsafe.Pointer, level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(r, C.uint32_t(level), unsafe.Pointer(&message))
+func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
+	v, err := structpb.NewValue(value)
+	if err != nil {
+		panic(err)
+	}
+	buf, err := proto.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	res := C.envoyGoFilterHttpSetDynamicMetadata(r, unsafe.Pointer(&filterName), unsafe.Pointer(&key), unsafe.Pointer(&buf))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
+	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+}
+
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.LogType(C.envoyGoFilterHttpLogLevel())
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
@@ -229,4 +268,9 @@ var cAPI api.HttpCAPI = &httpCApiImpl{}
 // SetHttpCAPI for mock cAPI
 func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
+}
+
+func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	handleCApiStatus(res)
 }

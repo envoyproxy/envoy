@@ -359,6 +359,9 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+  // Set this to true when sending malformed requests to avoid test client codec rejecting it.
+  // This flag is only valid when UHV build flag is enabled.
+  bool disable_client_header_validation_{false};
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};

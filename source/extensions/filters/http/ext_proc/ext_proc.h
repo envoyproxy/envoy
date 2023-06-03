@@ -1,9 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
@@ -12,8 +14,13 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/host_description.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -35,16 +42,19 @@ namespace ExternalProcessing {
   COUNTER(message_timeouts)                                                                        \
   COUNTER(rejected_header_mutations)                                                               \
   COUNTER(override_message_timeout_received)                                                       \
-  COUNTER(override_message_timeout_ignored)
+  COUNTER(override_message_timeout_ignored)                                                        \
+  COUNTER(clear_route_cache_ignored)                                                               \
+  COUNTER(clear_route_cache_disabled)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-info";
-
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
+  explicit ExtProcLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+      : filter_metadata_(filter_metadata) {}
+
   struct GrpcCall {
     GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
              const ProcessorState::CallbackState callback_state)
@@ -58,13 +68,36 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
+    if (cluster_info) {
+      cluster_info_ = cluster_info.value();
+    }
+  }
+  void setUpstreamHost(absl::optional<Upstream::HostDescriptionConstSharedPtr> upstream_host) {
+    if (upstream_host) {
+      upstream_host_ = upstream_host.value();
+    }
+  }
 
+  uint64_t bytesSent() const { return bytes_sent_; }
+  uint64_t bytesReceived() const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // The following stats are populated for ext_proc filters using Envoy gRPC only.
+  // The bytes sent and received are for the entire stream.
+  uint64_t bytes_sent_{0}, bytes_received_{0};
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
 class FilterConfig {
@@ -73,10 +106,14 @@ public:
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
-        max_message_timeout_ms_(max_message_timeout_ms),
+      : failure_mode_allow_(config.failure_mode_allow()),
+        disable_clear_route_cache_(config.disable_clear_route_cache()),
+        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
+        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
+        filter_metadata_(config.filter_metadata()),
+        allow_mode_override_(config.allow_mode_override()),
+        header_matchers_(initHeaderMatchers(config)) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -90,9 +127,17 @@ public:
     return processing_mode_;
   }
 
+  bool allowModeOverride() const { return allow_mode_override_; }
+
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
   }
+
+  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
+
+  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
+
+  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -100,14 +145,30 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+    std::vector<Matchers::StringMatcherPtr> header_matchers;
+    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+      header_matchers.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+    }
+    return header_matchers;
+  }
 
   const bool failure_mode_allow_;
+  const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  // If set to true, allow the processing mode to be modified by the ext_proc response.
+  const bool allow_mode_override_;
+  // Empty header_matchers_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -185,12 +246,11 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
-  void onNewTimeout(const uint32_t message_timeout_ms);
+  void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                        bool end_stream) {
-    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
-  }
+                        bool end_stream);
+
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                      ProcessorState::CallbackState new_state, bool end_stream);
 

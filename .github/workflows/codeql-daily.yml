@@ -16,6 +16,7 @@ jobs:
 
     # CodeQL runs on ubuntu-20.04
     runs-on: ubuntu-20.04
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
@@ -32,7 +33,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@04df1262e6247151b5ac09cd2c303ac36ad3f62b
+      uses: github/codeql-action/init@0225834cc549ee0ca93cb085b92954821a145866
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -63,4 +64,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@04df1262e6247151b5ac09cd2c303ac36ad3f62b
+      uses: github/codeql-action/analyze@0225834cc549ee0ca93cb085b92954821a145866

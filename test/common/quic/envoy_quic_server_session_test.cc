@@ -177,9 +177,10 @@ public:
                                    Event::Dispatcher::RunType::NonBlock);
     connection_helper_.GetClock()->Now();
 
-    ON_CALL(writer_, WritePacket(_, _, _, _, _))
+    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
-                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*) {
+                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*,
+                                 const quic::QuicPacketWriterParams&) {
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
@@ -462,7 +463,7 @@ TEST_F(EnvoyQuicServerSessionTest, RemoteConnectionCloseWithActiveStream) {
   EXPECT_CALL(request_decoder, accessLogHandlers());
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteConnectionFailure, _));
   quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version,
                                        quic::QUIC_HANDSHAKE_TIMEOUT, quic::NO_IETF_QUIC_ERROR,
                                        "dummy details",

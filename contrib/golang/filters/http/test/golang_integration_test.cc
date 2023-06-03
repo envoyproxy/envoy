@@ -1,7 +1,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/config/v2_link_hacks.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "contrib/golang/filters/http/source/golang_filter.h"
@@ -18,10 +20,67 @@ absl::string_view getHeader(const Http::HeaderMap& headers, absl::string_view ke
   return values[0]->value().getStringView();
 }
 
+class RetrieveDynamicMetadataFilter : public Http::StreamEncoderFilter {
+public:
+  // Http::StreamEncoderFilter
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    const auto& filter_it = metadata.find("filter.go");
+    ASSERT(filter_it != metadata.end());
+    const auto& fields = filter_it->second.fields();
+    std::string val = fields.at("foo").string_value();
+    EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  void onDestroy() override{};
+  Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
+};
+
+class RetrieveDynamicMetadataFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  RetrieveDynamicMetadataFilterConfig()
+      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
+
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamEncoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
+    };
+  }
+};
+
 class GolangIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                               public HttpIntegrationTest {
 public:
-  GolangIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  GolangIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
+
+  RetrieveDynamicMetadataFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -55,7 +114,8 @@ typed_config:
     config_helper_.skipPortUsageValidation();
   }
 
-  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*") {
+  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*",
+                             bool with_injected_metadata_validator = false) {
     const auto yaml_fmt = R"EOF(
 name: golang
 typed_config:
@@ -72,6 +132,10 @@ typed_config:
 
     auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), so_id);
     config_helper_.prependFilter(yaml_string);
+    if (with_injected_metadata_validator) {
+      config_helper_.prependFilter("{ name: validate-dynamic-metadata }");
+    }
+
     config_helper_.skipPortUsageValidation();
 
     config_helper_.addConfigModifier(
@@ -88,7 +152,14 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
         });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
   }
 
@@ -169,7 +240,11 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", false);
-    codec_client_->sendData(request_encoder, "", true);
+    codec_client_->sendData(request_encoder, "", false);
+
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
+    codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
     // original header: x-test-header-0
@@ -181,6 +256,16 @@ typed_config:
     // check header exists which removed in golang side: x-test-header-1
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+
+    // check header value which set in golang: req-downstream-local-address
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-local-address"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+    // check header value which set in golang: req-downstream-remote-address
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-remote-address"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
     // check header value which is appended in golang: existed-header
     auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
@@ -198,6 +283,25 @@ typed_config:
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
     EXPECT_EQ(expected, upstream_request_->body().toString());
+
+    // check trailer value which is appended in golang: existed-trailer
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check trailer value which set in golang: x-test-trailer-0
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_EQ(
+        true,
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
@@ -240,7 +344,7 @@ typed_config:
     // check route name in encode phase
     EXPECT_EQ("test-route-name", getHeader(response->headers(), "rsp-route-name"));
 
-    // check route name in encode phase
+    // check protocol in encode phase
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
@@ -253,7 +357,15 @@ typed_config:
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
 
-    // check response code details in encode phase
+    // check upstream host in encode phase
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+    // check upstream cluster in encode phase
+    EXPECT_EQ("cluster_0", getHeader(response->headers(), "rsp-upstream-cluster"));
+
+    // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
     // verify response status
@@ -273,6 +385,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
@@ -411,9 +526,11 @@ typed_config:
     // check resp status
     EXPECT_EQ("500", response->headers().getStatusValue());
 
-    // error happened in Golang filter\r\n
-    auto body = StringUtil::toUpper("error happened in Golang filter\r\n");
+    // error happened in filter\r\n
+    auto body = StringUtil::toUpper("error happened in filter\r\n");
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    EXPECT_EQ(1, test_server_->counter("http.config_test.golang.panic_error")->value());
 
     cleanup();
   }
@@ -427,6 +544,33 @@ typed_config:
       result = fake_upstream_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
+  }
+
+  void testDynamicMetadata(std::string path) {
+    initializeBasicFilter(BASIC, "*", true);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},        {":path", path},
+        {":scheme", "http"},        {":authority", "test.com"},
+        {"x-set-metadata", "true"},
+    };
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendData(request_encoder, "helloworld", true);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+    };
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+    cleanup();
   }
 
   const std::string ECHO{"echo"};
@@ -660,6 +804,16 @@ TEST_P(GolangIntegrationTest, PanicRecover_EncodeData_Async) {
 // Panic ErrInvalidPhase
 TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) {
   testPanicRecover("/test?badapi=decode-data", "decode-data");
+}
+
+TEST_P(GolangIntegrationTest, DynamicMetadata) { testDynamicMetadata("/test?dymeta=1"); }
+
+TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
+  testDynamicMetadata("/test?dymeta=1&async=1");
+}
+
+TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
+  testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
 }
 
 } // namespace Envoy

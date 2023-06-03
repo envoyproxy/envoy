@@ -143,6 +143,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
       scheme: http
@@ -171,6 +172,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
       downstream_header_bytes_received: 11
@@ -224,6 +226,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
       downstream_header_bytes_received: 11
@@ -290,11 +293,6 @@ typed_config:
 // Verify the grpc cached logger is available after the initial logger filter is destroyed.
 // Regression test for https://github.com/envoyproxy/envoy/issues/18066
 TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
-  return;
-#endif
-
   config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   // The grpc access logger connection never closes. It's ok to see an incomplete logging stream.
@@ -333,8 +331,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);
 
   // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

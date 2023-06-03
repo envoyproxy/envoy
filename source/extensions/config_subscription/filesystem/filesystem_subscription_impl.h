@@ -74,28 +74,19 @@ class FilesystemSubscriptionFactory : public ConfigSubscriptionFactory {
 public:
   std::string name() const override { return "envoy.config_subscription.filesystem"; }
 
-  SubscriptionPtr create(const LocalInfo::LocalInfo&, Upstream::ClusterManager&,
-                         Event::Dispatcher& dispatcher, Api::Api& api,
-                         const envoy::config::core::v3::ConfigSource& config, absl::string_view,
-                         SubscriptionCallbacks& callbacks,
-                         OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
-                         ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    if (config.config_source_specifier_case() ==
+  SubscriptionPtr create(SubscriptionData& data) override {
+    if (data.config_.config_source_specifier_case() ==
         envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
       return std::make_unique<Config::FilesystemSubscriptionImpl>(
-          dispatcher, makePathConfigSource(config.path()), callbacks, resource_decoder, stats,
-          validation_visitor, api);
+          data.dispatcher_, makePathConfigSource(data.config_.path()), data.callbacks_,
+          data.resource_decoder_, data.stats_, data.validation_visitor_, data.api_);
     } else {
-      ASSERT(config.config_source_specifier_case() ==
+      ASSERT(data.config_.config_source_specifier_case() ==
              envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource);
       return std::make_unique<Config::FilesystemSubscriptionImpl>(
-          dispatcher, config.path_config_source(), callbacks, resource_decoder, stats,
-          validation_visitor, api);
+          data.dispatcher_, data.config_.path_config_source(), data.callbacks_,
+          data.resource_decoder_, data.stats_, data.validation_visitor_, data.api_);
     }
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::core::v3::FilesystemSubscription>();
   }
 };
 
@@ -103,19 +94,10 @@ class FilesystemCollectionSubscriptionFactory : public ConfigSubscriptionFactory
 public:
   std::string name() const override { return "envoy.config_subscription.filesystem_collection"; }
 
-  SubscriptionPtr create(const LocalInfo::LocalInfo&, Upstream::ClusterManager&,
-                         Event::Dispatcher& dispatcher, Api::Api& api,
-                         const envoy::config::core::v3::ConfigSource& config, absl::string_view,
-                         SubscriptionCallbacks& callbacks,
-                         OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
-                         ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  SubscriptionPtr create(SubscriptionData& data) override {
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
-        dispatcher, makePathConfigSource(config.path()), callbacks, resource_decoder, stats,
-        validation_visitor, api);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::core::v3::FilesystemCollectionSubscription>();
+        data.dispatcher_, makePathConfigSource(data.config_.path()), data.callbacks_,
+        data.resource_decoder_, data.stats_, data.validation_visitor_, data.api_);
   }
 };
 

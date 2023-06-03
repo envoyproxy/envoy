@@ -547,14 +547,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // `host_` returns a string_view so doing this should be safe.
     absl::string_view sni_value = parsed_authority.host_;
 
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni()) {
+    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamServerName::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(sni_value),
           StreamInfo::FilterState::StateType::Mutable);
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation()) {
+    if (upstream_http_protocol_options.value().auto_san_validation() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamSubjectAltNames::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamSubjectAltNames::key(),
           std::make_unique<Network::UpstreamSubjectAltNames>(
@@ -724,9 +728,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-        options.setFilterConfig(config_);
-      }
+      options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -971,9 +973,7 @@ void Filter::maybeDoShadowing() {
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled())
                        .setIsShadow(true);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-      options.setFilterConfig(config_);
-    }
+    options.setFilterConfig(config_);
     config_.shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                   options);
   }
@@ -1337,7 +1337,9 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
 StreamInfo::ResponseFlag
 Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
-  case Http::StreamResetReason::ConnectionFailure:
+  case Http::StreamResetReason::LocalConnectionFailure:
+  case Http::StreamResetReason::RemoteConnectionFailure:
+  case Http::StreamResetReason::ConnectionTimeout:
     return StreamInfo::ResponseFlag::UpstreamConnectionFailure;
   case Http::StreamResetReason::ConnectionTermination:
     return StreamInfo::ResponseFlag::UpstreamConnectionTermination;
@@ -1395,17 +1397,7 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  // We coalesce 1xx headers here, to prevent encoder filters and HCM from having to worry
-  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
-  // potentially coalesce across retries and multiple upstream requests in the future, even though
-  // we currently don't support retry after 1xx.
-  // It's plausible that this functionality might need to move to HCM in the future for internal
-  // redirects, but we would need to maintain the "only call encode1xxHeaders() once"
-  // invariant.
-  if (!downstream_1xx_headers_encoded_) {
-    downstream_1xx_headers_encoded_ = true;
-    callbacks_->encode1xxHeaders(std::move(headers));
-  }
+  callbacks_->encode1xxHeaders(std::move(headers));
 }
 
 void Filter::resetAll() {

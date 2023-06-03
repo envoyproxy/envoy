@@ -42,8 +42,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Http::Context& http_context, Router::Context& router_context)
     : cluster_(cluster),
       config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
-              runtime, random, std::move(shadow_writer), true, false, false, false, false, {},
-              dispatcher.timeSource(), http_context, router_context),
+              runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
+              {}, dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -107,6 +107,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
+  stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
@@ -165,6 +166,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
+
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
 }

@@ -262,8 +262,8 @@ public:
     // Initialize the transport socket factory using a customized ssl option.
     ssl_client_option_.setAlpn(true).setSan(san_to_match_).setSni("lyft.com");
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
-    ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(stats_scope_));
+    ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
     ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;
@@ -1066,10 +1066,6 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   // Config the client to defer cert validation by 5ms.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
@@ -1086,10 +1082,6 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterDisconnect) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -1129,10 +1121,6 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterTearDown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -1392,6 +1380,27 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(/* RESP(test-header) */ metrics.at(21), "-");
 }
 
+TEST_P(QuicHttpIntegrationTest, InvalidTrailer) {
+  initialize();
+  // Empty string in trailer key is invalid.
+  Http::TestRequestTrailerMapImpl request_trailers{{"", "foo"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1024, false);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // Request fails due to invalid trailer.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
@@ -1468,8 +1477,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
 
   // Remove filter_chain_1.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1511,8 +1519,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
 
   // Remove filter_chain_1.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1531,8 +1538,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   makeRequestAndWaitForResponse(*codec_client_0);
 
   // Modify the default filter chain.
-  ConfigHelper new_config_helper1(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper.bootstrap()));
+  ConfigHelper new_config_helper1(version_, new_config_helper.bootstrap());
   new_config_helper1.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                            -> void {
     auto default_filter_chain =
@@ -1555,8 +1561,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   makeRequestAndWaitForResponse(*codec_client_1);
 
   // Remove the default filter chain.
-  ConfigHelper new_config_helper2(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper1.bootstrap()));
+  ConfigHelper new_config_helper2(version_, config_helper_.bootstrap());
   new_config_helper2.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1585,8 +1590,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   codec_client_0->close();
 
   // Modify 1st transport socket factory to disable early data.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false);
 
   new_config_helper.setLds("1");
