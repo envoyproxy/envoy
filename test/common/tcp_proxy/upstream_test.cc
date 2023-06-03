@@ -49,8 +49,7 @@ public:
   void expectCallOnEncodeData(std::string data_string, bool end_stream) {
     if (typeid(T) == typeid(CombinedUpstream)) {
       EXPECT_CALL(*this->mock_router_upstream_request_,
-                  acceptDataFromRouter(BufferStringEqual(data_string), end_stream))
-          .Times(1);
+                  acceptDataFromRouter(BufferStringEqual(data_string), end_stream));
     } else {
       EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual(data_string), end_stream));
     }
@@ -93,7 +92,7 @@ public:
           *upstream_, std::move(generic_conn_pool));
       mock_router_upstream_request_ = mock_upst.get();
       upstream_->setRouterUpstreamRequest(std::move(mock_upst));
-      EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false)).Times(1);
+      EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
       upstream_->newStream(*filter_);
     } else {
       upstream_->setRequestEncoder(encoder_, true);
@@ -342,10 +341,9 @@ public:
   void expectCallOnSetRequestEncoder(std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers,
                                      bool end_stream = false) {
     if (typeid(T) == typeid(CombinedUpstream)) {
-      EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(end_stream)).Times(1);
+      EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(end_stream));
     } else {
-      EXPECT_CALL(encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), end_stream))
-          .Times(1);
+      EXPECT_CALL(encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), end_stream));
     }
   }
 
@@ -528,14 +526,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
         *another_upstream, std::move(generic_conn_pool));
     auto another_router_upstream_request = mock_upst.get();
     another_upstream->setRouterUpstreamRequest(std::move(mock_upst));
-    EXPECT_CALL(*another_router_upstream_request, acceptHeadersFromRouter(false)).Times(1);
+    EXPECT_CALL(*another_router_upstream_request, acceptHeadersFromRouter(false));
     another_upstream->newStream(*this->filter_);
     Router::RouterFilterInterface* router_filter =
         dynamic_cast<Router::RouterFilterInterface*>(another_upstream.get());
     EXPECT_THAT(*router_filter->downstreamHeaders(), HeaderMapEqualRef(tmp_expected_headers));
   } else {
-    EXPECT_CALL(another_encoder, encodeHeaders(HeaderMapEqualRef(tmp_expected_headers), false))
-        .Times(1);
+    EXPECT_CALL(another_encoder, encodeHeaders(HeaderMapEqualRef(tmp_expected_headers), false));
     another_upstream->setRequestEncoder(another_encoder, false);
   }
 }
