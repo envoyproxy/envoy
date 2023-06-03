@@ -30,9 +30,14 @@
 
 namespace Envoy {
 envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(config, bootstrap);
   return bootstrap;
+#else
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out: can't parse YAML");
+#endif
 }
 
 using ::testing::_;
@@ -131,19 +136,17 @@ void BaseIntegrationTest::initialize() {
 Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  const std::string yaml = absl::StrFormat(
-      R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-)EOF",
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  TestUtility::loadFromYaml(yaml, tls_context);
+  const std::string rundir = TestEnvironment::runfilesDirectory();
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
+  auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  certs->mutable_certificate_chain()->set_filename(
+      rundir + "/test/config/integration/certs/upstreamcert.pem");
+  certs->mutable_private_key()->set_filename(rundir +
+                                             "/test/config/integration/certs/upstreamkey.pem");
+
   if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP2) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   } else if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP1) {
@@ -221,15 +224,22 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       ProtobufWkt::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
+#ifdef ENVOY_ENABLE_YAML
     TestEnvironment::writeStringToFileForTest(
         lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
-
+#else
+    PANIC("YAML support compiled out: can't parse YAML");
+#endif
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
   }
+#ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
                  MessageUtil::getYamlStringFromMessage(bootstrap));
+#else
+  ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}", bootstrap.DebugString());
+#endif
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
@@ -427,7 +437,11 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
+#ifdef ENVOY_ENABLE_YAML
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
+#else
+  return listener_info.dynamic_listeners(0).error_state().DebugString();
+#endif
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(
@@ -767,16 +781,16 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
 // Attempt to heuristically discover missing tag-extraction rules when new stats are added.
 // This is done by looking through the entire config for fields named `stat_prefix`, and then
 // validating that those values do not appear in the tag-extracted name of any stat. The alternate
-// approach of looking for the prefix in the extracted tags was more difficult because in the tests
-// some prefix values are reused (leading to false negatives) and some tests have base configuration
-// that sets a stat_prefix but don't produce any stats at all with that configuration (leading to
-// false positives).
+// approach of looking for the prefix in the extracted tags was more difficult because in the
+// tests some prefix values are reused (leading to false negatives) and some tests have base
+// configuration that sets a stat_prefix but don't produce any stats at all with that
+// configuration (leading to false positives).
 //
 // To add a rule, see `source/common/config/well_known_names.cc`.
 //
-// This is done in all integration tests because it is testing new stats and scopes that are created
-// for which the author isn't aware that tag extraction rules need to be written, and thus the
-// author wouldn't think to write tests for that themselves.
+// This is done in all integration tests because it is testing new stats and scopes that are
+// created for which the author isn't aware that tag extraction rules need to be written, and thus
+// the author wouldn't think to write tests for that themselves.
 void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
@@ -792,9 +806,9 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
                                               const Json::Object& root) -> bool {
-    // Looking for `stat_prefix` is based on precedent for how this is usually named in the config.
-    // If there are other names used for a similar purpose, this check could be expanded to add them
-    // also.
+    // Looking for `stat_prefix` is based on precedent for how this is usually named in the
+    // config. If there are other names used for a similar purpose, this check could be expanded
+    // to add them also.
     if (name == "stat_prefix") {
       auto prefix = root.asString();
       if (!prefix.empty()) {
