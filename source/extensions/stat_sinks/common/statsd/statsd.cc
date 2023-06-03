@@ -28,6 +28,11 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+// clang-format off
+// SPELLCHECKER(off)
+//
+// Performance benchmarks show this is slightly faster as an array of uint32_t
+// rather than an array of bool.
 static constexpr uint32_t needs_statsd_sanitizer[256] = {
   // Control-characters 0-31.
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -56,6 +61,8 @@ static constexpr uint32_t needs_statsd_sanitizer[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
+// SPELLCHECKER(on)
+// clang-format on
 
 absl::string_view sanitizeStatsdName(absl::string_view name, std::string& buffer) {
   static_assert(ARRAY_SIZE(needs_statsd_sanitizer) == 256);
@@ -64,11 +71,13 @@ absl::string_view sanitizeStatsdName(absl::string_view name, std::string& buffer
     need_statsd_sanitization |= needs_statsd_sanitizer[static_cast<uint8_t>(c)];
   }
   if (need_statsd_sanitization == 0) {
-    return name;  //  Fast path, should be executed most of the time.
+    return name; //  Fast path, should be executed most of the time.
   }
   buffer = name;
-    for (char &c : buffer) {
-      if (needs_statsd_sanitizer[static_cast<uint8_t>(c)]){ c = '_'; }
+  for (char& c : buffer) {
+    if (needs_statsd_sanitizer[static_cast<uint8_t>(c)]) {
+      c = '_';
+    }
   }
   return buffer;
 }
@@ -95,7 +104,8 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
       buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
-      sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+      sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_sanitization_during_sink")) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -202,18 +212,18 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
   if (sink_sanitization_enabled_) {
-      if (use_tag_) {
-        return sanitizeStatsdName(metric.tagExtractedName(), buffer_).data();
-      } else {
-        return sanitizeStatsdName(metric.name().data(), buffer_).data();
-      }
+    if (use_tag_) {
+      return sanitizeStatsdName(metric.tagExtractedName(), buffer_).data();
+    } else {
+      return sanitizeStatsdName(metric.name().data(), buffer_).data();
+    }
   } else {
-  if (use_tag_) {
-    return metric.tagExtractedName();
-  } else {
-    return metric.name();
+    if (use_tag_) {
+      return metric.tagExtractedName();
+    } else {
+      return metric.name();
+    }
   }
- }
 }
 
 const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) const {
@@ -252,29 +262,31 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
     std::string buffer;
     for (const auto& counter : snapshot.counters()) {
       if (counter.counter_.get().used()) {
-      tls_sink.flushCounter(sanitizeStatsdName(counter.counter_.get().name(), buffer).data(), counter.delta_);
+        tls_sink.flushCounter(sanitizeStatsdName(counter.counter_.get().name(), buffer).data(),
+                              counter.delta_);
+      }
     }
-  }
 
     for (const auto& gauge : snapshot.gauges()) {
       if (gauge.get().used()) {
-      tls_sink.flushGauge(sanitizeStatsdName(gauge.get().name(), buffer).data(), gauge.get().value());
+        tls_sink.flushGauge(sanitizeStatsdName(gauge.get().name(), buffer).data(),
+                            gauge.get().value());
       }
-  }
+    }
   } else {
 
-  for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
-      tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
+    for (const auto& counter : snapshot.counters()) {
+      if (counter.counter_.get().used()) {
+        tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
+      }
     }
-  }
 
-  for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
-      tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
+    for (const auto& gauge : snapshot.gauges()) {
+      if (gauge.get().used()) {
+        tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
+      }
     }
   }
- }
   // TODO(efimki): Add support of text readouts stats.
   tls_sink.endFlush(true);
 }
@@ -296,8 +308,7 @@ void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     const float scaled = float_value / divisor;
     tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram_name, scaled);
   } else {
-    tls_->getTyped<TlsSink>().onTimespanComplete(histogram_name,
-                                                 std::chrono::milliseconds(value));
+    tls_->getTyped<TlsSink>().onTimespanComplete(histogram_name, std::chrono::milliseconds(value));
   }
 }
 

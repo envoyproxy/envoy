@@ -26,9 +26,7 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
                                    });
 }
 
-
-absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string& buffer)
-{
+absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string& buffer) {
   if (absl::EndsWith(name, ".")) {
     name.remove_suffix(1);
   }
@@ -39,14 +37,13 @@ absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string
   if (absl::StrContains(name, "\0")) {
     // Replace the '\0' character with an underscore.
     buffer = absl::StrReplaceAll(name, {
-                                       {absl::string_view("\0", 1), "_"},
-                                   });
+                                           {absl::string_view("\0", 1), "_"},
+                                       });
     return buffer;
   }
   // The name does not contain a '\0' character, so simply return it.
   return name;
 }
-
 
 absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
   absl::optional<StatName> value;

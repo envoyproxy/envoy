@@ -9,13 +9,13 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -282,11 +282,13 @@ class IsolatedScopeImpl : public Scope {
 public:
   IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
       : prefix_(prefix, store.symbolTable()), store_(store),
-        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {}
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_sanitization_during_sink")) {}
 
   IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
       : prefix_(prefix, store.symbolTable()), store_(store),
-        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {}
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_sanitization_during_sink")) {}
 
   ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
 

@@ -117,9 +117,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   // Validate that we sanitize away bad characters in the stats prefix.
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  if (Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
-  EXPECT_EQ("scope1.foo:_:.bar", scope3->counterFromString("bar").name()); } else {
-  EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
+  if (Envoy::Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_sanitization_during_sink")) {
+    EXPECT_EQ("scope1.foo:_:.bar", scope3->counterFromString("bar").name());
+  } else {
+    EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
   }
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
@@ -185,9 +187,11 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 
   // Validate that we sanitize away bad characters in the stats prefix.
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  if (Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
-  EXPECT_EQ("scope1.foo:_:.bar", scope3->counterFromString("bar").name()); } else {
-  EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
+  if (Envoy::Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_sanitization_during_sink")) {
+    EXPECT_EQ("scope1.foo:_:.bar", scope3->counterFromString("bar").name());
+  } else {
+    EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
   }
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());

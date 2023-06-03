@@ -154,12 +154,13 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
   if (sink_sanitization_enabled_) {
     std::string buffer;
-    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name, buffer), symbolTable());
+    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name, buffer),
+                                             symbolTable());
     return scopeFromStatName(stat_name_storage.statName());
   } else {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName());
- }
+    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+    return scopeFromStatName(stat_name_storage.statName());
+  }
 }
 
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name) {
@@ -404,7 +405,8 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
     : scope_id_(parent.next_scope_id_++), parent_(parent),
       prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())),
-      sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {}
+      sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_sanitization_during_sink")) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   // Helps reproduce a previous race condition by pausing here in tests while we

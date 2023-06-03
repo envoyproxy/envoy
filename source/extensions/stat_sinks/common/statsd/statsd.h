@@ -58,7 +58,8 @@ public:
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
         buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
-        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_sanitization_during_sink")) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }

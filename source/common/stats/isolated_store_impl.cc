@@ -66,12 +66,12 @@ IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name) {
   if (sink_sanitization_enabled_) {
     std::string buffer;
-    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name, buffer), symbolTable());
+    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name, buffer),
+                                             symbolTable());
     return scopeFromStatName(stat_name_storage.statName());
-  }
-  else {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName());
+  } else {
+    StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+    return scopeFromStatName(stat_name_storage.statName());
   }
 }
 
