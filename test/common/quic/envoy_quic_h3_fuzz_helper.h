@@ -49,6 +49,9 @@ private:
   quic::QuicFramer framer_;
 
   H3Serializer h3serializer_;
+  // Unidirectional streams are started by sending a varint indicating the stream type.
+  // This set tracks which stream ids have already been established so that the stream type
+  // is not inserted into a previously opened stream. RFC9114, Sec. 6.2
   std::set<uint32_t> open_h3_streams_;
 };
 
