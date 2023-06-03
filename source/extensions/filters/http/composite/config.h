@@ -6,6 +6,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
@@ -35,9 +36,16 @@ public:
     // This ensure that trees are only allowed to match on request headers, avoiding configurations
     // where the matcher requires data that will be available too late for the delegation to work
     // correctly.
-    requirements->mutable_data_input_allow_list()->add_type_url(
+    // requirements->mutable_data_input_allow_list()->add_type_url(
+    //     TypeUtil::descriptorFullNameToTypeUrl(
+    //         envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+
+     requirements->mutable_data_input_allow_list()->add_type_url(
         TypeUtil::descriptorFullNameToTypeUrl(
             envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+    requirements->mutable_data_input_allow_list()->add_type_url(
+        TypeUtil::descriptorFullNameToTypeUrl(
+            xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name()));
 
     return requirements;
   }
