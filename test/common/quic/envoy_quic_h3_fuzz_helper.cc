@@ -173,38 +173,33 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
   framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE, std::make_unique<FuzzEncrypter>(p));
 }
 
-void QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
+size_t QuicPacketizer::serializePackets(const QuicH3FuzzCase& input,
+    QuicPacketizer::QuicPacket *packets, size_t max_packets) {
+  size_t idx = 0;
   for (auto& quic_frame_or_junk : input.frames()) {
-    if (idx_ >= sizeof(quic_packet_sizes_) / sizeof(quic_packet_sizes_[0])) {
-      return;
+    if (idx >= max_packets) {
+      return idx;
     }
     if (quic_frame_or_junk.has_qframe()) {
-      serializePacket(quic_frame_or_junk.qframe());
+      if (serializePacket(quic_frame_or_junk.qframe(), &packets[idx])) {
+        idx++;
+      }
     } else if (quic_frame_or_junk.has_junk()) {
       const std::string& junk = quic_frame_or_junk.junk();
-      serializeJunkPacket(junk);
+      if (serializeJunkPacket(junk, &packets[idx])) {
+        idx++;
+      }
     }
   }
-}
-
-void QuicPacketizer::foreach (std::function<void(const char*, size_t)> cb) {
-  for (size_t i = 0; i < idx_; i++) {
-    if (quic_packet_sizes_[i] > 0) {
-      cb(quic_packets_[i], quic_packet_sizes_[i]);
-    }
-  }
+  return idx;
 }
 
 void QuicPacketizer::reset() {
-  idx_ = 0;
   packet_number_ = quic::QuicPacketNumber(0);
-  for (unsigned long& quic_packet_size : quic_packet_sizes_) {
-    quic_packet_size = 0;
-  }
   open_h3_streams_.clear();
 }
 
-void QuicPacketizer::serializePacket(const QuicFrame& frame) {
+bool QuicPacketizer::serializePacket(const QuicFrame& frame, QuicPacketizer::QuicPacket *packet) {
   char buffer[1024];
 
   std::unique_ptr<quic::QuicCryptoFrame> crypto_frame = nullptr;
@@ -244,14 +239,14 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
       const auto& f = stream.h3frame();
       len = h3serializer_.serialize(buffer, sizeof(buffer), unidirectional, type, id, f);
       if (len == 0) {
-        return;
+        return false;
       }
     } else if (stream.has_junk()) {
       auto junk = stream.junk();
       len = std::min(junk.size(), sizeof(buffer));
       memcpy(buffer, junk.data(), len);
     } else {
-      return;
+      return false;
     }
     frames.push_back(quic::QuicFrame(quic::QuicStreamFrame(id, fin, offset, buffer, len)));
   } break;
@@ -284,7 +279,7 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   } break;
   case QuicFrame::kStopWaiting: {
     // not possible in IETF mode
-    return;
+    return false;
   } break;
   case QuicFrame::kPing: {
     const auto& f = frame.ping();
@@ -310,7 +305,7 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
   } break;
   case QuicFrame::kGoAway: {
     // not possible in IETF mode
-    return;
+    return false;
   } break;
   case QuicFrame::kWindowUpdate: {
     const auto& f = frame.window_update();
@@ -338,7 +333,7 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
         f.control_frame_id(), f.sequence_number());
     frames.push_back(quic::QuicFrame(retire_connection_id_frame.get()));
 
-    return;
+    return false;
   } break;
   case QuicFrame::kMaxStreams: {
     const auto& f = frame.max_streams();
@@ -390,26 +385,25 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
     frames.push_back(quic::QuicFrame(ack_frequency.get()));
   } break;
   default:
-    return;
+    return false;
   }
   quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
                           quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength);
 
   auto encrypter = std::make_unique<FuzzEncrypter>(quic::Perspective::IS_CLIENT);
   framer.SetEncrypter(quic::ENCRYPTION_INITIAL, std::move(encrypter));
-  quic_packet_sizes_[idx_] =
-      framer.BuildDataPacket(header, frames, quic_packets_[idx_], sizeof(quic_packets_[idx_]),
+  packet->size =
+      framer.BuildDataPacket(header, frames, packet->payload, sizeof(packet->payload),
                              quic::EncryptionLevel::ENCRYPTION_INITIAL);
-  idx_++;
+  return packet->size > 0;
 }
 
-void QuicPacketizer::serializeJunkPacket(const std::string& data) {
+bool QuicPacketizer::serializeJunkPacket(const std::string& data, QuicPacketizer::QuicPacket *packet) {
   quic::QuicPacketHeader header;
-  header.packet_number = packet_number_;
+  header.packet_number = packet_number_++;
   header.destination_connection_id = destination_connection_id_;
   header.source_connection_id = destination_connection_id_;
-  packet_number_++;
-  quic::QuicDataWriter writer(sizeof(quic_packets_[idx_]), quic_packets_[idx_]);
+  quic::QuicDataWriter writer(sizeof(packet->payload), packet->payload);
   quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
                           quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength);
 
@@ -418,13 +412,13 @@ void QuicPacketizer::serializeJunkPacket(const std::string& data) {
 
   size_t length_field_offset = 0;
   if (!framer.AppendIetfPacketHeader(header, &writer, &length_field_offset)) {
-    return;
+    return false;
   }
   size_t max_data_len = std::min(data.size(), writer.remaining());
   writer.WriteBytes(data.data(), max_data_len);
   framer.WriteIetfLongHeaderLength(header, &writer, length_field_offset, quic::ENCRYPTION_INITIAL);
-  quic_packet_sizes_[idx_] = writer.length();
-  idx_++;
+  packet->size = writer.length();
+  return packet->size > 0;
 }
 
 } // namespace Quic

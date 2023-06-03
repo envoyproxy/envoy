@@ -26,15 +26,20 @@ private:
 // would be sent over the wire.
 class QuicPacketizer {
 public:
+  struct QuicPacket {
+    size_t size;
+    char payload[1460];
+  };
+
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
-  void serializePackets(const test::common::quic::QuicH3FuzzCase& input);
-  void foreach (std::function<void(const char*, size_t)> cb);
+  size_t serializePackets(const test::common::quic::QuicH3FuzzCase& input, QuicPacket *packets,
+      size_t max_packets);
   void reset();
 
 private:
-  void serializePacket(const test::common::quic::QuicFrame& frame);
-  void serializeJunkPacket(const std::string& data);
+  bool serializePacket(const test::common::quic::QuicFrame& frame, QuicPacket *packet);
+  bool serializeJunkPacket(const std::string& data, QuicPacket *packet);
 
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;
@@ -45,10 +50,6 @@ private:
 
   H3Serializer h3serializer_;
   std::set<uint32_t> open_h3_streams_;
-
-  char quic_packets_[10][1460];
-  size_t quic_packet_sizes_[10] = {0};
-  size_t idx_{0};
 };
 
 // The following two classes handle the encryption and decryption in the fuzzer

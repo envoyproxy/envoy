@@ -169,16 +169,18 @@ struct Harness {
     setQuicConfigWithDefaultValues(session->config());
     session->OnConfigNegotiated();
 
-    packetizer_.serializePackets(input);
-    packetizer_.foreach ([this, &session](const char* payload, size_t size) {
-      auto receipt_time = connection_helper_->GetClock()->Now();
+    const size_t max_packets_count = 10;
+    QuicPacketizer::QuicPacket quic_packets[max_packets_count];
 
+    size_t n_packets = packetizer_.serializePackets(input, quic_packets, max_packets_count);
+    for (size_t i = 0; i < n_packets; i++) {
+      QuicPacketizer::QuicPacket *p = &quic_packets[i];
+      auto receipt_time = connection_helper_->GetClock()->Now();
       // We have to make sure that the server only receives the correct
       // connection ID in all packets.
-      quic::QuicReceivedPacket p(payload, size, receipt_time, false);
-      session->ProcessUdpPacket(srv_addr_, cli_addr_, p);
-    });
-
+      quic::QuicReceivedPacket qrp(p->payload, p->size, receipt_time, false);
+      session->ProcessUdpPacket(srv_addr_, cli_addr_, qrp);
+    }
     session->connection()->CloseConnection(quic::QUIC_PEER_GOING_AWAY, "Fuzzer case done",
                                            quic::ConnectionCloseBehavior::SILENT_CLOSE);
     packetizer_.reset();
