@@ -111,8 +111,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 // TODO(krajshiva) reset this to true after 2 releases (1.28)
-//FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_sanitization_during_sink);
-RUNTIME_GUARD(envoy_reloadable_features_enable_sanitization_during_sink);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_sanitization_during_sink);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
