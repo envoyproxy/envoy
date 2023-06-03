@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
@@ -36,7 +35,7 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   NiceMock<Network::MockConnection> connection_;
   Upstream::MockLoadBalancerContext lb_context_;
-  class TcpProxy tcp_proxy_;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_;
   NiceMock<Stats::MockStore> store_;
   Stats::MockScope& scope_{store_.mockScope()};
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

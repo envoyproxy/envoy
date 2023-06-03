@@ -1,5 +1,3 @@
-#include <asm-generic/errno-base.h>
-
 #include <memory>
 
 #include "source/common/tcp_proxy/tcp_proxy.h"
