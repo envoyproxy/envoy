@@ -27,19 +27,28 @@ private:
 class QuicPacketizer {
 public:
   struct QuicPacket {
-    size_t size;
+    size_t size{0};
     char payload[1460];
   };
 
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
-  size_t serializePackets(const test::common::quic::QuicH3FuzzCase& input, QuicPacket *packets,
-      size_t max_packets);
+  size_t serializePackets(const test::common::quic::QuicH3FuzzCase& input, QuicPacket* packets,
+                          size_t max_packets);
   void reset();
 
 private:
-  bool serializePacket(const test::common::quic::QuicFrame& frame, QuicPacket *packet);
-  bool serializeJunkPacket(const std::string& data, QuicPacket *packet);
+  bool serializePacket(const test::common::quic::QuicFrame& frame, QuicPacket* packet);
+  bool serializeJunkPacket(const std::string& data, QuicPacket* packet);
+  void serialize(quic::QuicFrame, QuicPacket* packet);
+  void serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame, QuicPacket* packet);
+  void serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame,
+                              QuicPacket* packet);
+  void serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame, QuicPacket* packet);
+  void serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame, QuicPacket* packet);
+  void serializeAckFrame(const test::common::quic::QuicAckFrame& frame, QuicPacket* packet);
+  void serializeNewConnectionIdFrame(const test::common::quic::QuicNewConnectionIdFrame& frame,
+                                     QuicPacket* packet);
 
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;

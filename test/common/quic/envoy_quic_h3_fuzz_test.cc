@@ -174,7 +174,7 @@ struct Harness {
 
     size_t n_packets = packetizer_.serializePackets(input, quic_packets, max_packets_count);
     for (size_t i = 0; i < n_packets; i++) {
-      QuicPacketizer::QuicPacket *p = &quic_packets[i];
+      QuicPacketizer::QuicPacket* p = &quic_packets[i];
       auto receipt_time = connection_helper_->GetClock()->Now();
       // We have to make sure that the server only receives the correct
       // connection ID in all packets.
