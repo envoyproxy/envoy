@@ -284,6 +284,9 @@ protected:
     // We replace path based secrets with inlined secrets on update.
     resolveDataSource(files,
                       *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
+    if (sds_certificate_validation_context_secrets_->has_crl()) {
+      resolveDataSource(files, *resolved_certificate_validation_context_secrets_->mutable_crl());
+    }
   }
 
   void

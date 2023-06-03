@@ -7,8 +7,8 @@ namespace Envoy {
 // A wrapper class around EngineBuilder, specifically for mobile tests.
 //
 // Mobile tests often supply their own configuration for convenience, instead of using the
-// EngineBuilder APIs. This wrapper class builds an Envoy Mobile Engine with the ability to
-// access setOverrideConfigForTests(), which is a protected method inside EngineBuilder.
+// EngineBuilder APIs. This wrapper class can build an Envoy Mobile Engine through createEngine
+// with a customized bootstrap configuration.
 class TestEngineBuilder : public Platform::EngineBuilder {
 public:
   virtual ~TestEngineBuilder() {}
