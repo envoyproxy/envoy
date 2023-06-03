@@ -75,8 +75,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
-  // startSecureTransport method should not be called for this transport socket.
-  bool startSecureTransport() override { return false; }
+  bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
 

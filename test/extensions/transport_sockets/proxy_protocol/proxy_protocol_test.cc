@@ -730,7 +730,7 @@ TEST_F(ProxyProtocolTest, TestStartSecureTransportCall) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   initialize(config, nullptr);
 
-  EXPECT_CALL(*inner_socket_, startSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(*inner_socket_, startSecureTransport());
   proxy_protocol_socket_->startSecureTransport();
 }
 
