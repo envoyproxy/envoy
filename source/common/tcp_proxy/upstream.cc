@@ -102,7 +102,7 @@ HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool,
       decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
       upstream_callbacks_(callbacks) {}
 
-HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+HttpUpstream::~HttpUpstream() = default;
 
 bool HttpUpstream::readDisable(bool disable) {
   if (!request_encoder_) {
@@ -307,6 +307,9 @@ HttpConnPool::~HttpConnPool() {
     // Because HTTP connections are generally shorter lived and have a higher probability of use
     // before going idle, they are closed with Default rather than CloseExcess.
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+  if (upstream_ != nullptr) {
+    upstream_->resetEncoder(Network::ConnectionEvent::LocalClose);
   }
 }
 
