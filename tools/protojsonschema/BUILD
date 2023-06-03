@@ -1,6 +1,7 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:write_source_files.bzl", "write_source_files")
-load(":generate.bzl", "generate_jsonschema")
+load("@rules_proto_grpc//:defs.bzl", "proto_plugin")
+load(":generate.bzl", "jsonschema_compile")
 load(":protos.bzl", "PROTOS")
 
 licenses(["notice"])  # Apache 2
@@ -42,10 +43,20 @@ write_source_files(
     },
 )
 
+proto_plugin(
+    name = "protoc_gen_jsonschema_proto_plugin",
+    options = [
+        "--jsonschema_opt=file_extension=schema.json",
+        "--jsonschema_opt=debug",
+    ],
+    output_directory = True,
+    tool = "@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema:protoc-gen-jsonschema",
+)
+
 [
     # example: "@envoy_api//contrib/envoy/extensions/filters/http/dynamo/v3:pkg" => "contrib_envoy_extensions_filters_http_dynamo_v3_jsonschema"
-    generate_jsonschema(
-        proto.replace("@envoy_api//", "").replace("/", "_").replace(":pkg", "") + "_jsonschema",
-        proto
+    jsonschema_compile(
+        name = proto.replace("@envoy_api//", "").replace("/", "_").replace(":pkg", "") + "_jsonschema",
+        protos = [proto]
     ) for proto in PROTOS
 ]
