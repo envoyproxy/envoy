@@ -76,12 +76,12 @@ public:
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void acceptHeadersFromRouter(bool end_stream);
-  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  virtual void acceptHeadersFromRouter(bool end_stream);
+  virtual void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
-  void resetStream();
+  virtual void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);

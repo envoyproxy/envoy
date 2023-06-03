@@ -61,6 +61,9 @@ public:
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                Http::StreamDecoderFilterCallbacks&, Http::CodecType type,
                StreamInfo::StreamInfo& downstream_info);
+
+  using RouterUpstreamRequest = Router::UpstreamRequest;
+  using RouterUpstreamRequestPtr = std::unique_ptr<RouterUpstreamRequest>;
   ~HttpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value() || generic_conn_pool_; }
@@ -387,6 +390,7 @@ public:
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
   ~HttpUpstream() override;
+  virtual void setRouterUpstreamRequest(UpstreamRequestPtr) PURE;
   virtual void newStream(GenericConnectionPoolCallbacks& callbacks) PURE;
   virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
@@ -428,7 +432,6 @@ protected:
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
-  // UpstreamRequestPtr upstream_request_;
   std::list<UpstreamRequestPtr> upstream_requests_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
   HttpConnPool& parent_;
@@ -533,33 +536,33 @@ class Http1Upstream : public HttpUpstream {
 public:
   Http1Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                 Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
-                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
-                std::unique_ptr<Router::GenericConnPool>&);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
   void newStream(GenericConnectionPoolCallbacks&) override {}
+  void setRouterUpstreamRequest(UpstreamRequestPtr) override {}
 };
 
 class Http2Upstream : public HttpUpstream {
 public:
   Http2Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                 Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
-                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
-                std::unique_ptr<Router::GenericConnPool>&);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
   void newStream(GenericConnectionPoolCallbacks&) override {}
+  void setRouterUpstreamRequest(UpstreamRequestPtr) override {}
 };
 
 class CombinedUpstream : public HttpUpstream {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                    Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
-                   const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
-                   std::unique_ptr<Router::GenericConnPool>&);
+                   const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   ~CombinedUpstream() override;
+  void setRouterUpstreamRequest(UpstreamRequestPtr) override;
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;

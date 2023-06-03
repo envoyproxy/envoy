@@ -327,6 +327,7 @@ public:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,
