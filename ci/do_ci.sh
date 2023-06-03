@@ -591,7 +591,7 @@ case $CI_TARGET in
         PUBLISH_ARGS=(
             --publish-commitish="$BUILD_SHA"
             --publish-assets=/build/release.signed/release.signed.tar.zst)
-        if [[ "$VERSION_DEV" == "dev" ]]; then
+        if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
