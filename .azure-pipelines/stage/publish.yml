@@ -118,6 +118,7 @@ jobs:
       cacheKeyDocker: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
       cacheKeyDockerName: publish_docker
       cacheKeyDockerTmpDir: /var/azpcache
+      cacheKeyDockerNoTmpfs: true
       cacheKeyDockerPath: ""
       cacheKeyDockerVersion: "$(cacheKeyDockerBuild)"
       env:
@@ -185,7 +186,7 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache
+      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
