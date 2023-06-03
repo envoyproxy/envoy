@@ -316,7 +316,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
           "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
     upstream_ =
         std::make_unique<CombinedUpstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                           *(route_.get()), config_, downstream_info_);
+                                           *(route_), config_, downstream_info_);
     RouterUpstreamRequestPtr upstream_request = std::make_unique<RouterUpstreamRequest>(
         *upstream_, std::move(generic_conn_pool_), /*can_send_early_data_=*/false,
         /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
@@ -327,11 +327,11 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   if (type_ == Http::CodecType::HTTP1) {
     upstream_ =
         std::make_unique<Http1Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                        *(route_.get()), config_, downstream_info_);
+                                        *(route_), config_, downstream_info_);
   } else {
     upstream_ =
         std::make_unique<Http2Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                        *(route_.get()), config_, downstream_info_);
+                                        *(route_), config_, downstream_info_);
   }
 
   Tcp::ConnectionPool::Cancellable* handle =
