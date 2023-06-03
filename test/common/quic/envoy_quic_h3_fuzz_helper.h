@@ -12,9 +12,9 @@ namespace Quic {
 
 // This class serializes structured protobuf `HTTP/3` messages to bytes as they
 // would be sent over the wire.
-class H3Packetizer {
+class H3Serializer {
 public:
-  H3Packetizer(std::set<uint32_t>& streams) : open_h3_streams_(streams){};
+  H3Serializer(std::set<uint32_t>& streams) : open_h3_streams_(streams){};
   size_t serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id,
                    const test::common::quic::H3Frame& h3frame);
 
@@ -43,7 +43,7 @@ private:
   quic::QuicConnectionId destination_connection_id_;
   quic::QuicFramer framer_;
 
-  H3Packetizer h3packetizer_;
+  H3Serializer h3serializer_;
   std::set<uint32_t> open_h3_streams_;
 
   char quic_packets_[10][1460];

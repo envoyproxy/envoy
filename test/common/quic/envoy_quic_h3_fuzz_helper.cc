@@ -77,7 +77,7 @@ static size_t buildPushPromiseFrame(quiche::QuicheDataWriter& dw, uint64_t push_
   return valid ? dw.length() : 0;
 }
 
-size_t H3Packetizer::serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type,
+size_t H3Serializer::serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type,
                                uint32_t id, const H3Frame& h3frame) {
   quiche::QuicheDataWriter dw(buffer_len, buffer);
   if (unidirectional) {
@@ -165,7 +165,7 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
       destination_connection_id_(quic::test::TestConnectionId()),
       framer_({quic_version_}, connection_helper_->GetClock()->Now(), quic::Perspective::IS_CLIENT,
               quic::kQuicDefaultConnectionIdLength),
-      h3packetizer_(open_h3_streams_) {
+      h3serializer_(open_h3_streams_) {
   quic::Perspective p = quic::Perspective::IS_CLIENT;
   framer_.SetEncrypter(quic::ENCRYPTION_INITIAL, std::make_unique<FuzzEncrypter>(p));
   framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE, std::make_unique<FuzzEncrypter>(p));
@@ -242,7 +242,7 @@ void QuicPacketizer::serializePacket(const QuicFrame& frame) {
     uint64_t offset = clampU64(stream.offset());
     if (stream.has_h3frame()) {
       const auto& f = stream.h3frame();
-      len = h3packetizer_.serialize(buffer, sizeof(buffer), unidirectional, type, id, f);
+      len = h3serializer_.serialize(buffer, sizeof(buffer), unidirectional, type, id, f);
       if (len == 0) {
         return;
       }
