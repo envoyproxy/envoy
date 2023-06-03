@@ -251,6 +251,13 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   tls_.shutdownThread();
 }
 
+TEST(StatsdUtilityTest, SanitizeStatsdName) {
+  std::string buffer;
+  EXPECT_EQ("a_b", sanitizeStatsdName("a:b", buffer));
+  EXPECT_EQ("a_b", sanitizeStatsdName("a|b", buffer));
+  EXPECT_EQ("a_b", sanitizeStatsdName("a@b", buffer));
+  EXPECT_EQ("a_b", sanitizeStatsdName("a#b", buffer));
+}
 } // namespace
 } // namespace Statsd
 } // namespace Common

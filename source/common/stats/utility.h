@@ -70,8 +70,16 @@ namespace Utility {
  * @param name the stat name to sanitize.
  * @return the sanitized stat name.
  */
+ // (TODO: krajshiva) Deprecate this infavor of new API
 std::string sanitizeStatsName(absl::string_view name);
-
+ /**
+  * Adding more performant function for sanitizing stats name.
+  * Very few stats need sanitization so avoid doing string copy for all other
+  * majority of stats. Also, just sanitizing basic minimum here and delegating
+  * responsibility of additional sanitization with sinks to ensure compatibility
+  * with their specific wire format.
+  */
+absl::string_view sanitizeStatsName(absl::string_view name, std::string& buffer);
 /**
  * Finds a metric tag with the specified name.
  *

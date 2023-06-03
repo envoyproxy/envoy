@@ -28,6 +28,50 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+static constexpr uint32_t needs_statsd_sanitizer[256] = {
+  // Control-characters 0-31.
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  // Pass through printable characters starting with space.
+  0, 0, 0, 1, 0, 0, 0, 0,                 //  !"#$%&'
+  0, 0, 0, 0, 0, 0, 0, 0,                 // ()*+,-.7
+  0, 0, 0, 0, 0, 0, 0, 0,                 // 01234567
+  0, 0, 1, 0, 0, 0, 0, 0,                 // 89:;<=>?
+  1, 0, 0, 0, 0, 0, 0, 0,                 // @ABCDEFG
+  0, 0, 0, 0, 0, 0, 0, 0,                 // HIJKLMNO
+  0, 0, 0, 0, 0, 0, 0, 0,                 // PQRSTUVW
+  0, 0, 0, 0, 0, 0, 0, 0,                 // XYZ[\]^_
+  0, 0, 0, 0, 0, 0, 0, 0,                 // `abcdefg
+  0, 0, 0, 0, 0, 0, 0, 0,                 // hijklmno
+  0, 0, 0, 0, 0, 0, 0, 0,                 // pqrstuvw
+  0, 0, 0, 0, 1, 0, 0, 0,                 // xyz{|}~\177
+
+  // 0x80-0xff, all of which require pass through.
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+absl::string_view sanitizeStatsdName(absl::string_view name, std::string& buffer) {
+  static_assert(ARRAY_SIZE(needs_statsd_sanitizer) == 256);
+  uint32_t need_statsd_sanitization = 0;
+  for (char c : name) {
+    need_statsd_sanitization |= needs_statsd_sanitizer[static_cast<uint8_t>(c)];
+  }
+  if (need_statsd_sanitization == 0) {
+    return name;  //  Fast path, should be executed most of the time.
+  }
+  buffer = name;
+    for (char &c : buffer) {
+      if (needs_statsd_sanitizer[static_cast<uint8_t>(c)]){ c = '_'; }
+  }
+  return buffer;
+}
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
     : parent_(parent), io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram,
@@ -50,7 +94,8 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              const Statsd::TagFormat& tag_format)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
-      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
+      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
+      sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -128,7 +173,7 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
 
 template <typename ValueType>
 const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
-                                              const std::string& type) const {
+                                              const std::string& type) {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
     const std::string message = absl::StrCat(
@@ -155,12 +200,20 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
+const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
+  if (sink_sanitization_enabled_) {
+      if (use_tag_) {
+        return sanitizeStatsdName(metric.tagExtractedName(), buffer_).data();
+      } else {
+        return sanitizeStatsdName(metric.name().data(), buffer_).data();
+      }
+  } else {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
     return metric.name();
   }
+ }
 }
 
 const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) const {
@@ -195,6 +248,21 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
 void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+    std::string buffer;
+    for (const auto& counter : snapshot.counters()) {
+      if (counter.counter_.get().used()) {
+      tls_sink.flushCounter(sanitizeStatsdName(counter.counter_.get().name(), buffer).data(), counter.delta_);
+    }
+  }
+
+    for (const auto& gauge : snapshot.gauges()) {
+      if (gauge.get().used()) {
+      tls_sink.flushGauge(sanitizeStatsdName(gauge.get().name(), buffer).data(), gauge.get().value());
+      }
+  }
+  } else {
+
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
@@ -206,11 +274,19 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }
+ }
   // TODO(efimki): Add support of text readouts stats.
   tls_sink.endFlush(true);
 }
 
 void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
+  std::string histogram_name;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+    std::string buffer;
+    histogram_name = sanitizeStatsdName(histogram.name(), buffer);
+  } else {
+    histogram_name = histogram.name();
+  }
   // For statsd histograms are all timers except percents.
   if (histogram.unit() == Stats::Histogram::Unit::Percent) {
     // 32-bit floating point values should have plenty of range for these values, and are faster to
@@ -218,9 +294,9 @@ void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     constexpr float divisor = Stats::Histogram::PercentScale;
     const float float_value = value;
     const float scaled = float_value / divisor;
-    tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram.name(), scaled);
+    tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram_name, scaled);
   } else {
-    tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
+    tls_->getTyped<TlsSink>().onTimespanComplete(histogram_name,
                                                  std::chrono::milliseconds(value));
   }
 }

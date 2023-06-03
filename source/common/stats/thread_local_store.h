@@ -440,6 +440,7 @@ private:
   private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
+    const bool sink_sanitization_enabled_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

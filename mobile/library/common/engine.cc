@@ -12,7 +12,8 @@ namespace Envoy {
 Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
                envoy_event_tracker event_tracker)
     : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+  sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
   ExtensionRegistry::registerFactories();
 
   // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
@@ -184,9 +185,16 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
   Stats::StatNameTagVector tags_vctr =
       Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  if (sink_sanitization_enabled_) {
+    std::string buffer;
+    absl::string_view name = Stats::Utility::sanitizeStatsName(elements, buffer);
+    Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
+      .add(count);
+  } else {
   std::string name = Stats::Utility::sanitizeStatsName(elements);
   Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
       .add(count);
+  }
   return ENVOY_SUCCESS;
 }
 

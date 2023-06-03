@@ -559,7 +559,11 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
 
   ScopeSharedPtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
   Counter& c1 = scope1->counterFromString("c1");
-  EXPECT_EQ("scope1___foo.c1", c1.name());
+  if (Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+    EXPECT_EQ("scope1:_:foo.c1", c1.name());
+  } else {
+    EXPECT_EQ("scope1___foo.c1", c1.name());
+  }
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -895,8 +899,10 @@ TEST_F(LookupWithStatNameTest, All) {
   // Validate that we sanitize away bad characters in the stats prefix. This happens only
   // when constructing a stat from a string, not from a stat name.
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
-
+  if (Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+    EXPECT_EQ("scope1.foo:_:.bar", scope3->counterFromString("bar").name());
+  } else {
+    EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());}
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
 }

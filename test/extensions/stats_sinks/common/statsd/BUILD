@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
+    "envoy_benchmark_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -41,5 +43,23 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "statsd_bm_test",
+    srcs = ["statsd_bm_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/extensions/stat_sinks/common/statsd:statsd_lib",
+        "//source/server:server_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

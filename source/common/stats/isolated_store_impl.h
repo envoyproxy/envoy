@@ -15,6 +15,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -280,10 +281,12 @@ private:
 class IsolatedScopeImpl : public Scope {
 public:
   IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
-      : prefix_(prefix, store.symbolTable()), store_(store) {}
+      : prefix_(prefix, store.symbolTable()), store_(store),
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {}
 
   IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
-      : prefix_(prefix, store.symbolTable()), store_(store) {}
+      : prefix_(prefix, store.symbolTable()), store_(store),
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {}
 
   ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
 
@@ -385,6 +388,7 @@ private:
 
   StatNameStorage prefix_;
   IsolatedStoreImpl& store_;
+  const bool sink_sanitization_enabled_;
 };
 
 } // namespace Stats

@@ -274,12 +274,23 @@ TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeText
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, SanitizeStatsName) {
-  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c."));
-  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c"));
-  EXPECT_EQ("a__b", Utility::sanitizeStatsName("a::b"));
-  EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
-  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
-  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+  // with flag on, sanitizeStatsName doesnt replace : or :/ or :// with _
+  if (Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
+   std::string buffer;
+   EXPECT_EQ("a://b", Utility::sanitizeStatsName("a://b", buffer));
+   EXPECT_EQ("a:/b", Utility::sanitizeStatsName("a:/b", buffer));
+   EXPECT_EQ("a::b", Utility::sanitizeStatsName("a::b", buffer));
+   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c.", buffer));
+   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c", buffer));
+   EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3), buffer));
+  } else {
+   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c."));
+   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c"));
+   EXPECT_EQ("a__b", Utility::sanitizeStatsName("a::b"));
+   EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
+   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
+   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+  }
 }
 
 } // namespace

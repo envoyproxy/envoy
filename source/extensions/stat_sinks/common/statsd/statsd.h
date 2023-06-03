@@ -26,6 +26,11 @@ namespace Common {
 namespace Statsd {
 
 static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
+/**
+ * statsd metric name sanitizer that complies with statsd wire format.
+ * It only copies string when input name has special chars to be replaced by _
+ */
+absl::string_view sanitizeStatsdName(absl::string_view name, std::string& buffer);
 
 /**
  * Implementation of Sink that writes to a UDP statsd address.
@@ -52,7 +57,8 @@ public:
                 const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
+        sink_sanitization_enabled_(Envoy::Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_sanitization_during_sink")) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -87,8 +93,8 @@ private:
 
   template <typename ValueType>
   const std::string buildMessage(const Stats::Metric& metric, ValueType value,
-                                 const std::string& type) const;
-  const std::string getName(const Stats::Metric& metric) const;
+                                 const std::string& type);
+  const std::string getName(const Stats::Metric& metric);
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   const ThreadLocal::SlotPtr tls_;
@@ -98,6 +104,8 @@ private:
   const std::string prefix_;
   const uint64_t buffer_size_;
   const Statsd::TagFormat tag_format_;
+  const bool sink_sanitization_enabled_;
+  std::string buffer_;
 };
 
 /**
