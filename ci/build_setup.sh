@@ -8,7 +8,7 @@
 set -e
 
 if [[ -n "$NO_BUILD_SETUP" ]]; then
-    exit
+    return
 fi
 
 export PPROF_PATH=/thirdparty_build/bin/pprof
