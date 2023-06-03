@@ -561,8 +561,8 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   // No need to set information using address_provider in case routing via Router::UpstreamRequest
-  // because in that case the information is already set in the
-  // Router::UpstreamRequest::onPoolReady.
+  // because in that case, information is already set by the
+  // Router::UpstreamRequest::onPoolReady() method before reaching here.
   if ((!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) ||
       (upstream_info.upstreamLocalAddress() == nullptr)) {

@@ -397,7 +397,7 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
   });
 
   if (config_.usePost()) {
-    downstream_headers_->addReference(Http::Headers::get().Path, "/");
+    downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
     downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 

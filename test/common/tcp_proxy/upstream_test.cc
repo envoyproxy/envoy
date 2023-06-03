@@ -339,15 +339,14 @@ public:
     }
   }
 
-  void expectCallOnSetRequestEncoder(std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers,
+  void expectCallOnSetRequestEncoder(Http::RequestHeaderMapImpl* expected_headers,
                                      bool end_stream = false) {
     if (typeid(T) == typeid(CombinedUpstream)) {
       EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(end_stream));
     } else {
-      EXPECT_CALL(encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), end_stream));
+      EXPECT_CALL(encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers), end_stream));
     }
   }
-
   void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
                         const std::string& key, const std::string& value) {
     ProtobufWkt::Struct struct_obj;
@@ -391,9 +390,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
       {Http::Headers::get().Method, "CONNECT"},
       {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
   });
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
@@ -410,9 +408,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
     expected_headers->addReference(Http::Headers::get().Scheme,
                                    Http::Headers::get().SchemeValues.Http);
   }
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
@@ -431,9 +428,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) 
                                    Http::Headers::get().SchemeValues.Http);
   }
 
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
@@ -472,9 +468,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value2");
 
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
@@ -502,9 +497,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
 
   expected_headers->setCopy(Http::LowerCaseString("key"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("key"), "value2");
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 
   Http::MockRequestEncoder another_encoder;
   auto another_upstream =
@@ -531,9 +525,9 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
     another_upstream->newStream(*this->filter_);
     Router::RouterFilterInterface* router_filter =
         dynamic_cast<Router::RouterFilterInterface*>(another_upstream.get());
-    EXPECT_THAT(*router_filter->downstreamHeaders(), HeaderMapEqualRef(tmp_expected_headers));
+    EXPECT_THAT(*router_filter->downstreamHeaders(), HeaderMapEqualRef(expected_headers.get()));
   } else {
-    EXPECT_CALL(another_encoder, encodeHeaders(HeaderMapEqualRef(tmp_expected_headers), false));
+    EXPECT_CALL(another_encoder, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
     another_upstream->setRequestEncoder(another_encoder, false);
   }
 }
@@ -567,9 +561,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
   Network::ConnectionInfoSetterImpl connection_info(ip_port, ip_port);
   EXPECT_CALL(this->downstream_stream_info_, downstreamAddressProvider)
       .WillRepeatedly(testing::ReturnRef(connection_info));
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest,
@@ -593,9 +586,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest,
   EXPECT_CALL(this->downstream_stream_info_, downstreamAddressProvider)
       .Times(AnyNumber())
       .WillRepeatedly(testing::ReturnRef(connection_info));
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest,
@@ -618,9 +610,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest,
 
   EXPECT_CALL(testing::Const(this->downstream_stream_info_), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
-  auto tmp_expected_headers = expected_headers.get();
-  this->expectCallOnSetRequestEncoder(std::move(expected_headers), false);
-  this->setRequestEncoderAndVerifyHeaders(tmp_expected_headers);
+  this->expectCallOnSetRequestEncoder(expected_headers.get(), false);
+  this->setRequestEncoderAndVerifyHeaders(expected_headers.get());
 }
 } // namespace
 } // namespace TcpProxy
