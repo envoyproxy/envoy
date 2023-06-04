@@ -146,6 +146,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
