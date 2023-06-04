@@ -194,6 +194,7 @@ void HttpUpstream::doneWriting() {
     resetEncoder(Network::ConnectionEvent::LocalClose);
   }
 }
+void HttpUpstream::cleanUp() { resetEncoder(Network::ConnectionEvent::LocalClose, false); }
 
 // Router::RouterFilterInterface
 void HttpUpstream::onUpstreamHeaders([[maybe_unused]] uint64_t response_code,
@@ -308,6 +309,9 @@ HttpConnPool::~HttpConnPool() {
     // before going idle, they are closed with Default rather than CloseExcess.
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
+  if (upstream_ != nullptr) {
+    upstream_->cleanUp();
+  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
@@ -377,7 +381,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    Router::Route& route, const TunnelingConfigHelper& config,
                                    StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
-CombinedUpstream::~CombinedUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+CombinedUpstream::~CombinedUpstream() = default;
 
 void CombinedUpstream::setRouterUpstreamRequest(UpstreamRequestPtr router_upstream_request) {
   LinkedList::moveIntoList(std::move(router_upstream_request), upstream_requests_);
@@ -475,7 +479,7 @@ Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
                              StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
 
-Http2Upstream::~Http2Upstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+Http2Upstream::~Http2Upstream() = default;
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (Http::Utility::getResponseStatus(headers) != 200) {
     return false;
@@ -518,7 +522,7 @@ Http1Upstream::Http1Upstream(HttpConnPool& http_conn_pool,
                              StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
 
-Http1Upstream::~Http1Upstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+Http1Upstream::~Http1Upstream() = default;
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
   request_encoder_ = &request_encoder;
   request_encoder_->getStream().addCallbacks(*this);

@@ -396,6 +396,7 @@ public:
 
   void doneReading();
   void doneWriting();
+  void cleanUp();
   Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
 
   // GenericUpstream

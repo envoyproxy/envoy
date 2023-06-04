@@ -67,7 +67,7 @@ public:
 
   void expectCallOnResetStream() {
     if (typeid(T) == typeid(CombinedUpstream)) {
-      EXPECT_CALL(*this->mock_router_upstream_request_, resetStream()).Times(AnyNumber());
+      EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
     } else {
       EXPECT_CALL(this->encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
     }
@@ -287,6 +287,7 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisab
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+  this->upstream_->cleanUp();
 }
 
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
