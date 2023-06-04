@@ -274,7 +274,7 @@ TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeText
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, SanitizeStatsName) {
-  // with flag on, sanitizeStatsName doesnt replace : or :/ or :// with _
+  // with flag on, sanitizeStatsName doesn't replace : or :/ or :// with _
   if (Envoy::Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_sanitization_during_sink")) {
     std::string buffer;
