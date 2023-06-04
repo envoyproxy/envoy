@@ -7238,17 +7238,8 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException,
-        "Invalid header configuration. Un-terminated variable expression "
-        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
-  } else {
-    EXPECT_THROW(
-        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException);
-  }
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
@@ -10292,10 +10283,16 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
+      "The filter test.default.filter doesn't support virtual host or route specific "
+      "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10333,10 +10330,16 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
+      "The filter test.default.filter doesn't support virtual host or route specific "
+      "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10376,6 +10379,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10413,7 +10421,12 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10430,6 +10443,31 @@ virtual_hosts:
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                     optional_http_filters),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAny) {
@@ -10476,6 +10514,8 @@ typed_per_filter_config:
   filter.unknown:
     "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
     is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.BoolValue
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -10486,14 +10526,38 @@ virtual_hosts:
           filter.unknown:
             "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
             is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.BoolValue
     typed_per_filter_config:
       filter.unknown:
         "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
         is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, FilterConfigWithoutConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, false),
+      EnvoyException,
+      "Empty route/virtual host per filter configuration for filter.unknown filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {

@@ -139,18 +139,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stats_request_lib",
-    srcs = [
-        "grouped_stats_request.cc",
-        "stats_request.cc",
-        "ungrouped_stats_request.cc",
-    ],
-    hdrs = [
-        "grouped_stats_request.h",
-        "stats_request.h",
-        "ungrouped_stats_request.h",
-    ],
+    srcs = ["stats_request.cc"],
+    hdrs = ["stats_request.h"],
     deps = [
         ":handler_ctx_lib",
+        ":prometheus_stats_lib",
         ":stats_params_lib",
         ":stats_render_lib",
         ":utils_lib",
@@ -190,6 +183,7 @@ envoy_cc_library(
     hdrs = ["stats_handler.h"],
     deps = [
         ":handler_ctx_lib",
+        ":prometheus_stats_lib",
         ":stats_render_lib",
         ":stats_request_lib",
         ":utils_lib",
@@ -200,6 +194,19 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "prometheus_stats_lib",
+    srcs = ["prometheus_stats.cc"],
+    hdrs = ["prometheus_stats.h"],
+    deps = [
+        ":stats_params_lib",
+        ":utils_lib",
+        "//envoy/stats:custom_stat_namespaces_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/stats:histogram_lib",
     ],
 )
 

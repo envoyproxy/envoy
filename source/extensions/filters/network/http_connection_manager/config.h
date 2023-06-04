@@ -18,6 +18,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/scopes.h"
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
@@ -154,6 +155,9 @@ public:
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_log_on_tunnel_successfully_established_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
@@ -187,6 +191,9 @@ public:
   }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
+  }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return scope_key_builder_ ? *scope_key_builder_ : OptRef<const Router::ScopeKeyBuilder>{};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -281,6 +288,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   bool flush_access_log_on_new_request_;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  bool flush_log_on_tunnel_successfully_established_{false};
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
@@ -317,6 +325,9 @@ private:
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
+  // used to get scope key, then scoped_routes_config_provider_ should be used to get the scoped
+  // routes
+  Router::ScopeKeyBuilderPtr scope_key_builder_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
@@ -357,11 +368,11 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
+  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-      bool clear_hop_by_hop_headers);
+      Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 };
 
 /**

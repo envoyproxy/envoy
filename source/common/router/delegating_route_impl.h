@@ -115,6 +115,7 @@ public:
   const ConnectConfigOptRef connectConfig() const override;
   const std::string& routeName() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;

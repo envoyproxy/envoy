@@ -139,6 +139,7 @@ public:
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
 protected:
   bool remoteClosed() { return remote_closed_; }
@@ -480,6 +481,7 @@ private:
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
+  absl::string_view filterConfigName() const override { return ""; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

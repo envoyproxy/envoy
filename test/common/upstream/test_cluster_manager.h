@@ -75,7 +75,10 @@ public:
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
                   ssl_context_manager_, outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
-              return std::make_pair(result.first, result.second.release());
+              if (!result.ok()) {
+                throw EnvoyException(std::string(result.status().message()));
+              }
+              return std::make_pair(result->first, result->second.release());
             }));
     ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
   }
@@ -102,7 +105,7 @@ public:
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {

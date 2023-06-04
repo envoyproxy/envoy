@@ -182,6 +182,26 @@ envoy_cc_mock(
     hdrs = ["instance.h"],
     deps = [
         "//envoy/server:instance_interface",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+    ],
+)
+
+envoy_cc_mock(
+    name = "main_mocks",
+    hdrs = ["main.h"],
+    deps = [
+        "//envoy/server:configuration_interface",
+        "//envoy/server/overload:overload_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "server_factory_context_mocks",
+    srcs = ["server_factory_context.cc"],
+    hdrs = ["server_factory_context.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -207,19 +227,9 @@ envoy_cc_mock(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_lifecycle_notifier_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-    ],
-)
-
-envoy_cc_mock(
-    name = "main_mocks",
-    hdrs = ["main.h"],
-    deps = [
-        "//envoy/server:configuration_interface",
-        "//envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -244,11 +254,7 @@ envoy_cc_mock(
         "//envoy/server:tracer_config_interface",
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
-        "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/server:options_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -269,6 +275,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:health_checker_config_interface",
         "//test/mocks:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

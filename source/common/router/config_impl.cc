@@ -2144,13 +2144,14 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (is_optional) {
-      ENVOY_LOG(debug,
-                "The filter {} doesn't support virtual host-specific configurations, and it is "
-                "optional, so ignore it.",
-                name);
+      ENVOY_LOG(
+          debug,
+          "The filter {} doesn't support virtual host or route specific configurations, and it is "
+          "optional, so ignore it.",
+          name);
     } else {
-      throw EnvoyException(
-          fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
+      throw EnvoyException(fmt::format(
+          "The filter {} doesn't support virtual host or route specific configurations", name));
     }
   }
   return object;
@@ -2161,12 +2162,30 @@ PerFilterConfigs::PerFilterConfigs(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  static absl::string_view filter_config_type =
+
+  const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
+
+  absl::string_view filter_config_type =
       envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
     RouteSpecificFilterConfigConstSharedPtr config;
+
+    // There are two ways to mark a route/virtual host per filter configuration as optional:
+    // 1. Mark it as optional in the HTTP filter of HCM. This way is deprecated but still works
+    //    when the runtime flag
+    //    `envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`
+    //    is explicitly set to false.
+    // 2. Mark it as optional in the route/virtual host per filter configuration. This way is
+    //    recommended.
+    //
+    // We check the first way first to ensure if this filter configuration is marked as optional
+    // or not. This will be true if the runtime flag is explicitly reverted to false and the
+    // config name is in the optional http filter list.
+    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config &&
+                              (optional_http_filters.find(name) != optional_http_filters.end());
 
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
         filter_config_type) {
@@ -2174,28 +2193,21 @@ PerFilterConfigs::PerFilterConfigs(
       Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
                                                     filter_config);
 
-      if (filter_config.disabled()) {
-        // Ignore disabled filters' configs.
-        configs_.emplace(name, FilterConfig{nullptr, true});
-        continue;
-      }
-
       if (!filter_config.has_config()) {
-        // The specific filter config is not set and disabled is not set to true, so we treat it
-        // flag to enabled filter but without specific config.
-        configs_.emplace(name, FilterConfig{nullptr, false});
-        continue;
+        throw EnvoyException(
+            fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
       }
 
-      bool is_optional = filter_config.is_optional() ||
-                         optional_http_filters.find(name) != optional_http_filters.end();
-      config = createRouteSpecificFilterConfig(name, filter_config.config(), is_optional,
+      config = createRouteSpecificFilterConfig(name, filter_config.config(),
+                                               is_optional_by_hcm || filter_config.is_optional(),
                                                factory_context, validator);
     } else {
-      config = createRouteSpecificFilterConfig(name, per_filter_config.second,
-                                               optional_http_filters.find(name) !=
-                                                   optional_http_filters.end(),
+      config = createRouteSpecificFilterConfig(name, per_filter_config.second, is_optional_by_hcm,
                                                factory_context, validator);
+    }
+
+    if (config != nullptr) {
+      configs_[name] = std::move(config);
     }
 
     // If a filter is explicitly configured we treat it as enabled.
