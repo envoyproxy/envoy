@@ -117,9 +117,9 @@ public:
     return match_tree();
   }
 
-  void setUpstreamClusterMetadata(const std::string& name_space, const std::string& metadata_key,
+  void setUpstreamClusterMetadata(const std::string& namespace, const std::string& metadata_key,
                                   const std::string& metadata_value) {
-    Envoy::Config::Metadata::mutableMetadataValue(metadata_, name_space, metadata_key)
+    Envoy::Config::Metadata::mutableMetadataValue(metadata_, namespace, metadata_key)
         .set_string_value(metadata_value);
     EXPECT_CALL(*cluster_info_, metadata()).WillRepeatedly(testing::ReturnPointee(&metadata_));
     stream_info_.setUpstreamClusterInfo(cluster_info_);
