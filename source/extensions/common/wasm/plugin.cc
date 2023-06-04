@@ -61,9 +61,6 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
   // Check key duplication.
   absl::flat_hash_set<std::string> keys;
   for (const auto& ld : config_.vm_config().log_destination()) {
-    keys.insert(ld.first);
-  }
-  for (const auto& ld : config_.vm_config().log_destination()) {
     if (!keys.insert(ld.first).second) {
       throw EnvoyException(fmt::format("Key {} is duplicated in "
                                        "envoy.extensions.wasm.v3.VmConfig.log_destination for {}. "

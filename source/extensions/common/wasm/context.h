@@ -202,6 +202,8 @@ public:
   uint64_t getMonotonicTimeNanoseconds() override;
   std::string_view getConfiguration() override;
   std::pair<uint32_t, std::string_view> getStatus() override;
+  WasmResult logWithDestination(uint32_t level, std::string_view message,
+                                std::string_view destination) override;
 
   // State accessors
   WasmResult getProperty(std::string_view path, std::string* result) override;

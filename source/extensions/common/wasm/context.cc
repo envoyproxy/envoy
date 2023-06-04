@@ -1196,6 +1196,32 @@ WasmResult Context::log(uint32_t level, std::string_view message) {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+WasmResult Context::logWithDestination(uint32_t level, std::string_view message,
+                                       std::string_view destination) {
+  const auto& log_destinations = wasm()->log_destinations();
+  // iterate over log_destinations map to check if dest
+  // destination requested by plugin exists
+  for (const auto& e : log_destinations) {
+    if (e.first == destination) {
+      // write message to the file which is the value of the key if it exists
+      std::ofstream log_file;
+      log_file.open(e.second, std::ios::out | std::ios_base::app);
+      if (!log_file) {
+        std::stringstream buf;
+        buf << "Failed to open log file: " << e.second;
+        log(level, buf.str());
+        return WasmResult::InvalidMemoryAccess;
+      }
+      log_file << message << std::endl;
+      log_file.close();
+      return WasmResult::Ok;
+    }
+  }
+  log(level, "logWithDestination: destination requested by plugin does not exist:  " +
+                 std::string(destination)); // log to default destination i.e proxy logs
+  return WasmResult::NotFound;
+}
+
 uint32_t Context::getLogLevel() {
   // Like the "log" call above, assume that spdlog level as an int
   // matches the enum in the SDK
