@@ -537,6 +537,7 @@ public:
   Http1Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                 Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
                 const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
+  ~Http1Upstream() override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
@@ -549,7 +550,7 @@ public:
   Http2Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                 Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
                 const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
-
+  ~Http2Upstream() override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
   void newStream(GenericConnectionPoolCallbacks&) override {}
