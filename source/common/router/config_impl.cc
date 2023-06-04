@@ -2193,6 +2193,12 @@ PerFilterConfigs::PerFilterConfigs(
       Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
                                                     filter_config);
 
+      // The filter is marked as disabled explicitly and the config is ignored directly.
+      if (filter_config.disabled()) {
+        configs_.emplace(name, FilterConfig{nullptr, true});
+        continue;
+      }
+
       if (!filter_config.has_config()) {
         throw EnvoyException(
             fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
@@ -2204,10 +2210,6 @@ PerFilterConfigs::PerFilterConfigs(
     } else {
       config = createRouteSpecificFilterConfig(name, per_filter_config.second, is_optional_by_hcm,
                                                factory_context, validator);
-    }
-
-    if (config != nullptr) {
-      configs_[name] = std::move(config);
     }
 
     // If a filter is explicitly configured we treat it as enabled.
