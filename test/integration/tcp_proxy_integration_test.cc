@@ -275,10 +275,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
 // Test that a downstream flush works correctly (all data is flushed)
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
 
-  // TODO (soulxu): skip this test for iouring, since this test depends on the io behavior.
-  // After we enable the parameter test for iouring and
+  // TODO (soulxu): skip this test for io-uring, since this test depends on the io behavior.
+  // After we enable the parameter test for io-uring and
   // default socket, then we should run this test for default socket, and write another version for
-  // the iouring.
+  // the io-uring.
   GTEST_SKIP();
 
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
