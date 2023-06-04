@@ -1240,6 +1240,20 @@ TEST_F(ZooKeeperFilterTest, SetWatches2Request) {
       config_->stats().setwatches2_resp_slow_);
 }
 
+TEST_F(ZooKeeperFilterTest, AddWatchRequest) {
+  initialize();
+
+  Buffer::OwnedImpl data =
+      encodePathVersion("/foo", enumToSignedInt(AddWatchMode::PersistentRecursive),
+                        enumToSignedInt(OpCodes::AddWatch));
+
+  testRequest(data, {{{"opname", "addwatch"}, {"path", "/foo"}, {"mode", "1"}}, {{"bytes", "24"}}},
+              config_->stats().addwatch_rq_, 24);
+  testResponse({{{"opname", "addwatch_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().addwatch_resp_, config_->stats().addwatch_resp_fast_,
+               config_->stats().addwatch_resp_slow_);
+}
+
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
   initialize();
 
