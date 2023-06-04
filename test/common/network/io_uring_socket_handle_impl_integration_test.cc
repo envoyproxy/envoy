@@ -603,8 +603,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Recv) {
   }
 }
 
-// This tests the case of a write event will be emitted after remote closed when the read is disabled
-// and only write event is listened
+// This tests the case of a write event will be emitted after remote closed when the read is
+// disabled and only write event is listened
 TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithoutEnableCloseEventAndDisabled) {
   initialize();
 
