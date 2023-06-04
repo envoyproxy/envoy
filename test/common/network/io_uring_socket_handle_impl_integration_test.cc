@@ -603,6 +603,69 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Recv) {
   }
 }
 
+// This tests the case of a write event will be emitted after remote closed when the read is disabled
+// and only write event is listened
+TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithoutEnableCloseEventAndDisabled) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  Buffer::OwnedImpl read_buffer;
+  bool got_write_event = false;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &got_write_event](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Write);
+        auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+        EXPECT_TRUE(ret.ok());
+        EXPECT_EQ(0, ret.return_value_);
+        server_io_handler->close();
+        got_write_event = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  server_io_handler->enableFileEvents(Event::FileReadyType::Write);
+
+  peer_io_handle_->close();
+
+  while (!got_write_event) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.length(), 0);
+
+  // Close safely.
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithoutEnableCloseEvent) {
   initialize();
 

@@ -167,6 +167,7 @@ enum IoUringSocketStatus {
   Initialized,
   Enabled,
   Disabled,
+  RemoteClosed,
   Closed,
 };
 

@@ -591,15 +591,36 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       read_error_.reset();
     }
   }
+
   // If `enable_close_event_` is true, then deliver the remote close as close event.
-  if (read_error_.has_value() && read_error_ == 0 && enable_close_event_) {
-    ENVOY_LOG(trace,
-              "remote closed and close event enabled, raise the close event, fd = "
-              "{}, result = {}",
-              fd_, read_error_.value());
-    io_uring_handler_.onRemoteClose();
-    read_error_.reset();
-    return;
+  // TODO (soulxu): Add test for the case the status is enabled, but listen on the closed
+  // event. This case is used for listener filter.
+  if (read_error_.has_value() && read_error_ == 0) {
+    if (enable_close_event_) {
+      ENVOY_LOG(trace,
+                "remote closed and close event enabled, raise the close event, fd = "
+                "{}, result = {}",
+                fd_, read_error_.value());
+      status_ = RemoteClosed;
+      io_uring_handler_.onRemoteClose();
+      read_error_.reset();
+      return;
+    } else {
+      // In this case, the closed event isn't listened and the status is disabled.
+      // It means we can't raise the closed or read event. So we only can raise the
+      // write event.
+      // TODO (soulxu): We should try to move this logic to the
+      // `IoUringSocketHandle::onRemoteClose()`.
+      ENVOY_LOG(trace,
+                "remote closed and close event disabled, raise the write event, fd = "
+                "{}, result = {}",
+                fd_, read_error_.value());
+      status_ = RemoteClosed;
+      WriteParam param{0};
+      io_uring_handler_.onWrite(param);
+      read_error_.reset();
+      return;
+    }
   }
 
   // The socket may be not readable during handler onRead callback, check it again here.

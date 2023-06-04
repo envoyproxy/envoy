@@ -92,7 +92,11 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 
   Api::IoCallUint64Result result = copyOut(max_length, slices, num_slice);
   if (result.ok()) {
-    read_param_->buf_.drain(result.return_value_);
+    // If the return is 0, this should be remote close. Return
+    // the result directly.
+    if (result.return_value_ != 0) {
+      read_param_->buf_.drain(result.return_value_);
+    }
   }
   return result;
 }
@@ -113,20 +117,25 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
   // It means there is no io_uring request is done, the read is invoked directly.
   if (read_param_ == absl::nullopt) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
+    if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::RemoteClosed) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    } else {
+      ENVOY_LOG(trace, "read remote close");
+      return Api::ioCallUint64ResultNoError();
+    }
   }
 
   ASSERT(io_uring_socket_.has_value());
 
   if (read_param_->result_ == 0) {
-    ENVOY_LOG(trace, "readv remote close");
+    ENVOY_LOG(trace, "read remote close");
     return Api::ioCallUint64ResultNoError();
   }
 
   if (read_param_->result_ < 0) {
     ASSERT(read_param_->buf_.length() == 0);
-    ENVOY_LOG(trace, "readv got error");
+    ENVOY_LOG(trace, "read got error");
     if (read_param_->result_ == -EAGAIN) {
       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                  IoSocketError::deleteIoError)};
@@ -544,8 +553,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
                                                          Buffer::RawSlice* slices,
                                                          uint64_t num_slice) {
   if (read_param_ == absl::nullopt) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
+    if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::RemoteClosed) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    } else {
+      ENVOY_LOG(trace, "readv remote close");
+      return Api::ioCallUint64ResultNoError();
+    }
   }
 
   ASSERT(io_uring_socket_.has_value());
