@@ -70,7 +70,7 @@ namespace Utility {
  * @param name the stat name to sanitize.
  * @return the sanitized stat name.
  */
-// (TODO: krajshiva) Deprecate this in favor of new API
+// TODO(krajshiva) Deprecate this in favor of new API where buffer is passed.
 std::string sanitizeStatsName(absl::string_view name);
 /**
  * Adding more performant function for sanitizing stats name.
