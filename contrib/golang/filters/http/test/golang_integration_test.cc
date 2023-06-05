@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -156,6 +158,8 @@ typed_config:
               ->mutable_route()
               ->set_cluster("cluster_0");
         });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
   }
 
@@ -236,7 +240,11 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", false);
-    codec_client_->sendData(request_encoder, "", true);
+    codec_client_->sendData(request_encoder, "", false);
+
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
+    codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
     // original header: x-test-header-0
@@ -275,6 +283,25 @@ typed_config:
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
     EXPECT_EQ(expected, upstream_request_->body().toString());
+
+    // check trailer value which is appended in golang: existed-trailer
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check trailer value which set in golang: x-test-trailer-0
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_EQ(
+        true,
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
@@ -358,6 +385,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());

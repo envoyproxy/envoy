@@ -414,11 +414,8 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:grpc_mux_lib",
-        "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
-        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
@@ -516,7 +513,9 @@ envoy_cc_library(
     hdrs = ["utils.h"],
     deps = [
         "//envoy/init:manager_interface",
+        "//envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

@@ -31,6 +31,7 @@ load(
     _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_signal_trace = "envoy_select_signal_trace",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
@@ -116,14 +117,17 @@ def envoy_cmake(
         name,
         cache_entries = {},
         debug_cache_entries = {},
+        default_cache_entries = {"CMAKE_BUILD_TYPE": "Bazel"},
         lib_source = "",
         postfix_script = "",
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         generate_crosstool_file = False,
+        generate_args = ["-GNinja"],
+        targets = ["", "install"],
         **kwargs):
-    cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
+    cache_entries.update(default_cache_entries)
     cache_entries_debug = dict(cache_entries)
     cache_entries_debug.update(debug_cache_entries)
 
@@ -151,8 +155,8 @@ def envoy_cmake(
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         }),
-        generate_args = ["-GNinja"],
-        targets = ["", "install"],
+        generate_args = generate_args,
+        targets = targets,
         # TODO: Remove install target and make this work
         install = False,
         # TODO(lizan): Make this always true
@@ -240,6 +244,7 @@ envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
+envoy_select_signal_trace = _envoy_select_signal_trace
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8

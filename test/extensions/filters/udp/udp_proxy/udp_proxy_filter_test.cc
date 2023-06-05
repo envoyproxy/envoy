@@ -200,7 +200,7 @@ public:
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(
             Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
-    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
+    ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
@@ -917,7 +917,7 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
@@ -1142,7 +1142,7 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
@@ -1199,7 +1199,7 @@ matcher:
 // Make sure exit when use the use_original_src_ip but platform does not support ip
 // transparent option.
 TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_)).WillOnce(Return(false));
 
   InSequence s;
 

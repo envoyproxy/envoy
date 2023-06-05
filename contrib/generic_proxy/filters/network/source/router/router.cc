@@ -4,6 +4,8 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
@@ -393,6 +395,27 @@ FilterStatus RouterFilter::onStreamDecoded(Request& request) {
   request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
   kickOffNewUpstreamRequest();
   return FilterStatus::StopIteration;
+}
+
+const Envoy::Router::MetadataMatchCriteria* RouterFilter::metadataMatchCriteria() {
+  // Have we been called before? If so, there's no need to recompute.
+  if (metadata_match_ != nullptr) {
+    return metadata_match_.get();
+  }
+
+  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it == request_metadata.end()) {
+    return nullptr;
+  }
+
+  metadata_match_ = std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+  return metadata_match_.get();
+}
+
+const Network::Connection* RouterFilter::downstreamConnection() const {
+  return callbacks_ != nullptr ? callbacks_->connection() : nullptr;
 }
 
 } // namespace Router
