@@ -124,12 +124,8 @@ xds_matcher:
 
   MatchDelegateConfig factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-
   envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
   TestUtility::loadFromYamlAndValidate(yaml, config);
-
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
       factory.createRouteSpecificFilterConfig(config, server_factory_context,
                                               ProtobufMessage::getNullValidationVisitor());
