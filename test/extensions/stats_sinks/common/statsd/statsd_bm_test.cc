@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <sys/types.h>
 
 #include <memory>
@@ -63,7 +62,7 @@ public:
 
   void histogramPushTest(::benchmark::State& state) {
     int idx = 1;
-    for (auto _ : state) {  //  NOLINT
+    for (auto _ : state) { //  NOLINT
       NiceMock<Stats::MockHistogram> duration_micro;
       duration_micro.name_ = "micro#duration_" + std::to_string(idx);
       duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
@@ -73,7 +72,7 @@ public:
   }
 
   void flushTest(::benchmark::State& state) {
-    for (auto _ : state) {  //  NOLINT
+    for (auto _ : state) { //  NOLINT
       sink_->flush(snapshot_);
     }
   }
