@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include <sys/types.h>
 
 #include <memory>
@@ -27,10 +27,10 @@ namespace Statsd {
 namespace {
 
 enum SinkOptions {
-  TCP_COUNTER_GAUGES_SINK,
-  UDP_COUNTER_GAUGES_SINK,
-  TCP_HISTOGRAM_COMPLETE,
-  UDP_HISTOGRAM_COMPLETE,
+  TcpCounterGaugesSink,
+  UdpCounterGaugesSink,
+  TcpHistogramComplete,
+  UdpHistogramComplete,
 };
 // set this value to percentage of stats requiring sanitization 0-100%
 int percent_requiring_sanitization = 10;
@@ -39,8 +39,8 @@ class StatsdSinkTest {
 public:
   StatsdSinkTest(SinkOptions sink_option, int num_stats)
       : sink_option_(sink_option), num_stats_(num_stats) {
-    if (sink_option_ == SinkOptions::TCP_COUNTER_GAUGES_SINK ||
-        sink_option_ == SinkOptions::TCP_HISTOGRAM_COMPLETE) {
+    if (sink_option_ == SinkOptions::TcpCounterGaugesSink ||
+        sink_option_ == SinkOptions::TcpHistogramComplete) {
       cluster_manager_.initializeClusters({"fake_cluster"}, {});
       cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
       sink_ = std::make_unique<TcpStatsdSink>(
@@ -53,17 +53,17 @@ public:
       sink_ = std::make_unique<UdpStatsdSink>(tls_, uds_address, false);
     }
 
-    if (sink_option_ == SinkOptions::TCP_COUNTER_GAUGES_SINK ||
-        sink_option_ == SinkOptions::UDP_COUNTER_GAUGES_SINK) {
+    if (sink_option_ == SinkOptions::TcpCounterGaugesSink ||
+        sink_option_ == SinkOptions::UdpCounterGaugesSink) {
       this->createSnapshotWithCounterAndGauges();
     }
   }
 
-  ~StatsdSinkTest() {}
+  ~StatsdSinkTest() = default;
 
-  void HistogramPushTest(::benchmark::State& state) {
+  void histogramPushTest(::benchmark::State& state) {
     int idx = 1;
-    for (auto _ : state) {
+    for (auto _ : state) {  //  NOLINT
       NiceMock<Stats::MockHistogram> duration_micro;
       duration_micro.name_ = "micro#duration_" + std::to_string(idx);
       duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
@@ -72,8 +72,8 @@ public:
     }
   }
 
-  void FlushTest(::benchmark::State& state) {
-    for (auto _ : state) {
+  void flushTest(::benchmark::State& state) {
+    for (auto _ : state) {  //  NOLINT
       sink_->flush(snapshot_);
     }
   }
@@ -81,29 +81,29 @@ public:
 private:
   void createSnapshotWithCounterAndGauges() {
     int sanitization_count = int(percent_requiring_sanitization * num_stats_) / 100;
-    counter1.name_ = "test_counter_name_";
-    counter1.used_ = true;
-    gauge1.name_ = "test_gauge_name_";
-    gauge1.used_ = true;
-    counter2.name_ = "test:counter@name_";
-    counter2.used_ = true;
-    gauge2.name_ = "test:gauge@name_";
-    gauge2.used_ = true;
+    counter1_.name_ = "test_counter_name_";
+    counter1_.used_ = true;
+    gauge1_.name_ = "test_gauge_name_";
+    gauge1_.used_ = true;
+    counter2_.name_ = "test:counter@name_";
+    counter2_.used_ = true;
+    gauge2_.name_ = "test:gauge@name_";
+    gauge2_.used_ = true;
     //  add repeated counter and gauge locations that do not require metric name sanitization
     for (int idx = 0; idx < num_stats_ - sanitization_count; ++idx) {
-      counter1.value_ = idx;
-      counter1.latch_ = idx;
-      gauge1.value_ = idx;
-      snapshot_.counters_.push_back({static_cast<uint64_t>(idx), counter1});
-      snapshot_.gauges_.push_back(gauge1);
+      counter1_.value_ = idx;
+      counter1_.latch_ = idx;
+      gauge1_.value_ = idx;
+      snapshot_.counters_.push_back({static_cast<uint64_t>(idx), counter1_});
+      snapshot_.gauges_.push_back(gauge1_);
     }
     //  add repeated counter and gauge locations that require metric name sanitization
     for (int idx = 0; idx < sanitization_count; ++idx) {
-      counter2.value_ = idx;
-      counter2.latch_ = idx;
-      snapshot_.counters_.push_back({static_cast<uint64_t>(idx), counter2});
-      gauge2.value_ = idx;
-      snapshot_.gauges_.push_back(gauge2);
+      counter2_.value_ = idx;
+      counter2_.latch_ = idx;
+      snapshot_.counters_.push_back({static_cast<uint64_t>(idx), counter2_});
+      gauge2_.value_ = idx;
+      snapshot_.gauges_.push_back(gauge2_);
     }
   }
 
@@ -111,33 +111,33 @@ private:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<Stats::Sink> sink_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Stats::MockGauge> gauge1;
-  NiceMock<Stats::MockCounter> counter1;
-  NiceMock<Stats::MockGauge> gauge2;
-  NiceMock<Stats::MockCounter> counter2;
+  NiceMock<Stats::MockGauge> gauge1_;
+  NiceMock<Stats::MockCounter> counter1_;
+  NiceMock<Stats::MockGauge> gauge2_;
+  NiceMock<Stats::MockCounter> counter2_;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   SinkOptions sink_option_;
   int num_stats_;
 };
 
 static void bmTCPStatsdSinktest(::benchmark::State& state) {
-  StatsdSinkTest statsd_speed_test(SinkOptions::TCP_COUNTER_GAUGES_SINK, state.range(0));
-  statsd_speed_test.FlushTest(state);
+  StatsdSinkTest statsd_speed_test(SinkOptions::TcpCounterGaugesSink, state.range(0));
+  statsd_speed_test.flushTest(state);
 }
 
 static void bmUDPStatsdSinktest(::benchmark::State& state) {
-  StatsdSinkTest statsd_speed_test(SinkOptions::UDP_COUNTER_GAUGES_SINK, state.range(0));
-  statsd_speed_test.FlushTest(state);
+  StatsdSinkTest statsd_speed_test(SinkOptions::UdpCounterGaugesSink, state.range(0));
+  statsd_speed_test.flushTest(state);
 }
 
 static void bmTCPStatsdOnHistogramComplete(::benchmark::State& state) {
-  StatsdSinkTest statsd_speed_test(SinkOptions::TCP_HISTOGRAM_COMPLETE, 0);
-  statsd_speed_test.HistogramPushTest(state);
+  StatsdSinkTest statsd_speed_test(SinkOptions::TcpHistogramComplete, 0);
+  statsd_speed_test.histogramPushTest(state);
 }
 
 static void bmUDPStatsdOnHistogramComplete(::benchmark::State& state) {
-  StatsdSinkTest statsd_speed_test(SinkOptions::UDP_HISTOGRAM_COMPLETE, 0);
-  statsd_speed_test.HistogramPushTest(state);
+  StatsdSinkTest statsd_speed_test(SinkOptions::UdpHistogramComplete, 0);
+  statsd_speed_test.histogramPushTest(state);
 }
 
 BENCHMARK(bmTCPStatsdSinktest)
