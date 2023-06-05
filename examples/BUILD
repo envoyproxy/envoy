@@ -25,6 +25,7 @@ filegroup(
             "mysql/*",
             "postgres/*",
             "kafka/*.yaml",
+            "smtp/*.yaml",
         ],
     ),
 )
@@ -37,6 +38,7 @@ filegroup(
             "mysql/*.yaml",
             "postgres/*.yaml",
             "kafka/*.yaml",
+            "smtp/*.yaml",
         ],
         exclude = [
             "**/*docker-compose*.yaml",
