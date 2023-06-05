@@ -403,6 +403,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter bytes_retransmitted_format("BYTES_RETRANSMITTED");
+    EXPECT_CALL(stream_info, bytesRetransmitted()).WillRepeatedly(Return(1));
+    EXPECT_EQ("1", bytes_retransmitted_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body,
+                                                     AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(bytes_retransmitted_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body,
+                                                       AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfoFormatter packets_retransmitted_format("PACKETS_RETRANSMITTED");
+    EXPECT_CALL(stream_info, packetsRetransmitted()).WillRepeatedly(Return(1));
+    EXPECT_EQ("1", packets_retransmitted_format.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body,
+                                                       AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(packets_retransmitted_format.formatValue(request_headers, response_headers,
+                                                         response_trailers, stream_info, body,
+                                                         AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
     StreamInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(stream_info, bytesReceived()).WillRepeatedly(Return(1));
     EXPECT_EQ("1",
