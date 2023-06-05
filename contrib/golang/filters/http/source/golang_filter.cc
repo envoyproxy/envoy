@@ -1255,6 +1255,8 @@ void FilterLogger::log(uint32_t level, absl::string_view message) const {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER().level()); }
+
 } // namespace Golang
 } // namespace HttpFilters
 } // namespace Extensions
