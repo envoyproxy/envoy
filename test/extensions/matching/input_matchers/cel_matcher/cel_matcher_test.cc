@@ -178,7 +178,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   EXPECT_EQ(result_2.on_match_, absl::nullopt);
 }
 
-TEST_F(CelMatcherTest, CelMatcherClusterMetadtaMatched) {
+TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              std::string(kMetadataValue));
   Envoy::Http::Matching::HttpMatchingDataImpl data =
@@ -192,7 +192,7 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadtaMatched) {
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
-TEST_F(CelMatcherTest, CelMatcherClusterMetadtaNotMatched) {
+TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              "wrong_service");
   Envoy::Http::Matching::HttpMatchingDataImpl data =
