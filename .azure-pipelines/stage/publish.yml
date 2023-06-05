@@ -90,6 +90,10 @@ parameters:
   displayName: "Publish Github release"
   type: string
   default: false
+- name: publishGithubReleaseDryRun
+  displayName: "Publish Github release (dry run)"
+  type: string
+  default: false
 
 
 jobs:
@@ -392,6 +396,7 @@ jobs:
   dependsOn: ["success"]
   condition: |
     and(not(canceled()),
+        in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
         eq(${{ parameters.publishGithubRelease }}, 'true'))
   pool:
     vmImage: "ubuntu-20.04"
@@ -408,3 +413,5 @@ jobs:
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
+      env:
+        ENVOY_PUBLISH_DRY_RUN: ${{ parameters.publishGithubReleaseDryRun }}

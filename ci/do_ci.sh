@@ -8,17 +8,15 @@ set -e
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
-NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
-if [[ -z "$NO_BUILD_SETUP" ]]; then
-    # shellcheck source=ci/setup_cache.sh
-    . "$(dirname "$0")"/setup_cache.sh
-    # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh
+# shellcheck source=ci/setup_cache.sh
+. "$(dirname "$0")"/setup_cache.sh
+# shellcheck source=ci/build_setup.sh
+. "$(dirname "$0")"/build_setup.sh
 
-    echo "building using ${NUM_CPUS} CPUs"
-    echo "building for ${ENVOY_BUILD_ARCH}"
-fi
+echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
+
 cd "${SRCDIR}"
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -202,8 +200,6 @@ case $CI_TARGET in
               //tools/protoprint:protoprint_test
         echo "Validating API structure..."
         "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-        echo "Validate Golang protobuf generation..."
-        "${ENVOY_SRCDIR}"/tools/api/generate_go_protobuf.py
         echo "Testing API..."
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -215,6 +211,43 @@ case $CI_TARGET in
         echo "Building API..."
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               -c fastbuild @envoy_api//envoy/...
+        if [[ -n "$ENVOY_API_ONLY" ]]; then
+            exit 0
+        fi
+        ;&
+
+    api.go)
+        if [[ -z "$NO_BUILD_SETUP" ]]; then
+            setup_clang_toolchain
+        fi
+        GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
+        GO_TARGETS=(@envoy_api//...)
+        read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+        echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --experimental_proto_descriptor_sets_include_source_info \
+              --remote_download_outputs=all \
+              "${GO_PROTOS[@]}"
+        rm -rf build_go
+        mkdir -p build_go
+        echo "Copying go protos -> build_go"
+        BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
+        for GO_PROTO in "${GO_PROTOS[@]}"; do
+             # strip @envoy_api//
+            RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
+            PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
+            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+            OUTPUT_DIR="build_go/${RULE_DIR}"
+            mkdir -p "$OUTPUT_DIR"
+            if [[ ! -e "$INPUT_DIR" ]]; then
+                echo "Unable to find input ${INPUT_DIR}" >&2
+                exit 1
+            fi
+            # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
+            while read -r GO_FILE; do
+                cp -a "$GO_FILE" "$OUTPUT_DIR"
+            done <<< "$(find "$INPUT_DIR" -name "*.go")"
+        done
         ;;
 
     api_compat)
@@ -591,7 +624,7 @@ case $CI_TARGET in
         PUBLISH_ARGS=(
             --publish-commitish="$BUILD_SHA"
             --publish-assets=/build/release.signed/release.signed.tar.zst)
-        if [[ "$VERSION_DEV" == "dev" ]]; then
+        if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \

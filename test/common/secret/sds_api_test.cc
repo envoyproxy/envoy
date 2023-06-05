@@ -293,6 +293,7 @@ protected:
   }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
+                      const std::string& crl_path, const std::string& crl_value,
                       const std::string& watch_path) {
     const std::string yaml = fmt::format(
         R"EOF(
@@ -300,17 +301,24 @@ protected:
   validation_context:
     trusted_ca:
       filename: "{}"
+    crl:
+      filename: "{}"
     allow_expired_certificate: true
     )EOF",
-        trusted_ca_path);
+        trusted_ca_path, crl_path);
     envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
     TestUtility::loadFromYaml(yaml, typed_secret);
     const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
     auto* watcher = new Filesystem::MockWatcher();
     EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
+    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
     EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
+        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          watch_cbs_.push_back(cb);
+        }));
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
         .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
           watch_cbs_.push_back(cb);
@@ -417,15 +425,19 @@ TEST_P(TlsCertificateSdsRotationApiTest, FailedRotation) {
 // Basic rotation of CertificateValidationContext.
 TEST_P(CertificateValidationContextSdsRotationApiTest, CertificateValidationContext) {
   InSequence s;
-  onConfigUpdate("/foo/bar/ca.pem", "a", "/foo/bar/");
+  onConfigUpdate("/foo/bar/ca.pem", "a", "/foo/bar/crl.pem", "b", "/foo/bar/");
 
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
+
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   watch_cbs_[0](Filesystem::Watcher::Events::MovedTo);
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("c", secret.trusted_ca().inline_bytes());
+  EXPECT_EQ("d", secret.crl().inline_bytes());
 }
 
 // Hash consistency verification prevents races.
