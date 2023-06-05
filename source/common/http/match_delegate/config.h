@@ -37,8 +37,8 @@ public:
       }
     }
 
-    // The matcher from the per route config, if available, will override the matcher from the filter
-    // config.
+    // The matcher from the per route config, if available, will override the matcher from the
+    // filter config.
     void setMatchTree(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) {
       match_tree_ = std::move(match_tree);
       has_match_tree_ = match_tree_ != nullptr;
