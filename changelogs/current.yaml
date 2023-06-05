@@ -301,6 +301,13 @@ new_features:
     This works with dynamic secrets when
     :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
     is delivered via SDS.
+- area: http
+  change: |
+    Add support to the route/virtual host level
+    :ref:`disabled <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` field.
+    A route/virtual host level per filter config can be marked as disabled, which means that if
+    the filter will be disabled in specific route/virtual host.
+
 
 deprecated:
 - area: access_log
