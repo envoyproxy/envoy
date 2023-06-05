@@ -412,11 +412,6 @@ void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) 
 }
 
 void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
-  auto f_stat_to_use = [&f_stat](Gauge& gauge) {
-    if (!(gauge.hidden())) {
-      f_stat(gauge);
-    }
-  };
   if (sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
@@ -424,7 +419,11 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
       f_stat(*gauge);
     }
   } else {
-    forEachGauge(f_size, f_stat_to_use);
+    forEachGauge(f_size, [&f_stat](Gauge& gauge) {
+      if (!(gauge.hidden())) {
+        f_stat(gauge);
+      }
+    });
   }
 }
 
