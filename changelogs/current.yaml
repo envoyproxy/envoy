@@ -90,6 +90,10 @@ minor_behavior_changes:
   change: |
     Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
     to the name of the ext_proc filter.
+- area: stats
+  change: |
+    Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with an
+    included query such as hidden?include or hidden?showonly.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
