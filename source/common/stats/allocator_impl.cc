@@ -421,7 +421,7 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
     for (auto gauge : sinked_gauges_) {
-      f_stat_to_use(*gauge);
+      f_stat(*gauge);
     }
   } else {
     forEachGauge(f_size, f_stat_to_use);

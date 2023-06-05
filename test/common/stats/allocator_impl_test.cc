@@ -541,7 +541,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
       alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                            [&num_iterations](Gauge&) { ++num_iterations; });
+                            [&num_iterations, unhidden_stat_name](Gauge& gauge) {
+                              EXPECT_EQ(unhidden_stat_name, gauge.statName());
+                              num_iterations++;
+                            });
   EXPECT_EQ(num_gauges, 2);
   EXPECT_EQ(num_iterations, 1);
 }
@@ -571,7 +574,12 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
       alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                            [&num_iterations](Gauge&) { ++num_iterations; });
+                            [&num_iterations, unhidden_stat_name, &sink_predicates](Gauge& gauge) {
+                              ++num_iterations;
+                              EXPECT_EQ(unhidden_stat_name, gauge.statName());
+                              EXPECT_TRUE(sink_predicates->has(gauge.statName()));
+                            });
+
   EXPECT_EQ(num_gauges, 2);
   EXPECT_EQ(num_iterations, 1);
 }

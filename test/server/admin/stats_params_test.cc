@@ -65,7 +65,9 @@ TEST(StatsParamsTest, ParseParamsHidden) {
   EXPECT_EQ(HiddenFlag::ShowOnly, params.hidden_);
   ASSERT_EQ(Http::Code::OK, params.parse("?hidden=exclude", response));
   EXPECT_EQ(HiddenFlag::Exclude, params.hidden_);
-  EXPECT_EQ(Http::Code::BadRequest, params.parse("?hidden=foo", response));
+  ASSERT_EQ(Http::Code::BadRequest, params.parse("?hidden=foo", response));
+  ASSERT_EQ(Http::Code::OK, params.parse("?hidden", response));
+  EXPECT_EQ(HiddenFlag::Exclude, params.hidden_);
 }
 
 TEST(StatsParamsTest, ParseParamsFilter) {

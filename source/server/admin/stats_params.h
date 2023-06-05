@@ -41,9 +41,9 @@ enum class StatsType {
 };
 
 enum class HiddenFlag {
-  Include,
-  ShowOnly,
-  Exclude,
+  Include,  // Will include hidden stats along side non-hidden stats
+  ShowOnly, // Will only show hidden stats and exclude hidden stats
+  Exclude,  // Default behavior. Will exclude all hidden stats
 };
 
 struct StatsParams {
