@@ -70,6 +70,24 @@ const (
 	Critical LogType = 5
 )
 
+func (self LogType) String() string {
+	switch self {
+	case Trace:
+		return "trace"
+	case Debug:
+		return "debug"
+	case Info:
+		return "info"
+	case Warn:
+		return "warn"
+	case Error:
+		return "error"
+	case Critical:
+		return "critical"
+	}
+	return "unknown"
+}
+
 //******************* log level end *******************//
 
 // ****************** HeaderMap start ******************//

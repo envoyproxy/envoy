@@ -194,37 +194,6 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   return verify_mode;
 }
 
-int DefaultCertValidator::doSynchronousVerifyCertChain(
-    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
-    const Network::TransportSocketOptions* transport_socket_options) {
-  if (verify_trusted_ca_) {
-    int ret = X509_verify_cert(store_ctx);
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(
-          ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
-                   : Envoy::Ssl::ClientValidationStatus::Failed);
-    }
-
-    if (ret <= 0) {
-      stats_.fail_verify_error_.inc();
-      ENVOY_LOG(debug, "{}", Utility::getX509VerificationErrorInfo(store_ctx));
-      return allow_untrusted_certificate_ ? 1 : ret;
-    }
-  }
-  Envoy::Ssl::ClientValidationStatus detailed_status =
-      Envoy::Ssl::ClientValidationStatus::NotValidated;
-  bool success = verifyCertAndUpdateStatus(&leaf_cert, transport_socket_options, detailed_status,
-                                           nullptr, nullptr);
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(detailed_status);
-  }
-  if (!success) {
-    X509_STORE_CTX_set_error(store_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
-    return 0;
-  }
-  return 1;
-}
-
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
     X509* leaf_cert, const Network::TransportSocketOptions* transport_socket_options,
     Envoy::Ssl::ClientValidationStatus& detailed_status, std::string* error_details,
