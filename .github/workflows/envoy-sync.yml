@@ -20,7 +20,7 @@ jobs:
         - envoy-filter-example
         - data-plane-api
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@1f1feae1e372dde41ecc6830028989bb6037c480
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@80a2b0325d086b0dee546bb89496763cd11c7f8e
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
