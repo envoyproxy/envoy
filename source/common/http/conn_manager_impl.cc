@@ -834,6 +834,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         refreshAccessLogFlushTimer();
       }
       const SystemTime now = connection_manager_.timeSource().systemTime();
+      // Downstream bytes meter is guaranteed to be non-null because ActiveStream and the timer
+      // event are created on the same thread that sets the meter in
+      // ConnectionManagerImpl::newStream.
       filter_manager_.streamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(
           now);
       if (auto& upstream_bytes_meter = filter_manager_.streamInfo().getUpstreamBytesMeter();
