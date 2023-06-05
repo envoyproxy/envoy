@@ -122,6 +122,7 @@ stages:
     RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
+    PUBLISH_GITHUB_RELEASE_DRY_RUN: $[stageDependencies.env.repo.outputs['publish.githubReleaseDryRun']]
     PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
     PUBLISH_DOCS: $[stageDependencies.env.repo.outputs['publish.docs']]
     PUBLISH_DOCS_LATEST: $[stageDependencies.env.repo.outputs['publish.docsLatest']]
@@ -153,6 +154,7 @@ stages:
       publishDocsRelease: variables['PUBLISH_DOCS_RELEASE']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
+      publishGithubReleaseDryRun: variables['PUBLISH_GITHUB_RELEASE_DRY_RUN']
 
 - stage: verify
   displayName: Verify
