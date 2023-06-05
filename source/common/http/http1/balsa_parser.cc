@@ -26,15 +26,10 @@ constexpr char kResponseFirstByte = 'H';
 // Allowed characters for field names according to Section 5.1
 // and for methods according to Section 9.1 of RFC 9110:
 // https://www.rfc-editor.org/rfc/rfc9110.html
-constexpr char kValidCharacters[] = {
-    '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '0', '1', '2', '3', '4', '5',
-    '6', '7', '8', '9', 'A', 'B',  'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
-    'M', 'N', 'O', 'P', 'Q', 'R',  'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_',
-    '`', 'a', 'b', 'c', 'd', 'e',  'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-    'p', 'q', 'r', 's', 't', 'u',  'v', 'w', 'x', 'y', 'z', '|', '~'};
-constexpr const char* kValidCharactersBegin = &kValidCharacters[0];
-constexpr const char* kValidCharactersEnd =
-    &kValidCharacters[ABSL_ARRAYSIZE(kValidCharacters) - 1] + 1;
+constexpr absl::string_view kValidCharacters =
+    "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
+constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
+constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
 
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
