@@ -40,7 +40,7 @@ public:
 
 class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(os_fd_t, fd, (), (const));
-  MOCK_METHOD(void, close, (bool));
+  MOCK_METHOD(void, close, (bool, IoUringSocketOnClosedCb));
   MOCK_METHOD(void, shutdown, (int32_t how));
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
@@ -76,7 +76,8 @@ public:
   MOCK_METHOD(IoUringSocket&, addServerSocket,
               (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addServerSocket,
-              (IoUringSocket & origin_socket, IoUringHandler& handler, bool enable_close_event));
+              (os_fd_t fd, Buffer::Instance& read_buf, IoUringHandler& handler,
+               bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addClientSocket,
               (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
