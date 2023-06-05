@@ -155,7 +155,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     const std::string config_yaml = R"EOF(
     host:
-      exact_match: fake_host
+      exact: fake_host
     )EOF";
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
@@ -173,9 +173,9 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     const std::string config_yaml = R"EOF(
     host:
-      exact_match: fake_host
+      exact: fake_host
     path:
-      exact_match: fake_path
+      exact: fake_path
     )EOF";
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
@@ -194,11 +194,11 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     const std::string config_yaml = R"EOF(
     host:
-      exact_match: fake_host
+      exact: fake_host
     path:
-      exact_match: fake_path
+      exact: fake_path
     method:
-      exact_match: fake_method
+      exact: fake_method
     )EOF";
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
@@ -218,11 +218,11 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     const std::string config_yaml = R"EOF(
     host:
-      exact_match: fake_host
+      exact: fake_host
     path:
-      exact_match: fake_path
+      exact: fake_path
     method:
-      exact_match: fake_method
+      exact: fake_method
     properties:
       - name: key_0
         string_match:
@@ -247,11 +247,11 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     const std::string config_yaml = R"EOF(
     host:
-      exact_match: fake_host
+      exact: fake_host
     path:
-      exact_match: fake_path
+      exact: fake_path
     method:
-      exact_match: fake_method
+      exact: fake_method
     properties:
       - name: key_0
         string_match:
