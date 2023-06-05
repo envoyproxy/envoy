@@ -85,6 +85,10 @@ public:
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addBytesRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, bytesRetransmitted, (), (const));
+  MOCK_METHOD(void, addPacketsRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
