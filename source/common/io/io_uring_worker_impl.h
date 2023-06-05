@@ -65,7 +65,7 @@ public:
                                  bool enable_close_event) override;
   IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
                                  bool enable_close_event) override;
-  IoUringSocket& addServerSocket(IoUringSocket& origin_socket, IoUringHandler& handler,
+  IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringHandler& handler,
                                  bool enable_close_event) override;
   IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
                                  bool enable_close_event) override;
@@ -120,8 +120,9 @@ public:
   // IoUringSocket
   IoUringWorker& getIoUringWorker() const override { return parent_; }
   os_fd_t fd() const override { return fd_; }
-  void close(bool keep_fd_open) override {
+  void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override {
     status_ = Closed;
+    on_closed_cb_ = cb;
     // When keep_fd_open is true, the IoHandle needn't cleanup the
     // reference to the IoUringSocket. The new IoUringSocket will be
     // replaced with it.
@@ -163,6 +164,9 @@ public:
     if (injected && (injected_completions_ & RequestType::Close)) {
       injected_completions_ &= ~RequestType::Close;
     }
+    if (on_closed_cb_) {
+      on_closed_cb_();
+    }
   }
   void onCancel(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Cancel)) {
@@ -184,6 +188,7 @@ protected:
   uint32_t injected_completions_{0};
   IoUringSocketStatus status_{Initialized};
   bool enable_close_event_;
+  IoUringSocketOnClosedCb on_closed_cb_;
 };
 
 class IoUringAcceptSocket : public IoUringSocketEntry {
@@ -191,7 +196,7 @@ public:
   IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
                       uint32_t accept_size, bool enable_close_event);
 
-  void close(bool keep_fd_open) override;
+  void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
   void enable() override;
   void disable() override;
   void onClose(Request* req, int32_t result, bool injected) override;
@@ -217,7 +222,7 @@ public:
   ~IoUringServerSocket() override;
 
   // IoUringSocket
-  void close(bool keep_fd_open) override;
+  void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
   void enable() override;
   void disable() override;
   void write(Buffer::Instance& data) override;

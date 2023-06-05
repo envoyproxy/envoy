@@ -42,12 +42,18 @@ public:
     if (create_second_thread) {
       second_dispatcher_ = api_->allocateDispatcher("test_second_thread");
       instance_.registerThread(*second_dispatcher_, false);
-      second_thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
     }
 
     io_uring_factory_ =
         std::make_unique<Io::IoUringFactoryImpl>(10, false, 5, 8192, 1000, instance_);
     io_uring_factory_->onWorkerThreadInitialized();
+
+    // create the thread after the io-uring worker initialized, otherwise the
+    // dispatcher will exit when there is no any registered event.
+    if (create_second_thread) {
+      second_thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
+    }
+
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
     io_handle_ = std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory_, fd_);
@@ -943,9 +949,10 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread)
   read_buffer.drain(read_buffer.length());
   EXPECT_EQ(read_buffer.length(), 0);
   std::atomic<bool> read_done = false;
+  std::atomic<bool> initialized_in_new_thread = false;
 
   second_dispatcher_->post([&server_io_handler, &second_dispatcher = second_dispatcher_,
-                            &read_buffer, &read_done, &data]() {
+                            &read_buffer, &read_done, &data, &initialized_in_new_thread]() {
     server_io_handler->initializeFileEvent(
         *second_dispatcher,
         [&server_io_handler, &read_buffer, &data, &read_done](uint32_t event) {
@@ -958,13 +965,19 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread)
           read_done = true;
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+    initialized_in_new_thread = true;
   });
+
+  while (!initialized_in_new_thread) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   write_buffer.add(data);
   peer_io_handle_->write(write_buffer);
 
   while (!read_done) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    sleep(1);
   }
   EXPECT_EQ(read_buffer.toString(), data);
 

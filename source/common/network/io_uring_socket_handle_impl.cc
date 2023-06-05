@@ -7,6 +7,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/io/io_uring_worker_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -394,8 +395,24 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       ENVOY_LOG(trace,
                 "initialize file event on another thread, fd = {}, io_uring_socket_type = {}", fd_,
                 ioUringSocketTypeStr());
-      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
-          *io_uring_socket_, *this, events & Event::FileReadyType::Closed);
+      // Close the original socket at its running thread.
+      io_uring_socket_->getIoUringWorker().dispatcher().post([&origin_socket = io_uring_socket_,
+                                                              &target_dispatcher = dispatcher,
+                                                              &io_uring_factory = io_uring_factory_,
+                                                              &io_handler = *this, &events]() {
+        // Move the data of original socket's read buffer after the original socket read request
+        // is done.
+        origin_socket->close(true, [&origin_socket, &target_dispatcher, &io_uring_factory,
+                                    &io_handler, &events]() {
+          std::shared_ptr<Buffer::OwnedImpl> buf = std::make_shared<Buffer::OwnedImpl>();
+          buf->move(dynamic_cast<Io::IoUringServerSocket*>(origin_socket.ptr())->getReadBuffer());
+          target_dispatcher.post([&origin_socket, &io_uring_factory, &io_handler, &events,
+                                  read_buf = buf, fd = origin_socket->fd()]() {
+            origin_socket.emplace(io_uring_factory.getIoUringWorker()->addServerSocket(
+                fd, *read_buf, io_handler, events & Event::FileReadyType::Closed));
+          });
+        });
+      });
     }
     cb_ = std::move(cb);
     return;
@@ -409,6 +426,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
     }
+
     io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
         fd_, *this, events & Event::FileReadyType::Closed);
     break;

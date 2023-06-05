@@ -173,6 +173,8 @@ enum IoUringSocketStatus {
 
 class IoUringWorker;
 
+using IoUringSocketOnClosedCb = std::function<void()>;
+
 /**
  * Abstract for each socket.
  */
@@ -196,7 +198,7 @@ public:
    * end. The value of `true` is used for destroy the IoUringSocket but keep the file descriptor
    * open.
    */
-  virtual void close(bool keep_fd_open) PURE;
+  virtual void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) PURE;
 
   /**
    * Enable the socket.
@@ -362,8 +364,8 @@ public:
   /**
    * Add an server socket through an existing socket from another thread.
    */
-  virtual IoUringSocket& addServerSocket(IoUringSocket& origin_socket, IoUringHandler& handler,
-                                         bool enable_close_event) PURE;
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
+                                         IoUringHandler& handler, bool enable_close_event) PURE;
   /**
    * Add an client socket socket to the worker.
    */

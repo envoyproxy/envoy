@@ -107,17 +107,12 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& ha
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addServerSocket(IoUringSocket& origin_socket,
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                                   IoUringHandler& handler,
                                                   bool enable_close_event) {
-  auto fd = origin_socket.fd();
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
-  Buffer::OwnedImpl buf;
-  buf.move(dynamic_cast<IoUringServerSocket*>(&origin_socket)->getReadBuffer());
-  origin_socket.getIoUringWorker().dispatcher().post(
-      [&origin_socket]() { origin_socket.close(true); });
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, buf, *this, handler, write_timeout_ms_, enable_close_event);
+      fd, read_buf, *this, handler, write_timeout_ms_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
@@ -332,11 +327,11 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
   enable();
 }
 
-void IoUringAcceptSocket::close(bool keep_fd_open) {
+void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}, request_count_ = {}, closed_ = {}", fd_,
             status_, request_count_.load(), closed_.load());
 
-  IoUringSocketEntry::close(keep_fd_open);
+  IoUringSocketEntry::close(keep_fd_open, cb);
 
   // We didn't implement keep_fd_open for accept socket.
   ASSERT(!keep_fd_open);
@@ -447,10 +442,10 @@ IoUringServerSocket::~IoUringServerSocket() {
   }
 }
 
-void IoUringServerSocket::close(bool keep_fd_open) {
+void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
 
-  IoUringSocketEntry::close(keep_fd_open);
+  IoUringSocketEntry::close(keep_fd_open, cb);
   keep_fd_open_ = keep_fd_open;
 
   // Delay close until read request and write (or shutdown) request are drained.
@@ -546,6 +541,16 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     read_req_ = nullptr;
     // If the socket is going to close, discard all results.
     if (status_ == Closed && write_or_shutdown_req_ == nullptr) {
+      if (result > 0 && keep_fd_open_) {
+        ReadRequest* read_req = static_cast<ReadRequest*>(req);
+        Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+            read_req->buf_.release(), result,
+            [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+              delete[] reinterpret_cast<const uint8_t*>(data);
+              delete this_fragment;
+            });
+        read_buf_.addBufferFragment(*fragment);
+      }
       closeInternal();
       return;
     }
@@ -690,6 +695,9 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
 
 void IoUringServerSocket::closeInternal() {
   if (keep_fd_open_) {
+    if (on_closed_cb_) {
+      on_closed_cb_();
+    }
     cleanup();
     return;
   }
