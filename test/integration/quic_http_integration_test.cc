@@ -28,6 +28,7 @@
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -1066,10 +1067,6 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   // Config the client to defer cert validation by 5ms.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
@@ -1086,10 +1083,6 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterDisconnect) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -1129,10 +1122,6 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterTearDown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -1390,6 +1379,41 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(8), "via_upstream");
   // no test header
   EXPECT_EQ(/* RESP(test-header) */ metrics.at(21), "-");
+}
+
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
+  useAccessLog("%BYTES_RETRANSMITTED%,%PACKETS_RETRANSMITTED%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+
+  // Temporarily prevent server from writing packets (i.e. to respond to downstream)
+  // to simulate packet loss and trigger retransmissions.
+  SocketInterfaceSwap socket_swap(upstreamProtocol() == Http::CodecType::HTTP3
+                                      ? Network::Socket::Type::Datagram
+                                      : Network::Socket::Type::Stream);
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  absl::SleepFor(absl::Milliseconds(500 * TSAN_TIMEOUT_FACTOR));
+  // Allow the response to be sent downstream again.
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  ASSERT_TRUE(response->complete());
+
+  // Confirm that retransmissions are logged.
+  std::string log = waitForAccessLog(access_log_name_);
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 2);
+  EXPECT_GT(/* BYTES_RETRANSMITTED */ std::stoi(metrics.at(0)), 0);
+  EXPECT_GT(/* PACKETS_RETRANSMITTED */ std::stoi(metrics.at(1)), 0);
+  EXPECT_GE(std::stoi(metrics.at(0)), std::stoi(metrics.at(1)));
 }
 
 TEST_P(QuicHttpIntegrationTest, InvalidTrailer) {

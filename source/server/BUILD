@@ -513,7 +513,9 @@ envoy_cc_library(
     hdrs = ["utils.h"],
     deps = [
         "//envoy/init:manager_interface",
+        "//envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
