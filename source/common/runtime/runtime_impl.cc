@@ -599,10 +599,9 @@ void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
                                           uint32_t removed_resources_num) {
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(
-        fmt::format("Unexpected RTDS resource length, number of added recources "
-                    "{}, number of removed recources {}",
-                    added_resources_num, removed_resources_num));
+    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
+                                     "{}, number of removed recources {}",
+                                     added_resources_num, removed_resources_num));
   }
 }
 

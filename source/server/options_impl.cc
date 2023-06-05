@@ -166,15 +166,17 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     count_ = cmd.getArgList().size();
   }
   END_TRY
-  CATCH (TCLAP::ArgException& e, {
-    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
-    END_TRY
-    CATCH(const TCLAP::ExitException&, {
-      // failure() has already written an informative message to stderr, so all that's left to do
-      // is throw our own exception with the original message.
-      throw MalformedArgvException(e.what());
-    });
-  }) CATCH (const TCLAP::ExitException& e, {
+  CATCH(TCLAP::ArgException & e,
+        {
+          TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+          END_TRY
+          CATCH(const TCLAP::ExitException&, {
+            // failure() has already written an informative message to stderr, so all that's left to
+            // do is throw our own exception with the original message.
+            throw MalformedArgvException(e.what());
+          });
+        })
+  CATCH(const TCLAP::ExitException& e, {
     // parse() throws an ExitException with status 0 after printing the output for --help and
     // --version.
     throw NoServingException();

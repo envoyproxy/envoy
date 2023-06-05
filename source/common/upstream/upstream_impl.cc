@@ -94,10 +94,9 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   if (factory == nullptr) {
-    throw EnvoyException(
-        fmt::format("Didn't find a registered network or http filter or protocol "
-                    "options implementation for name: '{}'",
-                    name));
+    throw EnvoyException(fmt::format("Didn't find a registered network or http filter or protocol "
+                                     "options implementation for name: '{}'",
+                                     name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -955,9 +954,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
   if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
     // Make sure multiple protocol configurations are not present
     if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
-      throw EnvoyException(
-          fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
-                      "configured with non-default 'protocol_selection' values"));
+      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
+                                       "configured with non-default 'protocol_selection' values"));
     }
   }
 
@@ -1095,16 +1093,15 @@ ClusterInfoImpl::ClusterInfoImpl(
       added_via_api_(added_via_api), has_configured_http_filters_(false) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
-    throw EnvoyException(
-        "set_local_interface_name_on_upstream_connections_ cannot be set to true "
-        "on Windows platforms");
+    throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
+                         "on Windows platforms");
   }
 #endif
 
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
     throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
-                               "HttpProtocolOptions can be specified");
+                         "HttpProtocolOptions can be specified");
   }
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
@@ -1147,8 +1144,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (config.lb_subset_config().locality_weight_aware() &&
       !config.common_lb_config().has_locality_weighted_lb_config()) {
     throw EnvoyException(fmt::format("Locality weight aware subset LB requires that a "
-                                           "locality_weighted_lb_config be set in {}",
-                                           name_));
+                                     "locality_weighted_lb_config be set in {}",
+                                     name_));
   }
 
   // Use default (1h) or configured `idle_timeout`, unless it's set to 0, indicating that no
@@ -1256,8 +1253,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
   }
 
   if (config.has_lb_subset_config()) {
-    throw EnvoyException(
-        "cluster: load_balancing_policy cannot be combined with lb_subset_config");
+    throw EnvoyException("cluster: load_balancing_policy cannot be combined with lb_subset_config");
   }
 
   if (config.has_common_lb_config()) {
@@ -1290,10 +1286,9 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
   }
 
   if (load_balancer_factory_ == nullptr) {
-    throw EnvoyException(
-        fmt::format("cluster: didn't find a registered load balancer factory "
-                    "implementation for cluster: '{}' with names from [{}]",
-                    name_, absl::StrJoin(missing_policies, ", ")));
+    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
+                                     "implementation for cluster: '{}' with names from [{}]",
+                                     name_, absl::StrJoin(missing_policies, ", ")));
   }
 
   lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;

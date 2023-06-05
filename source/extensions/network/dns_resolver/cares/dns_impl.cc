@@ -286,7 +286,8 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     // exception in fuzz tests.
     TRY_NEEDS_AUDIT {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
-    } END_TRY
+    }
+    END_TRY
     catch (const EnvoyException& e) {
       ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
       dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
