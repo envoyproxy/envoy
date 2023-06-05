@@ -2086,4 +2086,31 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Send a request with headers, large body with small chunks, and trailers.
+TEST_P(ExtProcIntegrationTest, SendHeaderAndSmallChunkBodyStreamedMode) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  const uint32_t chunk_size = 1;
+  const uint32_t chunk_number = 100;
+  for (uint32_t i = 0; i < chunk_number; i++) {
+    ENVOY_LOG_MISC(debug, "Sending chunk of {} bytes", chunk_size);
+    codec_client_->sendData(*request_encoder_, chunk_size, false);
+    processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  }
+  Http::TestRequestTrailerMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy

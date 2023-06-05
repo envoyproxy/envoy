@@ -61,6 +61,9 @@ void ExtProcLoggingInfo::recordGrpcCall(
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  if (grpcCalls(traffic_direction).size() >= kMaxGrpcLogging) {
+    grpcCalls(traffic_direction).pop_front();
+  }
   grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
 }
 

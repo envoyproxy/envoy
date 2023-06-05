@@ -31,6 +31,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+// The max number of gRPC logging. After it reaches this number, the old
+// logging will be removed when the new ones are added.
+const uint32_t kMaxGrpcLogging = 256;
+
 #define ALL_EXT_PROC_FILTER_STATS(COUNTER)                                                         \
   COUNTER(streams_started)                                                                         \
   COUNTER(stream_msgs_sent)                                                                        \
@@ -63,7 +67,7 @@ public:
     const Grpc::Status::GrpcStatus status_;
     const ProcessorState::CallbackState callback_state_;
   };
-  using GrpcCalls = std::vector<GrpcCall>;
+  using GrpcCalls = std::list<GrpcCall>;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,

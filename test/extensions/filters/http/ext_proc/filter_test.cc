@@ -294,6 +294,7 @@ protected:
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
                 filter_config_name)
             ->grpcCalls(traffic_direction);
+
     int calls_count = std::count_if(
         grpc_calls.begin(), grpc_calls.end(),
         [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
@@ -1181,6 +1182,61 @@ TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
   resp_data.add("ok");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
   filter_->onDestroy();
+}
+
+// Streaming sends request body with small chunks.
+TEST_F(HttpFilterTest, StreamingRequestBodySmallChunk) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  )EOF");
+
+  bool end_stream = false;
+  FilterDataStatus status = FilterDataStatus::Continue;
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(true, absl::nullopt);
+  const uint32_t req_chunk_number = kMaxGrpcLogging * 10;
+  for (uint32_t i = 0; i < req_chunk_number; i++) {
+    Buffer::OwnedImpl req_data("foo");
+    if (i == req_chunk_number - 1) {
+      end_stream = true;
+      status = FilterDataStatus::StopIterationNoBuffer;
+    }
+    EXPECT_EQ(status, filter_->decodeData(req_data, end_stream));
+    processRequestBody(absl::nullopt, false);
+  }
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+  const uint32_t resp_chunk_number = kMaxGrpcLogging / 2;
+  for (uint32_t i = 0; i < resp_chunk_number; i++) {
+    Buffer::OwnedImpl resp_data("bar");
+    if (i == resp_chunk_number - 1) {
+      end_stream = true;
+      status = FilterDataStatus::StopIterationNoBuffer;
+    }
+    EXPECT_EQ(status, filter_->encodeData(resp_data, end_stream));
+    processResponseBody(absl::nullopt, false);
+  }
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // Total gRPC messages include a request header and a response header on top of the chunk bodies.
+  uint32_t total_msg = 1 + req_chunk_number + 1 + resp_chunk_number;
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  // INBOUND gRPC calls logging reaches capacity.
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok,
+                  kMaxGrpcLogging);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok,
+                  resp_chunk_number + 1);
 }
 
 // Using a configuration with streaming set for the request and
