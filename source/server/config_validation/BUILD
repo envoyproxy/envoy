@@ -101,6 +101,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/server:configuration_lib",
         "//source/server:server_lib",
+        "//source/server:utils_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

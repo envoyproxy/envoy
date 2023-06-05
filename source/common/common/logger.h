@@ -15,6 +15,7 @@
 #include "source/common/common/logger_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/non_copyable.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -352,6 +353,11 @@ public:
    * Sets the log format.
    */
   static void setLogFormat(const std::string& log_format);
+
+  /**
+   * Sets the log format from a struct as a JSON string.
+   */
+  static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
 
   /**
    * @return std::vector<Logger>& the installed loggers.

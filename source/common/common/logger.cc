@@ -254,6 +254,31 @@ void Registry::setLogFormat(const std::string& log_format) {
   }
 }
 
+absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  json_options.always_print_primitive_fields = true;
+
+  std::string format_as_json;
+  const auto status =
+      Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
+
+  if (!status.ok()) {
+    return absl::InvalidArgumentError("Provided struct cannot be serialized as JSON string");
+  }
+
+  if (format_as_json.find("%v") != std::string::npos) {
+    return absl::InvalidArgumentError("Usage of %v is unavailable for JSON log formats");
+  }
+
+  if (format_as_json.find("%_") != std::string::npos) {
+    return absl::InvalidArgumentError("Usage of %_ is unavailable for JSON log formats");
+  }
+
+  setLogFormat(format_as_json);
+  return absl::OkStatus();
+}
+
 Logger* Registry::logger(const std::string& log_name) {
   Logger* logger_to_return = nullptr;
   for (Logger& logger : loggers()) {
