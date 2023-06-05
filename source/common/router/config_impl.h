@@ -91,10 +91,9 @@ public:
 private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  const OptionalHttpFilters& optional_http_filters,
+                                  bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
-
   absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
@@ -1487,8 +1486,8 @@ public:
 private:
   using WildcardVirtualHosts =
       std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
-  using SubstringFunction = std::function<std::string(const std::string&, int)>;
-  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
+  using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
+  const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
@@ -1610,7 +1609,6 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const {
     return shared_config_->shadowPolicies();
   }
-  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
   bool ignorePathParametersInPathMatching() const {
     return shared_config_->ignorePathParametersInPathMatching();
   }

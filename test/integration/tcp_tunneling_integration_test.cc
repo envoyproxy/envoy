@@ -21,7 +21,7 @@ public:
 
   void initialize() override {
     useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED% %ACCESS_LOG_TYPE%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
@@ -126,11 +126,6 @@ public:
 // Verify that H/2 extended CONNECT with bytestream protocol is treated like
 // standard CONNECT request
 TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#24945): This test needs CONNECT/upgrade normalization code which is not yet
-  // available in UHV.
-  return;
-#endif
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     // Extended CONNECT is applicable to H/2 and H/3 protocols only
     return;
@@ -169,6 +164,22 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
   cleanupUpstreamAndDownstream();
 
   setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, LogOnSuccessfulTunnel) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->set_flush_log_on_tunnel_successfully_established(true);
+      });
+
+  initialize();
+
+  setUpConnection();
+  std::string log = waitForAccessLog(access_log_name_, access_log_entry_);
+  EXPECT_THAT(log, testing::HasSubstr("DownstreamTunnelSuccessfullyEstablished"));
+  ++access_log_entry_;
   sendBidirectionalDataAndCleanShutdown();
 }
 
@@ -530,11 +541,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
 }
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#24945): This test needs CONNECT/upgrade normalization code which is not yet
-  // available in UHV.
-  return;
-#endif
   add_upgrade_config_ = true;
   initialize();
 
@@ -949,8 +955,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* header =

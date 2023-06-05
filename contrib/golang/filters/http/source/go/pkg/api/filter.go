@@ -69,6 +69,16 @@ type StreamInfo interface {
 	AttemptCount() uint32
 	// Get the dynamic metadata of the request
 	DynamicMetadata() DynamicMetadata
+	// DownstreamLocalAddress return the downstream local address.
+	DownstreamLocalAddress() string
+	// DownstreamRemoteAddress return the downstream remote address.
+	DownstreamRemoteAddress() string
+	// UpstreamHostAddress return the upstream host address.
+	UpstreamHostAddress() (string, bool)
+	// UpstreamClusterName return the upstream host cluster.
+	UpstreamClusterName() (string, bool)
+	// FilterState return the filter state interface.
+	FilterState() FilterState
 }
 
 type StreamFilterCallbacks interface {
@@ -83,6 +93,7 @@ type FilterCallbacks interface {
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	Log(level LogType, msg string)
+	LogLevel() LogType
 	// TODO add more for filter callbacks
 }
 
@@ -93,4 +104,32 @@ type FilterCallbackHandler interface {
 type DynamicMetadata interface {
 	// TODO: Get(filterName string) map[string]interface{}
 	Set(filterName string, key string, value interface{})
+}
+
+type StateType int
+
+const (
+	StateTypeReadOnly StateType = 0
+	StateTypeMutable  StateType = 1
+)
+
+type LifeSpan int
+
+const (
+	LifeSpanFilterChain LifeSpan = 0
+	LifeSpanRequest     LifeSpan = 1
+	LifeSpanConnection  LifeSpan = 2
+	LifeSpanTopSpan     LifeSpan = 3
+)
+
+type StreamSharing int
+
+const (
+	None                             StreamSharing = 0
+	SharedWithUpstreamConnection     StreamSharing = 1
+	SharedWithUpstreamConnectionOnce StreamSharing = 2
+)
+
+type FilterState interface {
+	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 }

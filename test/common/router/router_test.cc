@@ -72,7 +72,8 @@ public:
   explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
 
   void log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-           const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info) override {
+           const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info,
+           AccessLog::AccessLogType) override {
     func_(info);
   }
 
@@ -161,10 +162,15 @@ public:
     router_->onDestroy();
   }
 
+  // testAutoSniOptions checks that UpstreamServerName is server_name if non-empty,
+  // and that the first UpstreamSubjectAltNames is alt_server_name if non-empty.
+  // UpstreamServerName is pre-set to pre_set_sni if non-empty.
   void testAutoSniOptions(
       absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
-      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "host",
-      bool should_validate_san = false, std::string alt_server_name = "host") {
+      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "",
+      std::string alt_server_name = "", std::string pre_set_sni = "",
+      StreamInfo::FilterState::LifeSpan pre_set_life_span =
+          StreamInfo::FilterState::LifeSpan::FilterChain) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
         .WillByDefault(ReturnRef(dummy_option));
@@ -172,18 +178,26 @@ public:
         .WillByDefault(ReturnRef(stream_info.filterState()));
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
         .WillOnce(Return(&cancellable_));
-    stream_info.filterState()->setData(Network::UpstreamServerName::key(),
-                                       std::make_unique<Network::UpstreamServerName>("dummy"),
-                                       StreamInfo::FilterState::StateType::Mutable);
+
+    if (!pre_set_sni.empty()) {
+      // Simulate a network filter setting the server name, e.g. based on SNI seen by the
+      // tls_inspector by using the LifeSpan::Connection
+      stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                         std::make_unique<Network::UpstreamServerName>(pre_set_sni),
+                                         StreamInfo::FilterState::StateType::Mutable,
+                                         pre_set_life_span);
+    }
     expectResponseTimerCreate();
 
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
-    EXPECT_EQ(server_name,
-              stream_info.filterState()
-                  ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                  ->value());
-    if (should_validate_san) {
+    if (!server_name.empty()) {
+      EXPECT_EQ(server_name, stream_info.filterState()
+                                 ->getDataReadOnly<Network::UpstreamServerName>(
+                                     Network::UpstreamServerName::key())
+                                 ->value());
+    }
+    if (!alt_server_name.empty()) {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
                                      ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                          Network::UpstreamSubjectAltNames::key())
@@ -204,7 +218,24 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
+}
+
+TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExists) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host");
+}
+
+TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host",
+                     StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
@@ -213,7 +244,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header(":authority");
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
@@ -232,7 +263,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
-  testAutoSniOptions(dummy_option, headers);
+  testAutoSniOptions(dummy_option, headers, "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
@@ -241,7 +272,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
   dummy_option.value().set_auto_san_validation(true);
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
@@ -251,7 +282,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header(":authority");
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
@@ -262,7 +293,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
 
   const auto server_name = "foo.bar";
   Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
-  testAutoSniOptions(dummy_option, headers, server_name, true, server_name);
+  testAutoSniOptions(dummy_option, headers, server_name, server_name);
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride) {
@@ -272,7 +303,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride)
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
-  testAutoSniOptions(dummy_option, headers, "host", true);
+  testAutoSniOptions(dummy_option, headers, "host", "host");
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
@@ -283,7 +314,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
 
   const auto server_name = "127.0.0.1";
   Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
-  testAutoSniOptions(dummy_option, headers, "dummy", true, server_name);
+  testAutoSniOptions(dummy_option, headers, "", server_name);
 }
 
 TEST_F(RouterTest, RouteNotFound) {
@@ -1137,11 +1168,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)));
-  bool upstream_filters =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters");
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
-      .Times(!upstream_filters);
+      .Times(0);
   // The reset will be converted into a local reply.
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
@@ -3471,62 +3500,6 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-  EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-}
-
-// The router filter is responsible for not propagating 100-continue headers after the initial 100.
-// TODO(alyssawilk) remove coalescing with old code deprecation.
-TEST_F(RouterTest, Coalesce1xxHeaders) {
-  // Setup.
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  // Initial 100-continue, this is processed normally.
-  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
-  {
-    Http::ResponseHeaderMapPtr continue_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    response_decoder->decode1xxHeaders(std::move(continue_headers));
-  }
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-
-  // No encode1xxHeaders() invocation for the second 100-continue (but we continue to track
-  // stats from upstream).
-  EXPECT_CALL(callbacks_, encode1xxHeaders_(_)).Times(0);
-  {
-    Http::ResponseHeaderMapPtr continue_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    response_decoder->decode1xxHeaders(std::move(continue_headers));
-  }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")) {
-    // With the filter manager coalescing, the router only sees 1 100.
-    EXPECT_EQ(
-        1U,
-        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-  } else {
-    EXPECT_EQ(
-        2U,
-        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-  }
-
-  // Reset stream and cleanup.
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }

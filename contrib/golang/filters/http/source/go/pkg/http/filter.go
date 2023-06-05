@@ -115,6 +115,10 @@ func (r *httpRequest) Log(level api.LogType, message string) {
 	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
 }
 
+func (r *httpRequest) LogLevel() api.LogType {
+	return cAPI.HttpLogLevel()
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
@@ -177,4 +181,36 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
+}
+
+func (s *streamInfo) DownstreamLocalAddress() string {
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
+	return address
+}
+
+func (s *streamInfo) DownstreamRemoteAddress() string {
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
+	return address
+}
+
+func (s *streamInfo) UpstreamHostAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamHostAddress)
+}
+
+func (s *streamInfo) UpstreamClusterName() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
+}
+
+type filterState struct {
+	request *httpRequest
+}
+
+func (s *streamInfo) FilterState() api.FilterState {
+	return &filterState{
+		request: s.request,
+	}
+}
+
+func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request.req), key, value, stateType, lifeSpan, streamSharing)
 }

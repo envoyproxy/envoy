@@ -4,6 +4,7 @@
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/tracer.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,6 +36,7 @@ protected:
   Stats::TestUtil::TestStore store_;
   NiceMock<ThreadLocal::MockInstance> thread_local_slot_allocator_;
   Event::SimulatedTimeSystem time_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(DatadogTracerTest, Breathing) {
@@ -71,9 +73,10 @@ TEST_F(DatadogTracerTest, NoOpMode) {
 
   const std::string operation_name = "do.thing";
   const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
 
   const Tracing::SpanPtr span =
-      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
   ASSERT_TRUE(span);
   const auto as_null_span = dynamic_cast<Tracing::NullSpan*>(span.get());
   EXPECT_NE(nullptr, as_null_span);
@@ -84,6 +87,9 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   // resulting span.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  // Configure the tracer to keep all spans. We then override that
+  // configuration in the `Tracing::Decision`, below.
+  config.trace_sampler.sample_rate = 1.0; // 100%
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_);
@@ -97,9 +103,10 @@ TEST_F(DatadogTracerTest, SpanProperties) {
 
   const std::string operation_name = "do.thing";
   const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
 
   const Tracing::SpanPtr span =
-      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
   ASSERT_TRUE(span);
   const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
   EXPECT_NE(nullptr, as_dd_span_wrapper);
@@ -136,12 +143,14 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
 
   const std::string operation_name = "do.thing";
   const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
   // trace context in the Datadog style
   Tracing::TestTraceContextImpl context{{"x-datadog-trace-id", "1234"},
                                         {"x-datadog-parent-id", "5678"}};
 
   const Tracing::SpanPtr span =
-      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
   ASSERT_TRUE(span);
   const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
   EXPECT_NE(nullptr, as_dd_span_wrapper);
@@ -173,12 +182,14 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
 
   const std::string operation_name = "do.thing";
   const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
   // invalid trace context in the Datadog style
   Tracing::TestTraceContextImpl context{{"x-datadog-trace-id", "nope"},
                                         {"x-datadog-parent-id", "nice try"}};
 
   const Tracing::SpanPtr span =
-      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
   ASSERT_TRUE(span);
   const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
   EXPECT_NE(nullptr, as_dd_span_wrapper);

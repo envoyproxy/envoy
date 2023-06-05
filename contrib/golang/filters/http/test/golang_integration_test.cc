@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -150,7 +152,14 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
         });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
   }
 
@@ -231,7 +240,11 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", false);
-    codec_client_->sendData(request_encoder, "", true);
+    codec_client_->sendData(request_encoder, "", false);
+
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
+    codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
     // original header: x-test-header-0
@@ -243,6 +256,16 @@ typed_config:
     // check header exists which removed in golang side: x-test-header-1
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+
+    // check header value which set in golang: req-downstream-local-address
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-local-address"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+    // check header value which set in golang: req-downstream-remote-address
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-remote-address"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
     // check header value which is appended in golang: existed-header
     auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
@@ -260,6 +283,25 @@ typed_config:
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
     EXPECT_EQ(expected, upstream_request_->body().toString());
+
+    // check trailer value which is appended in golang: existed-trailer
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check trailer value which set in golang: x-test-trailer-0
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_EQ(
+        true,
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
@@ -302,7 +344,7 @@ typed_config:
     // check route name in encode phase
     EXPECT_EQ("test-route-name", getHeader(response->headers(), "rsp-route-name"));
 
-    // check route name in encode phase
+    // check protocol in encode phase
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
@@ -315,7 +357,15 @@ typed_config:
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
 
-    // check response code details in encode phase
+    // check upstream host in encode phase
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+    // check upstream cluster in encode phase
+    EXPECT_EQ("cluster_0", getHeader(response->headers(), "rsp-upstream-cluster"));
+
+    // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
     // verify response status
@@ -335,6 +385,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());

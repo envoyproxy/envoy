@@ -43,16 +43,14 @@ public:
 
   void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
                               const std::string& error_details, uint8_t /*tls_alert*/) override {
-    if (!succeeded) {
-      std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
-      quic_callback_->Run(succeeded, error_details, &details);
-      return;
-    }
     std::string error;
-
-    std::unique_ptr<quic::CertificateView> cert_view =
-        quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-    succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
+    if (!succeeded) {
+      error = error_details;
+    } else {
+      std::unique_ptr<quic::CertificateView> cert_view =
+          quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+      succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
+    }
     std::unique_ptr<quic::ProofVerifyDetails> details =
         std::make_unique<CertVerifyResult>(succeeded);
     quic_callback_->Run(succeeded, error, &details);
@@ -69,8 +67,8 @@ private:
 } // namespace
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
-    const std::string& hostname, const uint16_t port, const std::vector<std::string>& certs,
-    const std::string& ocsp_response, const std::string& cert_sct,
+    const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
+    const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
     const quic::ProofVerifyContext* context, std::string* error_details,
     std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
@@ -82,16 +80,6 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
   ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    if (doVerifyCertChain(hostname, port, certs, ocsp_response, cert_sct, context, error_details,
-                          out_alert, std::move(callback))) {
-      *details = std::make_unique<CertVerifyResult>(true);
-      return quic::QUIC_SUCCESS;
-    }
-    *details = std::make_unique<CertVerifyResult>(false);
-    return quic::QUIC_FAILURE;
-  }
 
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   for (const auto& cert_str : certs) {
@@ -141,46 +129,6 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
 
   *details = std::make_unique<CertVerifyResult>(false);
   return quic::QUIC_FAILURE;
-}
-
-bool EnvoyQuicProofVerifier::doVerifyCertChain(
-    const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
-    const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
-    const quic::ProofVerifyContext* /*context*/, std::string* error_details, uint8_t* /*out_alert*/,
-    std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
-  bssl::UniquePtr<X509> leaf;
-  for (size_t i = 0; i < certs.size(); i++) {
-    bssl::UniquePtr<X509> cert = parseDERCertificate(certs[i], error_details);
-    if (!cert) {
-      return false;
-    }
-    if (i == 0) {
-      leaf = std::move(cert);
-    } else {
-      sk_X509_push(intermediates.get(), cert.release());
-    }
-  }
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(certs[0]);
-  ASSERT(cert_view != nullptr);
-  int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
-  if (sign_alg == 0) {
-    return false;
-  }
-  // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
-  // verifyCertChain uses a bunch of SSL-specific structs which we want to keep
-  // out of the interface definition.
-  bool success = static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
-                     ->verifyCertChain(*leaf, *intermediates, *error_details);
-  if (!success) {
-    return false;
-  }
-  if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
-    return true;
-  }
-  *error_details = absl::StrCat("Leaf certificate doesn't match hostname: ", hostname);
-  return false;
 }
 
 } // namespace Quic

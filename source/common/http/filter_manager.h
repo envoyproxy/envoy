@@ -104,6 +104,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
+  absl::string_view filterConfigName() const override { return filter_context_.config_name; }
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -654,7 +655,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log() {
+  void log(AccessLog::AccessLogType access_log_type) {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
       request_headers = filter_manager_callbacks_.requestHeaders().ptr();
@@ -669,7 +670,8 @@ public:
     }
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, streamInfo());
+      log_handler->log(request_headers, response_headers, response_trailers, streamInfo(),
+                       access_log_type);
     }
   }
 
@@ -755,11 +757,6 @@ public:
    * Prepared local replies can occur in the decoder filter chain iteration.
    */
   virtual void executeLocalReplyIfPrepared() PURE;
-
-  /**
-   * Whether the Filter Manager has a prepared local reply that it has not sent.
-   */
-  virtual bool hasPreparedLocalReply() const PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -1115,8 +1112,6 @@ private:
    * Executes a prepared local reply along the encoder filters.
    */
   void executeLocalReplyIfPrepared() override;
-
-  bool hasPreparedLocalReply() const override { return prepared_local_reply_ != nullptr; }
 
   /**
    * Sends a local reply by constructing a response and skipping the encoder filters. The

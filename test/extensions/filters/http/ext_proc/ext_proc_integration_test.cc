@@ -210,6 +210,27 @@ protected:
     }
   }
 
+  void processRequestTrailersMessage(
+      FakeUpstream& grpc_upstream, bool first_message,
+      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
+    ProcessingRequest request;
+    if (first_message) {
+      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
+      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    }
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    ASSERT_TRUE(request.has_request_trailers());
+    if (first_message) {
+      processor_stream_->startGrpcStream();
+    }
+    ProcessingResponse response;
+    auto* body = response.mutable_request_trailers();
+    const bool sendReply = !cb || (*cb)(request.request_trailers(), *body);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
+    }
+  }
+
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
@@ -315,7 +336,7 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(const uint32_t timeout_ms) {
+  void serverSendNewTimeout(const uint64_t timeout_ms) {
     ProcessingResponse response;
     if (timeout_ms < 1000) {
       response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
@@ -327,7 +348,7 @@ protected:
 
   // The new timeout message is ignored by Envoy due to different reasons, like
   // new_timeout setting is out-of-range, or max_message_timeout is not configured.
-  void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
+  void newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
     // Config max_message_timeout proto to enable the new timeout API.
@@ -1056,6 +1077,21 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithInvalidCharacter) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    hdr->mutable_header()->set_key("x-failure-reason\n");
+    hdr->mutable_header()->set_value("testing");
+  });
+
+  verifyDownstreamResponse(*response, 401);
 }
 
 // Test the filter using the default configuration by connecting to
@@ -1818,8 +1854,9 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 10s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1835,7 +1872,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         // Sending the new timeout API to extend the timeout.
-        serverSendNewTimeout(500);
+        serverSendNewTimeout(TestUtility::DefaultTimeout.count());
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         // Server sends back response with the header mutation instructions.
@@ -1861,7 +1898,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
         // Sending the new timeout API to extend the timeout.
-        serverSendNewTimeout(500);
+        serverSendNewTimeout(TestUtility::DefaultTimeout.count());
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         return true;
@@ -1874,8 +1911,9 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 10s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1884,7 +1922,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
                                  // Sending the new timeout API to extend the timeout.
-                                 serverSendNewTimeout(500);
+                                 serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // ext_proc server stays idle for 300ms before sending back the
                                  // response.
                                  timeSystem().advanceTimeWaitImpl(300ms);
@@ -1906,16 +1944,17 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
 TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 10s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Send a 500ms new timeout update first.
-                                 serverSendNewTimeout(500);
+                                 // Sending the new big timeout API to extend the timeout.
+                                 serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // Server wait for 100ms.
                                  timeSystem().advanceTimeWaitImpl(100ms);
                                  // Send the 2nd 10ms new timeout update.
@@ -1955,6 +1994,96 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig
 // Not setting the max_message_timeout effectively disabled the new timeout API.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcceptedDefaultMax) {
   newTimeoutWrongConfigTest(500);
+}
+
+// Send the new timeout to be an extremely large number, which is out-of-range of duration.
+// Verify the code appropriately handled it.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutOutOfBounds) {
+  // Config max_message_timeout proto to 100ms to enable the new timeout API.
+  max_message_timeout_ms_ = 100;
+  const uint64_t override_message_timeout = 1000000000000000;
+  newTimeoutWrongConfigTest(override_message_timeout);
+}
+
+// Set the ext_proc filter in SKIP header, BUFFERED body mode.
+// Send a request with headers and trailers.
+TEST_P(ExtProcIntegrationTest, SendHeaderAndTrailerInBufferedMode) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  Http::TestRequestTrailerMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the filter with header allow list configured and verify only the allowed headers
+// in request or response headers and trailers are sent to the ext_proc server.
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
+  auto* forward_rules = proto_config_.mutable_forward_rules();
+  auto* list = forward_rules->mutable_allowed_headers();
+  list->add_patterns()->set_exact(":method");
+  list->add_patterns()->set_exact(":authority");
+  list->add_patterns()->set_exact(":status");
+  list->add_patterns()->set_exact("x-test-trailers");
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":method", "GET"},
+                                                                {":authority", "host"}};
+        // Verify only allowed request headers is received by ext_proc server.
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+        return true;
+      });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false,
+                                [](const HttpTrailers& trailers, TrailersResponse&) {
+                                  // The request trailer header is not in the allow list.
+                                  EXPECT_EQ(trailers.trailers().headers_size(), 0);
+                                  return true;
+                                });
+  // Send back response with :status 200 and trailer header: x-test-trailers.
+  handleUpstreamRequestWithTrailer();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
+        // The response trailer header is in the allow list.
+        Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
+        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+        return true;
+      });
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace Envoy

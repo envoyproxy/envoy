@@ -1,0 +1,46 @@
+diff --git a/sources/ippcp/crypto_mb/src/CMakeLists.txt b/sources/ippcp/crypto_mb/src/CMakeLists.txt
+index f75f448..043a0a2 100644
+--- a/sources/ippcp/crypto_mb/src/CMakeLists.txt
++++ b/sources/ippcp/crypto_mb/src/CMakeLists.txt
+@@ -90,41 +90,6 @@ if(CMAKE_C_COMPILER_VERSION VERSION_LESS 20.2.3)
+                                                                 COMPILE_FLAGS        "${AVX512_CFLAGS} ${CMAKE_C_FLAGS_SECURITY}")
+ endif()
+ 
+-# Create shared library
+-if(DYNAMIC_LIB OR MB_STANDALONE)
+-    if(WIN32)
+-        add_library(${MB_DYN_LIB_TARGET} SHARED ${CRYPTO_MB_HEADERS} ${CRYPTO_MB_SOURCES} ${CPU_FEATURES_FILE} ${WIN_RESOURCE_FILE})
+-    else()
+-        add_library(${MB_DYN_LIB_TARGET} SHARED ${CRYPTO_MB_HEADERS} ${CRYPTO_MB_SOURCES} ${CPU_FEATURES_FILE})
+-    endif()
+-
+-    set_target_properties(${MB_DYN_LIB_TARGET} PROPERTIES C_VISIBILITY_PRESET hidden
+-                                                          VISIBILITY_INLINES_HIDDEN ON
+-                                                          LINK_FLAGS "${LINK_FLAGS_DYNAMIC} ${LINK_FLAG_SECURITY}"
+-                                                          PUBLIC_HEADER "${PUBLIC_HEADERS}"
+-                                                          )
+-
+-    if(UNIX)
+-        set_target_properties(${MB_DYN_LIB_TARGET} PROPERTIES  VERSION   ${MBX_INTERFACE_VERSION}
+-                                                               SOVERSION ${MBX_INTERFACE_VERSION_MAJOR})
+-    endif()
+-
+-    target_link_libraries(${MB_DYN_LIB_TARGET} OpenSSL::Crypto)
+-endif(DYNAMIC_LIB OR MB_STANDALONE)
+-
+-# Installation of the shared library
+-if (MB_STANDALONE) # standalone crypto_mb's cmake run
+-    install(TARGETS ${MB_DYN_LIB_TARGET}
+-            LIBRARY DESTINATION "lib"
+-            RUNTIME DESTINATION "lib"
+-            PUBLIC_HEADER DESTINATION "include/crypto_mb")
+-elseif (DYNAMIC_LIB) # build from ippcp's cmake
+-    install(TARGETS ${MB_DYN_LIB_TARGET}
+-            LIBRARY DESTINATION "lib/intel64"
+-            RUNTIME DESTINATION "lib/intel64"
+-            PUBLIC_HEADER DESTINATION "include/crypto_mb")
+-endif()
+-
+ # Static library
+ if(WIN32)
+     add_library(${MB_STATIC_LIB_TARGET} STATIC ${CRYPTO_MB_HEADERS} ${CRYPTO_MB_SOURCES} ${CPU_FEATURES_FILE} ${WIN_RESOURCE_FILE})

@@ -142,9 +142,11 @@ public:
   MOCK_METHOD(uint64_t, latch, ());
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
 
   bool used_;
+  bool hidden_;
   uint64_t value_;
   uint64_t latch_;
 };
@@ -162,11 +164,13 @@ public:
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
   MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
 
   bool used_;
+  bool hidden_;
   uint64_t value_;
   ImportMode import_mode_;
 };
@@ -177,6 +181,7 @@ public:
   ~MockHistogram() override;
 
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
 
@@ -200,12 +205,14 @@ public:
   void merge() override {}
   std::string quantileSummary() const override { return ""; };
   std::string bucketSummary() const override { return ""; };
-
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
   MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
   MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedTotalBuckets, (), (const));
+  MOCK_METHOD(std::vector<Bucket>, detailedIntervalBuckets, (), (const));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -213,6 +220,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   bool used_;
+  bool hidden_;
   Unit unit_{Histogram::Unit::Unspecified};
   Store* store_{};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
@@ -229,9 +237,11 @@ public:
 
   MOCK_METHOD(void, set, (absl::string_view value), (override));
   MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(std::string, value, (), (const, override));
 
   bool used_;
+  bool hidden_;
   std::string value_;
 };
 
@@ -244,8 +254,7 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
-
-  SystemTime snapshotTime() const override { return snapshot_time_; }
+  MOCK_METHOD(SystemTime, snapshotTime, (), (const));
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;

@@ -44,6 +44,8 @@ const char MaxRequestHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_request_headers_count";
 const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
+const char MaxRequestHeadersSizeOverrideKey[] =
+    "envoy.reloadable_features.max_request_headers_size_kb";
 
 class Stream;
 class RequestDecoder;
@@ -524,6 +526,11 @@ struct Http1Settings {
   // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
   // used. See issue #21245.
   bool use_balsa_parser_{false};
+
+  // If true, any non-empty method composed of valid characters is accepted.
+  // If false, only methods from a hard-coded list of known methods are accepted.
+  // Only implemented in BalsaParser. http-parser only accepts known methods.
+  bool allow_custom_methods_{false};
 };
 
 /**

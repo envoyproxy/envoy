@@ -208,6 +208,7 @@ envoy.filters.http.aws_request_signing:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
 envoy.filters.http.bandwidth_limit:
   categories:
   - envoy.filters.http
@@ -728,6 +729,13 @@ envoy.filters.udp_listener.udp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+envoy.formatter.cel:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.cel.v3.Cel
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -787,6 +795,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_check.event_sinks.file:
+  categories:
+  - envoy.health_check.event_sinks
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection
@@ -863,6 +878,20 @@ envoy.matching.matchers.ip:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
+envoy.matching.matchers.runtime_fraction:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction
+envoy.matching.matchers.cel_matcher:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - xds.type.matcher.v3.CelMatcher
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1026,6 +1055,13 @@ envoy.stat_sinks.metrics_service:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.MetricsServiceConfig
+envoy.stat_sinks.open_telemetry:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig
 envoy.stat_sinks.statsd:
   categories:
   - envoy.stats_sinks
@@ -1320,6 +1356,13 @@ envoy.matching.inputs.query_params:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.cel_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - xds.type.matcher.v3.HttpAttributesCelMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input
@@ -1464,6 +1507,18 @@ envoy.load_balancing_policies.maglev:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.maglev.v3.Maglev
+envoy.load_balancing_policies.subset:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.load_balancing_policies.cluster_provided:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
@@ -1504,19 +1559,53 @@ envoy.config_subscription.rest:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.RestSubscription
 envoy.config_subscription.filesystem:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemSubscription
+envoy.config_subscription.ads_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_delta_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.ads:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.delta_grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
 envoy.config_subscription.filesystem_collection:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemCollectionSubscription
+envoy.config_mux.delta_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable
+envoy.config_mux.sotw_grpc_mux_factory:
+  categories:
+  - envoy.config_mux
+  security_posture: unknown
+  status: stable

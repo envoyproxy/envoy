@@ -12,7 +12,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
-#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/upstream_socket.pb.h"
@@ -75,7 +74,7 @@ public:
 
 class SocketConfigFactory : public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  std::string name() const override { return "envoy.test.integration.upstream_test_socket"; }
+  std::string name() const override { return "envoy.test.integration.upstreamt_socket"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<test::integration::upstream_socket::v3::Config>();
@@ -102,37 +101,25 @@ public:
   }
 };
 
-enum class AccessLogLocation { DOWNSTREAM = 0, UPSTREAM = 1 };
-
-class UpstreamStateAccessLogTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, AccessLogLocation>>,
-      public HttpIntegrationTest {
+class UpstreamAccessLogTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                              public HttpIntegrationTest {
 public:
-  UpstreamStateAccessLogTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
-        access_log_location_(std::get<1>(GetParam())) {}
+  UpstreamAccessLogTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
   SocketConfigFactory socket_factory_;
 
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
       registered_socket_factory_{socket_factory_};
-  const AccessLogLocation access_log_location_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    Params, UpstreamStateAccessLogTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(AccessLogLocation::DOWNSTREAM, AccessLogLocation::UPSTREAM)),
-    [](const testing::TestParamInfo<UpstreamStateAccessLogTest::ParamType>& info) -> std::string {
-      return absl::StrCat(
-          std::get<0>(info.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6", "_",
-          std::get<1>(info.param) == AccessLogLocation::DOWNSTREAM ? "downstream" : "upstream");
-    });
+INSTANTIATE_TEST_SUITE_P(Params, UpstreamAccessLogTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 /*
  * Verifies that the Http Router's `upstream_log` correctly reflects the upstream filter state data
  * when the access log format has `UPSTREAM_FILTER_STATE` specifier.
  */
-TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
+TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
   auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -143,45 +130,26 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
 
     auto* cluster_transport_socket =
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
-    cluster_transport_socket->set_name("envoy.test.integration.upstream_test_socket");
+    cluster_transport_socket->set_name("envoy.test.integration.upstreamt_socket");
     cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
-        envoy::config::accesslog::v3::AccessLog access_log;
-        access_log.set_name("accesslog");
+        auto* typed_config =
+            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
+
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.mutable_upstream_log_options()->set_flush_upstream_log_on_upstream_stream(
+            true);
+
+        auto* upstream_log_config = router_config.add_upstream_log();
+        upstream_log_config->set_name("accesslog");
         envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-            "%UPSTREAM_FILTER_STATE(test_key)%;%UPSTREAM_FILTER_STATE("
-            "http_filter_state)%\n");
-        access_log.mutable_typed_config()->PackFrom(access_log_config);
-        if (access_log_location_ == AccessLogLocation::DOWNSTREAM) {
-          *hcm.add_access_log() = access_log;
-        }
-        auto* typed_config =
-            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
-        envoy::extensions::filters::http::router::v3::Router router_config;
-
-        if (access_log_location_ == AccessLogLocation::UPSTREAM) {
-          router_config.mutable_upstream_log_options()->set_flush_upstream_log_on_upstream_stream(
-              true);
-          *router_config.add_upstream_log() = access_log;
-        }
-
-        // Add upstream http filter to add additional state.
-        auto* upstream_http_filter = router_config.add_upstream_http_filters();
-        upstream_http_filter->set_name("header-to-filter-state-upstream");
-        test::integration::filters::HeaderToFilterStateFilterConfig upstream_filter_config;
-        upstream_filter_config.set_header_name("simple-header-name");
-        upstream_filter_config.set_state_name("http_filter_state");
-        upstream_filter_config.set_read_only(true);
-        upstream_http_filter->mutable_typed_config()->PackFrom(upstream_filter_config);
-        // Also add the codec filter.
-        upstream_http_filter = router_config.add_upstream_http_filters();
-        upstream_http_filter->set_name("envoy.filters.http.upstream_codec");
-
+            "%UPSTREAM_FILTER_STATE(test_key)%\n");
+        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
         typed_config->PackFrom(router_config);
       });
 
@@ -189,20 +157,13 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/api"},
-                                         {":authority", "host"},
-                                         {":scheme", "http"},
-                                         {"simple-header-name", "unique_header_value"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
   auto response = codec_client_->makeRequestWithBody(headers, "hello!");
 
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
-  if (access_log_location_ == AccessLogLocation::UPSTREAM) {
-    EXPECT_THAT(waitForAccessLog(log_file),
-                testing::AllOf(testing::HasSubstr("test_value"),
-                               testing::HasSubstr("unique_header_value")));
-  }
+  EXPECT_THAT(waitForAccessLog(log_file), testing::HasSubstr("test_value"));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
@@ -216,15 +177,10 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("greetings", response->body());
 
-  EXPECT_THAT(
-      waitForAccessLog(log_file),
-      testing::AllOf(testing::HasSubstr("test_value"), testing::HasSubstr("unique_header_value")));
+  EXPECT_THAT(waitForAccessLog(log_file, 1), testing::HasSubstr("test_value"));
 }
 
-TEST_P(UpstreamStateAccessLogTest, Retry) {
-  if (access_log_location_ == AccessLogLocation::DOWNSTREAM) {
-    GTEST_SKIP() << "Only for upstream access logging.";
-  }
+TEST_P(UpstreamAccessLogTest, Retry) {
   auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
   config_helper_.addConfigModifier(
@@ -242,7 +198,7 @@ TEST_P(UpstreamStateAccessLogTest, Retry) {
         envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-            "%RESPONSE_CODE%\n");
+            "%RESPONSE_CODE% %ACCESS_LOG_TYPE%\n");
         upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
         typed_config->PackFrom(router_config);
       });
@@ -262,7 +218,8 @@ TEST_P(UpstreamStateAccessLogTest, Retry) {
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
   // Start of first stream access log - no response status code yet
-  EXPECT_THAT(waitForAccessLog(log_file, 0, true), testing::HasSubstr("0"));
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)),
+            waitForAccessLog(log_file, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
@@ -275,12 +232,14 @@ TEST_P(UpstreamStateAccessLogTest, Retry) {
   }
 
   // End of first request access log
-  EXPECT_THAT(waitForAccessLog(log_file, 1, true), testing::HasSubstr("503"));
+  EXPECT_EQ(absl::StrCat("503 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)),
+            waitForAccessLog(log_file, 1, true));
 
   waitForNextUpstreamRequest();
 
   // Start of second stream access log - no response status code yet
-  EXPECT_THAT(waitForAccessLog(log_file, 2, true), testing::HasSubstr("0"));
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)),
+            waitForAccessLog(log_file, 2, true));
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
@@ -294,7 +253,58 @@ TEST_P(UpstreamStateAccessLogTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 
   // End of second request access log
-  EXPECT_THAT(waitForAccessLog(log_file, 3, true), testing::HasSubstr("200"));
+  EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)),
+            waitForAccessLog(log_file, 3, true));
+}
+
+TEST_P(UpstreamAccessLogTest, Periodic) {
+  auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* typed_config =
+            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
+
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.mutable_upstream_log_options()
+            ->mutable_upstream_log_flush_interval()
+            ->set_nanos(100000000); // 0.1 seconds
+
+        auto* upstream_log_config = router_config.add_upstream_log();
+        upstream_log_config->set_name("accesslog");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        access_log_config.set_path(log_file);
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%ACCESS_LOG_TYPE%\n");
+        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        typed_config->PackFrom(router_config);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
+  auto response = codec_client_->makeRequestWithBody(headers, "hello!");
+
+  waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
+
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic),
+            waitForAccessLog(log_file));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("hello!", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl response_data{"greetings"};
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("greetings", response->body());
 }
 
 } // namespace Envoy
