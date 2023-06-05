@@ -482,6 +482,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
+  std::cerr << "==> AAB EdsIntegrationTest" << std::endl;
   config_helper_.prependFilter("name: eds-ready-filter");
   initializeTest(false);
 
