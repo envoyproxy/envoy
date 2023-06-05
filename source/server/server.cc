@@ -104,42 +104,41 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
-  TRY_ASSERT_MAIN_THREAD {
-    if (!options.logPath().empty()) {
-      TRY_ASSERT_MAIN_THREAD {
-        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-            options.logPath(), access_log_manager_, Logger::Registry::getSink());
-      }
-      END_TRY
-      catch (const EnvoyException& e) {
-        throw EnvoyException(
-            fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
-      }
-    }
+      enable_reuse_port_default_(true),
+      stats_flush_in_progress_(false){
+          TRY_ASSERT_MAIN_THREAD{if (!options.logPath().empty()){TRY_ASSERT_MAIN_THREAD{
+              file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+                  options.logPath(), access_log_manager_, Logger::Registry::getSink());
+} // namespace Server
+END_TRY
+CATCH(const EnvoyException& e, {
+  throw EnvoyException(
+      fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
+});
+} // namespace Envoy
 
-    restarter_.initialize(*dispatcher_, *this);
-    drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(std::move(local_address), component_factory);
-  }
-  END_TRY
-  catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-              options.configProto().DebugString(), options.configYaml(), options.configPath(),
-              e.what());
-    terminate();
-    throw;
-  }
-  catch (const std::exception& e) {
-    ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
-    terminate();
-    throw;
-  }
-  catch (...) {
-    ENVOY_LOG(critical, "error initializing due to unknown exception");
-    terminate();
-    throw;
-  }
+restarter_.initialize(*dispatcher_, *this);
+drain_manager_ = component_factory.createDrainManager(*this);
+initialize(std::move(local_address), component_factory);
+}
+END_TRY
+CATCH(const EnvoyException& e, {
+  ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+            options.configProto().DebugString(), options.configYaml(), options.configPath(),
+            e.what());
+  terminate();
+  throw;
+})
+CATCH(const std::exception& e, {
+  ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
+  terminate();
+  throw;
+})
+CATCH(..., {
+  ENVOY_LOG(critical, "error initializing due to unknown exception");
+  terminate();
+  throw;
+})
 }
 
 InstanceImpl::~InstanceImpl() {

@@ -21,7 +21,7 @@ void validateTypeUrlHelper(const std::string& type_url,
                            const absl::flat_hash_set<std::string> require_type_urls) {
   if (!require_type_urls.contains(type_url)) {
     throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls, ", ")));
+                                           type_url, absl::StrJoin(require_type_urls, ", ")));
   }
 }
 
@@ -98,8 +98,8 @@ void FilterConfigSubscription::onConfigUpdate(
   const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
       resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
-    throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
-                                     filter_config.name()));
+    throw EnvoyException(fmt::format(
+        "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
   }
   // Skip update if hash matches
   next->config_hash_ = MessageUtil::hash(filter_config.typed_config());
@@ -220,11 +220,12 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
                                subscription->lastFactoryName());
       last_config_valid = true;
     }
-    END_TRY catch (const EnvoyException& e) {
+    END_TRY CATCH(const EnvoyException& e, {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
       subscription->incrementConflictCounter();
-    }
+    });
+
     if (last_config_valid) {
       provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
                               nullptr);
@@ -241,9 +242,10 @@ void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, type_url));
+    throw EnvoyException(
+        fmt::format("Error: cannot find filter factory {} for default filter "
+                    "configuration with type URL {}.",
+                    filter_config_name, type_url));
   }
 }
 

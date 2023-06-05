@@ -599,9 +599,10 @@ void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
                                           uint32_t removed_resources_num) {
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
-                                     "{}, number of removed recources {}",
-                                     added_resources_num, removed_resources_num));
+    throw EnvoyException(
+        fmt::format("Unexpected RTDS resource length, number of added recources "
+                    "{}, number of removed recources {}",
+                    added_resources_num, removed_resources_num));
   }
 }
 
@@ -690,13 +691,13 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
           ++disk_layers;
         }
         END_TRY
-        catch (EnvoyException& e) {
+        CATCH(EnvoyException & e, {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
-        }
+        });
       }
       break;
     }
