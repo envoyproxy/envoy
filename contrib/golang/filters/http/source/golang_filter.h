@@ -259,6 +259,7 @@ public:
   FilterLogger() = default;
 
   void log(uint32_t level, absl::string_view message) const;
+  uint32_t level() const;
 };
 
 class GoStringFilterState : public StreamInfo::FilterState::Object {

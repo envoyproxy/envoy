@@ -38,6 +38,17 @@ public:
 
   // Overload action to reset streams using excessive memory.
   const std::string ResetStreams = "envoy.overload_actions.reset_high_memory_stream";
+
+  // This should be kept current with the Overload actions available.
+  // This is the last member of this class to duplicating the strings with
+  // proper lifetime guarantees.
+  const std::array<absl::string_view, 7> WellKnownActions = {StopAcceptingRequests,
+                                                             DisableHttpKeepAlive,
+                                                             StopAcceptingConnections,
+                                                             RejectIncomingConnections,
+                                                             ShrinkHeap,
+                                                             ReduceTimeouts,
+                                                             ResetStreams};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
