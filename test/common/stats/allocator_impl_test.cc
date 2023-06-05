@@ -525,8 +525,8 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
-  GaugeSharedPtr sinked_gauge;
-  GaugeSharedPtr unsinked_gauge;
+  GaugeSharedPtr unhidden_gauge;
+  GaugeSharedPtr hidden_gauge;
 
   auto unhidden_stat_name = makeStat(absl::StrCat("unhidden.gauge"));
   auto hidden_stat_name = makeStat(absl::StrCat("hidden.gauge"));
@@ -534,10 +534,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
   size_t num_gauges = 0;
   size_t num_iterations = 0;
 
-  sinked_gauge =
+  unhidden_gauge =
       alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
-  unsinked_gauge =
+  hidden_gauge =
       alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
@@ -553,8 +553,8 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
-  GaugeSharedPtr sinked_gauge;
-  GaugeSharedPtr unsinked_gauge;
+  GaugeSharedPtr unhidden_gauge;
+  GaugeSharedPtr hidden_gauge;
 
   alloc_.setSinkPredicates(std::move(moved_sink_predicates));
 
@@ -567,10 +567,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   size_t num_gauges = 0;
   size_t num_iterations = 0;
 
-  sinked_gauge =
+  unhidden_gauge =
       alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
-  unsinked_gauge =
+  hidden_gauge =
       alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
