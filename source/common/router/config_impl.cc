@@ -2199,9 +2199,17 @@ PerFilterConfigs::PerFilterConfigs(
         continue;
       }
 
+      // If the field `config` is not configured, we treat it as configuration error.
       if (!filter_config.has_config()) {
         throw EnvoyException(
             fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
+      }
+
+      // If the field `config` is configured but is empty, we treat the filter as disabled
+      // explicitly.
+      if (filter_config.config().type_url().empty()) {
+        configs_.emplace(name, FilterConfig{nullptr, false});
+        continue;
       }
 
       config = createRouteSpecificFilterConfig(name, filter_config.config(),

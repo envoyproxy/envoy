@@ -10782,6 +10782,8 @@ virtual_hosts:
         typed_per_filter_config:
           test.filter:
             "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            # Provide an empty config to enable the filter.
+            config: {}
     typed_per_filter_config:
       test.filter:
         "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
