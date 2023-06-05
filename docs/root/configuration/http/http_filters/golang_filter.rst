@@ -126,4 +126,4 @@ Go plugins can also be configured on a
 Complete example
 ----------------
 
-Learn more about building and running a plugin for the Envoy Go filter in the step by step :ref:`Envoy Go Sandbox <install_sandboxes_golang_http>`.
+Learn more about building and running a plugin for the Envoy Go filter in the step by step :ref:`Envoy Go Sandbox <install_sandboxes_golang>`.

@@ -10,12 +10,13 @@ filters.
 .. toctree::
   :maxdepth: 2
 
-  dubbo_proxy_filter
   client_ssl_auth_filter
   connection_limit_filter
-  echo_filter
   direct_response_filter
+  dubbo_proxy_filter
+  echo_filter
   ext_authz_filter
+  golang_filter
   kafka_broker_filter
   kafka_mesh_filter
   local_rate_limit_filter
@@ -26,10 +27,9 @@ filters.
   rbac_filter
   redis_proxy_filter
   rocketmq_proxy_filter
-  tcp_proxy_filter
-  thrift_proxy_filter
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
+  tcp_proxy_filter
+  thrift_proxy_filter
   wasm_filter
   zookeeper_proxy_filter
-  golang_filter

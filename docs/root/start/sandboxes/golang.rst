@@ -1,7 +1,7 @@
-.. _install_sandboxes_golang_http:
+.. _install_sandboxes_golang:
 
-Golang HTTP Filter
-==================
+Golang filter
+=============
 
 .. sidebar:: Requirements
 
@@ -10,22 +10,22 @@ Golang HTTP Filter
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
-In this example, we show how the `Golang <https://go.dev/>`_ http filter can be used with the Envoy
+In this example, we show how the `Golang <https://go.dev/>`_ filter can be used with the Envoy
 proxy.
 
-The example demonstrates a Go plugin that can respond directly to http requests and also update responses provided by an upstream server.
+The example demonstrates a Go plugin that can respond directly to requests and also update responses provided by an upstream server.
 
 It also shows how Go plugins can be independently configured at runtime.
 
 Step 1: Compile the go plugin library
 *************************************
 
-Change to the ``examples/golang-http`` directory and build the go plugin library.
+Change to the ``examples/golang`` directory and build the go plugin library.
 
 .. code-block:: console
 
    $ pwd
-   envoy/examples/golang-http
+   envoy/examples/golang
    $ docker compose -f docker-compose-go.yaml run --rm go_plugin_compile
 
 The compiled library should now be in the ``lib`` folder.
@@ -93,11 +93,9 @@ The output from the ``curl`` command below should include the body that contains
 
 .. seealso::
 
-   :ref:`Envoy Go HTTP Filter <config_http_filters_golang>`
-      Further information about the Envoy Go HTTP filter.
-   :ref:`Envoy Go Network Filter <config_network_filters_golang>`
-      Further information about the Envoy Go Network filter.
+   :ref:`Envoy Go filter <config_http_filters_golang>`
+      Further information about the Envoy Go filter.
    :ref:`Go extension API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`
       The Go extension filter API.
-   :repo:`Go plugin API <contrib/golang/common/go/api/filter.go>`
+   :repo:`Go plugin API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
       Overview of Envoy's Go plugin APIs.

@@ -17,7 +17,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
               library_id: simple
-              library_path: "/lib/simple.so"
+              library_path: "lib/simple.so"
               plugin_name: simple
               plugin_config:
                 "@type": type.googleapis.com/xds.type.v3.TypedStruct
