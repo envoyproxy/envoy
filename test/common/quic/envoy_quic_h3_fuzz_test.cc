@@ -127,7 +127,7 @@ struct Harness {
         connection_stats_({QUIC_CONNECTION_STATS(
             POOL_COUNTER_PREFIX(mock_listener_config_.listenerScope(), "quic.connection"))}) {
     SetQuicFlag(quic_allow_chlo_buffering, false);
-    ON_CALL(writer_, WritePacket(_, _, _, _, _))
+    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     ON_CALL(http_connection_callbacks_, newStream(_, _))
         .WillByDefault(Invoke([&](Http::ResponseEncoder&, bool) -> Http::RequestDecoder& {
