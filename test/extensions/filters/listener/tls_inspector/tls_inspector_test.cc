@@ -431,7 +431,7 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
-  // trigger the event to copy the client hello message into buffer
+  // Trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
