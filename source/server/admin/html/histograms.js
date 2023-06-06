@@ -35,7 +35,7 @@ const constants = {
   // text becomes illegible, so skip some if needed. We always put the range in
   // the popup, and when skipped, we'll put the count in the popup as well, in
   // addition to any percentiles or interval ranges.
-  maxBucketsWithText: 30,
+  maxBucketsWithText: 20,
 };
 
 
