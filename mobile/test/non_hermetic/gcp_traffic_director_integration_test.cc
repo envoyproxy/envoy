@@ -51,7 +51,7 @@ std::string jwtToken() {
   const std::string cert_url = absl::Substitute("https://www.googleapis.com/robot/v1/metadata/x509/"
                                                 "$0-compute%40developer.gserviceaccount.com",
                                                 PROJECT_ID);
-  const std::string private_key(std::getenv("GCP_SERVICE_ACCOUNT_JWT_TOKEN"));
+  const std::string private_key(TestEnvironment::getCheckedEnvVar("GCP_SERVICE_ACCOUNT_JWT_TOKEN"));
 
   return absl::Substitute(
       R"json({
