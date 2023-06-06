@@ -130,12 +130,21 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
                                  Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
                            : absl::nullopt},
   }};
-
-  for (const auto& optional_status : optional_statuses) {
+  absl::optional<Grpc::Status::GrpcStatus> optional_status;
+  optional_status = Grpc::Common::getGrpcStatus(trailers, allow_user_defined)
     if (optional_status.has_value()) {
       return optional_status;
     }
-  }
+    optional_status = Grpc::Common::getGrpcStatus(headers, allow_user_defined)
+    if (optional_status.has_value()) {
+      return optional_status;
+    }
+    optional_status = info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                           : absl::nullopt
+                           if (optional_status.has_value()) {
+                             return optional_status;
+                           }
 
   return absl::nullopt;
 }
