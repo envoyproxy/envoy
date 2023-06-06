@@ -15,17 +15,10 @@ namespace Ssl {
 
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
+  // Create a CertificateValidationContextConfigImpl or return an error status.
   static absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
-         Api::Api& api) {
-    auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
-        new CertificateValidationContextConfigImpl(context, api));
-    absl::Status status = config->initialize();
-    if (status.ok()) {
-      return config;
-    }
-    return status;
-  }
+         Api::Api& api);
 
   absl::Status initialize();
 

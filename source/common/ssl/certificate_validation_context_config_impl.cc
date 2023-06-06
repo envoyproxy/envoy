@@ -44,6 +44,19 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
                             : absl::nullopt) {}
 
+absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
+CertificateValidationContextConfigImpl::create(
+    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
+    Api::Api& api) {
+  auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
+      new CertificateValidationContextConfigImpl(context, api));
+  absl::Status status = config->initialize();
+  if (status.ok()) {
+    return config;
+  }
+  return status;
+}
+
 absl::Status CertificateValidationContextConfigImpl::initialize() {
   if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
