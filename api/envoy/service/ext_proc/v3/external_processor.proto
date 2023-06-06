@@ -288,6 +288,7 @@ message CommonResponse {
   // Clear the route cache for the current request.
   // This is necessary if the remote server
   // modified headers that are used to calculate the route.
+  // No-op if returned on response path.
   bool clear_route_cache = 5;
 }
 
