@@ -30,7 +30,6 @@ run_default_ci () {
         echo "mobile_ios_build=true"
         echo "mobile_ios_tests=true"
         echo "mobile_release_validation=true"
-        echo "mobile_traffic_director=true"
         echo "mobile_tsan=true"
     } >> "$GITHUB_OUTPUT"
 }
