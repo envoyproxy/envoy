@@ -18,7 +18,6 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::AtLeast;
@@ -1337,9 +1336,6 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 }
 
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
 
@@ -1361,7 +1357,10 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   }));
 
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
-  config_.mutable_key_value_config()->mutable_config()->set_name("mock_key_value_store_factory");
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
 
   initialize();
   InSequence s;
@@ -1471,9 +1470,6 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 }
 
 TEST_F(DnsCacheImplTest, CacheLoad) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
 
@@ -1501,7 +1497,10 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     return ret;
   }));
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
-  config_.mutable_key_value_config()->mutable_config()->set_name("mock_key_value_store_factory");
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
 
   initialize();
   ASSERT(store != nullptr);

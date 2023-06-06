@@ -276,6 +276,42 @@ public:
     EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
   }
 
+  void verifyMetadataMatchCriteria() {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+    (*mock_stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    auto match = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockDispatcher> dispatcher_;
 
@@ -705,6 +741,24 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
 
   expectConnectionClose();
   notifyDecodingFailure();
+}
+
+TEST_P(RouterFilterTest, LoadBalancerContextDownstreamConnection) {
+  setup();
+  EXPECT_CALL(mock_filter_callback_, connection());
+  filter_->downstreamConnection();
+}
+
+TEST_P(RouterFilterTest, LoadBalancerContextNoMetadataMatchCriteria) {
+  setup();
+
+  // No metadata match criteria by default.
+  EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
+}
+
+TEST_P(RouterFilterTest, LoadBalancerContextMetadataMatchCriteria) {
+  setup();
+  verifyMetadataMatchCriteria();
 }
 
 } // namespace
