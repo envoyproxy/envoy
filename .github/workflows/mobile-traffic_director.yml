@@ -1,6 +1,7 @@
 name: mobile_traffic_director
 
 on:
+  # TODO(abeyad): remove all except the cron schedule once I've debugged.
   push:
     branches:
     - main
@@ -14,26 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # env:
-  #   if: ${{ github.repository == 'envoyproxy/envoy' }}
-  #   uses: ./.github/workflows/env.yml
-  #   secrets: inherit
   cc_test:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    # if: |
-    #   ${{
-    #       github.repository == 'envoyproxy/envoy'
-    #       && (github.event.schedule
-    #           || !contains(github.actor, '[bot]'))
-    #   }}
     name: cc_test
     runs-on: ubuntu-20.04
     timeout-minutes: 120
-    # container:
-    #   image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
-    #   env:
-    #     CC: /opt/llvm/bin/clang
-    #     CXX: /opt/llvm/bin/clang++
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -51,11 +37,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GCP_SERVICE_ACCOUNT_JWT_TOKEN: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
+        # TODO(abeyad): rm this after debugging
         SONATYPE_PROFILE_ID: ${{ secrets.EM_SONATYPE_PROFILE_ID }}
       run: |
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            --test_env="SONATYPE_PROFILE_ID=$SONATYPE_PROFILE_ID" \
             --test_env="GCP_JWT_PRIVATE_KEY=$GCP_SERVICE_ACCOUNT_JWT_TOKEN" \
             //test/non_hermetic:gcp_traffic_director_integration_test --test_output=all

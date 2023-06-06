@@ -52,6 +52,10 @@ std::string jwtToken() {
                                                 "$0-compute%40developer.gserviceaccount.com",
                                                 PROJECT_ID);
   const std::string private_key(TestEnvironment::getCheckedEnvVar("GCP_JWT_PRIVATE_KEY"));
+  // TODO(abeyad): rm after debugging
+  const std::string sonatype_id(TestEnvironment::getCheckedEnvVar("SONATYPE_PROFILE_ID"));
+  std::cerr << "==> AAB private_key=" << private_key << std::endl;
+  std::cerr << "==> AAB sonatype_id=" << sonatype_id << std::endl;
 
   return absl::Substitute(
       R"json({
