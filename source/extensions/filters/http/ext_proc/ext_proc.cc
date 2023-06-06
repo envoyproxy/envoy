@@ -142,7 +142,7 @@ Filter::StreamOpenState Filter::openStream() {
   // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
   // have a proper implementation of streamInfo.
   if (!logging_info_upstream_host_set_ && grpc_service_.has_envoy_grpc()) {
-    if (stream_ && stream_->streamInfo().upstreamInfo() &&
+    if (stream_->streamInfo().upstreamInfo() &&
         stream_->streamInfo().upstreamInfo()->upstreamHost()) {
       logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
       logging_info_upstream_host_set_ = true;
