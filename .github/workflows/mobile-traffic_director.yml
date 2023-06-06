@@ -16,8 +16,7 @@ jobs:
   #   uses: ./.github/workflows/env.yml
   #   secrets: inherit
   cc_test:
-    if: ${{ needs.env.outputs.mobile_traffic_director == 'true' }}
-    needs: env
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
     name: cc_test
     runs-on: ubuntu-20.04
     timeout-minutes: 120
