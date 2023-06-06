@@ -118,7 +118,13 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 Filter::StreamOpenState Filter::openStream() {
-  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
+  // External processing is completed. This means there is no need to send any further
+  // message to the server for processing. Just return IgnoreError so the filter
+  // will return FilterHeadersStatus::Continue.
+  if (processing_complete_) {
+    ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
+    return StreamOpenState::IgnoreError;
+  }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
@@ -179,7 +185,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, config_->headerMatchers(),
+                                *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
@@ -551,7 +558,8 @@ void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackSta
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, config_->headerMatchers(),
+                                *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
@@ -605,8 +613,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
-  // being invoked in line.
-  if (response->has_mode_override()) {
+  // being invoked in line. This only happens when filter has allow_mode_override
+  // set to true. Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());
@@ -775,7 +784,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
-      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
+      if (!mut_status.ok()) {
+        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
+                              mut_status.message());
+      }
     }
   };
 

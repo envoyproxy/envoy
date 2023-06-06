@@ -162,27 +162,42 @@ Each of these RPC services can provide a method for each of the SotW and Increme
 variants. Here are the RPC services and methods for each resource type:
 
 -  Listener: Listener Discovery Service (LDS)
+
    -  SotW: ListenerDiscoveryService.StreamListeners
    -  Incremental: ListenerDiscoveryService.DeltaListeners
+
 -  RouteConfiguration: Route Discovery Service (RDS)
+
    -  SotW: RouteDiscoveryService.StreamRoutes
    -  Incremental: RouteDiscoveryService.DeltaRoutes
+
 -  ScopedRouteConfiguration: Scoped Route Discovery Service (SRDS)
+
    -  SotW: ScopedRouteDiscoveryService.StreamScopedRoutes
    -  Incremental: ScopedRouteDiscoveryService.DeltaScopedRoutes
+
 -  VirtualHost: Virtual Host Discovery Service (VHDS)
+
    -  SotW: N/A
    -  Incremental: VirtualHostDiscoveryService.DeltaVirtualHosts
+
 -  Cluster: Cluster Discovery Service (CDS)
+
    -  SotW: ClusterDiscoveryService.StreamClusters
    -  Incremental: ClusterDiscoveryService.DeltaClusters
+
 -  ClusterLoadAssignment: Endpoint Discovery Service (EDS)
+
    -  SotW: EndpointDiscoveryService.StreamEndpoints
    -  Incremental: EndpointDiscoveryService.DeltaEndpoints
+
 -  Secret: Secret Discovery Service (SDS)
+
    -  SotW: SecretDiscoveryService.StreamSecrets
    -  Incremental: SecretDiscoveryService.DeltaSecrets
+
 -  Runtime: Runtime Discovery Service (RTDS)
+
    -  SotW: RuntimeDiscoveryService.StreamRuntime
    -  Incremental: RuntimeDiscoveryService.DeltaRuntime
 
@@ -236,6 +251,14 @@ how to contact the ADS server, which will be used whenever a :ref:`ConfigSource
 <envoy_v3_api_msg_config.listener.v3.Listener>` or :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource obtained from a
 management server) contains an :ref:`AggregatedConfigSource
 <envoy_v3_api_msg_config.core.v3.AggregatedConfigSource>` message.
+
+A current limitation in Envoy is that any xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources
+should be specified first in the `static_resources` field of the Bootstrap configuration prior to any static
+:ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources that depend on the xDS cluster. Failure to do
+so will result in slower Envoy initialization (see the `GitHub issue <https://github.com/envoyproxy/envoy/issues/27702>`_
+for details). As an example, if a cluster depends on an xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
+for SDS to configure the secrets on a transport socket, the xDS :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
+should be specified first in the `static_resources` field, before the cluster with the transport socket secret is specified.
 
 In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of
 the ADS server, which will be used for all resources. The :ref:`ConfigSource

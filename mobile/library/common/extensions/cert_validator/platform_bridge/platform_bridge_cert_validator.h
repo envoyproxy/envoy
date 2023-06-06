@@ -37,14 +37,6 @@ public:
                                 unsigned /*hash_length*/) override {
     PANIC("Should not be reached");
   }
-  int doSynchronousVerifyCertChain(
-      X509_STORE_CTX* /*store_ctx*/,
-      Ssl::SslExtendedSocketInfo*
-      /*ssl_extended_info*/,
-      X509& /*leaf_cert*/,
-      const Network::TransportSocketOptions* /*transport_socket_options*/) override {
-    PANIC("Should not be reached");
-  }
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override { return absl::nullopt; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
   // Return empty string

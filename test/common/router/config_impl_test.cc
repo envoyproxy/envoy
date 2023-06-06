@@ -10295,6 +10295,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10337,6 +10342,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10376,6 +10386,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10413,7 +10428,12 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10430,6 +10450,121 @@ virtual_hosts:
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                     optional_http_filters),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAny) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.default.filter:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        seconds: 123
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.default.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                seconds: 123
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  filter.unknown:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.BoolValue
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.BoolValue
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, FilterConfigWithoutConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, false),
+      EnvoyException,
+      "Empty route/virtual host per filter configuration for filter.unknown filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {

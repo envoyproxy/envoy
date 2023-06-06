@@ -36,7 +36,6 @@ health_check_config {
     seconds: 131072
     nanos: 128
   }
-  event_log_path: "A("
   interval_jitter_percent: 641007544
   initial_jitter {
     seconds: 8960

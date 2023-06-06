@@ -20,6 +20,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -1622,6 +1623,41 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log.yaml"), EnvoyException,
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flagv.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
 }
 
 } // namespace
