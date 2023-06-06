@@ -42,7 +42,7 @@ constexpr char PROJECT_ID[] = "798832730858";
 // Copied from the "client_id" field in the generated JWT token.
 constexpr char CLIENT_ID[] = "102524055118681734203";
 // Copied from the "private_key_id" field in the generated JWT token.
-constexpr char PRIVATE_KEY_ID[] = "906325ffa8bf0e4e9020a341f18c1f96beb95ff3";
+constexpr char PRIVATE_KEY_ID[] = "e07f02d49044a533cf4342d138eacecc6acdb6ed";
 
 // Using a JWT token to authenticate to Traffic Director.
 std::string jwtToken() {

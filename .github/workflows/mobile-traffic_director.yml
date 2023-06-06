@@ -5,6 +5,9 @@ on:
     branches:
     - main
   pull_request:
+  schedule:
+  # Once a day at midnight.
+  - cron: '0 0 * * *'
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -17,16 +20,25 @@ jobs:
   #   secrets: inherit
   cc_test:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
+    # if: |
+    #   ${{
+    #       github.repository == 'envoyproxy/envoy'
+    #       && (github.event.schedule
+    #           || !contains(github.actor, '[bot]'))
+    #   }}
     name: cc_test
     runs-on: ubuntu-20.04
     timeout-minutes: 120
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
-      env:
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
+    # container:
+    #   image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+    #   env:
+    #     CC: /opt/llvm/bin/clang
+    #     CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run GcpTrafficDirectorIntegrationTest'
