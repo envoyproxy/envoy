@@ -1653,7 +1653,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
       "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
 }
 
-TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlag_) {
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore) {
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
       EnvoyException,
