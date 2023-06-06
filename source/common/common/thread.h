@@ -254,6 +254,18 @@ public:
   }
 #endif
 
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#define MULTI_CATCH(ExceptionType, Handler)
+#else
+#define MULTI_CATCH(Exception, Handler, Handler2)                                                  \
+  catch (Exception) {                                                                              \
+    Handler                                                                                        \
+  }                                                                                                \
+  catch (...) {                                                                                    \
+    Handler2                                                                                       \
+  }
+#endif
+
 // These convenience macros assert properties of the threading system, when
 // feasible. There is a platform-specific mechanism for determining whether the
 // current thread is from main(), which we call the "test thread", and if that

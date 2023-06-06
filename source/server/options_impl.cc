@@ -161,26 +161,24 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "string", cmd);
 
   cmd.setExceptionHandling(false);
+
+  std::function failure_function = [&](TCLAP::ArgException& e) {
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+    END_TRY
+    CATCH(const TCLAP::ExitException&, {
+      // failure() has already written an informative message to stderr, so all that's left to do
+      // is throw our own exception with the original message.
+      throw MalformedArgvException(e.what());
+    });
+  };
+
   TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
   }
   END_TRY
-  CATCH(TCLAP::ArgException & e,
-        {
-          TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
-          END_TRY
-          CATCH(const TCLAP::ExitException&, {
-            // failure() has already written an informative message to stderr, so all that's left to
-            // do is throw our own exception with the original message.
-            throw MalformedArgvException(e.what());
-          });
-        })
-  CATCH(const TCLAP::ExitException& e, {
-    // parse() throws an ExitException with status 0 after printing the output for --help and
-    // --version.
-    throw NoServingException();
-  });
+  MULTI_CATCH(
+      TCLAP::ArgException & e, { failure_function(e); }, { throw NoServingException(); });
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();

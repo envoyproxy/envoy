@@ -115,30 +115,27 @@ CATCH(const EnvoyException& e, {
   throw EnvoyException(
       fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
 });
-} // namespace Envoy
 
 restarter_.initialize(*dispatcher_, *this);
 drain_manager_ = component_factory.createDrainManager(*this);
 initialize(std::move(local_address), component_factory);
+} // namespace Envoy
 }
 END_TRY
-CATCH(const EnvoyException& e, {
-  ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-            options.configProto().DebugString(), options.configYaml(), options.configPath(),
-            e.what());
-  terminate();
-  throw;
-})
-CATCH(const std::exception& e, {
-  ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
-  terminate();
-  throw;
-})
-CATCH(..., {
-  ENVOY_LOG(critical, "error initializing due to unknown exception");
-  terminate();
-  throw;
-})
+MULTI_CATCH(
+    const EnvoyException& e,
+    {
+      ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+                options.configProto().DebugString(), options.configYaml(), options.configPath(),
+                e.what());
+      terminate();
+      throw;
+    },
+    {
+      ENVOY_LOG(critical, "error initializing due to unknown exception");
+      terminate();
+      throw;
+    })
 }
 
 InstanceImpl::~InstanceImpl() {
