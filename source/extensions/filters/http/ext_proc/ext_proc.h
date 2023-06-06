@@ -297,6 +297,9 @@ private:
 
   // Set to true then the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  // Set to true when setUpstreamHost() is called on logging_info_.
+  bool logging_info_upstream_host_set_ = false;
 };
 
 extern std::string responseCaseToString(
