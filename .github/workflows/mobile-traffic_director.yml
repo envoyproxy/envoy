@@ -4,6 +4,8 @@ on:
   schedule:
   # Once a day at midnight.
   - cron: '0 0 * * *'
+  # Allows manual triggering in the UI. Makes it easier to test.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
