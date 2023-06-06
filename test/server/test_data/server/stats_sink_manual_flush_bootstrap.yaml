@@ -16,5 +16,7 @@ admin:
       port_value: 0
 stats_sinks:
 - name: envoy.custom_stats_sink
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
 stats_flush_on_admin: true
 enable_dispatcher_stats: true
