@@ -131,7 +131,6 @@ paths:
     - source/common/http/filter_chain_helper.h
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
-    - source/common/http/http_server_properties_cache_manager_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/visitor_helper.h
     - source/common/protobuf/visitor.cc
