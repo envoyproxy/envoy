@@ -1065,6 +1065,47 @@ void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filte
   state.streamInfo().setDynamicMetadata(filter_name, value);
 }
 
+CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
+                                        int state_type, int life_span, int stream_sharing) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    state.streamInfo().filterState()->setData(
+        key, std::make_shared<GoStringFilterState>(value),
+        static_cast<StreamInfo::FilterState::StateType>(state_type),
+        static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+        static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+  } else {
+    auto key_str = std::string(key);
+    auto filter_state = std::make_shared<GoStringFilterState>(value);
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post(
+        [this, &state, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
+          if (!weak_ptr.expired() && !hasDestroyed()) {
+            Thread::LockGuard lock(mutex_);
+            state.streamInfo().filterState()->setData(
+                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
+                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+          } else {
+            ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+          }
+        });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -1213,6 +1254,8 @@ void FilterLogger::log(uint32_t level, absl::string_view message) const {
 
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
+
+uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER().level()); }
 
 } // namespace Golang
 } // namespace HttpFilters

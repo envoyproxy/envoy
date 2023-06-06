@@ -560,13 +560,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
       }));
 
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
-      .WillOnce(
-          Invoke([&](absl::string_view)
-                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
-            return host_info;
-          }));
-
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
   // Host was resolved successfully, so continue filter iteration.
@@ -618,13 +611,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
       }));
 
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
-      .WillOnce(
-          Invoke([&](absl::string_view)
-                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
-            return host_info;
-          }));
-
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
   // Host was resolved successfully, so continue filter iteration.
@@ -672,13 +658,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
                            ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
       }));
-
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
-      .WillOnce(
-          Invoke([&](absl::string_view)
-                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
-            return host_info;
-          }));
 
   EXPECT_CALL(*host_info, address());
   EXPECT_CALL(callbacks_,

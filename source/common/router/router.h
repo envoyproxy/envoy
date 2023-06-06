@@ -380,10 +380,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
-        downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
-        streaming_shadows_(
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
+        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
+        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
+                                               "envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -672,7 +671,6 @@ private:
   FilterUtility::HedgingParams hedging_params_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
-  bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;

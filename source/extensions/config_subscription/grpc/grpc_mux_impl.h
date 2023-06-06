@@ -20,11 +20,11 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
+#include "source/extensions/config_subscription/grpc/grpc_stream.h"
 
 #include "absl/container/node_hash_map.h"
 #include "xds/core/v3/resource_name.pb.h"
