@@ -54,8 +54,9 @@ Config::Config(
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       enable_ja3_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
-      max_client_hello_size_(max_client_hello_size) {
-
+      max_client_hello_size_(max_client_hello_size),
+      initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config, initial_read_buffer_size, max_client_hello_size)) {
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -92,7 +93,10 @@ Config::Config(
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-Filter::Filter(const ConfigSharedPtr& config) : config_(config), ssl_(config_->newSsl()) {
+Filter::Filter(const ConfigSharedPtr& config)
+    : config_(config), ssl_(config_->newSsl()),
+      requested_read_bytes_(
+          std::min(config->initialReadBufferSize(), config->maxClientHelloSize())) {
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
@@ -183,11 +187,15 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
   ParseState state = [this, ret]() {
     switch (SSL_get_error(ssl_.get(), ret)) {
     case SSL_ERROR_WANT_READ:
-      if (read_ == config_->maxClientHelloSize()) {
+      if (read_ == maxConfigReadBytes()) {
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
         return ParseState::Error;
+      }
+      if (read_ == requested_read_bytes_) {
+        // Double requested bytes up to the maximum configured.
+        requested_read_bytes_ = std::min<uint32_t>(2 * requested_read_bytes_, maxConfigReadBytes());
       }
       return ParseState::Continue;
     case SSL_ERROR_SSL:

@@ -54,7 +54,7 @@ public:
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
         *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-        cfg_->maxClientHelloSize());
+        cfg_->initialReadBufferSize());
     filter_->onAccept(cb_);
   }
 
@@ -75,6 +75,28 @@ public:
               ASSERT(length >= client_hello.size());
               memcpy(buffer, client_hello.data(), client_hello.size());
               return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+            }));
+#endif
+  }
+
+  // Unlike mockSysCallForPeek, this method does not assume that the buffer is
+  // already sufficiently sized to hold the client hello. Instead it uses the
+  // buffers length to determine how much to copy.
+  void mockSysCallForPeekFillBuffer(std::vector<uint8_t>& client_hello) {
+#ifdef WIN32
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .WillOnce(Invoke(
+            [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+              memcpy(iov->iov_base, client_hello.data(), iov->iov_len));
+              return Api::SysCallSizeResult{ssize_t(iov->iov_len), 0};
+            }))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillOnce(Invoke(
+            [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              memcpy(buffer, client_hello.data(), length);
+              return Api::SysCallSizeResult{ssize_t(length), 0};
             }));
 #endif
   }
@@ -264,23 +286,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
-#ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-      .WillOnce(Invoke(
-          [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= max_size);
-            memcpy(buffer, client_hello.data(), max_size);
-            return Api::SysCallSizeResult{ssize_t(max_size), 0};
-          }));
-#else
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke(
-          [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length == max_size);
-            memcpy(buffer, client_hello.data(), length);
-            return Api::SysCallSizeResult{ssize_t(length), 0};
-          }));
-#endif
+  mockSysCallForPeekFillBuffer(client_hello);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -440,6 +446,87 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
   filter_.reset();
 
   ASSERT_FALSE(store_.histogramRecordedValues("tls_inspector.bytes_processed"));
+}
+
+TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  const uint32_t initial_buffer_size = 1;
+  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
+      *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
+      cfg_->initialReadBufferSize());
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "\x02h2");
+
+  init();
+  EXPECT_CALL(socket_, setRequestedServerName(_));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(_));
+
+  // The number of iterations is based on how many times we'll have to double
+  // the buffer to read the full client hello.
+  const size_t num_iterations = absl::bit_width(client_hello.size()) + 1;
+
+  for (size_t i = 0; i < num_iterations; ++i) {
+    // Trigger the event to copy the client hello message into buffer
+    mockSysCallForPeekFillBuffer(client_hello);
+    file_event_callback_(Event::FileReadyType::Read);
+
+    auto state = filter_->onData(*buffer_);
+
+    if (const bool is_final_iteration = i == (num_iterations - 1); is_final_iteration) {
+      EXPECT_EQ(Network::FilterStatus::Continue, state);
+    } else {
+      EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+      const uint32_t expected_max_read_size = (1 << (i + 1)) * initial_buffer_size;
+      EXPECT_EQ(expected_max_read_size, filter_->maxReadBytes());
+      // The listener filter chain will resize the buffer given the adjusted
+      // maxReadBytes.
+      buffer_->resetCapacity(expected_max_read_size);
+    }
+  }
+}
+
+TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  const uint32_t initial_buffer_size = 15;
+  const size_t max_size = 50;
+  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config, max_size);
+  buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
+      *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
+      cfg_->initialReadBufferSize());
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "\x02h2");
+
+  init();
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
+
+  mockSysCallForPeekFillBuffer(client_hello);
+  file_event_callback_(Event::FileReadyType::Read);
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
+  buffer_->resetCapacity(2 * initial_buffer_size);
+
+  mockSysCallForPeekFillBuffer(client_hello);
+  file_event_callback_(Event::FileReadyType::Read);
+  state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(max_size, filter_->maxReadBytes());
+  buffer_->resetCapacity(max_size);
+
+  // The filter should not request a larger buffer as we've reached the max.
+  // It should close the connection.
+  mockSysCallForPeekFillBuffer(client_hello);
+  file_event_callback_(Event::FileReadyType::Read);
+  state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(max_size, filter_->maxReadBytes());
+  EXPECT_FALSE(io_handle_->isOpen());
 }
 
 } // namespace

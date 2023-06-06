@@ -248,6 +248,13 @@ new_features:
     the connection uses tls this records the tls client hello size. In cases
     where the connection doesn't use tls this records the amount of bytes the
     tls_inspector processed until it realized the connection was not using tls.
+- area: tls_inspector
+  change: |
+    added new configuration field :ref:`initial_read_buffer_size
+    <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.initial_read_buffer_size>`
+    to allow users to tune the buffer size requested by the filter. If
+    configured, and the filter needs additional bytes, the filter will double
+    the number of bytes requested up to the default 64KiB maximum.
 - area: access_log
   change: |
     added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
