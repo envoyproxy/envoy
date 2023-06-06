@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
+      image: envoyproxy/envoy-build-ubuntu:105fdc54acc55ff0ff0c5b784d8cfe8dc225aad4
     steps:
     - uses: actions/checkout@v3
     - name: Add safe directory
