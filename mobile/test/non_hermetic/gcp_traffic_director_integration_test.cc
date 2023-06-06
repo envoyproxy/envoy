@@ -2,25 +2,27 @@
 #include <tuple>
 #include <vector>
 
-#include "absl/strings/substitute.h"
-#include "absl/synchronization/notification.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "library/common/data/utility.h"
-#include "library/common/engine_handle.h"
-#include "library/common/types/c_types.h"
+
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/clusters/eds/eds.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
 
+#include "absl/strings/substitute.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
+#include "library/common/data/utility.h"
+#include "library/common/engine_handle.h"
+#include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace {
