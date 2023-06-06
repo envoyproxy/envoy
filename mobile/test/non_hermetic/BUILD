@@ -17,7 +17,7 @@ envoy_cc_test(
         "@envoy",
     ),
     data = [
-	"@envoy//test/config/integration/certs",
+        "@envoy//test/config/integration/certs",
     ],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
@@ -41,7 +41,7 @@ envoy_cc_test(
         "@envoy//source/extensions/config_subscription/grpc:new_grpc_mux_lib",
         "@envoy//test/common/grpc:grpc_client_integration_lib",
         "@envoy//test/integration:http_integration_lib",
-	"@envoy//test/test_common:environment_lib",
+        "@envoy//test/test_common:environment_lib",
         "@envoy//test/test_common:network_utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
