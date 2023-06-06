@@ -5,14 +5,10 @@ configuration {
 request {
     scheme { value: "https" }
     method { value: "GET" }
-    path { value: "/" }
+    path { value: "/path?query=value#fragment" }
     authority { value: "foo.bar.com" }
     headers {
         key: "foo"
         value: "bar"
-    }
-    headers {
-        key: "host"
-        value: "fuz.baz.net"
     }
 }

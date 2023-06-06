@@ -4,16 +4,12 @@ configuration {
 
 request {
     scheme { value: "https" }
-    method { value: "GET" }
-    path { value: "/websocket/endpoint" }
+    method { value: "POST" }
+    path { value: "/database?key=value&key2=value2&etc&etc2" }
     authority { value: "foo.bar.com" }
     headers {
-        key: "connection"
-        value: "upgrade, keep-alive"
-    }
-    headers {
-        key: "upgrade"
-        value: "websocket"
+        key: "content-length"
+        value: "10"
     }
     headers {
         key: "baz"

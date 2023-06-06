@@ -21,9 +21,17 @@ message ServerCodecDiffFuzzTestCase {
     google.protobuf.BytesValue method = 2;
     google.protobuf.BytesValue path = 3;
     google.protobuf.BytesValue authority = 4;
-    repeated HttpHeader headers = 5;
+    google.protobuf.BytesValue protocol = 5;
+    repeated HttpHeader headers = 6;
+  }
+
+  // Response is only sent if codec successfully parsed request
+  message Response {
+    google.protobuf.BytesValue status = 1;
+    repeated HttpHeader headers = 2;
   }
 
   Configuration configuration = 1;
   Request request = 2;
+  Response response = 3;
 }

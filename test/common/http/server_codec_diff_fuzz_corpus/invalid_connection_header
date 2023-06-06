@@ -15,7 +15,7 @@ request {
     value: "foo.bar.com"
   }
   headers {
-    key: "Conne\350tion"
+    key: "conne\350tion"
     value: "upgrade, keep-alive"
   }
   headers {

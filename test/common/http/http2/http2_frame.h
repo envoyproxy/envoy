@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/http/metadata_interface.h"
@@ -125,6 +126,9 @@ public:
 
   struct Header {
     Header(absl::string_view key, absl::string_view value) : key_(key), value_(value) {}
+    bool operator==(const Header& other) const {
+      return key_ == other.key_ && value_ == other.value_;
+    }
     std::string key_;
     std::string value_;
   };
@@ -242,16 +246,39 @@ public:
     return std::string(reinterpret_cast<const char*>(data()), size());
   }
 
+  absl::string_view getStringView() const {
+    if (data_.empty()) {
+      return {};
+    }
+    return absl::string_view(reinterpret_cast<const char*>(data()), size());
+  }
+
   uint32_t payloadSize() const;
+  uint32_t frameSize() const { return payloadSize() + HeaderSize; }
   // Total size of the frame
   size_t size() const { return data_.size(); }
   // Access to the raw frame bytes
   const uint8_t* data() const { return data_.data(); }
+  const uint8_t* payload() const {
+    ASSERT(size() > HeaderSize);
+    return data() + HeaderSize;
+  }
   Iterator begin() { return data_.begin(); }
   Iterator end() { return data_.end(); }
   ConstIterator begin() const { return data_.begin(); }
   ConstIterator end() const { return data_.end(); }
   bool empty() const { return data_.empty(); }
+
+  void appendHeaderWithoutIndexing(const Header& header);
+
+  // This method updates payload length in the HTTP2 header based on the size of the data_
+  void adjustPayloadSize() {
+    ASSERT(size() >= HeaderSize);
+    setPayloadSize(size() - HeaderSize);
+  }
+
+  std::vector<Header> parseHeadersFrame() const;
+  std::pair<bool, uint32_t> getResetErrorCode() const;
 
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);
@@ -272,14 +299,7 @@ private:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
-  void appendHeaderWithoutIndexing(const Header& header);
   void appendEmptyHeader();
-
-  // This method updates payload length in the HTTP2 header based on the size of the data_
-  void adjustPayloadSize() {
-    ASSERT(size() >= HeaderSize);
-    setPayloadSize(size() - HeaderSize);
-  }
 
   DataContainer data_;
 };

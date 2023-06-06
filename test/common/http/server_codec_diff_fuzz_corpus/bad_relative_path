@@ -5,7 +5,7 @@ configuration {
 request {
     scheme { value: "https" }
     method { value: "GET" }
-    path { value: "/" }
+    path { value: "/something/../../../etc/passwd" }
     authority { value: "foo.bar.com" }
     headers {
         key: "foo"
@@ -14,17 +14,5 @@ request {
     headers {
         key: "baz"
         value: "fuz"
-    }
-}
-
-response {
-    status { value: "200" }
-    headers {
-        key: "cow"
-        value: "moo"
-    }
-    headers {
-        key: "cat"
-        value: "meow"
     }
 }

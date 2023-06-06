@@ -4,9 +4,10 @@ configuration {
 
 request {
     scheme { value: "https" }
-    method { value: "GET" }
-    path { value: "/" }
+    method { value: "CONNECT" }
     authority { value: "foo.bar.com" }
+    protocol { value: "websocket" }
+    path { value: "/some/path/..////websocket/./ttt?key=value" }
     headers {
         key: "foo"
         value: "bar"
@@ -18,7 +19,15 @@ request {
 }
 
 response {
-    status { value: "200" }
+    status { value: "101" }
+    headers {
+        key: "upgrade"
+        value: "websocket"
+    }
+    headers {
+        key: "connection"
+        value: "upgrade"
+    }
     headers {
         key: "cow"
         value: "moo"

@@ -6,6 +6,7 @@
 
 #include "source/common/common/hex.h"
 
+#include "quiche/spdy/core/hpack/hpack_decoder_adapter.h"
 #include "quiche/spdy/core/hpack/hpack_encoder.h"
 
 namespace {
@@ -403,6 +404,35 @@ Http2Frame Http2Frame::makeDataFrame(uint32_t stream_index, absl::string_view da
   frame.appendData(data);
   frame.adjustPayloadSize();
   return frame;
+}
+
+std::vector<Http2Frame::Header> Http2Frame::parseHeadersFrame() const {
+  // CONTINUATION frames are not supported yet
+  if (empty() || Type::Headers != type() || size() <= HeaderSize ||
+      !andFlags(absl::get<HeadersFlags>(frameFlags()), HeadersFlags::EndHeaders)) {
+    return {};
+  }
+
+  std::vector<Http2Frame::Header> headers;
+  spdy::HpackDecoderAdapter decoder;
+  decoder.HandleControlFrameHeadersStart(nullptr);
+  if (decoder.HandleControlFrameHeadersData(reinterpret_cast<const char*>(payload()),
+                                            payloadSize())) {
+    if (decoder.HandleControlFrameHeadersComplete()) {
+      for (const auto& header : decoder.decoded_block()) {
+        headers.push_back(Header(header.first, header.second));
+      }
+    }
+  }
+  return headers;
+}
+
+std::pair<bool, uint32_t> Http2Frame::getResetErrorCode() const {
+  if (empty() || Type::RstStream != type() || payloadSize() != 4) {
+    return std::make_pair(false, 0);
+  }
+  return std::make_pair(true, (uint32_t(data_[9]) << 24) + (uint32_t(data_[10]) << 16) +
+                                  uint32_t(data_[11] << 8) + uint32_t(data_[12]));
 }
 
 } // namespace Http2
