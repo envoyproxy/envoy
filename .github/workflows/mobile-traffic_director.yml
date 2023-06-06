@@ -39,5 +39,6 @@ jobs:
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
-            --test_env=GCP_SERVICE_ACCOUNT_JWT_TOKEN=$GCP_SERVICE_ACCOUNT_JWT_TOKEN,ENVOY_IP_TEST_VERSIONS=v4only \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            --test_env="GCP_SERVICE_ACCOUNT_JWT_TOKEN=$GCP_SERVICE_ACCOUNT_JWT_TOKEN" \
             //test/non_hermetic:gcp_traffic_director_integration_test --test_output=all
