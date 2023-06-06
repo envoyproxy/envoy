@@ -139,6 +139,15 @@ Filter::StreamOpenState Filter::openStream() {
       logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
     }
   }
+  // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+  // have a proper implementation of streamInfo.
+  if (!logging_info_upstream_host_set_ && grpc_service_.has_envoy_grpc()) {
+    if (stream_ && stream_->streamInfo().upstreamInfo() &&
+        stream_->streamInfo().upstreamInfo()->upstreamHost()) {
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+      logging_info_upstream_host_set_ = true;
+    }
+  }
   return StreamOpenState::Ok;
 }
 
@@ -513,11 +522,6 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   const auto status = onHeaders(encoding_state_, headers, end_stream);
   ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
-  // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-  // have a proper implementation of streamInfo.
-  if (stream_ && stream_->streamInfo().upstreamInfo() && grpc_service_.has_envoy_grpc()) {
-    logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-  }
   return status;
 }
 
@@ -525,11 +529,6 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
   const auto status = onData(encoding_state_, data, end_stream);
   ENVOY_LOG(trace, "encodeData returning {}", static_cast<int>(status));
-  // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-  // have a proper implementation of streamInfo.
-  if (stream_ && stream_->streamInfo().upstreamInfo() && grpc_service_.has_envoy_grpc()) {
-    logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-  }
   return status;
 }
 
@@ -537,11 +536,6 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   ENVOY_LOG(trace, "encodeTrailers");
   const auto status = onTrailers(encoding_state_, trailers);
   ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
-  // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-  // have a proper implementation of streamInfo.
-  if (stream_ && stream_->streamInfo().upstreamInfo() && grpc_service_.has_envoy_grpc()) {
-    logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-  }
   return status;
 }
 
