@@ -43,9 +43,12 @@ std::string sanitizeValue(const absl::string_view value) {
                                     });
 }
 
-/*
- * Determine whether a metric has never been emitted and choose to
- * not show it if we only wanted used or hidden metrics.
+/**
+ * Determines whether a metric should be shown based on the specified query-parameters. This covers:
+ * ``usedonly``, hidden, and filter.
+ *
+ * @param metric the metric to test
+ * @param params captures query parameters indicating which metrics should be included.
  */
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {

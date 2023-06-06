@@ -92,8 +92,8 @@ minor_behavior_changes:
     to the name of the ext_proc filter.
 - area: stats
   change: |
-    Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with an
-    included query such as ?hidden=include or ?hidden=showonly.
+    Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
+    query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
