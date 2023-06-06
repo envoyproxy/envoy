@@ -40,9 +40,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
-  uint32_t connections_accepted_count = 0;
-  for (; connections_accepted_count < max_connections_to_accept_per_socket_event_;
-       ++connections_accepted_count) {
+  uint32_t connections_accepted_from_kernel_count = 0;
+  for (; connections_accepted_from_kernel_count < max_connections_to_accept_per_socket_event_;
+       ++connections_accepted_from_kernel_count) {
     if (!socket_->ioHandle().isOpen()) {
       PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
     }
@@ -93,7 +93,8 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   }
 
   ENVOY_LOG_MISC(trace, "TcpListener {} accepted {} new connections.",
-                 socket_->ioHandle().localAddress()->asStringView(), connections_accepted_count);
+                 socket_->ioHandle().localAddress()->asStringView(),
+                 connections_accepted_from_kernel_count);
 }
 
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,

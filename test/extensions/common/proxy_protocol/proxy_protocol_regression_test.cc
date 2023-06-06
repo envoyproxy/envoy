@@ -71,6 +71,9 @@ public:
     return socket_factories_;
   }
   bool bindToPort() const override { return true; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
