@@ -113,7 +113,7 @@ public:
   }
 };
 
-class JsonApplicationLogsValidationServerForbiddenFlag_Test : public ValidationServerTest {
+class JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest : public ValidationServerTest {
 public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     setupTestDirectory();
@@ -306,7 +306,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(
         JsonApplicationLogsValidationServerForbiddenFlagvTest::getAllConfigFiles()));
 
-TEST_P(JsonApplicationLogsValidationServerForbiddenFlag_Test, TestForbiddenFlag) {
+TEST_P(JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest, TestForbiddenFlag) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;
@@ -320,9 +320,9 @@ TEST_P(JsonApplicationLogsValidationServerForbiddenFlag_Test, TestForbiddenFlag)
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlag_Test,
+    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest,
     ::testing::ValuesIn(
-        JsonApplicationLogsValidationServerForbiddenFlag_Test::getAllConfigFiles()));
+        JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server
