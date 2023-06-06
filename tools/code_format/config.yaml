@@ -117,7 +117,6 @@ paths:
     - source/common/network/lc_trie.h
     - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/formatter/substitution_formatter.cc
     - source/common/formatter/substitution_format_string.cc
     - source/common/stats/tag_extractor_impl.cc
