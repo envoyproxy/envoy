@@ -36,7 +36,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GCP_SERVICE_ACCOUNT_JWT_TOKEN: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
       run: |
-        cd mobile && ./bazelw test \
+        echo $GCP_SERVICE_ACCOUNT_JWT_TOKEN && cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
