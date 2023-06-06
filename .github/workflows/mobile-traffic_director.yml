@@ -33,6 +33,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GCP_SERVICE_ACCOUNT_JWT_TOKEN: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
+        SONATYPE_PROFILE_ID: ${{ secrets.EM_SONATYPE_PROFILE_ID }}
       run: |
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
