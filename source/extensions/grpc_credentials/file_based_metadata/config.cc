@@ -77,7 +77,7 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
   }
   END_TRY
   catch (const EnvoyException& e) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, e.what());
+    return {grpc::StatusCode::NOT_FOUND, e.what()};
   }
   return grpc::Status::OK;
 }
