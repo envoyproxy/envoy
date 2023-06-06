@@ -11,11 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  env:
-    if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/env.yml
-    secrets: inherit
-
+  # env:
+  #   if: ${{ github.repository == 'envoyproxy/envoy' }}
+  #   uses: ./.github/workflows/env.yml
+  #   secrets: inherit
   cc_test:
     if: ${{ needs.env.outputs.mobile_traffic_director == 'true' }}
     needs: env
