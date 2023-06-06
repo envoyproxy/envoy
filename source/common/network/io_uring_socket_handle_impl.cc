@@ -395,24 +395,30 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       ENVOY_LOG(trace,
                 "initialize file event on another thread, fd = {}, io_uring_socket_type = {}", fd_,
                 ioUringSocketTypeStr());
+      Thread::CondVar wait_cv;
+      Thread::MutexBasicLockable mutex;
+      Buffer::OwnedImpl buf;
+      auto fd = io_uring_socket_->fd();
+
+      mutex.lock();
       // Close the original socket at its running thread.
       io_uring_socket_->getIoUringWorker().dispatcher().post([&origin_socket = io_uring_socket_,
-                                                              &target_dispatcher = dispatcher,
-                                                              &io_uring_factory = io_uring_factory_,
-                                                              &io_handler = *this, &events]() {
+                                                              &wait_cv, &mutex, &buf]() {
         // Move the data of original socket's read buffer after the original socket read request
         // is done.
-        origin_socket->close(true, [&origin_socket, &target_dispatcher, &io_uring_factory,
-                                    &io_handler, &events]() {
-          std::shared_ptr<Buffer::OwnedImpl> buf = std::make_shared<Buffer::OwnedImpl>();
-          buf->move(dynamic_cast<Io::IoUringServerSocket*>(origin_socket.ptr())->getReadBuffer());
-          target_dispatcher.post([&origin_socket, &io_uring_factory, &io_handler, &events,
-                                  read_buf = buf, fd = origin_socket->fd()]() {
-            origin_socket.emplace(io_uring_factory.getIoUringWorker()->addServerSocket(
-                fd, *read_buf, io_handler, events & Event::FileReadyType::Closed));
-          });
+        origin_socket->close(true, [&origin_socket, &wait_cv, &mutex, &buf]() {
+          mutex.lock();
+          buf.move(dynamic_cast<Io::IoUringServerSocket*>(origin_socket.ptr())->getReadBuffer());
+          wait_cv.notifyOne();
+          mutex.unlock();
         });
       });
+
+      wait_cv.wait(mutex);
+      mutex.unlock();
+
+      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
+          fd, buf, *this, events & Event::FileReadyType::Closed);
     }
     cb_ = std::move(cb);
     return;
