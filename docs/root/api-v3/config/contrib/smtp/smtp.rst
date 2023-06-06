@@ -1,4 +1,4 @@
-.. _arch_overview_smtp:
+.. _config_contrib_smtp:
 
 SMTP
 ====
