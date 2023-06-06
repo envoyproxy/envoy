@@ -289,7 +289,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
-  EXPECT_EQ(50, bytes_processed[0]);
+  EXPECT_EQ(max_size, bytes_processed[0]);
 }
 
 // Test that the filter sets the `JA3` hash
