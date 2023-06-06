@@ -10,7 +10,7 @@ on:
   - cron: '0 0 * * *'
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
 
 jobs:
