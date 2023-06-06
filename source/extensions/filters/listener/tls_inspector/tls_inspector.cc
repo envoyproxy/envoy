@@ -180,37 +180,41 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  switch (SSL_get_error(ssl_.get(), ret)) {
-  case SSL_ERROR_WANT_READ:
-    if (read_ == config_->maxClientHelloSize()) {
-      // We've hit the specified size limit. This is an unreasonably large ClientHello;
-      // indicate failure.
-      config_->stats().client_hello_too_large_.inc();
-      // Record client_hello size as we're done processing.
-      config_->stats().bytes_processed_.recordValue(
-          computeClientHelloSize(bio.get(), bytes_already_processed, len));
+  ParseState state = [this, ret]() {
+    switch (SSL_get_error(ssl_.get(), ret)) {
+    case SSL_ERROR_WANT_READ:
+      if (read_ == config_->maxClientHelloSize()) {
+        // We've hit the specified size limit. This is an unreasonably large ClientHello;
+        // indicate failure.
+        config_->stats().client_hello_too_large_.inc();
+        return ParseState::Error;
+      }
+      return ParseState::Continue;
+    case SSL_ERROR_SSL:
+      if (clienthello_success_) {
+        config_->stats().tls_found_.inc();
+        if (alpn_found_) {
+          config_->stats().alpn_found_.inc();
+        } else {
+          config_->stats().alpn_not_found_.inc();
+        }
+        cb_->socket().setDetectedTransportProtocol("tls");
+      } else {
+        config_->stats().tls_not_found_.inc();
+      }
+      return ParseState::Done;
+    default:
       return ParseState::Error;
     }
-    return ParseState::Continue;
-  case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      config_->stats().tls_found_.inc();
-      if (alpn_found_) {
-        config_->stats().alpn_found_.inc();
-      } else {
-        config_->stats().alpn_not_found_.inc();
-      }
-      cb_->socket().setDetectedTransportProtocol("tls");
-    } else {
-      config_->stats().tls_not_found_.inc();
-    }
-    // Record client_hello size as we're done processing.
+  }();
+
+  if (state != ParseState::Continue) {
+    // Record bytes analyzed as we're done processing.
     config_->stats().bytes_processed_.recordValue(
         computeClientHelloSize(bio.get(), bytes_already_processed, len));
-    return ParseState::Done;
-  default:
-    return ParseState::Error;
   }
+
+  return state;
 }
 
 // Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)

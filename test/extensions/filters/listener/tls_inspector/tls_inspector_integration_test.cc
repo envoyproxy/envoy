@@ -197,9 +197,9 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   EXPECT_EQ(
       TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
       1);
-  EXPECT_EQ(
-      TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram),
-      115);
+  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                        *bytes_processed_histogram)),
+            115);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,
