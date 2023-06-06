@@ -2064,7 +2064,7 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
-// callback on the filter when header modifications are also present.
+// callback on the filter when header modifications are also present, on the request path only.
 TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   initialize(R"EOF(
   grpc_service:
@@ -2076,7 +2076,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(1);
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
@@ -2094,7 +2094,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
-  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
@@ -2111,7 +2111,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
-// Verify that the "disable_route_cache_clearing" setting prevents the "clear_route_cache" flag
+// Verify that the "disable_clear_route_cache" setting prevents the "clear_route_cache" flag
 // from performing route clearing callbacks when enabled.
 TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   initialize(R"EOF(

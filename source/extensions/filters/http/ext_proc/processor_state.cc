@@ -366,11 +366,13 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 }
 
 void ProcessorState::clearRouteCache(const CommonResponse& common_response) {
-  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+  // Only clear the route cache if on INBOUND path, there is a mutation to the header and clearing
+  // is allowed.
   if (filter_.config().disableClearRouteCache()) {
     filter_.stats().clear_route_cache_disabled_.inc();
     ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
-  } else if (common_response.has_header_mutation()) {
+  } else if (common_response.has_header_mutation() &&
+             traffic_direction_ == envoy::config::core::v3::TrafficDirection::INBOUND) {
     ENVOY_LOG(debug, "clearing route cache");
     filter_callbacks_->downstreamCallbacks()->clearRouteCache();
   } else {
