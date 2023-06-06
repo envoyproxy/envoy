@@ -2076,7 +2076,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
