@@ -9,9 +9,11 @@
 # The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx3g
+startup --batch_cpu_scheduling --io_nice_level 7
 
 run --color=yes
 
+build --jobs 4 --local_ram_resources=HOST_RAM*0.5
 build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
