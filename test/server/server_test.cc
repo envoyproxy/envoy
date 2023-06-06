@@ -1660,6 +1660,19 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlag_) {
       "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
 }
 
+TEST_P(ServerInstanceImplTest, TextApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
