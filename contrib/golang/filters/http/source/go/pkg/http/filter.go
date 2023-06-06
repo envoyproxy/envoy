@@ -115,6 +115,10 @@ func (r *httpRequest) Log(level api.LogType, message string) {
 	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
 }
 
+func (r *httpRequest) LogLevel() api.LogType {
+	return cAPI.HttpLogLevel()
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
@@ -195,4 +199,18 @@ func (s *streamInfo) UpstreamHostAddress() (string, bool) {
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
 	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
+}
+
+type filterState struct {
+	request *httpRequest
+}
+
+func (s *streamInfo) FilterState() api.FilterState {
+	return &filterState{
+		request: s.request,
+	}
+}
+
+func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request.req), key, value, stateType, lifeSpan, streamSharing)
 }

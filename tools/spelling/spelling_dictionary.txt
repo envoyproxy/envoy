@@ -1160,6 +1160,7 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable

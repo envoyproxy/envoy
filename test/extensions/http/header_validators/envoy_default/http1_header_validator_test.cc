@@ -66,7 +66,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInRequest) {
 
   request_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInResponse) {
@@ -78,7 +78,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInResponse) {
 
   request_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(request_headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryCustomMethod) {
@@ -357,6 +357,36 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectRej
                              "uhv.http1.content_length_not_allowed");
 }
 
+TEST_F(Http1HeaderValidatorTest, ResponseTransferEncodingContentLengthReject) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"transfer-encoding", "chunked"}, {"content-length", "10"}};
+  auto uhv = createH1Client(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+                             "http1.content_length_and_chunked_not_allowed");
+}
+
+TEST_F(Http1HeaderValidatorTest, ResponseTransferEncodingContentLengthAllowed) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"transfer-encoding", "chunked"}, {"content-length", "10"}};
+  auto uhv = createH1Client(allow_chunked_length_config);
+
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  // The transform method should remove content-length
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers.ContentLength(), nullptr);
+}
+
+TEST_F(Http1HeaderValidatorTest, ResponseContentLengthNoTransferEncoding) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-length", "10"}};
+  auto uhv = createH1Client(allow_chunked_length_config);
+
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  // The transform method should keep content-length
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "envoy.com"}};
@@ -561,7 +591,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
   auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
