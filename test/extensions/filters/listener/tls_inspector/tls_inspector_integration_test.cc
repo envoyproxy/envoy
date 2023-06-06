@@ -30,6 +30,8 @@ public:
     filter_chains:
       filters:
        -  name: envoy.filters.network.echo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
 )EOF") {}
 
   ~TlsInspectorIntegrationTest() override = default;

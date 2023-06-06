@@ -341,6 +341,9 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
+                                    "false");
 }
 
 void HttpIntegrationTest::useAccessLog(
