@@ -45,7 +45,8 @@ public:
                                                 Io::IoUringFactory* io_uring_factory = nullptr);
 
   // TODO (soulxu): making those configurable
-  static constexpr uint32_t DefaultIoUringSize = 300;
+  // TODO (soulxu): we should handle when run out of all the entries.
+  static constexpr uint32_t DefaultIoUringSize = 3000;
   static constexpr uint32_t DefaultAcceptSize = 5;
   static constexpr uint32_t DefaultReadBufferSize = 8192;
   static constexpr uint32_t DefaultWriteTimeoutMs = 1000;
