@@ -214,7 +214,7 @@ case $CI_TARGET in
         if [[ -n "$ENVOY_API_ONLY" ]]; then
             exit 0
         fi
-        ;&
+        ;;
 
     api.go)
         if [[ -z "$NO_BUILD_SETUP" ]]; then
