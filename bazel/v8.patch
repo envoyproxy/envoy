@@ -106,3 +106,103 @@ index c3768b8..d4a1dda 100644
  import pdl
 
  try:
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90e7e3..5d6c6d9bf3c 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -333,6 +337,11 @@ v8_config(
+             "V8_ENABLE_CHECKS",
+         ],
+         "//conditions:default": [],
++    }) + select({
++        "@envoy//bazel:vtune_build": [
++            "ENABLE_VTUNE_JIT_INTERFACE",
++        ],
++        "//conditions:default": [],
+     }) + select(
+         {
+             "@v8//bazel/config:v8_target_ia32": ["V8_TARGET_ARCH_IA32"],
+@@ -3604,7 +3613,12 @@ v8_library(
+     hdrs = [":public_wasm_c_api_header_files"],
+     strip_include_prefix = "third_party",
+     visibility = ["//visibility:public"],
+-    deps = [":noicu/v8"],
++    deps = [":noicu/v8"] + select({
++            "@envoy//bazel:vtune_build": [
++                "v8_vtune",
++            ],
++            "//conditions:default": [],
++            }),
+ )
+ 
+ alias(
+@@ -3616,7 +3630,16 @@ alias(
+     name = "core_lib_icu",
+     actual = "icu/v8",
+ )
+-
++v8_library(
++    name = "v8_vtune",
++    srcs = [
++    "src/third_party/vtune/v8-vtune.h",
++    "src/third_party/vtune/vtune-jit.cc",
++    "src/third_party/vtune/vtune-jit.h",],
++    deps = ["//external:vtune_ittapi",
++            ":core_lib_noicu",
++    ],
++)
+ # =================================================
+ # Binary rules
+ # =================================================
+diff --git a/bazel/BUILD.ittapi b/bazel/BUILD.ittapi
+new file mode 100644
+index 00000000000..2bf9da3e6d9
+--- /dev/null
++++ b/bazel/BUILD.ittapi
+@@ -0,0 +1,9 @@
++
++cc_library(
++   name = "vtune_ittapi",
++   srcs = ["src/ittnotify/jitprofiling.c",
++   ],
++   hdrs = glob(["include/*.h","src/ittnotify/*.h"]),
++   includes = ["include"],
++   visibility = ["//visibility:public"],
++)
++\ No newline at end of file
+
+diff --git a/src/third_party/vtune/vtune-jit.h b/src/third_party/vtune/vtune-jit.h
+index 148c82434fd..d7cc9997c47 100644
+--- a/src/third_party/vtune/vtune-jit.h
++++ b/src/third_party/vtune/vtune-jit.h
+@@ -58,7 +58,7 @@
+ #ifndef VTUNE_VTUNE_JIT_H_
+ #define VTUNE_VTUNE_JIT_H_
+ 
+-#include "third_party/ittapi/include/jitprofiling.h"
++#include "jitprofiling.h"
+ 
+ #define VTUNERUNNING (iJIT_IsProfilingActive() == iJIT_SAMPLING_ON)
+
+diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
+index 4473e205c03..8c3b3c13333 100644
+--- a/src/wasm/c-api.cc
++++ b/src/wasm/c-api.cc
+@@ -42,7 +42,7 @@
+ #include "src/wasm/wasm-result.h"
+ #include "src/wasm/wasm-serialization.h"
+ #include "third_party/wasm-api/wasm.h"
+-
++#include "src/third_party/vtune/v8-vtune.h"
+ #ifdef WASM_API_DEBUG
+ #error "WASM_API_DEBUG is unsupported"
+ #endif
+@@ -468,6 +468,7 @@ auto Store::make(Engine*) -> own<Store> {
+   // Create isolate.
+   store->create_params_.array_buffer_allocator =
+       v8::ArrayBuffer::Allocator::NewDefaultAllocator();
++    store->create_params_.code_event_handler = vTune::GetVtuneCodeEventHandler();
+ #if DUMP_COUNTERS
+   store->create_params_.counter_lookup_callback = EngineImpl::LookupCounter;
+   store->create_params_.create_histogram_callback = EngineImpl::CreateHistogram;
+\ No newline at end of file

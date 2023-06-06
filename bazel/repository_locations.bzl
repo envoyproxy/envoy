@@ -1052,6 +1052,21 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-10-12",
         cpe = "N/A",
     ),
+    v8_ittapi = dict(
+        project_name = "ittapi",
+        project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
+        project_url = "https://v8.dev",
+        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
+        version = "3.24.0",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "36c42d3f2446ddfaa2d7dfa02dfaa79615933f1a68a72d7e4f1d70de7b56e2c9",
+        strip_prefix = "ittapi-3.24.0",
+        urls = ["https://github.com/intel/ittapi/archive/refs/tags/v3.24.0.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2022-10-12",
+        cpe = "cpe:2.3:a:google:v8:*",
+    ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",

@@ -182,3 +182,9 @@ def envoy_select_wasm_wasmtime(xs):
         "@envoy//bazel:wasm_wasmtime": xs,
         "//conditions:default": [],
     })
+
+def envoy_select_vtune_profile(xs, repository = ""):
+    return select({
+        repository + "//bazel:vtune_profile": xs,
+        "//conditions:default": [],
+    })

@@ -287,6 +287,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
+    _v8_ittapi()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
@@ -978,6 +979,16 @@ def _com_googlesource_chromium_base_trace_event_common():
     native.bind(
         name = "base_trace_event_common",
         actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+    )
+
+def _v8_ittapi():
+    external_http_archive(
+        name = "v8_ittapi",
+        build_file = "@v8//:bazel/BUILD.ittapi",
+    )
+    native.bind(
+        name = "vtune_ittapi",
+        actual = "@v8_ittapi//:vtune_ittapi",
     )
 
 def _com_github_google_quiche():

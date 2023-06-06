@@ -675,6 +675,11 @@ alias(
     }),
 )
 
+config_setting(
+    name = "vtune_build",
+    values = {"define": "vtune_profile=true"},
+)
+
 selects.config_setting_group(
     name = "apple",
     match_any = [
