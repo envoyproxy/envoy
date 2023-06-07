@@ -181,7 +181,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
-  const bool use_refresh_token_ : 1;
+  const bool use_refresh_token_{};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -256,14 +256,14 @@ public:
                                    const std::string& refresh_token,
                                    std::chrono::seconds expires_in) override;
 
-  void onUpdateAccessTokenFailure() override;
+  void onRefreshAccessTokenFailure() override;
 
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
   void finishGetAccessTokenFlow();
-  void finishUpdateAccessTokenFlow();
+  void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
 

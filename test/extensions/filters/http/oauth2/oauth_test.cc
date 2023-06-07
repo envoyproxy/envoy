@@ -32,7 +32,7 @@ public:
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
   MOCK_METHOD(void, onRefreshAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
-  MOCK_METHOD(void, onUpdateAccessTokenFailure, ());
+  MOCK_METHOD(void, onRefreshAccessTokenFailure, ());
 };
 
 class OAuth2ClientTest : public testing::Test {

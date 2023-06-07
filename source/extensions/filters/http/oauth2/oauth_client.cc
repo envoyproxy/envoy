@@ -133,7 +133,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
       parent_->sendUnauthorizedResponse();
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
-      parent_->onUpdateAccessTokenFailure();
+      parent_->onRefreshAccessTokenFailure();
       break;
     default:
       PANIC("Malformed oauth client state");
@@ -191,7 +191,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     parent_->sendUnauthorizedResponse();
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
-    parent_->onUpdateAccessTokenFailure();
+    parent_->onRefreshAccessTokenFailure();
     break;
   default:
     PANIC("Malformed oauth client state");

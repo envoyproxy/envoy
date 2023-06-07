@@ -1587,7 +1587,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  filter_->finishUpdateAccessTokenFlow();
+  filter_->finishRefreshAccessTokenFlow();
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
   EXPECT_EQ(2, config_->stats().oauth_success_.value());
 }
@@ -1696,7 +1696,7 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&redirect_response_headers), true));
 
-  filter_->onUpdateAccessTokenFailure();
+  filter_->onRefreshAccessTokenFailure();
 
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
@@ -1730,7 +1730,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessToken) {
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  filter_->finishUpdateAccessTokenFlow();
+  filter_->finishRefreshAccessTokenFlow();
 
   Http::TestResponseHeaderMapImpl response_headers{};
 
@@ -1780,7 +1780,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessTokenWithBasicAuth) {
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  filter_->finishUpdateAccessTokenFlow();
+  filter_->finishRefreshAccessTokenFlow();
 
   Http::TestResponseHeaderMapImpl response_headers{};
 

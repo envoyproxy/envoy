@@ -522,7 +522,7 @@ void OAuth2Filter::onRefreshAccessTokenSuccess(const std::string& access_code,
                                                std::chrono::seconds expires_in) {
   ASSERT(config_->useRefreshToken());
   updateTokens(access_code, id_token, refresh_token, expires_in);
-  finishUpdateAccessTokenFlow();
+  finishRefreshAccessTokenFlow();
 }
 
 void OAuth2Filter::finishGetAccessTokenFlow() {
@@ -540,7 +540,7 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   config_->stats().oauth_success_.inc();
 }
 
-void OAuth2Filter::finishUpdateAccessTokenFlow() {
+void OAuth2Filter::finishRefreshAccessTokenFlow() {
   ASSERT(config_->useRefreshToken());
   // At this point we have updated all of the pieces need to authorize a user
   // We need to actualize keys in the cookie header of the current request related
@@ -576,7 +576,7 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
   decoder_callbacks_->continueDecoding();
 }
 
-void OAuth2Filter::onUpdateAccessTokenFailure() {
+void OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token, so send the user to the oauth endpoint.
   redirectToOAuthServer(*request_headers_);
