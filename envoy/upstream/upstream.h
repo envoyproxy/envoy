@@ -823,6 +823,7 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class LoadBalancerConfig;
 class TypedLoadBalancerFactory;
 
 /**
@@ -939,10 +940,10 @@ public:
   }
 
   /**
-   * @return const ProtobufWkt::Message& the validated load balancing policy configuration to use
-   * for this cluster.
+   * @return OptRef<const LoadBalancerConfig> the validated load balancing policy configuration to
+   * use for this cluster.
    */
-  virtual const ProtobufTypes::MessagePtr& loadBalancingPolicy() const PURE;
+  virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
 
   /**
    * @return the load balancer factory for this cluster if the load balancing type is

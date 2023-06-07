@@ -1274,10 +1274,12 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
-      load_balancing_policy_ = factory->createEmptyConfigProto();
+      auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(),
-                                             *load_balancing_policy_);
+                                             context.messageValidationVisitor(), *proto_message);
+
+      load_balancer_config_ =
+          factory->loadConfig(std::move(proto_message), context.messageValidationVisitor());
 
       load_balancer_factory_ = factory;
       break;
