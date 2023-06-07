@@ -73,7 +73,7 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 
 class HttpFilterTest : public testing::Test {
 protected:
-  void initialize(std::string&& yaml) {
+  void initialize(std::string&& yaml, bool will_call_upstream_host = true) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -85,12 +85,14 @@ protected:
     EXPECT_CALL(async_client_stream_info_, bytesSent()).WillRepeatedly(Return(100));
     EXPECT_CALL(async_client_stream_info_, bytesReceived()).WillRepeatedly(Return(200));
     EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo());
-    EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo());
-    // Get pointer to MockUpstreamInfo.
-    std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
-        std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(
-            async_client_stream_info_.upstreamInfo());
-    EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
+    if (will_call_upstream_host) {
+      EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo());
+      // Get pointer to MockUpstreamInfo.
+      std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
+          std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(
+              async_client_stream_info_.upstreamInfo());
+      EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
+    }
 
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
@@ -497,7 +499,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF");
+  )EOF", /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1557,7 +1559,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF");
+  )EOF", /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1593,7 +1595,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF");
+  )EOF", /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1630,7 +1632,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF");
+  )EOF", /*will_call_upstream_host=*/false);
 
   EXPECT_FALSE(config_->failureModeAllow());
 
@@ -1808,7 +1810,7 @@ TEST_F(HttpFilterTest, PostAndDownstreamReset) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF");
+  )EOF", /*will_call_upstream_host=*/false);
 
   EXPECT_FALSE(config_->failureModeAllow());
 
