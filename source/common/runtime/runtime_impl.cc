@@ -351,27 +351,36 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
                                               absl::string_view raw_string,
                                               const char*& error_message) {
   Entry entry;
+  entry.raw_string_value_ = value.string_value();
+  if (!raw_string.empty()) {
+    entry.raw_string_value_ = raw_string;
+  }
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.number_value());
+    }
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+    }
     break;
   case ProtobufWkt::Value::kStructValue:
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = value.struct_value().DebugString();
+    }
     parseFractionValue(entry, value.struct_value());
     break;
   case ProtobufWkt::Value::kStringValue:
-    entry.raw_string_value_ = value.string_value();
     parseEntryDoubleValue(entry);
     if (parseEntryBooleanValue(entry)) {
       error_message = kBoolError;
     }
     if (parseEntryFractionalPercentValue(entry)) {
       error_message = kFractionError;
-    }
-    if (!raw_string.empty()) {
-      entry.raw_string_value_ = raw_string;
     }
   default:
     break;
@@ -438,6 +447,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
