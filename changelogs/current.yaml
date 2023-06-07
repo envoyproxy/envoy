@@ -90,6 +90,10 @@ minor_behavior_changes:
   change: |
     Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
     to the name of the ext_proc filter.
+- area: stats
+  change: |
+    Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
+    query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -179,6 +183,9 @@ removed_config_or_runtime:
 - area: header_formatters
   change: |
     removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
+- area: tls
+  change: |
+    remove runtime key ``envoy.reloadable_features.tls_async_cert_validation`` and legacy code paths.
 - area: config
   change: |
     removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
@@ -191,6 +198,9 @@ new_features:
 - area: access_log
   change: |
     added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: access_log
+  change: |
+    (QUIC only) Added support for %BYTES_RETRANSMITTED% and %PACKETS_RETRANSMITTED%.
 - area: dynamic_forward_proxy
   change: |
     added :ref:`sub_clusters_config
@@ -235,6 +245,13 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: tls_inspector
+  change: |
+    added histogram ``bytes_processed`` which records the number of bytes of
+    the tls_inspector processed while analyzing for tls usage. In cases where
+    the connection uses tls this records the tls client hello size. In cases
+    where the connection doesn't use tls this records the amount of bytes the
+    tls_inspector processed until it realized the connection was not using tls.
 - area: access_log
   change: |
     added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
@@ -288,14 +305,28 @@ new_features:
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: application_logs
+  change: |
+    Added bootstrap option
+    :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`
+    to enable setting application log format as JSON structure.
 - area: ext_proc
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
-    Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
+    Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
 - area: matching
   change: |
     added CEL(Common Expression Language) matcher support :ref:`CEL data input <extension_envoy.matching.inputs.cel_data_input>`
     and :ref:`CEL input matcher <extension_envoy.matching.matchers.cel_matcher>`.
+- area: tls
+  change: |
+    Added support for hot-reloading CRL file when the file changes on disk.
+    This works with dynamic secrets when
+    :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+    is delivered via SDS.
+- area: http
+  change: |
+    added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
 
 deprecated:
 - area: access_log

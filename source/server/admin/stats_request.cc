@@ -183,6 +183,14 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
       return true;
     }
 
+    if (params_.hidden_ == HiddenFlag::Exclude && stat->hidden()) {
+      return true;
+    }
+
+    if (params_.hidden_ == HiddenFlag::ShowOnly && !stat->hidden()) {
+      return true;
+    }
+
     // Capture the name if we did not early-exit due to used_only -- we'll use
     // the name for both filtering and for capturing the stat in the map.
     // stat->name() takes a symbol table lock and builds a string, so we only
