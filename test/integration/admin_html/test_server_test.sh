@@ -90,4 +90,5 @@ check_debug_log() {
 check_debug_log active_stats.js
 check_debug_log admin_head_start.html
 check_debug_log admin.css
+check_debug_log histograms.js
 
