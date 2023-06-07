@@ -1138,7 +1138,7 @@ FilterConfig::FilterConfig(
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
-  ENVOY_LOG(debug, "initilizing golang filter config");
+  ENVOY_LOG(debug, "initializing golang filter config");
 
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
@@ -1160,7 +1160,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& config,
     Server::Configuration::ServerFactoryContext&) {
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
-  ENVOY_LOG(debug, "initilizing per route golang filter config");
+  ENVOY_LOG(debug, "initializing per route golang filter config");
 
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;
@@ -1188,7 +1188,7 @@ RoutePluginConfig::RoutePluginConfig(
     const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
     : plugin_name_(plugin_name), plugin_config_(config.config()) {
 
-  ENVOY_LOG(debug, "initilizing golang filter route plugin config, plugin_name: {}, type_url: {}",
+  ENVOY_LOG(debug, "initializing golang filter route plugin config, plugin_name: {}, type_url: {}",
             plugin_name_, config.config().type_url());
 
   dso_lib_ = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name_);
