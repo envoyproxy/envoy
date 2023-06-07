@@ -68,9 +68,9 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   state_ = OAuthState::PendingAccessToken;
 }
 
-void OAuth2ClientImpl::asyncUpdateAccessToken(const std::string& refresh_token,
-                                              const std::string& client_id,
-                                              const std::string& secret, AuthType auth_type) {
+void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
+                                               const std::string& client_id,
+                                               const std::string& secret, AuthType auth_type) {
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
 

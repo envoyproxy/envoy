@@ -29,9 +29,9 @@ public:
                                    const std::string& secret, const std::string& cb_url,
                                    AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
-  virtual void asyncUpdateAccessToken(const std::string& refresh_token,
-                                      const std::string& client_id, const std::string& secret,
-                                      AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+  virtual void asyncRefreshAccessToken(const std::string& refresh_token,
+                                       const std::string& client_id, const std::string& secret,
+                                       AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
@@ -60,8 +60,8 @@ public:
                            const std::string& secret, const std::string& cb_url,
                            AuthType auth_type) override;
 
-  void asyncUpdateAccessToken(const std::string& refresh_token, const std::string& client_id,
-                              const std::string& secret, AuthType auth_type) override;
+  void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
+                               const std::string& secret, AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

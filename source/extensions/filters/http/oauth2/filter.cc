@@ -321,8 +321,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
       // try to update access token by refresh token
-      oauth_client_->asyncUpdateAccessToken(validator_->refreshToken(), config_->clientId(),
-                                            config_->clientSecret(), config_->authType());
+      oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
+                                             config_->clientSecret(), config_->authType());
       // pause while we await the next step from the OAuth server
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }

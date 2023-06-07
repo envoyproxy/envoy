@@ -77,7 +77,7 @@ public:
               (const std::string&, const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
-  MOCK_METHOD(void, asyncUpdateAccessToken,
+  MOCK_METHOD(void, asyncRefreshAccessToken,
               (const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 };
@@ -1579,8 +1579,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                     AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                      AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(third_request_headers, false));
@@ -1592,7 +1592,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   EXPECT_EQ(2, config_->stats().oauth_success_.value());
 }
 
-TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenSuccess) {
+TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
@@ -1616,8 +1616,8 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenSuccess) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                     AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                      AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -1646,7 +1646,7 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenSuccess) {
   EXPECT_EQ(1, config_->stats().oauth_success_.value());
 }
 
-TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
+TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
@@ -1670,8 +1670,8 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                     AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                      AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -1702,7 +1702,7 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
 }
 
-TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessToken) {
+TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
 
@@ -1722,8 +1722,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessToken) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                     AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                      AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -1750,7 +1750,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessToken) {
   EXPECT_EQ(response_headers, expected_response_headers);
 }
 
-TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessTokenWithBasicAuth) {
+TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
@@ -1772,8 +1772,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessTokenWithBasicAuth) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                     AuthType::BasicAuth));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                      AuthType::BasicAuth));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));

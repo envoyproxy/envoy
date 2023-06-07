@@ -194,7 +194,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccess) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccess) {
   std::string json = R"EOF(
   {
     "access_token": "golden ticket",
@@ -227,7 +227,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccess) {
       }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncUpdateAccessToken("a", "b", "c");
+  client_->asyncRefreshAccessToken("a", "b", "c");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -235,7 +235,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccess) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccessBasicAuthType) {
+TEST_F(OAuth2ClientTest, RequestSuccessBasicAuthType) {
   std::string json = R"EOF(
 {
   "access_token": "golden ticket",
@@ -268,7 +268,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccessBasicAuthType) {
       }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncUpdateAccessToken("a", "b", "c", AuthType::BasicAuth);
+  client_->asyncRefreshAccessToken("a", "b", "c", AuthType::BasicAuth);
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -276,7 +276,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccessBasicAuthType) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenErrorResponse) {
+TEST_F(OAuth2ClientTest, RequestErrorResponse) {
   Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
       {Http::Headers::get().Status.get(), "500"},
       {Http::Headers::get().ContentType.get(), "application/json"},
@@ -293,9 +293,9 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenErrorResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncUpdateAccessToken("a", "b", "c");
+  client_->asyncRefreshAccessToken("a", "b", "c");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenFailure());
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenFailure());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -331,10 +331,10 @@ TEST_F(OAuth2ClientTest, UpdateTokenNetworkError) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncUpdateAccessToken("a", "b", "c");
+  client_->asyncRefreshAccessToken("a", "b", "c");
   EXPECT_EQ(1, callbacks_.size());
 
-  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenFailure());
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenFailure());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
@@ -351,10 +351,10 @@ TEST_F(OAuth2ClientTest, NetworkErrorDoubleCallStateInvalid) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncUpdateAccessToken("a", "b", "c");
+  client_->asyncRefreshAccessToken("a", "b", "c");
   EXPECT_EQ(1, callbacks_.size());
 
-  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenFailure());
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenFailure());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
