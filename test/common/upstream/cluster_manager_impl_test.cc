@@ -1028,9 +1028,6 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
@@ -1046,6 +1043,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
           name: envoy.load_balancers.unknown_lb
       - typed_extension_config:
           name: envoy.load_balancers.custom_lb
+          typed_config:
+            "@type": type.googleapis.com/test.integration.custom_lb.CustomLbConfig
     load_assignment:
       cluster_name: cluster_1
       endpoints:
@@ -1065,7 +1064,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
+  EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
 }
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
@@ -4433,9 +4432,6 @@ public:
 
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
       factory);
@@ -4457,6 +4453,8 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
                   port_value: 11001
       filters:
       - name: envoy.test.filter
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
   create(parseBootstrapFromV3Yaml(yaml));
