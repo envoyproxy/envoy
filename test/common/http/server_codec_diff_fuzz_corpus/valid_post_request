@@ -16,3 +16,11 @@ request {
         value: "fuz"
     }
 }
+
+response {
+    status { value: "404" }
+    headers {
+        key: "content-length"
+        value: "32"
+    }
+}

@@ -16,3 +16,11 @@ request {
         value: "fuz.baz.net"
     }
 }
+
+response {
+    status { value: "200" }
+    headers {
+        key: "1"
+        value: "2"
+    }
+}

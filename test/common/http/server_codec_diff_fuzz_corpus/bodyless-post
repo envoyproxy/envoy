@@ -1,0 +1,29 @@
+configuration {
+  normalize_path: true
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "POST"
+  }
+  path {
+    value: "/database?key=value&key2=value2&etc&etc2"
+  }
+  authority {
+    value: "foo.bar.com"
+  }
+  headers {
+    key: "baz"
+    value: "fuz"
+  }
+}
+
+response {
+    status { value: "200" }
+    headers {
+        key: "1"
+        value: "2"
+    }
+}

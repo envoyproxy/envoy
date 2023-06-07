@@ -12,3 +12,11 @@ request {
         value: "bar"
     }
 }
+
+response {
+    status { value: "301" }
+    headers {
+        key: "location"
+        value: "/somewhere_else/not/../here/./?with=query"
+    }
+}

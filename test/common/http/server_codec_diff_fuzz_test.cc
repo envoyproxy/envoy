@@ -460,6 +460,7 @@ public:
     FUZZ_ASSERT(hcm_under_test_1_.out_end_stream_ == hcm_under_test_2_.out_end_stream_);
     // Check that wire output of both codecs was the same
     compareOutputWireBytes();
+    closeClientConnection();
   }
 
   void sendResponse() {
@@ -693,11 +694,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input
     return;
   }
 
-  //  Http1HcmTest http1_test(input);
-  //  http1_test.test();
+  Http1HcmTest http1_test(input);
+  http1_test.test();
 
-  Http2HcmTest http2_test(input);
-  http2_test.test();
+  //Http2HcmTest http2_test(input);
+  //http2_test.test();
 }
 
 } // namespace Http

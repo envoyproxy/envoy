@@ -14,3 +14,7 @@ request {
         value: "fuz"
     }
 }
+
+response {
+    status { value: "200" }
+}

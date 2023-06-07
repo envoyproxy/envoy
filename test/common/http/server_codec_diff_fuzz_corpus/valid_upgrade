@@ -20,3 +20,23 @@ request {
         value: "fuz"
     }
 }
+
+response {
+    status { value: "101" }
+    headers {
+        key: "upgrade"
+        value: "websocket"
+    }
+    headers {
+        key: "connection"
+        value: "upgrade"
+    }
+    headers {
+        key: "cow"
+        value: "moo"
+    }
+    headers {
+        key: "cat"
+        value: "meow"
+    }
+}

@@ -11,7 +11,15 @@ request {
         value: "bar"
     }
     headers {
-        key: "baz"
-        value: "fuz"
+        key: "proxy-authorization"
+        value: "basic aGVsbG86d29ybGQ="
+    }
+}
+
+response {
+    status { value: "200" }
+    headers {
+        key: "something"
+        value: "other"
     }
 }
