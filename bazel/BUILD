@@ -677,7 +677,7 @@ alias(
 
 config_setting(
     name = "vtune_build",
-    values = {"define": "vtune_profile=true"},
+    values = {"define": "vtune_profile=false"},
 )
 
 selects.config_setting_group(
