@@ -833,6 +833,18 @@ message RouteAction {
       type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
+    // CookieAttribute defines an API for adding additional attributes for a HTTP cookie.
+    message CookieAttribute {
+      // The name of the cookie attribute.
+      string name = 1
+          [(validate.rules).string =
+               {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+      // The optional value of the cookie attribute.
+      string value = 2 [(validate.rules).string =
+                            {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    }
+
     // Envoy supports two types of cookie affinity:
     //
     // 1. Passive. Envoy takes a cookie that's present in the cookies header and
@@ -864,6 +876,9 @@ message RouteAction {
       // The name of the path for the cookie. If no path is specified here, no path
       // will be set for the cookie.
       string path = 3;
+
+      // Additional attributes for the cookie. They will be used when generating a new cookie.
+      repeated CookieAttribute attributes = 4;
     }
 
     message ConnectionProperties {
