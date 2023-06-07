@@ -49,7 +49,7 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
   std::unique_ptr<EngineCommon> main_common;
   {
     Thread::LockGuard lock(mutex_);
-    try {
+    TRY_NEEDS_AUDIT {
       if (event_tracker_.track != nullptr) {
         assert_handler_registration_ =
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
@@ -79,13 +79,9 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
       event_dispatcher_ = &server_->dispatcher();
 
       cv_.notifyAll();
-    } catch (const Envoy::NoServingException& e) {
-      PANIC(e.what());
-    } catch (const Envoy::MalformedArgvException& e) {
-      PANIC(e.what());
-    } catch (const Envoy::EnvoyException& e) {
-      PANIC(e.what());
     }
+    END_TRY
+    CATCH(const Envoy::EnvoyException& e, { PANIC(e.what()); });
 
     // Note: We're waiting longer than we might otherwise to drain to the main thread's dispatcher.
     // This is because we're not simply waiting for its availability and for it to have started, but
