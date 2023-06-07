@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Network {
 
 // Set this to the maximum value which effectively accepts all connections.
-const uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = -1;
+constexpr uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = UINT32_MAX;
 
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
