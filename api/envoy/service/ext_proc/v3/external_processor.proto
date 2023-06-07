@@ -285,10 +285,21 @@ message CommonResponse {
   // along with the CONTINUE_AND_REPLACE status.
   config.core.v3.HeaderMap trailers = 4;
 
-  // Clear the route cache for the current request.
-  // This is necessary if the remote server
-  // modified headers that are used to calculate the route.
-  bool clear_route_cache = 5;
+  // Specify the response data specially for downstream client request.
+  // If the external processing server set this field when responding
+  // to the upstream response request, it will be ignored by Envoy.
+  DownstreamRequestResponse downstream_response = 5;
+}
+
+// This message specifies the response data from the external processing
+// server for downstream client request.
+message DownstreamRequestResponse {
+  // When the external processing server sends the response corresponding to either
+  // downstream header request or downstream body request, it may contain
+  // :ref:`header_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.header_mutation>`.
+  // At same time, it may set this ``clear_route_cache`` to true to clear the route cache,
+  // and recalculate the route.
+  bool clear_route_cache = 1;
 }
 
 // This message causes the filter to attempt to create a locally
