@@ -30,7 +30,6 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   data_.add("\r\n");
   EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
   data_.drain(data_.length());
-  ;
 
   data_.add(std::string(1022, 'q'));
   data_.add("\r\n");
@@ -40,13 +39,11 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   EXPECT_TRUE(command.rest.empty());
   EXPECT_EQ(1024, command.wire_len);
   data_.drain(data_.length());
-  ;
 
   data_.add(std::string(1023, 'q'));
   data_.add("\r\n");
   EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
   data_.drain(data_.length());
-  ;
 
   data_.add("fOo bar\r\n");
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));

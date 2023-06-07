@@ -44,12 +44,6 @@ public:
   void setMetadata() {
     EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
     EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-    ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().SmtpProxy, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
-          stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-                  NetworkFilterNames::get().SmtpProxy, obj));
-        }));
   }
 
   void ExpectInjectReadData(absl::string_view s, bool end_stream) {

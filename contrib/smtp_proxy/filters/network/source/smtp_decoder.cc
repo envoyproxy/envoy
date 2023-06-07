@@ -38,7 +38,7 @@ Decoder::Result GetLine(Buffer::Instance& data, size_t start, std::unique_ptr<ch
                         absl::string_view& line, size_t max_line) {
   ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
-    if (data.length() >= 512) {
+    if (data.length() >= max_line) {
       return Decoder::Result::Bad;
     } else {
       return Decoder::Result::NeedMoreData;

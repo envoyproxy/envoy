@@ -9,8 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-#package(default_visibility = ["//visibility:public"])
-
 # Smtp proxy L7 network filter.
 # Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/smtp_proxy_filter
 
