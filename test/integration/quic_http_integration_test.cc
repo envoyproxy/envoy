@@ -1400,7 +1400,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
     socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
     socket_swap.write_matcher_->setWriteOverride(ebadf);
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    absl::SleepFor(absl::Milliseconds(1000 * TSAN_TIMEOUT_FACTOR));
+    absl::SleepFor(absl::Seconds(TSAN_TIMEOUT_FACTOR));
   }
 
   ASSERT_TRUE(response->waitForEndStream());
