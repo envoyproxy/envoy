@@ -1884,7 +1884,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
-    const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
+    absl::string_view host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
     RouteMatcher::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
@@ -1897,7 +1897,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     if (wildcard_length >= host.size()) {
       continue;
     }
-    const auto& match = wildcard_map.find(substring_function(host, wildcard_length));
+    const auto match = wildcard_map.find(substring_function(host, wildcard_length));
     if (match != wildcard_map.end()) {
       return match->second.get();
     }
@@ -1922,7 +1922,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         virtual_host_config, optional_http_filters, global_route_config, factory_context,
         *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      const std::string domain = Http::LowerCaseString(domain_name).get();
+      const Http::LowerCaseString lower_case_domain_name(domain_name);
+      absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
@@ -1975,14 +1976,14 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
   const std::string host = absl::AsciiStrToLower(host_header_value);
-  const auto& iter = virtual_hosts_.find(host);
+  const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   }
   if (!wildcard_virtual_host_suffixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_suffixes_,
-        [](const std::string& h, int l) -> std::string { return h.substr(h.size() - l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
     if (vhost != nullptr) {
       return vhost;
     }
@@ -1990,7 +1991,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   if (!wildcard_virtual_host_prefixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_prefixes_,
-        [](const std::string& h, int l) -> std::string { return h.substr(0, l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
     if (vhost != nullptr) {
       return vhost;
     }
@@ -2103,11 +2104,10 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 }
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config,
-    const OptionalHttpFilters& optional_http_filters,
+    const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
+
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -2129,13 +2129,14 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (is_optional) {
-      ENVOY_LOG(debug,
-                "The filter {} doesn't support virtual host-specific configurations, and it is "
-                "optional, so ignore it.",
-                name);
+      ENVOY_LOG(
+          debug,
+          "The filter {} doesn't support virtual host or route specific configurations, and it is "
+          "optional, so ignore it.",
+          name);
     } else {
-      throw EnvoyException(
-          fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
+      throw EnvoyException(fmt::format(
+          "The filter {} doesn't support virtual host or route specific configurations", name));
     }
   }
   return object;
@@ -2146,12 +2147,52 @@ PerFilterConfigs::PerFilterConfigs(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  for (const auto& it : typed_configs) {
-    const auto& name = it.first;
-    auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
-                                                  factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
+
+  const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
+
+  absl::string_view filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+
+  for (const auto& per_filter_config : typed_configs) {
+    const std::string& name = per_filter_config.first;
+    RouteSpecificFilterConfigConstSharedPtr config;
+
+    // There are two ways to mark a route/virtual host per filter configuration as optional:
+    // 1. Mark it as optional in the HTTP filter of HCM. This way is deprecated but still works
+    //    when the runtime flag
+    //    `envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`
+    //    is explicitly set to false.
+    // 2. Mark it as optional in the route/virtual host per filter configuration. This way is
+    //    recommended.
+    //
+    // We check the first way first to ensure if this filter configuration is marked as optional
+    // or not. This will be true if the runtime flag is explicitly reverted to false and the
+    // config name is in the optional http filter list.
+    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config &&
+                              (optional_http_filters.find(name) != optional_http_filters.end());
+
+    if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
+        filter_config_type) {
+      envoy::config::route::v3::FilterConfig filter_config;
+      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
+                                                    filter_config);
+
+      if (!filter_config.has_config()) {
+        throw EnvoyException(
+            fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
+      }
+
+      config = createRouteSpecificFilterConfig(name, filter_config.config(),
+                                               is_optional_by_hcm || filter_config.is_optional(),
+                                               factory_context, validator);
+    } else {
+      config = createRouteSpecificFilterConfig(name, per_filter_config.second, is_optional_by_hcm,
+                                               factory_context, validator);
+    }
+
+    if (config != nullptr) {
+      configs_[name] = std::move(config);
     }
   }
 }

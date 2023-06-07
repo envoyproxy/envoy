@@ -400,10 +400,11 @@ def envoy_gencontent(
         name = "%s_generate_content_py" % name,
         cmd = """
         echo "import pathlib" > $@ \
+        && echo "import os" >> $@ \
         && echo "import sys" >> $@ \
-        && echo "sys.path.append(pathlib.Path(\\"$(location :%s)\\").parent)" >> $@ \
+        && echo "sys.path.append(str(pathlib.Path(os.environ.get('RUNFILES_DIR', '.')).joinpath(\\"$(rlocationpath :%s)\\").parent))" >> $@ \
         && echo "from %s import data" >> $@ \
-        && echo "sys.path.append(pathlib.Path(\\"$(location :%s)\\").parent)" >> $@ \
+        && echo "sys.path.append(str(pathlib.Path(\\"$(rlocationpath :%s)\\").parent))" >> $@ \
         && echo "from %s import env" >> $@ \
         && echo "print(env.get_template(\\"%s\\").render(**data))" >> $@
         """ % (name_data, name_data, name_tpl, name_tpl, template_name),

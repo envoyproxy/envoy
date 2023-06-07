@@ -26,10 +26,13 @@ envoy_stream_t init_stream(envoy_engine_t engine);
  * @param stream, handle to the stream to be started.
  * @param callbacks, the callbacks that will run the stream callbacks.
  * @param explicit_flow_control, whether to enable explicit flow control on the response stream.
+ * @param min_delivery_size, if non-zero, indicates the smallest non-terminal number of bytes which
+ * should be delivered via on_data callbacks.
  * @return envoy_stream, with a stream handle and a success status, or a failure status.
  */
 envoy_status_t start_stream(envoy_engine_t engine, envoy_stream_t stream,
-                            envoy_http_callbacks callbacks, bool explicit_flow_control);
+                            envoy_http_callbacks callbacks, bool explicit_flow_control,
+                            uint64_t min_delivery_size);
 
 /**
  * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -211,8 +214,9 @@ envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char*
  * terminated engine is illegal.
  * @param engine, handle to the engine to terminate.
  * @param release, set to true to release the engine from memory.
+ * @return envoy_status_t, the resulting status of the operation.
  */
-void terminate_engine(envoy_engine_t engine, bool release);
+envoy_status_t terminate_engine(envoy_engine_t engine, bool release);
 
 /**
  * Refresh DNS, and drain connections associated with an engine.

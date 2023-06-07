@@ -6,12 +6,17 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
+
+using testing::HasSubstr;
+using testing::Return;
 
 namespace Envoy {
 namespace Server {
@@ -72,14 +77,54 @@ public:
 
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
+    return {"runtime_config.yaml"};
+  }
+};
 
-    auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
+class JsonApplicationLogsValidationServerTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
 
-    // Strip directory part. options_ adds it for each test.
-    for (auto& file : files) {
-      file = file.substr(directory_.length() + 1);
-    }
-    return files;
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"json_application_logs.yaml"};
+  }
+};
+
+class JsonApplicationLogsValidationServerForbiddenFlagvTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"json_application_logs_forbidden_flagv.yaml"};
+  }
+};
+
+class JsonApplicationLogsValidationServerForbiddenFlag_Test : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"json_application_logs_forbidden_flag_.yaml"};
   }
 };
 
@@ -132,6 +177,16 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.transportSocketFactoryContext();
   server.shutdownAdmin();
   server.shutdown();
+
+  server.admin()->addStreamingHandler("", "", nullptr, false, false);
+  server.admin()->addListenerToHandler(nullptr);
+  server.admin()->closeSocket();
+  server.admin()->startHttpListener({}, "", nullptr, nullptr, nullptr);
+
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(), false, false);
+
+  server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -194,6 +249,80 @@ TEST(ValidationTest, Admin) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
     ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
+
+TEST_P(JsonApplicationLogsValidationServerTest, BootstrapApplicationLogsAndCLIThrows) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException,
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
+}
+
+TEST_P(JsonApplicationLogsValidationServerTest, JsonApplicationLogs) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+  server.shutdown();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, JsonApplicationLogsValidationServerTest,
+    ::testing::ValuesIn(JsonApplicationLogsValidationServerTest::getAllConfigFiles()));
+
+TEST_P(JsonApplicationLogsValidationServerForbiddenFlagvTest, TestForbiddenFlag) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_THROW_WITH_MESSAGE(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlagvTest,
+    ::testing::ValuesIn(
+        JsonApplicationLogsValidationServerForbiddenFlagvTest::getAllConfigFiles()));
+
+TEST_P(JsonApplicationLogsValidationServerForbiddenFlag_Test, TestForbiddenFlag) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_THROW_WITH_MESSAGE(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlag_Test,
+    ::testing::ValuesIn(
+        JsonApplicationLogsValidationServerForbiddenFlag_Test::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server

@@ -43,6 +43,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
+        "//envoy/server/overload:overload_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",

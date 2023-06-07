@@ -213,7 +213,8 @@ Filter::~Filter() {
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpConnectionEnd);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -628,7 +629,7 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
   return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view());
+                               absl::string_view(), AccessLog::AccessLogType::NotSet);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -701,7 +702,14 @@ Network::FilterStatus Filter::onNewConnection() {
   return establishUpstreamConnection();
 }
 
-bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
+bool Filter::startUpstreamSecureTransport() {
+  bool switched_to_tls = upstream_->startUpstreamSecureTransport();
+  if (switched_to_tls) {
+    StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+    upstream_info.setUpstreamSslConnection(upstream_->getUpstreamConnectionSslInfo());
+  }
+  return switched_to_tls;
+}
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -813,7 +821,8 @@ void Filter::onUpstreamConnection() {
 
   if (config_->flushAccessLogOnConnected()) {
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                      AccessLog::AccessLogType::TcpUpstreamConnected);
     }
   }
 }
@@ -838,7 +847,8 @@ void Filter::onMaxDownstreamConnectionDuration() {
 
 void Filter::onAccessLogFlushInterval() {
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpPeriodic);
   }
   resetAccessLogFlushTimer();
 }

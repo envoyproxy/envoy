@@ -23,9 +23,6 @@ constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
 
-#ifndef ENVOY_ENABLE_UHV
-// When UHV is enabled, BalsaParser allows any method and defers to UHV for
-// validation. When UHV is disabled, BalsaParser behavior matches http-parser.
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -35,7 +32,27 @@ bool isFirstCharacterOfValidMethod(char c) {
   return std::binary_search(begin, end, c);
 }
 
-bool isMethodValid(absl::string_view method) {
+// TODO(#21245): Skip method validation altogether when UHV method validation is
+// enabled.
+bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
+  if (allow_custom_methods) {
+    // Allowed characters in method according to RFC 9110,
+    // https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1.
+    static constexpr char kValidCharacters[] = {
+        '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '0', '1', '2', '3', '4', '5',
+        '6', '7', '8', '9', 'A', 'B',  'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
+        'M', 'N', 'O', 'P', 'Q', 'R',  'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_',
+        '`', 'a', 'b', 'c', 'd', 'e',  'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+        'p', 'q', 'r', 's', 't', 'u',  'v', 'w', 'x', 'y', 'z', '|', '~'};
+    const auto* begin = &kValidCharacters[0];
+    const auto* end = &kValidCharacters[ABSL_ARRAYSIZE(kValidCharacters) - 1] + 1;
+
+    return !method.empty() &&
+           std::all_of(method.begin(), method.end(), [begin, end](absl::string_view::value_type c) {
+             return std::binary_search(begin, end, c);
+           });
+  }
+
   static constexpr absl::string_view kValidMethods[] = {
       "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
       "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
@@ -47,7 +64,6 @@ bool isMethodValid(absl::string_view method) {
   const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
   return std::binary_search(begin, end, method);
 }
-#endif
 
 // This function is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
@@ -125,8 +141,8 @@ bool isVersionValid(absl::string_view version_input) {
 } // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-                         bool enable_trailers)
-    : message_type_(type), connection_(connection) {
+                         bool enable_trailers, bool allow_custom_methods)
+    : message_type_(type), connection_(connection), allow_custom_methods_(allow_custom_methods) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
@@ -134,6 +150,10 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = false;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+#ifdef ENVOY_ENABLE_UHV
+  // UHV - disable transfer-encoding validations in Balsa
+  http_validation_policy.validate_transfer_encoding = false;
+#endif
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -158,13 +178,12 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
-#ifndef ENVOY_ENABLE_UHV
-    if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
+    if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
+        !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_METHOD";
       return 0;
     }
-#endif
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
@@ -266,13 +285,11 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-#ifndef ENVOY_ENABLE_UHV
-  if (!isMethodValid(method_input)) {
+  if (!isMethodValid(method_input, allow_custom_methods_)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;
   }
-#endif
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;

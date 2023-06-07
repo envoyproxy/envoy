@@ -42,8 +42,8 @@ private:
 // Base class for librdkafka objects.
 class MockKafkaHandle : public virtual RdKafka::Handle {
 public:
-  MOCK_METHOD(const std::string, name, (), (const));
-  MOCK_METHOD(const std::string, memberid, (), (const));
+  MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, memberid, (), (const));
   MOCK_METHOD(int, poll, (int), ());
   MOCK_METHOD(int, outq_len, (), ());
   MOCK_METHOD(RdKafka::ErrorCode, metadata,
@@ -59,7 +59,7 @@ public:
   MOCK_METHOD(RdKafka::Queue*, get_partition_queue, (const RdKafka::TopicPartition*), ());
   MOCK_METHOD(RdKafka::ErrorCode, set_log_queue, (RdKafka::Queue*), ());
   MOCK_METHOD(void, yield, (), ());
-  MOCK_METHOD(const std::string, clusterid, (int), ());
+  MOCK_METHOD(std::string, clusterid, (int), ());
   MOCK_METHOD(struct rd_kafka_s*, c_ptr, (), ());
   MOCK_METHOD(int32_t, controllerid, (int), ());
   MOCK_METHOD(RdKafka::ErrorCode, fatal_error, (std::string&), (const));
@@ -98,6 +98,10 @@ public:
               ());
   MOCK_METHOD(RdKafka::Error*, commit_transaction, (int), ());
   MOCK_METHOD(RdKafka::Error*, abort_transaction, (int), ());
+  MOCK_METHOD(RdKafka::Error*, sasl_background_callbacks_enable, (), ());
+  MOCK_METHOD(RdKafka::Queue*, get_sasl_queue, (), ());
+  MOCK_METHOD(RdKafka::Queue*, get_background_queue, (), ());
+  MOCK_METHOD(RdKafka::Error*, sasl_set_credentials, (const std::string&, const std::string&), ());
 };
 
 class MockKafkaMessage : public RdKafka::Message {
@@ -121,6 +125,8 @@ public:
   MOCK_METHOD(RdKafka::Headers*, headers, ());
   MOCK_METHOD(RdKafka::Headers*, headers, (RdKafka::ErrorCode*));
   MOCK_METHOD(int32_t, broker_id, (), (const));
+  MOCK_METHOD(int32_t, leader_epoch, (), (const));
+  MOCK_METHOD(RdKafka::Error*, offset_store, ());
 };
 
 class MockKafkaConsumer : public RdKafka::KafkaConsumer, public MockKafkaHandle {
@@ -144,6 +150,8 @@ public:
   MOCK_METHOD(RdKafka::ErrorCode, committed, (std::vector<RdKafka::TopicPartition*>&, int), ());
   MOCK_METHOD(RdKafka::ErrorCode, position, (std::vector<RdKafka::TopicPartition*>&), ());
   MOCK_METHOD(RdKafka::ErrorCode, close, (), ());
+  MOCK_METHOD(RdKafka::Error*, close, (RdKafka::Queue*), ());
+  MOCK_METHOD(bool, closed, (), ());
   MOCK_METHOD(RdKafka::ErrorCode, seek, (const RdKafka::TopicPartition&, int), ());
   MOCK_METHOD(RdKafka::ErrorCode, offsets_store, (std::vector<RdKafka::TopicPartition*>&), ());
   MOCK_METHOD(RdKafka::ConsumerGroupMetadata*, groupMetadata, (), ());
@@ -153,6 +161,10 @@ public:
               ());
   MOCK_METHOD(RdKafka::Error*, incremental_unassign, (const std::vector<RdKafka::TopicPartition*>&),
               ());
+  MOCK_METHOD(RdKafka::Error*, sasl_background_callbacks_enable, (), ());
+  MOCK_METHOD(RdKafka::Queue*, get_sasl_queue, (), ());
+  MOCK_METHOD(RdKafka::Queue*, get_background_queue, (), ());
+  MOCK_METHOD(RdKafka::Error*, sasl_set_credentials, (const std::string&, const std::string&), ());
 };
 
 } // namespace Mesh

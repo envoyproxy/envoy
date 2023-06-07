@@ -134,33 +134,37 @@ public:
               value: {}
           route_config:
             name: test-routes
-            routes:
-              matcher_tree:
-                input:
-                  name: request-service
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
-                exact_match_map:
-                  map:
-                    service_name_0:
-                      matcher:
-                        matcher_list:
-                          matchers:
-                          - predicate:
-                              single_predicate:
-                                input:
-                                  name: request-properties
+            virtual_hosts:
+            - name: test
+              hosts:
+              - "*"
+              routes:
+                matcher_tree:
+                  input:
+                    name: request-service
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
+                  exact_match_map:
+                    map:
+                      service_name_0:
+                        matcher:
+                          matcher_list:
+                            matchers:
+                            - predicate:
+                                single_predicate:
+                                  input:
+                                    name: request-properties
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                                      property_name: version
+                                  value_match:
+                                    exact: v1
+                              on_match:
+                                action:
+                                  name: route
                                   typed_config:
-                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
-                                    property_name: version
-                                value_match:
-                                  exact: v1
-                            on_match:
-                              action:
-                                name: route
-                                typed_config:
-                                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
-                                  cluster: cluster_0
+                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+                                    cluster: cluster_0
 )EOF");
   }
 
@@ -406,8 +410,12 @@ TEST_P(IntegrationTest, MultipleRequests) {
   request_2.protocol_ = "fake_fake_fake";
   request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}};
 
-  // Send the second request with the same stream id and expect the connection to be closed.
+  // Reset request encoder callback.
+  request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
+
+  // Send the second request with the different stream id and expect the connection to be alive.
   sendRequestForTest(request_2);
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";

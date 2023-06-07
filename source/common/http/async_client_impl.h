@@ -28,7 +28,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -139,6 +139,7 @@ public:
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
 protected:
   bool remoteClosed() { return remote_closed_; }
@@ -479,6 +480,7 @@ private:
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
+  absl::string_view filterConfigName() const override { return ""; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

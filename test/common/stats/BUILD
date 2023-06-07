@@ -267,6 +267,30 @@ envoy_benchmark_test(
     benchmark_binary = "symbol_table_benchmark",
 )
 
+envoy_cc_benchmark_binary(
+    name = "stats_matcher_impl_benchmark",
+    srcs = [
+        "stats_matcher_impl_speed_test.cc",
+    ],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/memory:stats_lib",
+        "//source/common/stats:stats_matcher_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "stats_matcher_impl_benchmark_test",
+    benchmark_binary = "stats_matcher_impl_benchmark",
+)
+
 envoy_cc_test(
     name = "tag_extractor_impl_test",
     srcs = ["tag_extractor_impl_test.cc"],
@@ -359,6 +383,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/stats:utility_lib",

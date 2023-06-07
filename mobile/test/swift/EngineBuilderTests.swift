@@ -96,20 +96,6 @@ final class EngineBuilderTests: XCTestCase {
   }
 #endif
 
-  func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.enableHappyEyeballs)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableHappyEyeballs(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testEnablingInterfaceBindingAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled interface binding")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -359,28 +345,6 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppId("com.envoymobile.ios")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ], config.virtualClusters)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ])
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

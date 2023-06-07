@@ -185,6 +185,18 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
+  void addBytesRetransmitted(uint64_t bytes_retransmitted) override {
+    bytes_retransmitted_ += bytes_retransmitted;
+  }
+
+  uint64_t bytesRetransmitted() const override { return bytes_retransmitted_; }
+
+  void addPacketsRetransmitted(uint64_t packets_retransmitted) override {
+    packets_retransmitted_ += packets_retransmitted;
+  }
+
+  uint64_t packetsRetransmitted() const override { return packets_retransmitted_; }
+
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
@@ -284,8 +296,7 @@ struct StreamInfoImpl : public StreamInfo {
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_)
-       << DUMP_MEMBER_AS(filter_state_, filter_state_->serializeAsString(indent_level));
+       << DUMP_MEMBER(route_name_);
     DUMP_DETAILS(upstream_info_);
   }
 
@@ -345,6 +356,8 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    bytes_retransmitted_ = info.bytesRetransmitted();
+    packets_retransmitted_ = info.packetsRetransmitted();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -436,6 +449,8 @@ private:
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};
+  uint64_t bytes_retransmitted_{};
+  uint64_t packets_retransmitted_{};
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};

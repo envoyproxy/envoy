@@ -163,7 +163,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                upstream_stream_info_, Http::Protocol::Http10);
+                                stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectResponseTimerCreate();
@@ -205,7 +205,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder1,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                upstream_stream_info_, Http::Protocol::Http10);
+                                stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectPerTryTimerCreate();
@@ -237,7 +237,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info2_));
           callbacks.onPoolReady(encoder2,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                upstream_stream_info_, Http::Protocol::Http10);
+                                stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectPerTryTimerCreate();
@@ -278,8 +278,7 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
-  NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_{
-      StreamInfo::FilterState::LifeSpan::Connection};
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(RouterUpstreamLogTest, NoLogConfigured) {
@@ -430,7 +429,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%UPSTREAM_CLUSTER%"
+      inline_string: "%UPSTREAM_CLUSTER% %ACCESS_LOG_TYPE%"
   path: "/dev/null"
   )EOF";
 
@@ -443,8 +442,11 @@ typed_config:
   // It is expected that there will be two log records, one when a new request is received
   // and one when the request is finished, due to 'flush_upstream_log_on_upstream_stream' enabled
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "cluster_0");
-  EXPECT_EQ(output_.back(), "cluster_0");
+  EXPECT_EQ(
+      output_.front(),
+      absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)));
+  EXPECT_EQ(output_.back(),
+            absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)));
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {
@@ -454,7 +456,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%UPSTREAM_CLUSTER%"
+      inline_string: "%ACCESS_LOG_TYPE%"
   path: "/dev/null"
   )EOF";
 
@@ -476,7 +478,7 @@ typed_config:
                 .WillRepeatedly(ReturnRef(connection_info1_));
             callbacks.onPoolReady(encoder,
                                   context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
+                                  stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -495,13 +497,13 @@ typed_config:
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "cluster_0");
+  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "cluster_0");
-  EXPECT_EQ(output_.back(), "cluster_0");
+  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
+  EXPECT_EQ(output_.back(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
 
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
   response_headers->setStatus(200);
