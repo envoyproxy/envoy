@@ -289,13 +289,13 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
 TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
   OtlpMetricsFlusherImpl flusher(otlpOptions());
 
-  addGaugeToSnapshot("test_guage1", 1);
-  addGaugeToSnapshot("test_guage2", 2);
+  addGaugeToSnapshot("test_gauge1", 1);
+  addGaugeToSnapshot("test_gauge2", 2);
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
   expectMetricsCount(metrics, 2);
-  expectGauge(metricAt(0, metrics), getTagExtractedName("test_guage1"), 1);
-  expectGauge(metricAt(1, metrics), getTagExtractedName("test_guage2"), 2);
+  expectGauge(metricAt(0, metrics), getTagExtractedName("test_gauge1"), 1);
+  expectGauge(metricAt(1, metrics), getTagExtractedName("test_gauge2"), 2);
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {

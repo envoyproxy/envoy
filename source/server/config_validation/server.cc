@@ -15,6 +15,7 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -84,6 +85,11 @@ void ValidationInstance::initialize(const Options& options,
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
+
+  if (bootstrap_.has_application_log_config()) {
+    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
+    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+  }
 
   // Inject regex engine to singleton.
   Regex::EnginePtr regex_engine = createRegexEngine(
