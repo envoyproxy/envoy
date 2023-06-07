@@ -6,7 +6,6 @@
 
 #include "source/common/common/hex.h"
 
-#include "quiche/spdy/core/hpack/hpack_decoder_adapter.h"
 #include "quiche/spdy/core/hpack/hpack_encoder.h"
 
 namespace {
@@ -302,8 +301,10 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
 
 Http2Frame Http2Frame::makeMalformedRequest(uint32_t stream_index) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
-                    makeNetworkOrderStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(
       StaticHeaderIndex::Status200); // send :status as request header, which is invalid
   frame.adjustPayloadSize();
@@ -314,8 +315,10 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
                                                              absl::string_view host,
                                                              absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
-                    makeNetworkOrderStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
@@ -327,8 +330,10 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
 
 Http2Frame Http2Frame::makeMalformedResponseWithZerolenHeader(uint32_t stream_index) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
-                    makeNetworkOrderStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::Status200);
   frame.appendEmptyHeader();
   frame.adjustPayloadSize();
@@ -338,8 +343,10 @@ Http2Frame Http2Frame::makeMalformedResponseWithZerolenHeader(uint32_t stream_in
 Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
                                    absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
-                    makeNetworkOrderStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
@@ -362,7 +369,7 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
 Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view host,
                                        absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndHeaders),
+  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(HeadersFlags::EndHeaders),
                     makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
@@ -385,8 +392,11 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
 }
 
 Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
+  ASSERT(contents.size() >= HeaderSize);
   Http2Frame frame;
-  frame.appendData(contents);
+  uint32_t length =
+      (uint32_t(contents[0]) << 16) + (uint32_t(contents[1]) << 8) + uint32_t(contents[2]);
+  frame.appendData(contents.substr(0, HeaderSize + length));
   return frame;
 }
 
@@ -406,7 +416,8 @@ Http2Frame Http2Frame::makeDataFrame(uint32_t stream_index, absl::string_view da
   return frame;
 }
 
-std::vector<Http2Frame::Header> Http2Frame::parseHeadersFrame() const {
+std::vector<Http2Frame::Header>
+Http2Frame::parseHeadersFrame(spdy::HpackDecoderAdapter& decoder) const {
   // CONTINUATION frames are not supported yet
   if (empty() || Type::Headers != type() || size() <= HeaderSize ||
       !andFlags(absl::get<HeadersFlags>(frameFlags()), HeadersFlags::EndHeaders)) {
@@ -414,7 +425,6 @@ std::vector<Http2Frame::Header> Http2Frame::parseHeadersFrame() const {
   }
 
   std::vector<Http2Frame::Header> headers;
-  spdy::HpackDecoderAdapter decoder;
   decoder.HandleControlFrameHeadersStart(nullptr);
   if (decoder.HandleControlFrameHeadersData(reinterpret_cast<const char*>(payload()),
                                             payloadSize())) {

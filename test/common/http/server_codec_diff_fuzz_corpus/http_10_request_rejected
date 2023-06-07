@@ -1,0 +1,19 @@
+configuration {
+    http1_options { 
+        accept_http_10: false
+        request_version: HTTP10 
+    }
+}
+
+request {
+    method { value: "GET" }
+    path { value: "/some/resource?get=it&now" }
+    headers {
+        key: "foo"
+        value: "bar"
+    }
+    headers {
+        key: "baz"
+        value: "fuz"
+    }
+}

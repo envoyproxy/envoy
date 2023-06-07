@@ -1,5 +1,6 @@
 configuration {
-    normalize_path: true
+    merge_slashes: true
+    http2_options { allow_extended_connect: true }
 }
 
 request {

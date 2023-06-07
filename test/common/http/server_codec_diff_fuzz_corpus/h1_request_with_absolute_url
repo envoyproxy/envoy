@@ -1,0 +1,21 @@
+configuration {
+    http1_options { allow_absolute_url: true }
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "GET" }
+    path { value: "https://foo.bar.com/some/path/../with/query?abc=xyz" }
+    headers {
+        key: "foo"
+        value: "bar"
+    }
+}
+
+response {
+    status { value: "200" }
+    headers {
+        key: "cow"
+        value: "moo"
+    }
+}

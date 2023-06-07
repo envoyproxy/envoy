@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -10,12 +11,13 @@
 #include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
+#include "quiche/spdy/core/hpack/hpack_decoder_adapter.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
+template <typename Flag> constexpr Flag orFlags(Flag flag) { return flag; }
 template <typename Flag> constexpr uint8_t andFlags(Flag flag) {
   return static_cast<uint8_t>(flag);
 }
@@ -25,10 +27,10 @@ template <typename First, typename... Rest> struct FirstArgType {
   using type = First; // NOLINT(readability-identifier-naming)
 };
 
-template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first, Flags... rest) {
+template <typename Flag, typename... Flags> constexpr Flag orFlags(Flag first, Flags... rest) {
   static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
                 "All flag types must be the same!");
-  return static_cast<uint8_t>(first) | orFlags(rest...);
+  return static_cast<Flag>(static_cast<uint8_t>(first) | static_cast<uint8_t>(orFlags(rest...)));
 }
 
 template <typename Flag, typename... Flags> constexpr uint8_t andFlags(Flag first, Flags... rest) {
@@ -267,6 +269,8 @@ public:
   Iterator end() { return data_.end(); }
   ConstIterator begin() const { return data_.begin(); }
   ConstIterator end() const { return data_.end(); }
+  Iterator payloadBegin() { return data_.begin() + HeaderSize; }
+  ConstIterator payloadBegin() const { return data_.begin() + HeaderSize; }
   bool empty() const { return data_.empty(); }
 
   void appendHeaderWithoutIndexing(const Header& header);
@@ -277,7 +281,7 @@ public:
     setPayloadSize(size() - HeaderSize);
   }
 
-  std::vector<Header> parseHeadersFrame() const;
+  std::vector<Header> parseHeadersFrame(spdy::HpackDecoderAdapter& decoder) const;
   std::pair<bool, uint32_t> getResetErrorCode() const;
 
 private:

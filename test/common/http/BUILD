@@ -588,6 +588,7 @@ envoy_proto_library(
     srcs = ["server_codec_diff_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
     ],
 )
 

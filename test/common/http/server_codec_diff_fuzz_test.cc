@@ -44,6 +44,11 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+constexpr absl::string_view request_body = "The quick brown fox jumps over the lazy dog";
+constexpr absl::string_view response_body = "0123456789aBcDeFgHiJkLmNoPqRsTuVwXyZ";
+} // namespace
+
 using Http2::Http2Frame;
 using testing::InvokeWithoutArgs;
 using testing::Return;
@@ -53,6 +58,7 @@ public:
   MOCK_METHOD(void, setDateHeader, (ResponseHeaderMap&));
 };
 
+// Common configuration for HCMs under test
 class HcmConfig : public ConnectionManagerConfig {
 public:
   HcmConfig(const test::common::http::ServerCodecDiffFuzzTestCase::Configuration& configuration)
@@ -62,54 +68,21 @@ public:
                "", *fake_stats_.rootScope()),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
+        path_with_escaped_slashes_action_(
+            configuration.path_with_escaped_slashes_action() ==
+                    envoy::extensions::filters::network::http_connection_manager::v3::
+                        HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT
+                ? envoy::extensions::filters::network::http_connection_manager::v3::
+                      HttpConnectionManager::KEEP_UNCHANGED
+                : configuration.path_with_escaped_slashes_action()),
         normalize_path_(configuration.normalize_path()),
+        merge_slashes_(configuration.merge_slashes()),
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
     request_id_extension_ = Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_);
-
-    EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillRepeatedly(Invoke([this](FilterChainManager& manager) -> bool {
-          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamDecoderFilter(decoder_filter_);
-          };
-          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamEncoderFilter(encoder_filter_);
-          };
-
-          manager.applyFilterFactoryCb({}, decoder_filter_factory);
-          manager.applyFilterFactoryCb({}, encoder_filter_factory);
-          return true;
-        }));
-    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
-        .WillRepeatedly(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
-          decoder_filter_->callbacks_ = &callbacks;
-          callbacks.streamInfo().setResponseCodeDetails("");
-        }));
-    EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_)).Times(testing::AtMost(1));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainManager& manager) -> bool {
-          return filter_factory_.createFilterChain(manager);
-        }));
-
-    EXPECT_CALL(*decoder_filter_, decodeHeaders(_, _))
-        .WillRepeatedly(
-            Invoke([&](RequestHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
-              request_headers_ = createHeaderMap<RequestHeaderMapImpl>(headers);
-              request_end_stream_ = end_stream;
-              return FilterHeadersStatus::Continue;
-            }));
-
-    EXPECT_CALL(*encoder_filter_, encodeHeaders(_, _))
-        .WillRepeatedly(
-            Invoke([&](ResponseHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
-              response_headers_ = createHeaderMap<ResponseHeaderMapImpl>(headers);
-              response_end_stream_ = end_stream;
-              return FilterHeadersStatus::Continue;
-            }));
 
     ON_CALL(date_provider_, setDateHeader(_)).WillByDefault(Invoke([](ResponseHeaderMap& headers) {
       headers.setDate("Fri, 13 May 2023 00:00:00 GMT");
@@ -197,7 +170,7 @@ public:
   }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
-  bool shouldMergeSlashes() const override { return false; }
+  bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -208,8 +181,7 @@ public:
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
-    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        KEEP_UNCHANGED;
+    return path_with_escaped_slashes_action_;
   }
   const std::vector<Http::OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const override {
@@ -236,10 +208,6 @@ public:
   bool flush_access_log_on_new_request_ = false;
   bool flush_access_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
-  std::shared_ptr<MockStreamDecoderFilter> decoder_filter_ =
-      std::make_shared<NiceMock<MockStreamDecoderFilter>>();
-  std::shared_ptr<MockStreamEncoderFilter> encoder_filter_ =
-      std::make_shared<NiceMock<MockStreamEncoderFilter>>();
   NiceMock<MockFilterChainFactory> filter_factory_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockDateProvider> date_provider_;
@@ -276,18 +244,20 @@ public:
   bool preserve_external_request_id_{false};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
+  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+              KEEP_UNCHANGED};
   const bool normalize_path_{false};
+  const bool merge_slashes_{false};
   LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
-  RequestHeaderMapPtr request_headers_;
-  ResponseHeaderMapPtr response_headers_;
-  bool request_end_stream_{false};
-  bool response_end_stream_{false};
 };
 
+// Configuration for testing HCMs with HTTP/1 codec
 class Http1HcmConfig : public HcmConfig {
 public:
   Http1HcmConfig(
@@ -295,6 +265,13 @@ public:
       const test::common::http::ServerCodecDiffFuzzTestCase::Configuration& configuration)
       : HcmConfig(configuration) {
     http1_settings_.use_balsa_parser_ = codec_impl == Http1ParserImpl::BalsaParser;
+    http1_settings_.allow_absolute_url_ = configuration.http1_options().allow_absolute_url();
+    http1_settings_.allow_chunked_length_ = configuration.http1_options().allow_chunked_length();
+    http1_settings_.enable_trailers_ = configuration.http1_options().enable_trailers();
+    http1_settings_.accept_http_10_ = configuration.http1_options().accept_http_10();
+    if (http1_settings_.accept_http_10_) {
+      http1_settings_.default_host_for_http_10_ = "some.host.com";
+    }
   }
 
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance&,
@@ -309,6 +286,7 @@ public:
   }
 };
 
+// Configuration for testing HCMs with HTTP/2 codec
 class Http2HcmConfig : public HcmConfig {
 public:
   enum class Http2Impl {
@@ -321,7 +299,7 @@ public:
       const test::common::http::ServerCodecDiffFuzzTestCase::Configuration& configuration)
       : HcmConfig(configuration) {
     http2_settings_.mutable_use_oghttp2_codec()->set_value(codec_impl == Http2Impl::Oghttp2);
-    http2_settings_.set_allow_connect(true);
+    http2_settings_.set_allow_connect(configuration.http2_options().allow_extended_connect());
     http2_settings_ = Envoy::Http2::Utility::initializeAndValidateOptions(http2_settings_);
   }
 
@@ -340,6 +318,8 @@ public:
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
+// Test context object keeps track of artifacts (HTTP elements and output wire bytes) produced by
+// the HCMs under test.
 class HcmTestContext {
 public:
   HcmTestContext(
@@ -361,6 +341,7 @@ public:
   }
 
   void initialize() {
+    setupFilterChain();
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
     ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
     ON_CALL(filter_callbacks_.connection_, close(_)).WillByDefault(InvokeWithoutArgs([&] {
@@ -382,6 +363,76 @@ public:
     conn_manager_.initializeReadFilterCallbacks(filter_callbacks_);
   }
 
+  void setupFilterChain() {
+    EXPECT_CALL(config_->filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([this](FilterChainManager& manager) -> bool {
+          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamDecoderFilter(decoder_filter_);
+          };
+          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamEncoderFilter(encoder_filter_);
+          };
+
+          manager.applyFilterFactoryCb({}, decoder_filter_factory);
+          manager.applyFilterFactoryCb({}, encoder_filter_factory);
+          return true;
+        }));
+    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+        .WillRepeatedly(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+          decoder_filter_->callbacks_ = &callbacks;
+          callbacks.streamInfo().setResponseCodeDetails("");
+        }));
+    EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_)).Times(testing::AtMost(1));
+    EXPECT_CALL(config_->filter_factory_, createUpgradeFilterChain(_, _, _))
+        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                   FilterChainManager& manager) -> bool {
+          return config_->filter_factory_.createFilterChain(manager);
+        }));
+
+    EXPECT_CALL(*decoder_filter_, decodeHeaders(_, _))
+        .WillRepeatedly(
+            Invoke([&](RequestHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
+              request_headers_ = createHeaderMap<RequestHeaderMapImpl>(headers);
+              request_end_stream_ = end_stream;
+              return FilterHeadersStatus::Continue;
+            }));
+
+    EXPECT_CALL(*encoder_filter_, encodeHeaders(_, _))
+        .WillRepeatedly(
+            Invoke([&](ResponseHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
+              response_headers_ = createHeaderMap<ResponseHeaderMapImpl>(headers);
+              response_end_stream_ = end_stream;
+              return FilterHeadersStatus::Continue;
+            }));
+
+    EXPECT_CALL(*decoder_filter_, decodeData(_, _))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterDataStatus {
+          request_data_ = data.toString();
+          request_end_stream_ = end_stream;
+          return FilterDataStatus::Continue;
+        }));
+
+    EXPECT_CALL(*encoder_filter_, encodeData(_, _))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterDataStatus {
+          response_data_ = data.toString();
+          response_end_stream_ = end_stream;
+          return FilterDataStatus::Continue;
+        }));
+
+    EXPECT_CALL(*decoder_filter_, decodeTrailers(_))
+        .WillRepeatedly(Invoke([&](RequestTrailerMap& trailers) -> FilterTrailersStatus {
+          request_trailers_ = createHeaderMap<RequestTrailerMapImpl>(trailers);
+          request_end_stream_ = true;
+          return FilterTrailersStatus::Continue;
+        }));
+
+    EXPECT_CALL(*encoder_filter_, encodeTrailers(_))
+        .WillRepeatedly(Invoke([&](ResponseTrailerMap&) -> FilterTrailersStatus {
+          response_end_stream_ = true;
+          return FilterTrailersStatus::Continue;
+        }));
+  }
+
   const std::unique_ptr<HcmConfig> config_;
   NiceMock<Network::MockDrainDecision> drain_close_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -398,8 +449,20 @@ public:
   std::string written_wire_bytes_;
   bool out_end_stream_{false};
   ConnectionManagerImpl conn_manager_;
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter_ =
+      std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  std::shared_ptr<MockStreamEncoderFilter> encoder_filter_ =
+      std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+  RequestHeaderMapPtr request_headers_;
+  ResponseHeaderMapPtr response_headers_;
+  std::string request_data_;
+  std::string response_data_;
+  RequestTrailerMapPtr request_trailers_;
+  bool request_end_stream_{false};
+  bool response_end_stream_{false};
 };
 
+// Common class for encapsulating two HCMs under test as well as common test procedures.
 class HcmTest {
 public:
   HcmTest(Http1ParserImpl codec1, Http1ParserImpl codec2,
@@ -421,39 +484,38 @@ public:
     sendRequest();
 
     // Check that both codecs either produced request headers or did not
-    FUZZ_ASSERT((hcm_under_test_1_.config_->request_headers_ != nullptr &&
-                 hcm_under_test_2_.config_->request_headers_ != nullptr) ||
-                (hcm_under_test_1_.config_->request_headers_ == nullptr &&
-                 hcm_under_test_2_.config_->request_headers_ == nullptr));
+    FUZZ_ASSERT((hcm_under_test_1_.request_headers_ != nullptr &&
+                 hcm_under_test_2_.request_headers_ != nullptr) ||
+                (hcm_under_test_1_.request_headers_ == nullptr &&
+                 hcm_under_test_2_.request_headers_ == nullptr));
 
-    if (hcm_under_test_1_.config_->request_headers_ != nullptr) {
+    if (hcm_under_test_1_.request_headers_ != nullptr) {
       // When both codecs produced request headers they must be the same
-      FUZZ_ASSERT(*hcm_under_test_1_.config_->request_headers_ ==
-                  *hcm_under_test_2_.config_->request_headers_);
+      FUZZ_ASSERT(*hcm_under_test_1_.request_headers_ == *hcm_under_test_2_.request_headers_);
     }
 
     // If codecs produced request headers, send the response from the fuzzer input
-    if (hcm_under_test_1_.config_->request_headers_ && input_.has_response()) {
+    if (hcm_under_test_1_.request_headers_ && input_.has_response()) {
       sendResponse();
     }
 
-    // Check that both codecs either produced response headers or did not
-    FUZZ_ASSERT((hcm_under_test_1_.config_->response_headers_ != nullptr &&
-                 hcm_under_test_2_.config_->response_headers_ != nullptr) ||
-                (hcm_under_test_1_.config_->response_headers_ == nullptr &&
-                 hcm_under_test_2_.config_->response_headers_ == nullptr));
+    FUZZ_ASSERT(hcm_under_test_1_.request_data_ == hcm_under_test_2_.request_data_);
+    FUZZ_ASSERT(hcm_under_test_1_.response_data_ == hcm_under_test_2_.response_data_);
+
+    // Check that both codecs either produced request trailers or did not
+    FUZZ_ASSERT((hcm_under_test_1_.request_trailers_ != nullptr &&
+                 hcm_under_test_2_.request_trailers_ != nullptr) ||
+                (hcm_under_test_1_.request_trailers_ == nullptr &&
+                 hcm_under_test_2_.request_trailers_ == nullptr));
+
+    if (hcm_under_test_1_.request_trailers_ != nullptr) {
+      // When both codecs produced request trailers they must be the same
+      FUZZ_ASSERT(*hcm_under_test_1_.request_trailers_ == *hcm_under_test_2_.request_trailers_);
+    }
 
     // Check consistency of end stream flags across codecs
-    FUZZ_ASSERT(hcm_under_test_1_.config_->request_end_stream_ ==
-                hcm_under_test_2_.config_->request_end_stream_);
-    FUZZ_ASSERT(hcm_under_test_1_.config_->response_end_stream_ ==
-                hcm_under_test_2_.config_->response_end_stream_);
-
-    if (hcm_under_test_1_.config_->response_headers_ != nullptr) {
-      // When both codecs produced response headers they must be the same
-      FUZZ_ASSERT(*hcm_under_test_1_.config_->response_headers_ ==
-                  *hcm_under_test_2_.config_->response_headers_);
-    }
+    FUZZ_ASSERT(hcm_under_test_1_.request_end_stream_ == hcm_under_test_2_.request_end_stream_);
+    FUZZ_ASSERT(hcm_under_test_1_.response_end_stream_ == hcm_under_test_2_.response_end_stream_);
 
     // Check connection state consistency across codecs
     FUZZ_ASSERT(hcm_under_test_1_.connection_alive_ == hcm_under_test_2_.connection_alive_);
@@ -467,16 +529,33 @@ public:
     ResponseHeaderMapPtr response_headers_1 = makeResponseHeaders();
     ResponseHeaderMapPtr response_headers_2 =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers_1);
+    const bool end_stream = !input_.send_response_body() && !input_.has_response_trailers();
     if (HeaderUtility::isSpecial1xx(*response_headers_1)) {
-      hcm_under_test_1_.config_->decoder_filter_->callbacks_->encode1xxHeaders(
+      hcm_under_test_1_.decoder_filter_->callbacks_->encode1xxHeaders(
           std::move(response_headers_1));
-      hcm_under_test_2_.config_->decoder_filter_->callbacks_->encode1xxHeaders(
+      hcm_under_test_2_.decoder_filter_->callbacks_->encode1xxHeaders(
           std::move(response_headers_2));
     } else {
-      hcm_under_test_1_.config_->decoder_filter_->callbacks_->encodeHeaders(
-          std::move(response_headers_1), true, "");
-      hcm_under_test_2_.config_->decoder_filter_->callbacks_->encodeHeaders(
-          std::move(response_headers_2), true, "");
+      hcm_under_test_1_.decoder_filter_->callbacks_->encodeHeaders(std::move(response_headers_1),
+                                                                   end_stream, "");
+      hcm_under_test_2_.decoder_filter_->callbacks_->encodeHeaders(std::move(response_headers_2),
+                                                                   end_stream, "");
+    }
+
+    if (input_.send_response_body()) {
+      const bool end_stream = !input_.has_response_trailers();
+      Buffer::OwnedImpl body_1(response_body);
+      hcm_under_test_1_.decoder_filter_->callbacks_->encodeData(body_1, end_stream);
+      Buffer::OwnedImpl body_2(response_body);
+      hcm_under_test_2_.decoder_filter_->callbacks_->encodeData(body_2, end_stream);
+    }
+
+    if (input_.has_response_trailers()) {
+      ResponseTrailerMapPtr response_trailers_1 = makeResponseTrailers();
+      ResponseTrailerMapPtr response_trailers_2 =
+          Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*response_trailers_1);
+      hcm_under_test_1_.decoder_filter_->callbacks_->encodeTrailers(std::move(response_trailers_1));
+      hcm_under_test_2_.decoder_filter_->callbacks_->encodeTrailers(std::move(response_trailers_2));
     }
   }
 
@@ -487,9 +566,23 @@ public:
       headers->setStatus(input_.response().status().value());
     }
     for (const auto& header : input_.response().headers()) {
-      headers->addCopy(LowerCaseString(header.key()), header.value());
+      LowerCaseString key(header.key());
+      absl::string_view value = header.value();
+      if (input_.send_response_body() && static_cast<absl::string_view>(key) == "content-length") {
+        value = std::to_string(response_body.size());
+      }
+      headers->addCopy(key, value);
     }
     return headers;
+  }
+
+  ResponseTrailerMapPtr makeResponseTrailers() {
+    ASSERT(input_.has_response_trailers());
+    ResponseTrailerMapPtr trailers = Http::ResponseTrailerMapImpl::create();
+    for (const auto& trailer : input_.response_trailers().trailers()) {
+      trailers->addCopy(LowerCaseString(trailer.key()), trailer.value());
+    }
+    return trailers;
   }
 
   void closeClientConnection() {
@@ -507,6 +600,7 @@ public:
   const test::common::http::ServerCodecDiffFuzzTestCase input_;
 };
 
+// Test procedures specific to HTTP/1 codecs
 class Http1HcmTest : public HcmTest {
 public:
   Http1HcmTest(const test::common::http::ServerCodecDiffFuzzTestCase& input)
@@ -530,27 +624,57 @@ private:
   std::string
   makeHttp1Request(const test::common::http::ServerCodecDiffFuzzTestCase::Request& request) {
     std::string wire_bytes;
-    wire_bytes =
-        absl::StrCat(request.method().value(), " ", request.path().value(), " HTTP/1.1\r\n");
+    wire_bytes = absl::StrCat(request.method().value(), " ", request.path().value());
+    if (input_.configuration().http1_options().request_version() ==
+        test::common::http::ServerCodecDiffFuzzTestCase::Configuration::Http1Options::HTTP11) {
+      absl::StrAppend(&wire_bytes, " HTTP/1.1\r\n");
+    } else {
+      absl::StrAppend(&wire_bytes, " HTTP/1.0\r\n");
+    }
     if (request.has_authority()) {
       absl::StrAppend(&wire_bytes, "Host: ", request.authority().value(), "\r\n");
     }
+    bool chunked_encoding = false;
     for (const auto& header : request.headers()) {
-      absl::StrAppend(&wire_bytes, header.key(), ": ", header.value(), "\r\n");
+      if (absl::EqualsIgnoreCase(header.key(), "transfer-encoding") &&
+          absl::StrContainsIgnoreCase(header.value(), "chunked")) {
+        chunked_encoding = true;
+      }
+      absl::string_view value = header.value();
+      if (input_.send_request_body() && absl::EqualsIgnoreCase(header.key(), "content-length")) {
+        value = std::to_string(request_body.size());
+      }
+      absl::StrAppend(&wire_bytes, header.key(), ": ", value, "\r\n");
     }
+
     absl::StrAppend(&wire_bytes, "\r\n");
+    if (input_.send_request_body()) {
+      if (chunked_encoding) {
+        absl::StrAppend(&wire_bytes, absl::StrFormat("%X", request_body.size()), "\r\n",
+                        request_body, "\r\n0\r\n");
+        if (!input_.has_request_trailers()) {
+          absl::StrAppend(&wire_bytes, "\r\n");
+        }
+      } else {
+        absl::StrAppend(&wire_bytes, request_body);
+      }
+    }
+
+    if (input_.has_request_trailers() && chunked_encoding) {
+      if (!input_.send_request_body()) {
+        absl::StrAppend(&wire_bytes, "0\r\n");
+      }
+      for (const auto& trailer : input_.request_trailers().trailers()) {
+        absl::StrAppend(&wire_bytes, trailer.key(), ": ", trailer.value(), "\r\n");
+      }
+      absl::StrAppend(&wire_bytes, "\r\n");
+    }
+
     return wire_bytes;
   }
 };
 
-void printBuffer(absl::string_view buffer) {
-  std::cout << "----------------\n";
-  for (auto iter = buffer.cbegin(); iter != buffer.cend(); ++iter) {
-    std::cout << fmt::format("{:02X} ", static_cast<const unsigned char>(*iter));
-  }
-  std::cout << std::endl;
-}
-
+// Test procedures specific to HTTP/2 codecs
 class Http2HcmTest : public HcmTest {
 public:
   Http2HcmTest(const test::common::http::ServerCodecDiffFuzzTestCase& input)
@@ -566,7 +690,7 @@ public:
     Buffer::OwnedImpl wire_input_2(wire_bytes);
     hcm_under_test_2_.conn_manager_.onData(wire_input_2, false);
 
-    // The server codec sends SETTINGS, SETTINGS ACK and WINDOW_UPDATE frames.
+    // The server codec sends SETTINGS, SETTINGS ACK and WINDOW_UPDATE frames. Throw them away.
     hcm_under_test_1_.written_wire_bytes_.clear();
     hcm_under_test_2_.written_wire_bytes_.clear();
 
@@ -584,8 +708,12 @@ public:
   void sendRequest() override {
     sendInitialFrames();
 
-    auto request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
-                                                     Http2Frame::HeadersFlags::EndHeaders);
+    const uint32_t stream_index = Http2Frame::makeClientStreamId(0);
+    const bool end_stream = !input_.send_request_body() && !input_.has_request_trailers();
+    auto request = Http2Frame::makeEmptyHeadersFrame(
+        stream_index, end_stream ? Http2::orFlags(Http2Frame::HeadersFlags::EndStream,
+                                                  Http2Frame::HeadersFlags::EndHeaders)
+                                 : Http2Frame::HeadersFlags::EndHeaders);
     if (input_.request().has_scheme()) {
       request.appendHeaderWithoutIndexing(
           Http2Frame::Header(":scheme", input_.request().scheme().value()));
@@ -608,7 +736,11 @@ public:
     }
 
     for (const auto& header : input_.request().headers()) {
-      request.appendHeaderWithoutIndexing(Http2Frame::Header(header.key(), header.value()));
+      absl::string_view value = header.value();
+      if (input_.send_request_body() && header.key() == "content-length") {
+        value = std::to_string(request_body.size());
+      }
+      request.appendHeaderWithoutIndexing(Http2Frame::Header(header.key(), value));
     }
     request.adjustPayloadSize();
 
@@ -617,6 +749,35 @@ public:
 
     Buffer::OwnedImpl wire_input_2(request.getStringView());
     hcm_under_test_2_.conn_manager_.onData(wire_input_2, false);
+
+    if (input_.send_request_body()) {
+      const bool end_stream = !input_.has_request_trailers();
+      Http2Frame body = Http2Frame::makeDataFrame(stream_index, request_body,
+                                                  end_stream ? Http2Frame::DataFlags::EndStream
+                                                             : Http2Frame::DataFlags::None);
+      Buffer::OwnedImpl wire_input_1(body.getStringView());
+      hcm_under_test_1_.conn_manager_.onData(wire_input_1, false);
+
+      Buffer::OwnedImpl wire_input_2(body.getStringView());
+      hcm_under_test_2_.conn_manager_.onData(wire_input_2, false);
+    }
+
+    if (input_.has_request_trailers()) {
+      auto trailers = Http2Frame::makeEmptyHeadersFrame(
+          stream_index, Http2::orFlags(Http2Frame::HeadersFlags::EndStream,
+                                       Http2Frame::HeadersFlags::EndHeaders));
+
+      for (const auto& trailer : input_.request_trailers().trailers()) {
+        trailers.appendHeaderWithoutIndexing(Http2Frame::Header(trailer.key(), trailer.value()));
+      }
+      trailers.adjustPayloadSize();
+
+      Buffer::OwnedImpl wire_input_1(trailers.getStringView());
+      hcm_under_test_1_.conn_manager_.onData(wire_input_1, false);
+
+      Buffer::OwnedImpl wire_input_2(trailers.getStringView());
+      hcm_under_test_2_.conn_manager_.onData(wire_input_2, false);
+    }
   }
 
   void compareOutputWireBytes() override {
@@ -624,37 +785,41 @@ public:
     if (hcm_under_test_1_.written_wire_bytes_ == hcm_under_test_2_.written_wire_bytes_) {
       return;
     }
+
+    // If output bytes do not match, it does not indicate failure yet.
+    // Strip all control frames and make sure all other frames match in content and order
     std::vector<Http2Frame> hcm_1_frames(
         parseNonControlFrames(hcm_under_test_1_.written_wire_bytes_));
     std::vector<Http2Frame> hcm_2_frames(
-        parseNonControlFrames(hcm_under_test_1_.written_wire_bytes_));
+        parseNonControlFrames(hcm_under_test_2_.written_wire_bytes_));
 
-    // If output bytes do not match, it does not indicate failure yet. These possibilities are
-    // allowed:
-    // 1. Both codecs emitted just control frames
-    // 2. Both codecs emitted RST_STREAM
-    // 3. Both codecs emitted HEADERS followed by RST_STREAM
-    // 4. Both codecs emitted HEADERS
     if (hcm_1_frames.empty() && hcm_2_frames.empty()) {
       return;
     }
+
     FUZZ_ASSERT(hcm_1_frames.size() == hcm_2_frames.size());
-    if (hcm_1_frames.front().type() == Http2Frame::Type::RstStream) {
-      // No frames should be after RST_STREAM and should match RST_STREAM from second HCM
-      FUZZ_ASSERT(hcm_1_frames.size() == 1 &&
-                  hcm_2_frames.front().type() == Http2Frame::Type::RstStream);
-      // Maybe check error code too?
-    } else if (hcm_1_frames.front().type() == Http2Frame::Type::Headers) {
-      FUZZ_ASSERT(hcm_2_frames.front().type() == Http2Frame::Type::Headers);
-      std::vector<Http2Frame::Header> hcm_1_headers = hcm_1_frames.front().parseHeadersFrame();
-      std::vector<Http2Frame::Header> hcm_2_headers = hcm_2_frames.front().parseHeadersFrame();
-      // Headers should be the same
-      FUZZ_ASSERT(hcm_1_headers.size() == hcm_2_headers.size() &&
-                  std::equal(hcm_1_headers.begin(), hcm_1_headers.end(), hcm_2_headers.begin()));
-      // HEADERS may be followed by RST_STREAM
-      FUZZ_ASSERT(hcm_1_frames.size() == 2 &&
-                  hcm_1_frames[1].type() == Http2Frame::Type::RstStream &&
-                  hcm_2_frames[1].type() == Http2Frame::Type::RstStream);
+    spdy::HpackDecoderAdapter decoder_1;
+    spdy::HpackDecoderAdapter decoder_2;
+    for (auto frame_1 = hcm_1_frames.cbegin(), frame_2 = hcm_2_frames.cbegin();
+         frame_1 != hcm_1_frames.cend(); ++frame_1, ++frame_2) {
+      FUZZ_ASSERT(frame_1->type() == frame_2->type());
+      if (frame_1->type() == Http2Frame::Type::RstStream) {
+        // There should be nothing after RST_STREAM
+        FUZZ_ASSERT(++frame_1 == hcm_1_frames.cend());
+        break;
+      } else if (frame_1->type() == Http2Frame::Type::Headers) {
+        std::vector<Http2Frame::Header> hcm_1_headers = frame_1->parseHeadersFrame(decoder_1);
+        std::vector<Http2Frame::Header> hcm_2_headers = frame_2->parseHeadersFrame(decoder_2);
+        // Headers should be the same
+        FUZZ_ASSERT(hcm_1_headers.size() == hcm_2_headers.size());
+        FUZZ_ASSERT(std::equal(hcm_1_headers.begin(), hcm_1_headers.end(), hcm_2_headers.begin()));
+      } else if (frame_1->type() == Http2Frame::Type::Data) {
+        // Payload should be the same
+        FUZZ_ASSERT(frame_1->payloadSize() == frame_2->payloadSize());
+        FUZZ_ASSERT(std::equal(frame_1->payloadBegin(), frame_1->end(), frame_2->payloadBegin()));
+      } else {
+        FUZZ_ASSERT(false); // should never get here
+      }
     }
   }
 
@@ -694,11 +859,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input
     return;
   }
 
+  // Run the same fuzz input through HTTP/1 and HTTP/2 codecs
   Http1HcmTest http1_test(input);
   http1_test.test();
 
-  //Http2HcmTest http2_test(input);
-  //http2_test.test();
+  Http2HcmTest http2_test(input);
+  http2_test.test();
 }
 
 } // namespace Http

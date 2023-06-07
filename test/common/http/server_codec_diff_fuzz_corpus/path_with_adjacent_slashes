@@ -1,12 +1,12 @@
 configuration {
     normalize_path: true
-    path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+    merge_slashes: true
 }
 
 request {
     scheme { value: "https" }
     method { value: "GET" }
-    path { value: "/path%2Fwith%2fescaped%5Cslashes%5c" }
+    path { value: "/path///with//..///adjacent//./slashes/////" }
     authority { value: "foo.bar.com" }
     headers {
         key: "foo"

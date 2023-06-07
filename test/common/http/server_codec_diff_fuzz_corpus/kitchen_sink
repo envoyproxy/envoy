@@ -11,8 +11,8 @@ request {
     path { value: "/database?key=value&key2=value2&etc&etc2" }
     authority { value: "foo.bar.com" }
     headers {
-        key: "transfer-encoding"
-        value: "chunked"
+        key: "content-length"
+        value: "10"
     }
     headers {
         key: "baz"
@@ -34,11 +34,18 @@ request_trailers {
 }
 
 response {
-    status { value: "404" }
-    headers {
-        key: "content-length"
-        value: "32"
-    }
+    status { value: "200" }
 }
 
 send_response_body: true
+
+response_trailers {
+    trailers {
+        key: "start"
+        value: "stop"
+    }
+    trailers {
+        key: "data"
+        value: "01234now"
+    }
+}

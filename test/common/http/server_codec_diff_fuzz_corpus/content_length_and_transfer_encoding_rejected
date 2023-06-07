@@ -1,6 +1,5 @@
 configuration {
-    normalize_path: true
-    http1_options { allow_chunked_length: true }
+    http1_options { allow_chunked_length: false }
 }
 
 request {
@@ -19,13 +18,5 @@ request {
     headers {
         key: "baz"
         value: "fuz"
-    }
-}
-
-response {
-    status { value: "200" }
-    headers {
-        key: "1"
-        value: "2"
     }
 }

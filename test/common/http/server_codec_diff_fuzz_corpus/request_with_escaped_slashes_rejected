@@ -1,6 +1,6 @@
 configuration {
     normalize_path: true
-    path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+    path_with_escaped_slashes_action: REJECT_REQUEST
 }
 
 request {
@@ -11,13 +11,5 @@ request {
     headers {
         key: "foo"
         value: "bar"
-    }
-}
-
-response {
-    status { value: "301" }
-    headers {
-        key: "location"
-        value: "/somewhere_else/not/../here/./?with=query"
     }
 }

@@ -1,0 +1,15 @@
+configuration {
+    http2_options { allow_extended_connect: false }
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "CONNECT" }
+    authority { value: "foo.bar.com" }
+    protocol { value: "websocket" }
+    path { value: "/some/path/..////websocket/./ttt?key=value" }
+    headers {
+        key: "foo"
+        value: "bar"
+    }
+}

@@ -1,20 +1,15 @@
 configuration {
     normalize_path: true
-    http1_options { allow_chunked_length: true }
 }
 
 request {
     scheme { value: "https" }
-    method { value: "GET" }
-    path { value: "/" }
+    method { value: "POST" }
+    path { value: "/database?key=value&key2=value2&etc&etc2" }
     authority { value: "foo.bar.com" }
     headers {
         key: "content-length"
         value: "10"
-    }
-    headers {
-        key: "transfer-encoding"
-        value: "chunked"
     }
     headers {
         key: "baz"
@@ -22,10 +17,19 @@ request {
     }
 }
 
+send_request_body: true
+
+request_trailers {
+    trailers {
+        key: "something"
+        value: "other"
+    }
+    trailers {
+        key: "key"
+        value: "value"
+    }
+}
+
 response {
     status { value: "200" }
-    headers {
-        key: "1"
-        value: "2"
-    }
 }

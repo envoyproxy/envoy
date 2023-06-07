@@ -1,5 +1,8 @@
 configuration {
     normalize_path: true
+    http1_options {
+        enable_trailers: true
+    }
 }
 
 request {
@@ -8,8 +11,8 @@ request {
     path { value: "/database?key=value&key2=value2&etc&etc2" }
     authority { value: "foo.bar.com" }
     headers {
-        key: "content-length"
-        value: "10"
+        key: "transfer-encoding"
+        value: "chunked"
     }
     headers {
         key: "baz"
@@ -19,6 +22,19 @@ request {
 
 send_request_body: true
 
-response {
-    status { value: "404" }
+request_trailers {
+    trailers {
+        key: "something"
+        value: "other"
+    }
+    trailers {
+        key: "key"
+        value: "valUe"
+    }
 }
+
+response {
+    status { value: "200" }
+}
+
+send_response_body: true

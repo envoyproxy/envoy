@@ -2,13 +2,36 @@ syntax = "proto3";
 
 package test.common.http;
 
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "google/protobuf/wrappers.proto";
 
 // Structured input for server_codec_diff_fuzz_test.
 
 message ServerCodecDiffFuzzTestCase {
   message Configuration {
+    message Http2Options {
+      bool allow_extended_connect = 1;
+    }
+
+    message Http1Options {
+      enum Version {
+        HTTP11 = 0;
+        HTTP10 = 1;
+      }
+      bool allow_absolute_url = 1;
+      bool accept_http_10 = 2;
+      bool enable_trailers = 3;
+      bool allow_chunked_length = 4;
+      Version request_version = 5;
+    }
+
     bool normalize_path = 1;
+    bool merge_slashes = 2;
+    envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        .PathWithEscapedSlashesAction path_with_escaped_slashes_action = 3;
+
+    Http2Options http2_options = 4;
+    Http1Options http1_options = 5;
   }
 
   message HttpHeader {
@@ -25,6 +48,10 @@ message ServerCodecDiffFuzzTestCase {
     repeated HttpHeader headers = 6;
   }
 
+  message Trailers {
+    repeated HttpHeader trailers = 1;
+  }
+
   // Response is only sent if codec successfully parsed request
   message Response {
     google.protobuf.BytesValue status = 1;
@@ -33,5 +60,9 @@ message ServerCodecDiffFuzzTestCase {
 
   Configuration configuration = 1;
   Request request = 2;
-  Response response = 3;
+  bool send_request_body = 3;
+  Trailers request_trailers = 4;
+  Response response = 5;
+  bool send_response_body = 6;
+  Trailers response_trailers = 7;
 }
