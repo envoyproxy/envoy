@@ -81,10 +81,11 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::MockApi api;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, dispatcher,
-                                   log_manager, validation_visitor, api),
-      EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
+  EXPECT_EQ(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
+                                         dispatcher, log_manager, validation_visitor, api)
+                .status()
+                .message(),
+            "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
 TEST(HealthCheckerFactoryTest, CreateGrpc) {
@@ -103,6 +104,7 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
             dynamic_cast<GrpcHealthCheckerImpl*>(
                 HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
                                              dispatcher, log_manager, validation_visitor, api)
+                    .value()
                     .get()));
 }
 
@@ -4063,7 +4065,8 @@ TEST(PayloadMatcher, loadJsonBytes) {
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
-    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+    PayloadMatcher::MatchSegments segments =
+        PayloadMatcher::loadProtoBytes(repeated_payload).value();
     EXPECT_EQ(2U, segments.size());
   }
 
@@ -4071,14 +4074,14 @@ TEST(PayloadMatcher, loadJsonBytes) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
-    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
   }
 
   {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
-    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
   }
 }
 
@@ -4091,7 +4094,7 @@ TEST(PayloadMatcher, matchHexText) {
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 
-  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload).value();
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
@@ -4118,7 +4121,7 @@ TEST(PayloadMatcher, matchBinary) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_binary(std::string({0x01, 0x02}));
 
-  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload).value();
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(PayloadMatcher::match(segments, buffer));

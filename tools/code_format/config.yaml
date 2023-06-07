@@ -97,7 +97,6 @@ paths:
     - source/common/upstream/cds_api_helper.cc
     - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/load_balancer_impl.cc
-    - source/common/upstream/health_checker_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
