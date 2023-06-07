@@ -66,7 +66,11 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
+  static const InstanceConstSharedPtrFn defaultAddressFunction(Network::Address::IpVersion version);
 
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,

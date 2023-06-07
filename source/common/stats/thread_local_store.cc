@@ -585,7 +585,8 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll()) {
+  // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
 
@@ -594,7 +595,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result;
+  if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    fast_reject_result = parent_.fastRejects(final_stat_name);
+  } else {
+    fast_reject_result = StatsMatcher::FastResult::Matches;
+  }
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_gauge_;
   }
@@ -905,6 +911,8 @@ bool ParentHistogramImpl::used() const {
   // Consider ParentHistogram used only if has ever been merged.
   return merged_;
 }
+
+bool ParentHistogramImpl::hidden() const { return false; }
 
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);

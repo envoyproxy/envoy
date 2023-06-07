@@ -65,8 +65,12 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
 
 void envoyGoFilterHttpLog(uint32_t level, void* message);
+uint32_t envoyGoFilterHttpLogLevel();
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
+
+CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
+                                                 int life_span, int stream_sharing);
 
 #ifdef __cplusplus
 } // extern "C"
