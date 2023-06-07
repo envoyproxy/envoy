@@ -48,16 +48,24 @@ public:
     EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
   }
 
-  void validateLbTypeConfigs(LoadBalancerType lb_type) const {
+  void validateLbTypeConfigs() const {
+    const auto* legacy_child_lb_creator =
+        dynamic_cast<const LegacyChildLoadBalancerCreatorImpl*>(lb_->child_lb_creator_.get());
+
+    if (legacy_child_lb_creator == nullptr) {
+      return;
+    }
+
     // Each of these expects that an lb_type is set to that type iff the
     // returned config for that type exists.
-    EXPECT_EQ(lb_type == LoadBalancerType::RingHash,
-              lb_.get()->lbRingHashConfig() != absl::nullopt);
-    EXPECT_EQ(lb_type == LoadBalancerType::Maglev, lb_.get()->lbMaglevConfig() != absl::nullopt);
-    EXPECT_EQ(lb_type == LoadBalancerType::RoundRobin,
-              lb_.get()->lbRoundRobinConfig() != absl::nullopt);
-    EXPECT_EQ(lb_type == LoadBalancerType::LeastRequest,
-              lb_.get()->lbLeastRequestConfig() != absl::nullopt);
+    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::RingHash,
+              legacy_child_lb_creator->lbRingHashConfig() != absl::nullopt);
+    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::Maglev,
+              legacy_child_lb_creator->lbMaglevConfig() != absl::nullopt);
+    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::RoundRobin,
+              legacy_child_lb_creator->lbRoundRobinConfig() != absl::nullopt);
+    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::LeastRequest,
+              legacy_child_lb_creator->lbLeastRequestConfig() != absl::nullopt);
   }
 
 private:
@@ -250,8 +258,8 @@ public:
       configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
     }
 
-    lb_ = std::make_shared<SubsetLoadBalancer>(
-        lb_type_, priority_set_, nullptr, stats_, *scope_, runtime_, random_, subset_info_,
+    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+        lb_type_,
         lb_type_ == LoadBalancerType::RingHash
             ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
                   ring_hash_lb_config_)
@@ -268,7 +276,11 @@ public:
             ? makeOptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
                   least_request_lb_config_)
             : absl::nullopt,
-        common_config_, simTime());
+        common_config_);
+
+    lb_ = std::make_shared<SubsetLoadBalancer>(subset_info_, std::move(child_lb_creator),
+                                               priority_set_, nullptr, stats_, *scope_, runtime_,
+                                               random_, simTime());
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -315,10 +327,13 @@ public:
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
         {}, {}, {}, absl::nullopt);
 
-    lb_ = std::make_shared<SubsetLoadBalancer>(
-        lb_type_, priority_set_, &local_priority_set_, stats_, *scope_, runtime_, random_,
-        subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-        least_request_lb_config_, common_config_, simTime());
+    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+        lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+        least_request_lb_config_, common_config_);
+
+    lb_ = std::make_shared<SubsetLoadBalancer>(subset_info_, std::move(child_lb_creator),
+                                               priority_set_, &local_priority_set_, stats_, *scope_,
+                                               runtime_, random_, simTime());
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -1516,10 +1531,12 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -1533,31 +1550,31 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRoundRobin) {
   doLbTypeTest(LoadBalancerType::RoundRobin);
   auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs(LoadBalancerType::RoundRobin);
+  tester.validateLbTypeConfigs();
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesLeastRequest) {
   doLbTypeTest(LoadBalancerType::LeastRequest);
   auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs(LoadBalancerType::LeastRequest);
+  tester.validateLbTypeConfigs();
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) {
   doLbTypeTest(LoadBalancerType::Random);
   auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs(LoadBalancerType::Random);
+  tester.validateLbTypeConfigs();
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
   doLbTypeTest(LoadBalancerType::RingHash);
   auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs(LoadBalancerType::RingHash);
+  tester.validateLbTypeConfigs();
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) {
   doLbTypeTest(LoadBalancerType::Maglev);
   auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs(LoadBalancerType::Maglev);
+  tester.validateLbTypeConfigs();
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
@@ -1950,10 +1967,12 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1974,10 +1993,12 @@ TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
 
   EXPECT_CALL(*mock_host, weight()).WillRepeatedly(Return(1));
 
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
@@ -1999,10 +2020,12 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       host_set_, {1, 100});
 
   common_config_.mutable_locality_weighted_lb_config();
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -2036,10 +2059,12 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       host_set_, {50, 50});
 
   common_config_.mutable_locality_weighted_lb_config();
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
@@ -2083,10 +2108,12 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       host_set_, {2, 2});
 
   common_config_.mutable_locality_weighted_lb_config();
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
@@ -2116,10 +2143,12 @@ TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
       },
       host_set_);
 
+  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
+      least_request_lb_config_, common_config_);
   lb_ = std::make_shared<SubsetLoadBalancer>(
-      lb_type_, priority_set_, nullptr, stats_, *stats_store_.rootScope(), runtime_, random_,
-      subset_info_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_, simTime());
+      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
+      *stats_store_.rootScope(), runtime_, random_, simTime());
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
