@@ -115,6 +115,10 @@ func (r *httpRequest) Log(level api.LogType, message string) {
 	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
 }
 
+func (r *httpRequest) LogLevel() api.LogType {
+	return cAPI.HttpLogLevel()
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
