@@ -379,7 +379,8 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   cleanup();
 }
 
-TEST_P(IntegrationTest, MultipleRequests) {
+// https://github.com/envoyproxy/envoy/issues/27842
+TEST_P(IntegrationTest, DISABLED_MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
   codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
