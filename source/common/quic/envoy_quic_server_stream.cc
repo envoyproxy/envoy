@@ -262,8 +262,9 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #endif
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
-      Http::HeaderUtility::isConnectUdp(*headers)) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
+       Http::HeaderUtility::isConnectUdp(*headers))) {
     useCapsuleProtocol();
   }
 #endif

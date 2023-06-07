@@ -703,7 +703,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
               if (scope_exist) {
                 parent_.refreshCachedRoute();
               }
-              (*cb)(scope_exist && parent_.hasCachedRoute());
+              (*cb)(scope_exist&& parent_.hasCachedRoute());
             }
           });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -1168,7 +1168,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Rewrites the host of CONNECT-UDP requests.
-  if (HeaderUtility::isConnectUdp(*request_headers_) &&
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      HeaderUtility::isConnectUdp(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
     sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);

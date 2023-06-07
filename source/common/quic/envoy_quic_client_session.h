@@ -66,7 +66,11 @@ public:
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-    return quic::HttpDatagramSupport::kRfc;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+      return quic::HttpDatagramSupport::kRfc;
+    } else {
+      return quic::HttpDatagramSupport::kNone;
+    }
 #else
     return quic::HttpDatagramSupport::kNone;
 #endif

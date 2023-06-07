@@ -22,9 +22,18 @@ namespace Http {
 
 namespace {
 
-const Regex::CompiledGoogleReMatcher& connectUdpPathMatcher() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, R"(/\.well-known/masque/udp/(.+)/(.+)/)",
-                         false);
+static bool isIpv6(absl::string_view ip_address) {
+  ASSERT(!ip_address.empty());
+  // Removes the Zone ID in the IPv6 address.
+  std::vector<absl::string_view> ip_address_split = absl::StrSplit(ip_address, '%');
+  if (ip_address_split.empty()) {
+    return false;
+  }
+  sockaddr_in6 addr_in;
+  return inet_pton(AF_INET6,
+                   ip_address_split.size() == 1 ? ip_address_split[0].data()
+                                                : std::string(ip_address_split[0]).c_str(),
+                   &addr_in.sin6_addr) == 1;
 }
 
 } // namespace
@@ -266,10 +275,21 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
 
 bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
   absl::string_view path = headers.getPathValue();
-  std::string new_host = connectUdpPathMatcher().replaceAll(path, "\\1:\\2");
-  if (new_host == path) {
+  // Extract target host and port from path using default template.
+  std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
+  if (path_split.size() != 7 || !path_split[0].empty() || path_split[1] != ".well-known" ||
+      path_split[2] != "masque" || path_split[3] != "udp" || path_split[4].empty() ||
+      path_split[5].empty() || !path_split[6].empty()) {
+    ENVOY_LOG_MISC(error, "CONNECT-UDP request with bad path {}", path);
     return false;
   }
+
+  // Utility::PercentEncoding::decode never returns an empty string if the input argument is not
+  // empty.
+  std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
+  std::string target_port = Utility::PercentEncoding::decode(path_split[5]);
+  std::string new_host = absl::StrCat(
+      (isIpv6(target_host) ? absl::StrCat("[", target_host, "]") : target_host), ":", target_port);
   headers.setHost(new_host);
   return true;
 }
