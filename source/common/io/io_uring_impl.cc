@@ -128,6 +128,7 @@ IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_add
   ENVOY_LOG(trace, "prepare accept for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare accept for fd = {}", fd);
     return IoUringResult::Failed;
   }
 
@@ -142,6 +143,7 @@ IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
   ENVOY_LOG(trace, "prepare connect for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare connect for fd = {}", fd);
     return IoUringResult::Failed;
   }
 
@@ -155,6 +157,7 @@ IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, 
   ENVOY_LOG(trace, "prepare readv for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare readv for fd = {}", fd);
     return IoUringResult::Failed;
   }
 
@@ -168,6 +171,7 @@ IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs,
   ENVOY_LOG(trace, "prepare writev for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare writev for fd = {}", fd);
     return IoUringResult::Failed;
   }
 
@@ -180,6 +184,7 @@ IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
   ENVOY_LOG(trace, "prepare close for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare close for fd = {}", fd);
     return IoUringResult::Failed;
   }
 
@@ -192,6 +197,7 @@ IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_
   ENVOY_LOG(trace, "prepare cancels for user data = {}", fmt::ptr(cancelling_user_data));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare cancel for user data = {}", fmt::ptr(cancelling_user_data));
     return IoUringResult::Failed;
   }
 
@@ -204,6 +210,7 @@ IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, void* user_data)
   ENVOY_LOG(trace, "prepare shutdown for fd = {}, how = {}", fd, how);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare shutdown for fd = {}", fd);
     return IoUringResult::Failed;
   }
 

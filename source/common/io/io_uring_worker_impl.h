@@ -205,9 +205,10 @@ public:
 private:
   const uint32_t accept_size_;
   // These are used to track the current submitted accept requests.
-  std::vector<Request*> requests_;
-  std::atomic<size_t> request_count_{};
-  std::atomic<bool> closed_{};
+  mutable absl::Mutex mutex_;
+  std::vector<Request*> requests_ ABSL_GUARDED_BY(mutex_);
+  size_t request_count_ ABSL_GUARDED_BY(mutex_){0};
+  bool closed_ ABSL_GUARDED_BY(mutex_){false};
 
   void submitRequests();
 };

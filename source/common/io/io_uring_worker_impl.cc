@@ -328,8 +328,9 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 }
 
 void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
+  absl::MutexLock lock(&mutex_);
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}, request_count_ = {}, closed_ = {}", fd_,
-            status_, request_count_.load(), closed_.load());
+            status_, request_count_, closed_);
 
   IoUringSocketEntry::close(keep_fd_open, cb);
 
@@ -337,8 +338,9 @@ void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   ASSERT(!keep_fd_open);
 
   // Delay close until all accept requests are drained.
-  if (!request_count_.load()) {
-    if (!closed_.exchange(true)) {
+  if (!request_count_) {
+    if (!closed_) {
+      closed_ = true;
       parent_.submitCloseRequest(*this);
     }
     return;
@@ -365,6 +367,7 @@ void IoUringAcceptSocket::enable() {
 void IoUringAcceptSocket::disable() {
   IoUringSocketEntry::disable();
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
+  absl::MutexLock lock(&mutex_);
   for (auto& req : requests_) {
     if (req != nullptr) {
       parent_.submitCancelRequest(*this, req);
@@ -381,18 +384,22 @@ void IoUringAcceptSocket::onClose(Request* req, int32_t result, bool injected) {
 
 void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onAccept(req, result, injected);
-
-  ENVOY_LOG(trace,
-            "onAccept with result {}, fd = {}, injected = {}, status_ = {}, request_count_ = {}",
-            result, fd_, injected, status_, request_count_.load());
-  ASSERT(!injected);
   // If there is no pending accept request and the socket is going to close, submit close request.
   AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
-  requests_[accept_req->i_] = nullptr;
-  request_count_.fetch_sub(1);
-  if (status_ == Closed && !request_count_.load()) {
-    if (!closed_.exchange(true)) {
-      parent_.submitCloseRequest(*this);
+  {
+    absl::MutexLock lock(&mutex_);
+    ENVOY_LOG(trace,
+              "onAccept with result {}, fd = {}, injected = {}, status_ = {}, request_count_ = {}",
+              result, fd_, injected, status_, request_count_);
+    ASSERT(!injected);
+
+    requests_[accept_req->i_] = nullptr;
+    request_count_--;
+    if (status_ == Closed && !request_count_) {
+      if (!closed_) {
+        closed_ = true;
+        parent_.submitCloseRequest(*this);
+      }
     }
   }
 
@@ -409,11 +416,12 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringAcceptSocket::submitRequests() {
+  absl::MutexLock lock(&mutex_);
   for (size_t i = 0; i < requests_.size(); i++) {
     if (requests_[i] == nullptr) {
       requests_[i] = parent_.submitAcceptRequest(*this);
       static_cast<AcceptRequest*>(requests_[i])->i_ = i;
-      request_count_.fetch_add(1);
+      request_count_++;
     }
   }
 }
