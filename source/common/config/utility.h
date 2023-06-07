@@ -350,9 +350,9 @@ public:
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
     static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+        xds::type::v3::TypedStruct::default_instance().GetTypeName();
     static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
@@ -401,7 +401,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
@@ -425,7 +425,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
