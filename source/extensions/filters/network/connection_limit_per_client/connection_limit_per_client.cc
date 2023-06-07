@@ -76,7 +76,7 @@ Network::FilterStatus Filter::onNewConnection() {
 
   if (!config_->incrementConnectionWithinLimit(client_address)) {
     config_->stats().limited_connections_.inc();
-    ENVOY_CONN_LOG(info, "connection_limit_per_client: limiting connection (from: {})",
+    ENVOY_CONN_LOG(debug, "connection_limit_per_client: limiting connection (from: {})",
                    read_callbacks_->connection(), client_address);
 
     // Set is_rejected_ is true, so that onData() will return StopIteration during the delay time.
@@ -98,7 +98,7 @@ Network::FilterStatus Filter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  ENVOY_CONN_LOG(info, "connection_limit_per_client: allowing connection (from: {})",
+  ENVOY_CONN_LOG(debug, "connection_limit_per_client: allowing connection (from: {})",
                    read_callbacks_->connection(), client_address);
 
   return Network::FilterStatus::Continue;
@@ -115,7 +115,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
     config_->decrementConnection(client_address);
     config_->stats().active_connections_.dec();
 
-    ENVOY_CONN_LOG(info, "connection_limit_per_client: closing connection (from: {})",
+    ENVOY_CONN_LOG(debug, "connection_limit_per_client: closing connection (from: {})",
                    read_callbacks_->connection(), client_address);
   }
 }
