@@ -52,7 +52,7 @@ public:
           Stats::StatNamePool pool(scope->symbolTable());
           return Stats::Utility::gaugeFromElements(
               *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
-              Stats::Gauge::ImportMode::Accumulate);
+              Stats::Gauge::ImportMode::HiddenAccumulate);
         }()),
         ctor_([stats_scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
           initialized_.inc();

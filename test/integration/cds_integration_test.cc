@@ -251,7 +251,8 @@ public:
   void updateCluster() {
     envoy::config::cluster::v3::Cluster cluster1_updated = cluster_creator_(
         ClusterName1, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+        Network::Test::getLoopbackAddressString(ipVersion()),
+        envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");

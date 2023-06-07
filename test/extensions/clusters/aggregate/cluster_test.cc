@@ -32,8 +32,8 @@ const std::string secondary_name("secondary");
 class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AggregateClusterTest()
-      : stat_names_(stats_store_.symbolTable()),
-        traffic_stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_.rootScope(),
+      : stat_names_(server_context_.store_.symbolTable()),
+        traffic_stats_(Upstream::ClusterInfoImpl::generateStats(server_context_.store_.rootScope(),
                                                                 stat_names_, false)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));

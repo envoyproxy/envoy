@@ -44,5 +44,5 @@ Lazy Initialization of Stats
 
 When :ref:`enable_deferred_creation_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`
 is enabled in Bootstrap, for stats that are deferred creation compatible, the actual stats struct creation
-is deferred to first access of any member of that stats, i.e., instantiation only happens when an invocation on
+is deferred to first access of any member of that stats, i.e. instantiation only happens when an invocation on
 operator "*" or "->" happens.

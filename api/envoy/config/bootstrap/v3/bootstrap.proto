@@ -181,7 +181,7 @@ message Bootstrap {
   // Optional set of stats sinks.
   repeated metrics.v3.StatsSink stats_sinks = 6;
 
-  // When true, enable deferred creation feature for compatabile stats types.
+  // When true, enable deferred creation feature for compatible stats types.
   // NOTE: see https://github.com/envoyproxy/envoy/issues/26106, a visible
   // internal gauge will be created for every stats struct that's used to track
   // life cycle between config updates.
