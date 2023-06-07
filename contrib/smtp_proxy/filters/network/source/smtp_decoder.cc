@@ -37,7 +37,7 @@ const size_t kMaxReplyLine = 1024;
 const size_t kMaxReplyBytes = 65536;
 
 using RawLinePtr = std::unique_ptr<char[]>;
-}
+} // anonymous namespace
 
 Decoder::Result GetLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
                         absl::string_view& line, size_t max_line) {
