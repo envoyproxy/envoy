@@ -1,6 +1,6 @@
 # This configuration takes incoming HTTP requests on port 10000 and encapsulates it in a CONNECT
 # request which is sent upstream port 10001.
-# `curl --resolve www.google.com:10000:127.0.0.1 https://www.google.com:10000`
+# `curl --resolve www.google.com:10000:127.0.0.1 https://www.google.com:10000 -H 'Host: www.google.com'`
 bootstrap_extensions:
 - name: envoy.bootstrap.internal_listener
   typed_config:
