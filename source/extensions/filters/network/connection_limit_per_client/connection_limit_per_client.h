@@ -13,6 +13,9 @@
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/runtime/runtime_protos.h"
 
+#include <unordered_map>
+#include <mutex>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -41,9 +44,9 @@ public:
              proto_config,
          Stats::Scope& scope, Runtime::Loader& runtime);
 
-  bool incrementConnectionWithinLimit();
-  void incrementConnection();
-  void decrementConnection();
+  bool incrementConnectionWithinLimit(const std::string& client_address);
+  void incrementConnection(const std::string& client_address);
+  void decrementConnection(const std::string& client_address);
   bool enabled() { return enabled_.enabled(); }
   absl::optional<std::chrono::milliseconds> delay() { return delay_; }
   ConnectionLimitPerClientStats& stats() { return stats_; }
@@ -53,9 +56,11 @@ private:
   Runtime::FeatureFlag enabled_;
   ConnectionLimitPerClientStats stats_;
   const uint64_t max_connections_;
-  std::atomic<uint64_t> connections_;
   absl::optional<std::chrono::milliseconds> delay_;
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
+
+  std::mutex mutex_;
+  std::unordered_map<std::string, uint64_t> connections_;
 
   friend class ConnectionLimitPerClientTestBase;
 };
@@ -63,7 +68,7 @@ private:
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
- * Per-connection connection limit filter
+ * Per-client connection limit filter
  */
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,

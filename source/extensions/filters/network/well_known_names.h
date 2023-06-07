@@ -16,6 +16,8 @@ public:
   const std::string ClientSslAuth = "envoy.filters.network.client_ssl_auth";
   // Connection limit filter
   const std::string ConnectionLimit = "envoy.filters.network.connection_limit";
+  // Connection limit per client filter
+  const std::string ConnectionLimitPerClient = "envoy.filters.network.connection_limit_per_client";
   // Echo filter
   const std::string Echo = "envoy.filters.network.echo";
   // Direct response filter

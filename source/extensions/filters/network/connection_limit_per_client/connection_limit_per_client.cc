@@ -15,7 +15,7 @@ Config::Config(
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
       max_connections_(PROTOBUF_GET_WRAPPED_REQUIRED(proto_config, max_connections)),
-      connections_(0), delay_(PROTOBUF_GET_OPTIONAL_MS(proto_config, delay)) {}
+      delay_(PROTOBUF_GET_OPTIONAL_MS(proto_config, delay)) {}
 
 ConnectionLimitPerClientStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = "connection_limit_per_client." + prefix;
@@ -23,25 +23,30 @@ ConnectionLimitPerClientStats Config::generateStats(const std::string& prefix, S
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool Config::incrementConnectionWithinLimit() {
-  auto conns = connections_.load(std::memory_order_relaxed);
-  while (conns < max_connections_) {
+bool Config::incrementConnectionWithinLimit(const std::string& client_address) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto& conns = connections_[client_address];
+  if (conns < max_connections_) {
     // Testing hook.
     synchronizer_.syncPoint("increment_pre_cas");
 
-    if (connections_.compare_exchange_weak(conns, conns + 1, std::memory_order_release,
-                                           std::memory_order_relaxed)) {
-      return true;
-    }
+    conns++;
+    return true;
   }
   return false;
 }
 
-void Config::incrementConnection() { connections_++; }
+void Config::incrementConnection(const std::string& client_address) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  connections_[client_address]++;
+}
 
-void Config::decrementConnection() {
-  ASSERT(connections_ > 0);
-  connections_--;
+void Config::decrementConnection(const std::string& client_address) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  // TODO: check key exists before asserting > 0
+  ASSERT(connections_[client_address] > 0);
+  connections_[client_address]--;
 }
 
 void Filter::resetTimerState() {
@@ -63,18 +68,21 @@ Network::FilterStatus Filter::onNewConnection() {
     ENVOY_CONN_LOG(trace, "connection_limit_per_client: runtime disabled", read_callbacks_->connection());
     return Network::FilterStatus::Continue;
   }
+  std::string client_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress()->asString();
+  std::size_t pos = client_address.find_last_of(':');
+  client_address = client_address.substr(0, pos);
 
   config_->stats().active_connections_.inc();
 
-  if (!config_->incrementConnectionWithinLimit()) {
+  if (!config_->incrementConnectionWithinLimit(client_address)) {
     config_->stats().limited_connections_.inc();
-    ENVOY_CONN_LOG(trace, "connection_limit_per_client: connection limiting connection",
-                   read_callbacks_->connection());
+    ENVOY_CONN_LOG(info, "connection_limit_per_client: limiting connection (from: {})",
+                   read_callbacks_->connection(), client_address);
 
     // Set is_rejected_ is true, so that onData() will return StopIteration during the delay time.
     is_rejected_ = true;
     // The close() will trigger onEvent() with close event, increment the active connections count.
-    config_->incrementConnection();
+    config_->incrementConnection(client_address);
 
     // Delay rejection provides a better DoS protection for Envoy.
     absl::optional<std::chrono::milliseconds> duration = config_->delay();
@@ -90,6 +98,9 @@ Network::FilterStatus Filter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  ENVOY_CONN_LOG(info, "connection_limit_per_client: allowing connection (from: {})",
+                   read_callbacks_->connection(), client_address);
+
   return Network::FilterStatus::Continue;
 }
 
@@ -97,8 +108,15 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     resetTimerState();
-    config_->decrementConnection();
+
+    std::string client_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress()->asString();
+    std::size_t pos = client_address.find_last_of(':');
+    client_address = client_address.substr(0, pos);
+    config_->decrementConnection(client_address);
     config_->stats().active_connections_.dec();
+
+    ENVOY_CONN_LOG(info, "connection_limit_per_client: closing connection (from: {})",
+                   read_callbacks_->connection(), client_address);
   }
 }
 

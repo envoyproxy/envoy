@@ -145,6 +145,7 @@ extensions/filters/common/original_src @snowp @klarose
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
+/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder @juan-vg
 /*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy @tonya11en
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123

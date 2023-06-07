@@ -187,6 +187,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.connection_limit":                     "//source/extensions/filters/network/connection_limit:config",
+    "envoy.filters.network.connection_limit_per_client":          "//source/extensions/filters/network/connection_limit_per_client:config",
     "envoy.filters.network.direct_response":                      "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                          "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",

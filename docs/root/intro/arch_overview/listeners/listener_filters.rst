@@ -152,3 +152,13 @@ Connection limiting filter
 Envoy supports local (non-distributed) connection limiting of L4 connections via the
 :ref:`Connection limit filter <config_network_filters_connection_limit>` and runtime
 connection limiting via the :ref:`Runtime listener connection limit <config_listeners_runtime>`.
+
+
+.. _arch_overview_connection_limit_per_client:
+
+Connection limiting per client filter
+--------------------------
+
+Envoy also supports local (non-distributed) connection limiting of L4 connections per each client via the
+:ref:`Connection limit per client filter <config_network_filters_connection_limit_per_client>` and runtime
+connection limiting per client via the :ref:`Runtime listener connection limit per client <config_listeners_runtime>`.
