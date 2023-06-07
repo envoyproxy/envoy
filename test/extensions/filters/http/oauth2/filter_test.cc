@@ -1579,8 +1579,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                      AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(third_request_headers, false));
@@ -1616,8 +1616,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                      AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -1670,8 +1670,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                      AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -1722,8 +1722,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                      AuthType::UrlEncodedBody));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -1772,8 +1772,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
 
   EXPECT_CALL(*oauth_client_,
-              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                      AuthType::BasicAuth));
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::BasicAuth));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
