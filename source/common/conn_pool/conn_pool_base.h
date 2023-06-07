@@ -23,6 +23,7 @@ class ConnPoolImplBase;
 struct AttachContext {
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
+  uint64_t connection_id_;
 };
 
 // ActiveClient provides a base class for connection pool clients that handles connection timings
