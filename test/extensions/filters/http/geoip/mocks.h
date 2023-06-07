@@ -1,5 +1,8 @@
 #include "source/extensions/filters/http/geoip/geoip_provider_config.h"
 
+#include "test/extensions/filters/http/geoip/dummy.pb.h"
+#include "test/extensions/filters/http/geoip/dummy.pb.validate.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -27,7 +30,7 @@ public:
   std::string name() const override { return "envoy.geoip_providers.dummy"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<test::extensions::filters::http::geoip::DummyProvider>();
   }
 
 private:

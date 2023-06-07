@@ -23,13 +23,6 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
       quic_info->quic_config_.max_idle_time_before_crypto_handshake()) {
     quic_info->quic_config_.set_max_idle_time_before_crypto_handshake(crypto_timeout);
   }
-  // Default enable RVCM connection option so that port migration is enabled.
-  quic::QuicTagVector connection_options;
-  if (quic_info->quic_config_.HasSendConnectionOptions()) {
-    connection_options = quic_info->quic_config_.SendConnectionOptions();
-  }
-  connection_options.push_back(quic::kRVCM);
-  quic_info->quic_config_.SetConnectionOptionsToSend(connection_options);
   return quic_info;
 }
 
