@@ -340,6 +340,7 @@ case $CI_TARGET in
             "--define" "tcmalloc=gperftools"
             "--define" "zlib=ng"
             "--define" "uhv=enabled"
+            "--define" "vtune_profile=true"
             "--@envoy//bazel:http3=False"
             "--@envoy//source/extensions/filters/http/kill_request:enabled"
             "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
