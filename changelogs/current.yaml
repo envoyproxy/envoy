@@ -94,6 +94,10 @@ minor_behavior_changes:
   change: |
     Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
     query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
+- area: upstream
+  change: |
+    Changed behavior of the request encoder related to half closed connections. This change can be reverted temporarily by
+    setting the runtime guard ``envoy.reloadable_features.use_half_close_hint_from_connection`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
