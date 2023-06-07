@@ -549,11 +549,12 @@ TEST_F(RouterTest, AddCookie) {
       }));
 
   std::string cookie_value;
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,
                            const StreamInfo::FilterStateSharedPtr) {
-        cookie_value = add_cookie("foo", "", std::chrono::seconds(1337));
+        cookie_value = add_cookie("foo", "", std::chrono::seconds(1337), cookie_attributes);
         return absl::optional<uint64_t>(10);
       }));
 
@@ -590,13 +591,13 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,
                            const StreamInfo::FilterStateSharedPtr) {
         // this should be ignored
-        add_cookie("foo", "", std::chrono::seconds(1337));
+        add_cookie("foo", "", std::chrono::seconds(1337), cookie_attributes);
         return absl::optional<uint64_t>(10);
       }));
 
@@ -634,12 +635,13 @@ TEST_F(RouterTest, AddMultipleCookies) {
       }));
 
   std::string choco_c, foo_c;
+  Http::CookieAttributeRefVector cookie_attributes;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const Http::HashPolicy::AddCookieCallback add_cookie,
                            const StreamInfo::FilterStateSharedPtr) {
-        choco_c = add_cookie("choco", "", std::chrono::seconds(15));
-        foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337));
+        choco_c = add_cookie("choco", "", std::chrono::seconds(15), cookie_attributes);
+        foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337), cookie_attributes);
         return absl::optional<uint64_t>(10);
       }));
 
