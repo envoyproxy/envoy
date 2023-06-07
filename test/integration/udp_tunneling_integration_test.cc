@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -130,8 +131,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, IPv4HostMatch) {
 
 TEST_P(ConnectUdpTerminationIntegrationTest, IPv6HostMatch) {
   host_to_match_ = "[2001:0db8:85a3::8a2e:0370:7334]:80";
-  connect_udp_headers_.setPath(
-      "/.well-known/masque/udp/2001:0db8:85a3::8a2e:0370:7334/80/");
+  connect_udp_headers_.setPath("/.well-known/masque/udp/2001:0db8:85a3::8a2e:0370:7334/80/");
   initialize();
   setUpConnection();
 }

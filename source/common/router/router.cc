@@ -777,7 +777,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
       upstream_protocol = UpstreamProtocol::TCP;
     }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      downstream_headers_->getUpgradeValue() == Http::Headers::get().UpgradeValues.ConnectUdp) {
+        downstream_headers_->getUpgradeValue() == Http::Headers::get().UpgradeValues.ConnectUdp) {
       upstream_protocol = UpstreamProtocol::UDP;
     }
     // Allow POST for proxying raw TCP if it is configured.
