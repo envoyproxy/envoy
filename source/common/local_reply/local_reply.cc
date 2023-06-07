@@ -56,8 +56,7 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::ResponseMapper&
           config,
       Server::Configuration::FactoryContext& context)
-      : filter_(AccessLog::FilterFactory::fromProto(config.filter(),
-                                                    context.getServerFactoryContext())) {
+      : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context)) {
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
