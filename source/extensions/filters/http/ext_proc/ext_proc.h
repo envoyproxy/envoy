@@ -67,7 +67,7 @@ public:
     const Grpc::Status::GrpcStatus status_;
     const ProcessorState::CallbackState callback_state_;
   };
-  using GrpcCalls = std::list<GrpcCall>;
+  using GrpcCalls = std::deque<GrpcCall>;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,

@@ -294,7 +294,6 @@ protected:
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
                 filter_config_name)
             ->grpcCalls(traffic_direction);
-
     int calls_count = std::count_if(
         grpc_calls.begin(), grpc_calls.end(),
         [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
