@@ -2368,20 +2368,27 @@ TEST_P(XdsTpAdsIntegrationTest, EdsAlternatingLedsUsage) {
 }
 
 // Make sure two listeners send only a single SRDS request.
-TEST_P(AdsIntegrationTest, SRDSPausedDuringLDS) {
+TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
   initialize();
-  const auto lds_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
-  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-  const auto eds_type_url =
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto lds_type_url = Config::TypeUrl::get().Listener;
+  const auto cds_type_url = Config::TypeUrl::get().Cluster;
+  const auto eds_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const auto srds_type_url = Config::TypeUrl::get().ScopedRouteConfiguration;
+  const auto rds_type_url = Config::TypeUrl::get().RouteConfiguration;
 
-  const auto srds_type_url =
-      Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>();
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
 
   std::vector<envoy::config::listener::v3::Listener> listeners;
-  for (int i = 0; i < 2; ++i) {
-    std::string hcm = fmt::format(
-        R"EOF(
+  const std::string hcm = R"EOF(
         filters:
         - name: http
           typed_config:
@@ -2400,40 +2407,30 @@ TEST_P(AdsIntegrationTest, SRDSPausedDuringLDS) {
                       key: vip
               rds_config_source:
                 resource_api_version: V3
-                ads: {{}}
+                ads: {}
               scoped_rds:
                 scoped_rds_config_source:
                   resource_api_version: V3
-                  ads: {{}}
+                  ads: {}
             http_filters:
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-      )EOF");
+    )EOF";
+  for (int i = 0; i < 2; ++i) {
     auto listener = ConfigHelper::buildBaseListener(
         "listener", Network::Test::getLoopbackAddressString(ipVersion()), hcm);
     listener.set_name(absl::StrCat("listener_", i));
     listeners.push_back(std::move(listener));
   }
 
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                             {buildCluster("cluster_0")},
-                                                             {buildCluster("cluster_0")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
-  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
-
   EXPECT_TRUE(compareDiscoveryRequest(lds_type_url, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(lds_type_url, listeners, listeners,
                                                                {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"cluster_0"}, {}, {}));
-
   test_server_->waitForCounterEq("listener_manager.listener_added", 2);
+
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
 
   // Expect a single request for SRDS resources.
   EXPECT_TRUE(compareDiscoveryRequest(srds_type_url, "", {}, {}, {}));
@@ -2453,11 +2450,25 @@ TEST_P(AdsIntegrationTest, SRDSPausedDuringLDS) {
       )EOF",
                                   i, i, i),
                               scoped_route);
+    scoped_route_configs.push_back(scoped_route);
   }
 
   sendDiscoveryResponse<envoy::config::route::v3::ScopedRouteConfiguration>(
       srds_type_url, scoped_route_configs, scoped_route_configs, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "", {"route_0", "route_1"},
+                                      {"route_0", "route_1"}, {}));
+
   EXPECT_TRUE(compareDiscoveryRequest(srds_type_url, "1", {}, {}, {}));
+
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      rds_type_url,
+      {buildRouteConfig("route_0", "cluster_0"), buildRouteConfig("route_1", "cluster_0")},
+      {buildRouteConfig("route_0", "cluster_0"), buildRouteConfig("route_1", "cluster_0")}, {},
+      "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "1", {"route_0", "route_1"}, {}, {}));
+
   test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
 }
 
