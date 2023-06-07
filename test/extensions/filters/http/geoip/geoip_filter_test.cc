@@ -59,8 +59,6 @@ public:
 
   void initializeProviderFactory() {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     Registry::InjectFactory<GeoipProviderFactory> registered(*dummy_factory_);
   }
 
@@ -90,6 +88,8 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
       city: "x-geo-city"
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;

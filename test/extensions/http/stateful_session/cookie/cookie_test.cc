@@ -63,12 +63,12 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       Envoy::Http::TestResponseHeaderMapImpl response_headers;
       // Check the format of the cookie sent back to client.
       session_state->onUpdate(mock_host, response_headers);
-
+      Envoy::Http::CookieAttributeRefVector cookie_attributes;
       EXPECT_EQ(response_headers.get_("set-cookie"),
                 Envoy::Http::Utility::makeSetCookieValue(
                     "override_host",
                     Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "",
-                    std::chrono::seconds(0), true));
+                    std::chrono::seconds(0), true, cookie_attributes));
     }
   }
 
@@ -128,11 +128,12 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       } else {
         cookie_content = "2.3.4.5:80";
       }
+      Envoy::Http::CookieAttributeRefVector cookie_attributes;
       EXPECT_EQ(response_headers.get_("set-cookie"),
                 Envoy::Http::Utility::makeSetCookieValue(
                     "override_host",
                     Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "/path",
-                    std::chrono::seconds(5), true));
+                    std::chrono::seconds(5), true, cookie_attributes));
     }
   }
   {
