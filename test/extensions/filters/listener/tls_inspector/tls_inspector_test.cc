@@ -87,7 +87,7 @@ public:
     EXPECT_CALL(os_sys_calls_, readv(_, _, _))
         .WillOnce(Invoke(
             [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-              memcpy(iov->iov_base, client_hello.data(), iov->iov_len));
+              memcpy(iov->iov_base, client_hello.data(), iov->iov_len);
               return Api::SysCallSizeResult{ssize_t(iov->iov_len), 0};
             }))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));

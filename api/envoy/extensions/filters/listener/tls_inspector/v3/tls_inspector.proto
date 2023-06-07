@@ -24,10 +24,10 @@ message TlsInspector {
   // Populate ``JA3`` fingerprint hash using data from the TLS Client Hello packet. Default is false.
   google.protobuf.BoolValue enable_ja3_fingerprinting = 1;
 
-  // The size of the initial buffer requested by the tls_inspector.
+  // The size in bytes of the initial buffer requested by the tls_inspector.
   // If the filter needs to read additional bytes from the socket, the
   // filter will double the buffer up to it's default maximum of 64KiB.
   // If this size is not defined, defaults to maximum 64KiB that the
   // tls inspector will consume.
-  google.protobuf.UInt32Value initial_read_buffer_size = 2;
+  google.protobuf.UInt32Value initial_read_buffer_size = 2 {lt: 65537 gt: 0}];
 }

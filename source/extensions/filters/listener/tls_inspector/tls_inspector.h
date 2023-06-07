@@ -103,7 +103,7 @@ private:
   bool clienthello_success_{false};
   // We dynamically adjust the number of bytes requested by the filter up to the
   // maxConfigReadBytes.
-  uint32_t requested_read_bytes_{0};
+  uint32_t requested_read_bytes_;
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;
