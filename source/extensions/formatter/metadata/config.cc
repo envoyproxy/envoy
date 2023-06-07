@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-::Envoy::Formatter::CommandParserPtr
-MetadataFormatterFactory::createCommandParserFromProto(const Protobuf::Message&) {
+::Envoy::Formatter::CommandParserPtr MetadataFormatterFactory::createCommandParserFromProto(
+    const Protobuf::Message&, Server::Configuration::CommonFactoryContext&) {
   return std::make_unique<MetadataFormatterCommandParser>();
 }
 

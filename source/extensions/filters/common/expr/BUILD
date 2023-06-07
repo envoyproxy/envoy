@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["evaluator.h"],
     deps = [
         ":context_lib",
+        "//envoy/singleton:manager_interface",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@com_google_cel_cpp//eval/public:activation",

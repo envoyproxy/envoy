@@ -9,9 +9,9 @@ namespace CEL {
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
-    Expr::Builder& builder, const google::api::expr::v1alpha1::Expr& input_expr)
-    : parsed_expr_(input_expr) {
-  compiled_expr_ = Expr::createExpression(builder, parsed_expr_);
+    Expr::BuilderInstanceSharedPtr builder, const google::api::expr::v1alpha1::Expr& input_expr)
+    : builder_(builder), parsed_expr_(input_expr) {
+  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
 }
 
 bool CELAccessLogExtensionFilter::evaluate(const StreamInfo::StreamInfo& stream_info,

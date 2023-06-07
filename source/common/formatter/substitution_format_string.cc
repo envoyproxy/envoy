@@ -30,7 +30,7 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     }
     auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         formatter.typed_config(), context.messageValidationVisitor(), *factory);
-    auto parser = factory->createCommandParserFromProto(*typed_config);
+    auto parser = factory->createCommandParserFromProto(*typed_config, context);
     if (!parser) {
       throw EnvoyException(absl::StrCat("Failed to create command parser: ", formatter.name()));
     }

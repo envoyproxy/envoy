@@ -1661,9 +1661,9 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
@@ -1740,9 +1740,9 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
 
     ProtobufWkt::Struct struct_config =
         *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());

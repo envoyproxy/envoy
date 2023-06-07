@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
@@ -122,10 +123,13 @@ public:
    * Creates a particular CommandParser implementation.
    *
    * @param config supplies the configuration for the command parser.
+   * @param context supplies the factory context.
    * @return CommandParserPtr the CommandParser which will be used in
    * SubstitutionFormatParser::parse() when evaluating an access log format string.
    */
-  virtual CommandParserPtr createCommandParserFromProto(const Protobuf::Message& config) PURE;
+  virtual CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message& config,
+                               Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.formatter"; }
 };
