@@ -76,6 +76,9 @@ class GcpTrafficDirectorIntegrationTest
       public testing::TestWithParam<std::tuple<IpVersion, SotwOrDelta>> {
 public:
   GcpTrafficDirectorIntegrationTest() : BaseClientIntegrationTest(ip_version()) {
+    // TODO(https://github.com/envoyproxy/envoy/issues/27848): remove these force registrations
+    // once the EngineBuilder APIs support conditional force registration.
+
     // Force register the Google gRPC library.
     Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
     // Force register the gRPC mux implementations.
