@@ -499,7 +499,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF", /*will_call_upstream_host=*/false);
+  )EOF",
+             /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1559,7 +1560,8 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF", /*will_call_upstream_host=*/false);
+  )EOF",
+             /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1595,7 +1597,8 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF", /*will_call_upstream_host=*/false);
+  )EOF",
+             /*will_call_upstream_host=*/false);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1632,7 +1635,8 @@ TEST_F(HttpFilterTest, PostAndFail) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF", /*will_call_upstream_host=*/false);
+  )EOF",
+             /*will_call_upstream_host=*/false);
 
   EXPECT_FALSE(config_->failureModeAllow());
 
@@ -1810,7 +1814,8 @@ TEST_F(HttpFilterTest, PostAndDownstreamReset) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
-  )EOF", /*will_call_upstream_host=*/false);
+  )EOF",
+             /*will_call_upstream_host=*/false);
 
   EXPECT_FALSE(config_->failureModeAllow());
 
