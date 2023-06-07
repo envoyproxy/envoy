@@ -828,11 +828,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
   auto excluded_hosts_per_locality =
       original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
 
-  HostSetImpl::updateHosts(
-      HostSetImpl::updateHostsParams(
-          hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
-          degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed, absl::nullopt);
+  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
+                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
+                               degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
+                               excluded_hosts_per_locality),
+                           determineLocalityWeights(*hosts_per_locality), hosts_added,
+                           hosts_removed, absl::nullopt, absl::nullopt);
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
@@ -870,7 +871,8 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
-    uint32_t priority, absl::optional<uint32_t> overprovisioning_factor) {
+    uint32_t priority, absl::optional<bool> weighted_priority_health,
+    absl::optional<uint32_t> overprovisioning_factor) {
   // Use original hostset's overprovisioning_factor.
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
 
@@ -878,6 +880,8 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioningFactor());
+  ASSERT(!weighted_priority_health.has_value() ||
+         weighted_priority_health.value() == host_set->weightedPriorityHealth());
   return HostSetImplPtr{
       new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }

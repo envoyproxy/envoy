@@ -26,6 +26,7 @@ private:
 
   PriorityStateManagerPtr priority_state_manager_;
   uint32_t overprovisioning_factor_;
+  bool weighted_priority_health_;
 };
 
 /**

@@ -377,6 +377,7 @@ protected:
       LocalityWeightsConstSharedPtr locality_weights_;
       // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
       const uint32_t priority_;
+      bool weighted_priority_health_;
       uint32_t overprovisioning_factor_;
     };
 
@@ -533,6 +534,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
@@ -623,7 +625,7 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor,
+                                 bool weighted_priority_health, uint64_t overprovisioning_factor,
                                  HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 

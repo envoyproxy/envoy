@@ -301,6 +301,12 @@ new_features:
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: load_balancing
+  change: |
+    added new option :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
+    to compute the health of a :ref:`priority level <arch_overview_load_balancing_priority_levels>` by using
+    :ref:`load balancing weight <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>`
+    instead of the count of healthy hosts.
 - area: application_logs
   change: |
     Added bootstrap option
