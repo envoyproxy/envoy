@@ -9,6 +9,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SmtpProxy {
 
+namespace {
+
 static const absl::string_view CRLF = "\r\n";
 
 // While https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.4
@@ -34,7 +36,10 @@ const size_t kMaxReplyLine = 1024;
 // unbounded amount.
 const size_t kMaxReplyBytes = 65536;
 
-Decoder::Result GetLine(Buffer::Instance& data, size_t start, std::unique_ptr<char[]>& raw_line,
+using RawLinePtr = std::unique_ptr<char[]>;
+}
+
+Decoder::Result GetLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
                         absl::string_view& line, size_t max_line) {
   ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
@@ -60,7 +65,7 @@ Decoder::Result GetLine(Buffer::Instance& data, size_t start, std::unique_ptr<ch
 }
 
 Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& result) {
-  std::unique_ptr<char[]> raw_line;
+  RawLinePtr raw_line;
   absl::string_view line;
   Result res = GetLine(data, 0, raw_line, line, kMaxCommandLine);
   if (res != Result::ReadyForNext) {
@@ -106,7 +111,7 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
 }
 
 Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& result) {
-  std::unique_ptr<char[]> raw_line;
+  RawLinePtr raw_line;
 
   absl::optional<int> code;
   size_t line_off = 0;
