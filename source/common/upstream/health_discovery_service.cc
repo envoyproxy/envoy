@@ -289,14 +289,14 @@ void HdsDelegate::onReceiveMessage(
                           server_context_.messageValidationContext().dynamicValidationVisitor());
   }
   END_TRY
-  catch (const ProtoValidationException& ex) {
+  CATCH(const ProtoValidationException& ex, {
     // Increment error count
     stats_.errors_.inc();
     ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());
 
     // Do not continue processing message
     return;
-  }
+  });
 
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);

@@ -690,13 +690,13 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
           ++disk_layers;
         }
         END_TRY
-        catch (EnvoyException& e) {
+        CATCH(EnvoyException & e, {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
-        }
+        });
       }
       break;
     }
