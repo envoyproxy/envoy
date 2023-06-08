@@ -401,6 +401,11 @@ namespace Utility {
  */
 void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
 
+/**
+ * Serializes custom log tags to a string that will be prepended to the log message.
+ */
+std::string serializeLogTags(std::map<std::string, std::string> tags);
+
 } // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
@@ -516,6 +521,24 @@ public:
  * Command line options for log macros: use Fine-Grain Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,\
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
+/**
+ * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
+ * are serialized and prepended to the log message.
+ * For example, the map {{"key1","val1","key2","val2"}} would be serialized to:
+ * [Tags: "key1":"val1","key2":"val2"]. The serialization pattern is defined by
+ * Envoy::Logger::Utility::serializeLogTags function.
+ */
+#define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
+  ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to
