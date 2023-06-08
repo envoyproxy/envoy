@@ -1064,7 +1064,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
+  EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
 }
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {

@@ -554,10 +554,12 @@ public:
     *selector->mutable_keys()->Add() = std::string(metadata_key);
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
-    lb_ = std::make_unique<SubsetLoadBalancer>(
-        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_scope_,
-        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
-        absl::nullopt, common_config_, simTime());
+    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+        LoadBalancerType::Random, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt,
+        common_config_);
+    lb_ = std::make_unique<SubsetLoadBalancer>(*subset_info_, std::move(child_lb_creator),
+                                               priority_set_, &local_priority_set_, stats_,
+                                               stats_scope_, runtime_, random_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);
