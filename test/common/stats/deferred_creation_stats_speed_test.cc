@@ -95,8 +95,7 @@ public:
       ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
       scopes_.push_back(scope);
       auto lazy_stat = std::make_shared<DeferredCreationCompatibleStats<AwesomeStats>>(
-          DeferredCreationCompatibleStats<AwesomeStats>::create(scope, stat_names_,
-                                                                deferred_creation_));
+          createDeferredCompatibleStats<AwesomeStats>(scope, stat_names_, deferred_creation_));
       lazy_stats_.push_back(lazy_stat);
       if (!defer_init) {
         *(*lazy_stat);

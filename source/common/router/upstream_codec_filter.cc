@@ -23,7 +23,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/stats/deferred_creation.h"
 
 namespace Envoy {
 namespace Router {

@@ -218,6 +218,22 @@ using SizeFn = std::function<void(std::size_t)>;
  */
 template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
+/**
+ * Interface for stats lazy initialization.
+ * To reduce memory and CPU consumption, Envoy can enable the bootstrap config
+ * :ref:`enable_deferred_creation_stats
+ * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
+ * A 'StatsStructType' is only created when any of its field is referenced.
+ * See more context: https://github.com/envoyproxy/envoy/issues/23575
+ */
+template <typename StatsStructType> class DeferredCreationCompatibleInterface {
+public:
+  // Helper function to get-or-create and return the StatsStructType object.
+  virtual StatsStructType& instantiate() PURE;
+
+  virtual ~DeferredCreationCompatibleInterface() = default;
+};
+
 // Template that lazily initializes a StatsStruct.
 // The bootstrap config :ref:`enable_deferred_creation_stats
 // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
@@ -225,5 +241,21 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
 template <typename StatsStructType> class DeferredCreation;
 template <typename StatsStructType> class DirectStats;
 
+// A helper class for a lazy compatible stats struct type.
+template <typename StatsStructType> class DeferredCreationCompatibleStats {
+public:
+  DeferredCreationCompatibleStats(
+      std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
+      : data_(std::move(d)) {}
+  // Allows move construct and assign.
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) = default;
+
+  inline StatsStructType* operator->() { return &data_->instantiate(); };
+  inline StatsStructType& operator*() { return data_->instantiate(); };
+
+private:
+  std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
+};
 } // namespace Stats
 } // namespace Envoy

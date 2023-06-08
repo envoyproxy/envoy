@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/conn_pool_map.h"
 
 namespace Envoy {

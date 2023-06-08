@@ -12,25 +12,6 @@
 namespace Envoy {
 namespace Stats {
 
-template <typename StatsStructType> class DirectStats;
-template <typename StatsStructType> class DeferredCreation;
-
-/**
- * Interface for stats lazy initialization.
- * To reduce memory and CPU consumption, Envoy can enable the bootstrap config
- * :ref:`enable_deferred_creation_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
- * A 'StatsStructType' is only created when any of its field is referenced.
- * See more context: https://github.com/envoyproxy/envoy/issues/23575
- */
-template <typename StatsStructType> class DeferredCreationCompatibleInterface {
-public:
-  // Helper function to get-or-create and return the StatsStructType object.
-  virtual StatsStructType& instantiate() PURE;
-
-  virtual ~DeferredCreationCompatibleInterface() = default;
-};
-
 /**
  * Lazy-initialization wrapper for StatsStructType, intended for deferred instantiation of a block
  * of stats that might not be needed in a given Envoy process.
@@ -116,33 +97,17 @@ private:
   StatsStructType stats_;
 };
 
-// A helper class for a lazy compatible stats struct type.
-template <typename StatsStructType> class DeferredCreationCompatibleStats {
-public:
-  static DeferredCreationCompatibleStats
-  create(Stats::ScopeSharedPtr scope, const typename StatsStructType::StatNameType& stat_names,
-         bool deferred_creation) {
-    if (deferred_creation) {
-      return {std::make_unique<DeferredCreation<StatsStructType>>(stat_names, scope)};
-    } else {
-      return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
-    }
+template <typename StatsStructType>
+DeferredCreationCompatibleStats<StatsStructType>
+createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
+                              const typename StatsStructType::StatNameType& stat_names,
+                              bool deferred_creation) {
+  if (deferred_creation) {
+    return {std::make_unique<DeferredCreation<StatsStructType>>(stat_names, scope)};
+  } else {
+    return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
   }
-
-  // Allows move construct and assign.
-  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) = default;
-  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) = default;
-
-  inline StatsStructType* operator->() { return &data_->instantiate(); };
-  inline StatsStructType& operator*() { return data_->instantiate(); };
-
-private:
-  DeferredCreationCompatibleStats(
-      std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
-      : data_(std::move(d)) {}
-
-  std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
-};
+}
 
 } // namespace Stats
 } // namespace Envoy

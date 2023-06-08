@@ -56,7 +56,6 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/shared_pool/shared_pool.h"
-#include "source/common/stats/deferred_creation.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"

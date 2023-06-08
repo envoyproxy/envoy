@@ -14,7 +14,6 @@
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/stats/deferred_creation.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

@@ -1,7 +1,6 @@
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 
 #include "source/common/network/connection_impl.h"
-#include "source/common/stats/deferred_creation.h"
 
 namespace Envoy {
 namespace Network {
