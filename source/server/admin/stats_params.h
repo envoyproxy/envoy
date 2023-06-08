@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <regex>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -25,6 +24,7 @@ constexpr absl::string_view TextReadouts = "TextReadouts";
 enum class StatsFormat {
 #ifdef ENVOY_ADMIN_HTML
   Html,
+  ActiveHtml,
 #endif
   Json,
   Prometheus,
@@ -38,6 +38,12 @@ enum class StatsType {
   Gauges,
   Histograms,
   All,
+};
+
+enum class HiddenFlag {
+  Include,  // Will include hidden stats along side non-hidden stats
+  ShowOnly, // Will only show hidden stats and exclude hidden stats
+  Exclude,  // Default behavior. Will exclude all hidden stats
 };
 
 struct StatsParams {
@@ -59,8 +65,8 @@ struct StatsParams {
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
   StatsFormat format_{StatsFormat::Text};
+  HiddenFlag hidden_{HiddenFlag::Exclude};
   std::string filter_string_;
-  std::shared_ptr<std::regex> filter_;
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;

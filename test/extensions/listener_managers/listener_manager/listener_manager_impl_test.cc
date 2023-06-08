@@ -23,11 +23,14 @@
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/listener_managers/listener_manager/config.pb.h"
+#include "test/extensions/listener_managers/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"
@@ -597,18 +600,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
   }
 
   std::string name() const override { return "non_terminal"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -620,6 +619,8 @@ address:
 filter_chains:
 - filters:
   - name: non_terminal
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.NonTerminalFilter
   name: foo
   )EOF";
 
@@ -679,9 +680,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::TestStatsFilter>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -699,9 +699,6 @@ private:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -714,6 +711,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -727,9 +726,6 @@ filter_chains:
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, UsingAddressAsStatsPrefixForMultipleAddresses) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -747,6 +743,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -787,6 +785,18 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
                             EnvoyException,
                             "listener foo: has different socket type. The listener only "
                             "support same socket type for all the addresses.");
+}
+
+TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    connection_balance_config:
+      exact_balance: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener named 'foo': address is necessary");
 }
 
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
@@ -3837,6 +3847,72 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateMatch) {
+  if (!use_matcher_) {
+    return;
+  }
+
+  std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - name: foo
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+            key: filter_state_key
+        exact_match_map:
+          map:
+            "filter_state_value":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+    )EOF";
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // No filter state value set - no match.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a non-matching key - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a matching key but unknown value - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Known filter state key and matching value - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationProtocolMatch) {
   std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -4912,6 +4988,82 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterStateMatch) {
+  if (!use_matcher_) {
+    return;
+  }
+
+  std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - name: foo
+    - name: bar
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+            key: filter_state_key
+        exact_match_map:
+          map:
+            "filter_state_value":
+              action:
+                name: bar
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bar
+      on_no_match:
+        action:
+          name: foo
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: foo
+    )EOF";
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // No filter state value set - match foo.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a non-matching key - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Filter state set to a matching key but unknown value - no match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+
+  stream_info_.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Known filter state key and matching value - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "bar");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicationProtocolMatch) {
   std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -5764,18 +5916,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::OriginalDstTestFilter>();
   }
 
   std::string name() const override { return "test.listener.original_dst"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -5789,6 +5937,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5833,9 +5983,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -5849,6 +5996,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5888,9 +6037,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -5904,6 +6050,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5968,16 +6116,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      // Using Struct instead of a custom per-filter empty config proto
-      // This is only allowed in tests.
-      return std::make_unique<Envoy::ProtobufWkt::Struct>();
+      return std::make_unique<
+          test::extensions::listener_managers::listener_manager::OriginalDstTestIPv6Filter>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
@@ -5989,6 +6134,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       name: foo
     listener_filters:
     - name: "test.listener.original_dstipv6"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestIPv6Filter
   )EOF",
                                                        Network::Address::IpVersion::v6);
 

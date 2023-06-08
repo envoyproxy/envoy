@@ -19,15 +19,15 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(
           *connection, connection->connection_id(), dispatcher, send_buffer_limit,
           std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
-}
+      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
+      connection_stats_(connection_stats) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -199,12 +199,14 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
 void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address,
                                               const quic::QuicReceivedPacket& packet) {
-  if (quic_connection_->deferSend()) {
-    // If L4 filters causes the connection to be closed early during initialization, now
-    // is the time to actually close the connection.
-    maybeHandleCloseDuringInitialize();
-  }
+  // If L4 filters causes the connection to be closed early during initialization, now
+  // is the time to actually close the connection.
+  maybeHandleCloseDuringInitialize();
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
+  if (connection()->sent_server_preferred_address().IsInitialized() &&
+      self_address == connection()->sent_server_preferred_address()) {
+    connection_stats_.num_packets_rx_on_preferred_address_.inc();
+  }
 }
 
 } // namespace Quic

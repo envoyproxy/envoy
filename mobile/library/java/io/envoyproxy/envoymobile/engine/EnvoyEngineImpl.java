@@ -8,14 +8,11 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 import java.util.Map;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
-  // TODO(goaway): enforce agreement values in /library/common/types/c_types.h.
-  private static final int ENVOY_SUCCESS = 0;
-  private static final int ENVOY_FAILURE = 1;
-
   private static final int ENVOY_NET_GENERIC = 0;
   private static final int ENVOY_NET_WWAN = 1;
   private static final int ENVOY_NET_WLAN = 2;
@@ -38,13 +35,16 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param callbacks The callbacks for the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
+   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
+   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
+                                     long minDeliverySize) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    EnvoyHTTPStream stream =
-        new EnvoyHTTPStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
+    EnvoyHTTPStream stream = new EnvoyHTTPStream(engineHandle, streamHandle, callbacks,
+                                                 explicitFlowControl, minDeliverySize);
     stream.start();
     return stream;
   }
@@ -97,10 +97,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
-   * TODO(alyssawilk) change all the status returns to EnvoyStatus.
    */
   @Override
-  public int runWithYaml(String configurationYAML, String logLevel) {
+  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
     return runWithResolvedYAML(configurationYAML, logLevel);
   }
 
@@ -109,22 +108,33 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
-   * @return int A status indicating if the action was successful.
+   * @return EnvoyStatus A status indicating if the action was successful.
    */
   @Override
-  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
+  public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     performRegistration(envoyConfiguration);
-
-    return runWithResolvedYAML(envoyConfiguration.createYaml(), logLevel);
-  }
-
-  private int runWithResolvedYAML(String configurationYAML, String logLevel) {
     try {
-      return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
+      int status = JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(),
+                                        logLevel);
+      if (status == 0) {
+        return EnvoyStatus.ENVOY_SUCCESS;
+      }
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere.
-      return ENVOY_FAILURE;
     }
+    return EnvoyStatus.ENVOY_FAILURE;
+  }
+
+  private EnvoyStatus runWithResolvedYAML(String configurationYAML, String logLevel) {
+    try {
+      int status = JniLibrary.runEngine(this.engineHandle, configurationYAML, 0, logLevel);
+      if (status == 0) {
+        return EnvoyStatus.ENVOY_SUCCESS;
+      }
+    } catch (Throwable throwable) {
+      // TODO: Need to have a way to log the exception somewhere.
+    }
+    return EnvoyStatus.ENVOY_FAILURE;
   }
 
   /**

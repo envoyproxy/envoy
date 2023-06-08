@@ -70,6 +70,24 @@ const (
 	Critical LogType = 5
 )
 
+func (self LogType) String() string {
+	switch self {
+	case Trace:
+		return "trace"
+	case Debug:
+		return "debug"
+	case Info:
+		return "info"
+	case Warn:
+		return "warn"
+	case Error:
+		return "error"
+	case Critical:
+		return "critical"
+	}
+	return "unknown"
+}
+
 //******************* log level end *******************//
 
 // ****************** HeaderMap start ******************//
@@ -83,19 +101,27 @@ type HeaderMap interface {
 	// If multiple values associated with this key, first one will be returned.
 	Get(key string) (string, bool)
 
-	// Set key-value pair in header map, the previous pair will be replaced if exists
+	// Values returns all values associated with the given key.
+	// The returned slice is not a copy.
+	Values(key string) []string
+
+	// Set key-value pair in header map, the previous pair will be replaced if exists.
+	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
 	Set(key, value string)
 
 	// Add value for given key.
 	// Multiple headers with the same key may be added with this function.
 	// Use Set for setting a single header for the given key.
+	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
 	Add(key, value string)
 
 	// Del delete pair of specified key
+	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
 	Del(key string)
 
 	// Range calls f sequentially for each key and value present in the map.
 	// If f returns false, range stops the iteration.
+	// When there are multiple values of a key, f will be invoked multiple times with the same key and each value.
 	Range(f func(key, value string) bool)
 
 	// ByteSize return size of HeaderMap
@@ -104,7 +130,11 @@ type HeaderMap interface {
 
 type RequestHeaderMap interface {
 	HeaderMap
-	// others
+	Protocol() string
+	Scheme() string
+	Method() string
+	Host() string
+	Path() string
 }
 
 type RequestTrailerMap interface {
@@ -114,7 +144,7 @@ type RequestTrailerMap interface {
 
 type ResponseHeaderMap interface {
 	HeaderMap
-	// others
+	Status() (int, bool)
 }
 
 type ResponseTrailerMap interface {

@@ -39,6 +39,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "grpc_http1_bridge_integration_test",
+    size = "large",
     srcs = [
         "grpc_http1_bridge_integration_test.cc",
     ],

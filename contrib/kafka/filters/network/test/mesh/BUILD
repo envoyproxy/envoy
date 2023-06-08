@@ -39,6 +39,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:request_processor_lib",
+        "//test/mocks/network:network_mocks",
     ],
 )
 

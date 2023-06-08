@@ -64,6 +64,13 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    // TODO(https://github.com/envoyproxy/envoy/issues/23564): Http3 Datagram support should be
+    // turned on by returning quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is
+    // completed.
+    return quic::HttpDatagramSupport::kNone;
+  }
+
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
@@ -81,6 +88,9 @@ public:
 
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
+
+  void OnServerPreferredAddressAvailable(
+      const quic::QuicSocketAddress& server_preferred_address) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 

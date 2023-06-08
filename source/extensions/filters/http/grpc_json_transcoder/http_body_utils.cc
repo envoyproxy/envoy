@@ -4,7 +4,6 @@
 
 using Envoy::Protobuf::io::CodedInputStream;
 using Envoy::Protobuf::io::CodedOutputStream;
-using Envoy::Protobuf::io::StringOutputStream;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 
 namespace Envoy {

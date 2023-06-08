@@ -34,14 +34,14 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
 #ifdef ENVOY_ADMIN_HTML
+  case StatsFormat::ActiveHtml:
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setSubmitOnChange(true);
-    html_render->tableBegin(response_);
-    html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
-    html_render->tableEnd(response_);
-    html_render->startPre(response_);
+    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
     render_ = std::move(html_render);
+    if (params_.format_ == StatsFormat::ActiveHtml) {
+      return Http::Code::OK;
+    }
     break;
   }
 #endif
@@ -183,6 +183,14 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
       return true;
     }
 
+    if (params_.hidden_ == HiddenFlag::Exclude && stat->hidden()) {
+      return true;
+    }
+
+    if (params_.hidden_ == HiddenFlag::ShowOnly && !stat->hidden()) {
+      return true;
+    }
+
     // Capture the name if we did not early-exit due to used_only -- we'll use
     // the name for both filtering and for capturing the stat in the map.
     // stat->name() takes a symbol table lock and builds a string, so we only
@@ -192,12 +200,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // differs in that Prometheus only uses stat->name() for filtering, not
     // rendering, so it only grab the name if there's a filter.
     std::string name = stat->name();
-    if (params_.filter_ != nullptr) {
-      if (!std::regex_search(name, *params_.filter_)) {
-        return true;
-      }
-    } else if (params_.re2_filter_ != nullptr &&
-               !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
+    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
     stat_map_[name] = stat;

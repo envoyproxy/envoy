@@ -85,5 +85,20 @@ public:
 };
 
 } // namespace ConnectionPool
+
+namespace AsyncClient {
+
+class MockAsyncTcpClientCallbacks : public AsyncTcpClientCallbacks {
+public:
+  MockAsyncTcpClientCallbacks() = default;
+  ~MockAsyncTcpClientCallbacks() override = default;
+
+  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+} // namespace AsyncClient
 } // namespace Tcp
 } // namespace Envoy

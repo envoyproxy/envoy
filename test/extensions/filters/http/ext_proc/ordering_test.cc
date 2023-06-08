@@ -52,6 +52,7 @@ static const uint32_t BufferSize = 100000;
 class OrderingTest : public testing::Test {
 protected:
   static constexpr std::chrono::milliseconds kMessageTimeout = 200ms;
+  static constexpr uint64_t kMaxMessageTimeoutMs = 10000;
   static constexpr auto kMessageTimeoutNanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(kMessageTimeout).count();
 
@@ -69,7 +70,8 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, kMessageTimeout, *stats_store_.rootScope(), ""));
+    config_.reset(new FilterConfig(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
+                                   *stats_store_.rootScope(), ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -84,6 +86,7 @@ protected:
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
+    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     EXPECT_CALL(*stream, close());
     return stream;
   }
@@ -204,6 +207,7 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -219,6 +223,7 @@ class FastFailOrderingTest : public OrderingTest {
                                      const StreamInfo::StreamInfo&) override {
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, close());
+    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     callbacks.onGrpcError(Grpc::Status::Internal);
     return stream;
   }
@@ -454,7 +459,7 @@ TEST_F(OrderingTest, ResponseAllDataComesFast) {
   sendResponseHeaders(true);
   // The rest of the data might come in even before the response headers
   // response comes back.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, true));
 
   // When the response does comes back, we should immediately send the body to the server
   EXPECT_CALL(stream_delegate_, send(_, false));

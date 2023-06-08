@@ -45,8 +45,7 @@ TEST_P(InternalListenerIntegrationTest, BasicConfigUpdate) {
   initialize();
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -66,8 +65,7 @@ TEST_P(InternalListenerIntegrationTest, InplaceUpdate) {
   initialize();
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -90,8 +88,7 @@ TEST_P(InternalListenerIntegrationTest, DeleteListener) {
   initialize();
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         bootstrap.mutable_static_resources()->mutable_listeners()->RemoveLast();

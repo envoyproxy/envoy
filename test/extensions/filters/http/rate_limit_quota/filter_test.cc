@@ -337,8 +337,8 @@ public:
     // `on_no_match` field is configured.
     ASSERT_TRUE(match_result.ok());
     // Retrieve the matched action.
-    const RateLimitOnMactchAction* match_action =
-        dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+    const RateLimitOnMatchAction* match_action =
+        dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
     RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
@@ -442,8 +442,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   // `on_no_match` field is configured.
   ASSERT_TRUE(match_result.ok());
   // Retrieve the matched action.
-  const RateLimitOnMactchAction* match_action =
-      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+  const RateLimitOnMatchAction* match_action =
+      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.

@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -101,6 +100,7 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
+  ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
     end_time_ = absl::make_optional<std::chrono::nanoseconds>(
@@ -184,6 +184,17 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
+  ON_CALL(*this, setDownstreamTransportFailureReason(_))
+      .WillByDefault(Invoke([this](absl::string_view failure_reason) {
+        downstream_transport_failure_reason_ = std::string(failure_reason);
+      }));
+  ON_CALL(*this, downstreamTransportFailureReason())
+      .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
+  ON_CALL(*this, setUpstreamClusterInfo(_))
+      .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+        upstream_cluster_info_ = std::move(cluster_info);
+      }));
+  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

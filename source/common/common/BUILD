@@ -211,6 +211,7 @@ envoy_cc_library(
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//source/common/protobuf:protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
@@ -221,6 +222,9 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
+    external_deps = [
+        "spdlog",
+    ],
 )
 
 envoy_cc_library(
@@ -505,6 +509,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "scalar_to_byte_vector_lib",
     hdrs = ["scalar_to_byte_vector.h"],
+)
+
+envoy_cc_library(
+    name = "bit_array_lib",
+    hdrs = ["bit_array.h"],
+    deps = [
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(

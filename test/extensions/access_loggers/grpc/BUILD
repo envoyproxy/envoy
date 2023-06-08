@@ -75,6 +75,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "http_grpc_access_log_integration_test",
+    size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
@@ -106,6 +107,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
+    size = "large",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
@@ -128,6 +130,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",

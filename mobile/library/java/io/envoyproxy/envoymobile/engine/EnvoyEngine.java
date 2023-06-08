@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -13,9 +14,12 @@ public interface EnvoyEngine {
    *
    * @param callbacks The callbacks for receiving callbacks from the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
+   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
+   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
+                              long minDeliverySize);
 
   /**
    * Terminates the running engine.
@@ -40,7 +44,7 @@ public interface EnvoyEngine {
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithYaml(String configurationYAML, String logLevel);
+  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
@@ -51,7 +55,7 @@ public interface EnvoyEngine {
    * @param logLevel           The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+  EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 
   /**
    * Increments a counter with the given count.

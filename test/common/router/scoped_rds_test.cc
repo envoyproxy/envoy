@@ -14,7 +14,7 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/config/config_provider_impl.h"
-#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/scoped_rds.h"
 
@@ -24,6 +24,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -220,20 +221,26 @@ scoped_routes:
         key:
           fragments: { string_key: foo-key-2 }
 )EOF");
+  const auto config =
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes"));
   Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
-      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+      config, server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  Envoy::Router::ScopeKeyBuilderPtr scope_key_builder =
+      ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
   ASSERT_THAT(provider->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(provider->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key"}})
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key"}}))
                 ->name(),
             "foo");
   EXPECT_EQ(provider->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key-2"}})
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key-2"}}))
                 ->name(),
             "foo2");
   EXPECT_EQ(provider->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key,foo-key-2"}})
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key,foo-key-2"}}))
                 ->name(),
             "foo");
 }
@@ -388,11 +395,13 @@ scope_key_builder:
     envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
         scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
+    auto scope_key_builder_config = scoped_routes_config.scope_key_builder();
+    scope_key_builder_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder_config));
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
-        ScopedRoutesConfigProviderManagerOptArg(
-            scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
-            scoped_routes_config.scope_key_builder(), optional_http_filters));
+        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                                scoped_routes_config.rds_config_source(),
+                                                optional_http_filters));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -410,8 +419,8 @@ scope_key_builder:
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
   void pushRdsConfig(const std::vector<std::string>& route_config_names, const std::string& version,
-                     const std::string& override_config_tmpl = "") {
-    std::string route_config_tmpl = R"EOF(
+                     const fmt::format_string<const std::string&>& override_config_tmpl = "") {
+    constexpr absl::string_view default_route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -420,9 +429,10 @@ scope_key_builder:
         - match: {{ prefix: "/" }}
           route: {{ cluster: bluh }}
 )EOF";
-    if (!override_config_tmpl.empty()) {
-      route_config_tmpl = override_config_tmpl;
-    }
+
+    fmt::format_string<const std::string&> route_config_tmpl =
+        fmt::basic_string_view<char>(override_config_tmpl).size() != 0 ? override_config_tmpl
+                                                                       : default_route_config_tmpl;
     for (const std::string& name : route_config_names) {
       const auto route_config =
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
@@ -444,6 +454,7 @@ scope_key_builder:
   }
 
   Envoy::Config::SubscriptionCallbacks* srds_subscription_{};
+  Envoy::Router::ScopeKeyBuilderPtr scope_key_builder_;
   Envoy::Config::ConfigProviderPtr provider_;
   std::list<Init::TargetHandlePtr> target_handles_;
   Init::ExpectableWatcherImpl init_watcher_;
@@ -498,7 +509,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
 
-  std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -560,6 +571,11 @@ key:
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.
 TEST_F(ScopedRdsTest, OptionalUnknownFactoryForPerVirtualHostTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   setup(optional_http_filters);
@@ -578,7 +594,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
 
-  std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -630,24 +646,28 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -664,11 +684,13 @@ key:
 
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -709,24 +731,28 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -742,11 +768,13 @@ key:
                 .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -785,7 +813,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
@@ -826,7 +855,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
@@ -865,7 +895,8 @@ key:
   // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
   EXPECT_THAT(getScopedRdsProvider()
                   ->config<ScopedConfigImpl>()
-                  ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                  ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                   ->name(),
               "");
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
@@ -875,7 +906,8 @@ key:
             1UL);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -902,7 +934,8 @@ key:
   // The same scope-key now points to the same route table.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -927,7 +960,8 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "bar_routes");
 
@@ -942,12 +976,14 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -1001,7 +1037,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
@@ -1377,21 +1414,25 @@ key:
   // Route config for foo key is NullConfigImpl and route config for bar key is nullptr
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   pushRdsConfig({"foo_routes"}, "111");
   // Scope foo now have route config but route config for scope bar is still nullptr.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(1UL, active_scopes_.value());
@@ -1434,15 +1475,17 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(1UL, active_scopes_.value());
 
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(event_dispatcher_, post(_));
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
@@ -1452,12 +1495,14 @@ key:
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
   // Now we have 1 active on demand scope and 1 eager loading scope.
@@ -1501,20 +1546,23 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   // Push rds update before on demand srds request.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
   EXPECT_CALL(event_dispatcher_, post(_));
@@ -1523,7 +1571,8 @@ key:
                                             std::move(route_config_updated_cb));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -1548,7 +1597,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
 
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   EXPECT_EQ(0UL, active_scopes_.value());
   EXPECT_EQ(1UL, on_demand_scopes_.value());
@@ -1564,13 +1614,15 @@ key:
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   // Now we have 1 eager scope.
@@ -1602,7 +1654,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   // Update the scope to on demand, rds provider and the route config will be deleted.
@@ -1616,7 +1669,8 @@ key:
   )EOF";
   srdsUpdateWithYaml({lazy_resource}, "2");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   // The new scope will be on demand and inactive after srds update.
   EXPECT_EQ(0UL, active_scopes_.value());
@@ -1644,7 +1698,7 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
   // All the on demand updated callbacks will be executed when the route table comes.
   for (int i = 0; i < 5; i++) {
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
@@ -1656,7 +1710,7 @@ key:
   // Route table have been fetched, callbacks will be executed immediately.
   for (int i = 0; i < 5; i++) {
     EXPECT_CALL(event_dispatcher_, post(_));
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
@@ -1665,7 +1719,8 @@ key:
   // Activating the same on_demand scope multiple times, active_scopes is still 1.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(1UL, active_scopes_.value());
@@ -1677,10 +1732,9 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(testing::SaveArg<0>(&temp_post_cb));
-  std::shared_ptr<ScopeKey> scope_key =
-      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+      .WillOnce([&temp_post_cb](Event::PostCb cb) { temp_post_cb = std::move(cb); });
+  std::shared_ptr<ScopeKey> scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   getScopedRdsProvider()->onDemandRdsUpdate(scope_key, event_dispatcher_,
                                             std::move(route_config_updated_cb));
   // Destroy the scoped_rds subscription by destroying its only config provider.
@@ -1709,7 +1763,7 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
   // All the on demand updated callbacks will be executed when the route table comes.
   {
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
       EXPECT_TRUE(scope_exist);
@@ -1721,7 +1775,7 @@ key:
   EXPECT_CALL(event_dispatcher_, post(_));
   pushRdsConfig({"foo_routes"}, "111");
 
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   // Delete the scope route.
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate({}, "2"));
@@ -1733,6 +1787,54 @@ key:
   };
   getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
+}
+
+TEST_F(ScopedRdsTest, OnScopeKeyBuilderUpdate) {
+  setup();
+
+  // update scope_key_builder separator to ,
+  const std::string hcm_config = R"EOF(
+name: foo_scoped_routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element:
+          key: x-foo-key
+          separator: ","
+)EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
+      scoped_routes_config;
+  TestUtility::loadFromYaml(hcm_config, scoped_routes_config);
+  auto scope_key_builder_config = scoped_routes_config.scope_key_builder();
+  scope_key_builder_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder_config));
+  provider_ = config_provider_manager_->createXdsConfigProvider(
+      scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
+      ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                              scoped_routes_config.rds_config_source(),
+                                              OptionalHttpFilters()));
+  srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
+  context_init_manager_.initialize(init_watcher_);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+
+  pushRdsConfig({"foo_routes"}, "111");
+
+  auto config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key,x-bar-key"}}));
+  ASSERT_THAT(config, Not(IsNull()));
+  EXPECT_EQ(config->name(), "foo_routes");
 }
 
 } // namespace

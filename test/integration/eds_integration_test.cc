@@ -118,7 +118,7 @@ public:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
@@ -135,7 +135,7 @@ public:
     eds_cluster_config->mutable_eds_config()->set_resource_api_version(
         envoy::config::core::v3::ApiVersion::V3);
     eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
-        eds_helper_.eds_path());
+        eds_helper_.edsPath());
     if (http_active_hc) {
       auto* health_check = cluster_.add_health_checks();
       health_check->mutable_timeout()->set_seconds(30);

@@ -39,6 +39,8 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   void incRequestsRejectedWithUnderscoresInHeaders() override {
     requests_rejected_with_underscores_in_headers_.inc();
   }
+  // TODO(yanavlasov): add corresponding counter for H/1 codec.
+  void incMessagingError() override {}
 
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };

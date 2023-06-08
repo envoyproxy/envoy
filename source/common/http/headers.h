@@ -68,13 +68,19 @@ public:
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CacheStatus{"cache-status"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
+  const LowerCaseString ConnectAcceptEncoding{"connect-accept-encoding"};
+  const LowerCaseString ConnectContentEncoding{"connect-content-encoding"};
+  const LowerCaseString ConnectProtocolVersion{"connect-protocol-version"};
+  const LowerCaseString ConnectTimeoutMs{"connect-timeout-ms"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString GrpcEncoding{"grpc-encoding"};
   const LowerCaseString GrpcMessageType{"grpc-message-type"};
+  const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
   const LowerCaseString IfModifiedSince{"if-modified-since"};
@@ -247,6 +253,8 @@ public:
     const std::string TextEventStream{"text/event-stream"};
     const std::string TextUtf8{"text/plain; charset=UTF-8"}; // TODO(jmarantz): fold this into Text
     const std::string Html{"text/html; charset=UTF-8"};
+    const std::string Connect{"application/connect"};
+    const std::string ConnectProto{"application/connect+proto"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
     const std::string GrpcWebProto{"application/grpc-web+proto"};

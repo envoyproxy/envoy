@@ -228,7 +228,7 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   // Wait for the upstream to connect timeout and the failed early data request to be retried.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
-  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 3);
 
   // The retry should attempt both HTTP/3 and HTTP/2. And the TCP connection will win the race.
   waitForNextUpstreamRequest(0);
@@ -295,9 +295,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
-  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
-  }
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 
   checkSimpleRequestSuccess(0, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);

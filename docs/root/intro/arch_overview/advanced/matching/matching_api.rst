@@ -34,6 +34,7 @@ These input functions are available for matching HTTP requests:
 * :ref:`Request trailer value <extension_envoy.matching.inputs.request_trailers>`.
 * :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
 * :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
+* :ref:`Query parameters value <extension_envoy.matching.inputs.query_params>`.
 
 .. _extension_category_envoy.matching.network.input:
 
@@ -57,6 +58,7 @@ These input functions are available for matching TCP connections:
 
 * :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.
 * :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
+* :ref:`Filter state <extension_envoy.matching.inputs.filter_state>`.
 
 .. _extension_category_envoy.matching.ssl.input:
 
@@ -85,6 +87,16 @@ are available in some contexts:
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+
+* `Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching:
+
+.. _extension_envoy.matching.inputs.cel_data_input:
+
+  * CEL matching data input: :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
+
+.. _extension_envoy.matching.matchers.cel_matcher:
+
+  * CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
 
 Matching actions
 ################

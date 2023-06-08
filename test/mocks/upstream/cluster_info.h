@@ -126,7 +126,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
-  MOCK_METHOD(const ProtobufTypes::MessagePtr&, loadBalancingPolicy, (), (const));
+  MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
@@ -173,7 +173,7 @@ public:
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
               alternateProtocolsCacheOptions, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
+  MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
@@ -186,7 +186,9 @@ public:
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
                Http::FilterChainManager& manager),
               (const));
+  MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
 
+  ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
@@ -251,6 +253,7 @@ public:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

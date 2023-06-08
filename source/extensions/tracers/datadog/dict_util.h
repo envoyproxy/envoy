@@ -10,10 +10,10 @@
  * headers, or writing HTTP request headers.
  */
 
-#include <datadog/dict_reader.h>
-#include <datadog/dict_writer.h>
-
 #include <string>
+
+#include "datadog/dict_reader.h"
+#include "datadog/dict_writer.h"
 
 namespace Envoy {
 namespace Tracing {

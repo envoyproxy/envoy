@@ -263,16 +263,16 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
         Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    coroutine_.resume(1, yield_callback_);
+    resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   }
 
   if (state_ == State::HttpCall || state_ == State::WaitForBody) {
@@ -294,17 +294,17 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
   if (state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    coroutine_.resume(luaTrailers(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -457,7 +457,7 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     markLive();
 
     try {
-      coroutine_.resume(2, yield_callback_);
+      resumeCoroutine(2, yield_callback_);
       markDead();
     } catch (const Filters::Common::Lua::LuaException& e) {
       filter_.scriptError(e);
@@ -942,27 +942,18 @@ void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view messag
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.lua_respond_with_send_local_reply")) {
-    uint64_t status = Http::Utility::getResponseStatus(*headers);
-    auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
-      headers->iterate(
-          [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
-                                     header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
-    };
-    callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                               modify_headers, absl::nullopt,
-                               HttpResponseCodeDetails::get().LuaResponse);
-  } else {
-    callbacks_->encodeHeaders(std::move(headers), body == nullptr,
-                              HttpResponseCodeDetails::get().LuaResponse);
-    if (body && !parent_.destroyed_) {
-      callbacks_->encodeData(*body, true);
-    }
-  }
+  uint64_t status = Http::Utility::getResponseStatus(*headers);
+  auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
+    headers->iterate(
+        [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                   header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        });
+  };
+  callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
+                             modify_headers, absl::nullopt,
+                             HttpResponseCodeDetails::get().LuaResponse);
 }
 
 const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {

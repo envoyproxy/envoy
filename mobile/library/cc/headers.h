@@ -51,7 +51,7 @@ public:
   const_iterator begin() const;
   const_iterator end() const;
 
-  const std::vector<std::string>& operator[](const std::string& key) const;
+  const std::vector<std::string>& operator[](absl::string_view key) const;
   const RawHeaderMap& allHeaders() const;
   bool contains(const std::string& key) const;
 

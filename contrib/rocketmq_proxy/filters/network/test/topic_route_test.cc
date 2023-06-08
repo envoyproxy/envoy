@@ -63,7 +63,7 @@ TEST(TopicRouteDataTest, Serialization) {
   }
   ProtobufWkt::Struct doc;
   EXPECT_NO_THROW(topic_route_data.encode(doc));
-  MessageUtil::getJsonStringFromMessageOrDie(doc);
+  MessageUtil::getJsonStringFromMessageOrError(doc);
 }
 
 } // namespace RocketmqProxy

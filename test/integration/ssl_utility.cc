@@ -25,47 +25,30 @@ namespace Ssl {
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
-  std::string yaml_plain = R"EOF(
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
-)EOF";
+  const std::string rundir = TestEnvironment::runfilesDirectory();
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
+  auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  std::string chain;
+  std::string key;
   if (options.client_ecdsa_cert_) {
-    yaml_plain += R"EOF(
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client_ecdsacert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client_ecdsakey.pem"
-)EOF";
+    chain = rundir + "/test/config/integration/certs/client_ecdsacert.pem";
+    key = rundir + "/test/config/integration/certs/client_ecdsakey.pem";
   } else if (options.use_expired_spiffe_cert_) {
-    yaml_plain += R"EOF(
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_key.pem"
-)EOF";
+    chain = rundir + "/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem";
+    key = rundir + "/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_key.pem";
   } else if (options.client_with_intermediate_cert_) {
-    yaml_plain += R"EOF(
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client2_chain.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client2key.pem"
-)EOF";
+    chain = rundir + "/test/config/integration/certs/client2_chain.pem";
+    key = rundir + "/test/config/integration/certs/client2key.pem";
   } else {
-    yaml_plain += R"EOF(
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/clientcert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/config/integration/certs/clientkey.pem"
-)EOF";
+    chain = rundir + "/test/config/integration/certs/clientcert.pem";
+    key = rundir + "/test/config/integration/certs/clientkey.pem";
   }
+  certs->mutable_certificate_chain()->set_filename(chain);
+  certs->mutable_private_key()->set_filename(key);
 
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
@@ -95,6 +78,9 @@ void initializeUpstreamTlsContextConfig(
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
   }
+  for (const std::string& algorithm : options.sigalgs_) {
+    common_context->mutable_tls_params()->add_signature_algorithms(algorithm);
+  }
   if (!options.sni_.empty()) {
     tls_context.set_sni(options.sni_);
   }
@@ -114,9 +100,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   initializeUpstreamTlsContextConfig(options, tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      tls_context, options.sigalgs_, mock_factory_ctx);
+      tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
@@ -129,7 +115,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, mock_factory_ctx);
 

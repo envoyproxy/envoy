@@ -4,6 +4,7 @@
 #include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -83,7 +84,7 @@ public:
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   ConfigSharedPtr cfg_;
   std::unique_ptr<Filter> filter_;
   Network::MockListenerFilterCallbacks cb_;
@@ -145,10 +146,15 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
+
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_not_found_.value());
   EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(client_hello.size(), bytes_processed[0]);
 }
 
 // Test with the ClientHello spread over multiple socket reads.
@@ -208,6 +214,10 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_found_.value());
   EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(client_hello.size(), bytes_processed[0]);
 }
 
 // Test that the filter correctly handles a ClientHello with no extensions present.
@@ -255,11 +265,11 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
 
   filter_->onAccept(cb_);
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
       .WillOnce(Invoke(
-          [=, &client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-            ASSERT(iov->iov_len >= max_size);
-            memcpy(iov->iov_base, client_hello.data(), max_size);
+          [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= max_size);
+            memcpy(buffer, client_hello.data(), max_size);
             return Api::SysCallSizeResult{ssize_t(max_size), 0};
           }));
 #else
@@ -276,6 +286,10 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(max_size, bytes_processed[0]);
 }
 
 // Test that the filter sets the `JA3` hash
@@ -397,6 +411,35 @@ TEST_P(TlsInspectorTest, NotSsl) {
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(5, bytes_processed[0]);
+}
+
+TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "");
+
+  // Clobber half of client_hello so we don't have sufficient bytes to finish inspection.
+  client_hello.resize(client_hello.size() / 2);
+
+  init();
+  mockSysCallForPeek(client_hello);
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // Trigger the event to copy the client hello message into buffer
+  file_event_callback_(Event::FileReadyType::Read);
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+
+  // Terminate early.
+  filter_.reset();
+
+  ASSERT_FALSE(store_.histogramRecordedValues("tls_inspector.bytes_processed"));
 }
 
 } // namespace

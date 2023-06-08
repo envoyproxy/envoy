@@ -51,7 +51,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::DoAll;
-using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
@@ -808,7 +807,7 @@ public:
 
 // Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
-  const std::string yamlPattern = R"EOF(
+  constexpr absl::string_view yamlPattern = R"EOF(
  static_resources:
   clusters:
   - name: cluster_1
@@ -1029,9 +1028,6 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
@@ -1047,6 +1043,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
           name: envoy.load_balancers.unknown_lb
       - typed_extension_config:
           name: envoy.load_balancers.custom_lb
+          typed_config:
+            "@type": type.googleapis.com/test.integration.custom_lb.CustomLbConfig
     load_assignment:
       cluster_name: cluster_1
       endpoints:
@@ -1066,7 +1064,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
+  EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
 }
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
@@ -1251,6 +1249,32 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
   EXPECT_EQ(3U, cluster.info().use_count());
+}
+
+TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
+  create(defaultConfig());
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.3);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_EQ(common_config_ptr_a, common_config_ptr_b);
+}
+
+TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
+  create(defaultConfig());
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_a;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig config_b;
+
+  config_a.mutable_healthy_panic_threshold()->set_value(0.3);
+  config_b.mutable_healthy_panic_threshold()->set_value(0.5);
+  auto common_config_ptr_a = cluster_manager_->getCommonLbConfigPtr(config_a);
+  auto common_config_ptr_b = cluster_manager_->getCommonLbConfigPtr(config_b);
+  EXPECT_NE(common_config_ptr_a, common_config_ptr_b);
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
@@ -1952,6 +1976,65 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   idle_cb2();
 
   checkStats(1 /*added*/, 1 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
+}
+
+// Validates that a callback can remove itself from the callbacks list.
+TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration) {
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).WillOnce(Invoke([&cb](ThreadLocalCluster&) {
+    // This call will remove the callback from the list.
+    cb.reset();
+  }));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
+  cluster1->initialize_callback_();
+
+  EXPECT_EQ(cluster1->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
+
+  // Now do it again with a different hash.
+  auto update_cluster = defaultStaticCluster("fake_cluster");
+  update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster2->info_, "tcp://127.0.0.1:80", time_system_)};
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster2, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  // There shouldn't be a call to onClusterAddOrUpdate on the callbacks as the
+  // handler was removed.
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(0);
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
+
+  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
@@ -4349,9 +4432,6 @@ public:
 
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
       factory);
@@ -4373,6 +4453,8 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
                   port_value: 11001
       filters:
       - name: envoy.test.filter
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
   create(parseBootstrapFromV3Yaml(yaml));

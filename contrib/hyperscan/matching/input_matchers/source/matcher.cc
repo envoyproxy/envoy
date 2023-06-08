@@ -34,8 +34,10 @@ bool Bound::operator<(const Bound& other) const {
 
 Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
-                 ThreadLocal::SlotAllocator& tls, bool report_start_of_matching)
-    : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
+                 Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
+                 bool report_start_of_matching)
+    : main_thread_dispatcher_(main_thread_dispatcher),
+      tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
 
@@ -63,7 +65,8 @@ Matcher::~Matcher() {
 
 bool Matcher::match(absl::string_view value) const {
   bool matched = false;
-  hs_scratch_t* scratch = tls_->get()->scratch_;
+  ScratchThreadLocalPtr local_scratch;
+  hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
       database_, value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
@@ -84,9 +87,10 @@ bool Matcher::match(absl::string_view value) const {
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
   // Find matched bounds.
   std::vector<Bound> bounds;
-  hs_scratch_t* scratch_ = tls_->get()->scratch_;
+  ScratchThreadLocalPtr local_scratch;
+  hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
-      start_of_match_database_, value.data(), value.size(), 0, scratch_,
+      start_of_match_database_, value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
         std::vector<Bound>* bounds = static_cast<std::vector<Bound>*>(context);
@@ -121,12 +125,12 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   return absl::StrJoin(parts, "");
 }
 
-bool Matcher::match(absl::optional<absl::string_view> input) {
-  if (!input) {
+bool Matcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
+  if (absl::holds_alternative<absl::monostate>(input)) {
     return false;
   }
 
-  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(*input);
+  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(absl::get<std::string>(input));
 }
 
 void Matcher::compile(const std::vector<const char*>& expressions,
@@ -150,6 +154,26 @@ void Matcher::compile(const std::vector<const char*>& expressions,
     }
   }
   hs_free_compile_error(compile_err);
+}
+
+hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
+  // Some matchers are constructed before dispatching threads and set() method of thread local slot
+  // will only initialize thread local object in existing threads, which may lead to unintialized
+  // thread local object in threads which are dispatched later. E.g, stats matchers are constructed
+  // before workers while there is chance to use these matchers in working threads. As a result,
+  // we have to ask main thread to allocate thread local object again.
+  if (!tls_->get().has_value()) {
+    main_thread_dispatcher_.post([this]() {
+      tls_->set([this](Event::Dispatcher&) {
+        return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
+      });
+    });
+
+    local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
+    return local_scratch->scratch_;
+  }
+
+  return tls_->get()->scratch_;
 }
 
 } // namespace Hyperscan

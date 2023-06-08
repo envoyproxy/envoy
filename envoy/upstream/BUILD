@@ -42,6 +42,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_check_event_sink_interface",
+    hdrs = ["health_check_event_sink.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:health_checker_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_interface",
     hdrs = ["health_checker.h"],
     deps = [
@@ -131,6 +140,7 @@ envoy_cc_library(
         ":load_balancer_interface",
         ":upstream_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/tcp:async_tcp_client_interface",
     ],
 )
 
@@ -156,6 +166,7 @@ envoy_cc_library(
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:filter_factory_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/runtime:runtime_interface",

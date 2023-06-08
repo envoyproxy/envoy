@@ -85,6 +85,11 @@ public:
   virtual SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const PURE;
 
   /**
+   * @see send (man 2 send)
+   */
+  virtual SysCallSizeResult send(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
+
+  /**
    * @see recv (man 2 recv)
    */
   virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
@@ -116,9 +121,9 @@ public:
   virtual bool supportsUdpGso() const PURE;
 
   /**
-   * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
+   * return true if the OS support IP_TRANSPARENT or IPV6_TRANSPARENT options by the ip version.
    */
-  virtual bool supportsIpTransparent() const PURE;
+  virtual bool supportsIpTransparent(Network::Address::IpVersion version) const PURE;
 
   /**
    * return true if the OS supports multi-path TCP

@@ -9,7 +9,7 @@ import static org.junit.Assert.assertNotNull;
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import org.chromium.net.AndroidNetworkLibrary;
+import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.EnvoyError;
@@ -18,7 +18,6 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import java.net.MalformedURLException;
@@ -41,7 +40,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import java.nio.charset.StandardCharsets;
 import org.chromium.net.testing.CertTestUtil;
-import org.chromium.net.FakeX509Util;
+import io.envoyproxy.envoymobile.utilities.FakeX509Util;
 
 @RunWith(RobolectricTestRunner.class)
 public class Http2TestServerTest {
@@ -235,7 +234,7 @@ public class Http2TestServerTest {
     RequestHeaders getHeaders() {
       RequestHeadersBuilder requestHeadersBuilder =
           new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
-      return requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2).build();
+      return requestHeadersBuilder.build();
     }
 
     RequestScenario setHttpMethod(RequestMethod requestMethod) {

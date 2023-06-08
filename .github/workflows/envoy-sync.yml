@@ -1,0 +1,29 @@
+name: 'Sync downstream'
+
+on:
+  push:
+    branches:
+    - main
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        downstream:
+        - go-control-plane
+        - envoy-filter-example
+        - data-plane-api
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.1
+      with:
+        repository: "envoyproxy/${{ matrix.downstream }}"
+        ref: main
+        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        workflow: envoy-sync.yaml
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}

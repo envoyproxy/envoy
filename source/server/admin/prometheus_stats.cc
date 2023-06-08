@@ -43,9 +43,12 @@ std::string sanitizeValue(const absl::string_view value) {
                                     });
 }
 
-/*
- * Determine whether a metric has never been emitted and choose to
- * not show it if we only wanted used metrics.
+/**
+ * Determines whether a metric should be shown based on the specified query-parameters. This covers:
+ * ``usedonly``, hidden, and filter.
+ *
+ * @param metric the metric to test
+ * @param params captures query parameters indicating which metrics should be included.
  */
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
@@ -55,12 +58,14 @@ static bool shouldShowMetric(const StatType& metric, const StatsParams& params) 
   if (params.used_only_ && !metric.used()) {
     return false;
   }
-  if (params.filter_ != nullptr) {
-    if (!std::regex_search(metric.name(), *params.filter_)) {
-      return false;
-    }
-  } else if (params.re2_filter_ != nullptr &&
-             !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
+  if (params.hidden_ == HiddenFlag::ShowOnly && !metric.hidden()) {
+    return false;
+  }
+  if (params.hidden_ == HiddenFlag::Exclude && metric.hidden()) {
+    return false;
+  }
+  if (params.re2_filter_ != nullptr &&
+      !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
     return false;
   }
   return true;

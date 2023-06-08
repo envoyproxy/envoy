@@ -57,9 +57,13 @@ std::string smallRequestBufferConfig() {
 
 using FileSystemBufferIntegrationTest = HttpProtocolIntegrationTest;
 
-INSTANTIATE_TEST_SUITE_P(Protocols, FileSystemBufferIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, FileSystemBufferIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(FileSystemBufferIntegrationTest, NotFoundBodyBuffer) {
   config_helper_.prependFilter(contentLengthConfig());
@@ -71,7 +75,7 @@ TEST_P(FileSystemBufferIntegrationTest, RequestAndResponseWithGiantBodyBuffer) {
   // Not quite as giant as the memory buffer's integration test uses - with
   // disk operations involved that size risks timing out the test.
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false, false, nullptr,
-                                       std::chrono::milliseconds(25000));
+                                       std::chrono::milliseconds(25000) * TSAN_TIMEOUT_FACTOR);
 }
 
 TEST_P(FileSystemBufferIntegrationTest, HeaderOnlyRequestAndResponseBuffer) {

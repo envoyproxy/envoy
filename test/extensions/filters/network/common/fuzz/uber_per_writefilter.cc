@@ -10,21 +10,15 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
   // Will extend to cover other network filters one by one.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    const auto factories = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
-        // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it supports untrusted
-        // data.
-    };
-    for (auto& filter_name : supported_filter_names) {
-      if (factories.contains(filter_name)) {
-        filter_names.push_back(filter_name);
-      } else {
-        ENVOY_LOG_MISC(debug, "Filter name not found in the factory: {}", filter_name);
-      }
-    }
+    // Only use the names of the filters that are compiled into envoy. The build system takes care
+    // about reducing these to the allowed set.
+    // See test/extensions/filters/network/common/fuzz/BUILD for more information.
+    filter_names = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
+    // http_connection_manager gets into the build by dependencies, but shall not be
+    // fuzzed in the write filter.
+    filter_names.erase(std::remove(filter_names.begin(), filter_names.end(),
+                                   "envoy.filters.network.http_connection_manager"));
   }
   return filter_names;
 }

@@ -7,14 +7,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::type::v3::RateLimitStrategy;
 using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 
 absl::StatusOr<BucketId>
-RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                          Server::Configuration::FactoryContext& factory_context,
-                                          RateLimitQuotaValidationVisitor& visitor) const {
+RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
+                                         Server::Configuration::FactoryContext& factory_context,
+                                         RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
   // Generate the `BucketId` based on the bucked id builder from the configuration.
@@ -40,16 +39,16 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           input_factory_ptr->createDataInput(builder_method.custom_value());
       auto result = data_input_cb()->get(data);
       // If result has data.
-      if (result.data_) {
-        if (!result.data_.value().empty()) {
-          // Build the bucket id from the matched result.
-          bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
-        } else {
-          // TODO(tyxia) Nothing hits this line at this moment.
-          return absl::InternalError("Empty resulting data from custom value config.");
-        }
-      } else {
+      if (absl::holds_alternative<absl::monostate>(result.data_)) {
         return absl::InternalError("Failed to generate the id from custom value config.");
+      }
+      const std::string& str = absl::get<std::string>(result.data_);
+      if (!str.empty()) {
+        // Build the bucket id from the matched result.
+        bucket_id.mutable_bucket()->insert({bucket_id_key, str});
+      } else {
+        // TODO(tyxia) Nothing hits this line at this moment.
+        return absl::InternalError("Empty resulting data from custom value config.");
       }
       break;
     }
@@ -66,8 +65,8 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
 /**
  * Static registration for the on match action factory.
  */
-REGISTER_FACTORY(RateLimitOnMactchActionFactory,
-                 Matcher::ActionFactory<RateLimitOnMactchActionContext>);
+REGISTER_FACTORY(RateLimitOnMatchActionFactory,
+                 Matcher::ActionFactory<RateLimitOnMatchActionContext>);
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters

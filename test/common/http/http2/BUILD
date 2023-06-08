@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/common/http/http2:codec_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/http/header_validators/envoy_default:header_validator_factory",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//test/common/http:common_lib",
         "//test/common/http/http2:http2_frame",
@@ -56,6 +57,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/server:overload_manager_mocks",
     ],
 )
 
@@ -145,6 +147,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/common/http/http2:http2_frame",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -227,6 +230,7 @@ envoy_cc_fuzz_test(
         "//test/common/http/http2:http2_frame",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],

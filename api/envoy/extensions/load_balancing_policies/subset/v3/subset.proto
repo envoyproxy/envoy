@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.subset.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+
+import "google/protobuf/struct.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.subset.v3";
+option java_outer_classname = "SubsetProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/subset/v3;subsetv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Subset Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.subset]
+
+// Optionally divide the endpoints in this cluster into subsets defined by
+// endpoint metadata and selected by route and weighted cluster metadata.
+// [#next-free-field: 10]
+message Subset {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.LbSubsetConfig";
+
+  // If NO_FALLBACK is selected, a result
+  // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
+  // any cluster endpoint may be returned (subject to policy, health checks,
+  // etc). If DEFAULT_SUBSET is selected, load balancing is performed over the
+  // endpoints matching the values from the default_subset field.
+  enum LbSubsetFallbackPolicy {
+    NO_FALLBACK = 0;
+    ANY_ENDPOINT = 1;
+    DEFAULT_SUBSET = 2;
+  }
+
+  enum LbSubsetMetadataFallbackPolicy {
+    // No fallback. Route metadata will be used as-is.
+    METADATA_NO_FALLBACK = 0;
+
+    // A special metadata key ``fallback_list`` will be used to provide variants of metadata to try.
+    // Value of ``fallback_list`` key has to be a list. Every list element has to be a struct - it will
+    // be merged with route metadata, overriding keys that appear in both places.
+    // ``fallback_list`` entries will be used in order until a host is found.
+    //
+    // ``fallback_list`` key itself is removed from metadata before subset load balancing is performed.
+    //
+    // Example:
+    //
+    // for metadata:
+    //
+    // .. code-block:: yaml
+    //
+    //   version: 1.0
+    //   fallback_list:
+    //     - version: 2.0
+    //       hardware: c64
+    //     - hardware: c32
+    //     - version: 3.0
+    //
+    // at first, metadata:
+    //
+    // .. code-block:: json
+    //
+    //   {"version": "2.0", "hardware": "c64"}
+    //
+    // will be used for load balancing. If no host is found, metadata:
+    //
+    // .. code-block:: json
+    //
+    //   {"version": "1.0", "hardware": "c32"}
+    //
+    // is next to try. If it still results in no host, finally metadata:
+    //
+    // .. code-block:: json
+    //
+    //   {"version": "3.0"}
+    //
+    // is used.
+    FALLBACK_LIST = 1;
+  }
+
+  // Specifications for subsets.
+  message LbSubsetSelector {
+    // Allows to override top level fallback policy per selector.
+    enum LbSubsetSelectorFallbackPolicy {
+      // If NOT_DEFINED top level config fallback policy is used instead.
+      NOT_DEFINED = 0;
+
+      // If NO_FALLBACK is selected, a result equivalent to no healthy hosts is reported.
+      NO_FALLBACK = 1;
+
+      // If ANY_ENDPOINT is selected, any cluster endpoint may be returned
+      // (subject to policy, health checks, etc).
+      ANY_ENDPOINT = 2;
+
+      // If DEFAULT_SUBSET is selected, load balancing is performed over the
+      // endpoints matching the values from the default_subset field.
+      DEFAULT_SUBSET = 3;
+
+      // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
+      // keys reduced to
+      // :ref:`fallback_keys_subset<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.fallback_keys_subset>`.
+      // It allows for a fallback to a different, less specific selector if some of the keys of
+      // the selector are considered optional.
+      KEYS_SUBSET = 4;
+    }
+
+    // List of keys to match with the weighted cluster metadata.
+    repeated string keys = 1;
+
+    // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
+    // choosing a host, but updating hosts is faster, especially for large numbers of hosts.
+    //
+    // If a match is found to a host, that host will be used regardless of priority levels.
+    //
+    // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in ``keys``
+    // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
+    // :ref:`lb_subsets_single_host_per_subset_duplicate<config_cluster_manager_cluster_stats_subset_lb>` indicates how many duplicates are
+    // present in the current configuration.
+    bool single_host_per_subset = 4;
+
+    // The behavior used when no endpoint subset matches the selected route's
+    // metadata.
+    LbSubsetSelectorFallbackPolicy fallback_policy = 2
+        [(validate.rules).enum = {defined_only: true}];
+
+    // Subset of
+    // :ref:`keys<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.keys>` used by
+    // :ref:`KEYS_SUBSET<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+    // fallback policy.
+    // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
+    // For any other fallback policy the parameter is not used and should not be set.
+    // Only values also present in
+    // :ref:`keys<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.keys>` are allowed, but
+    // ``fallback_keys_subset`` cannot be equal to ``keys``.
+    repeated string fallback_keys_subset = 3;
+  }
+
+  // The behavior used when no endpoint subset matches the selected route's
+  // metadata. The value defaults to
+  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+  LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Specifies the default subset of endpoints used during fallback if
+  // fallback_policy is
+  // :ref:`DEFAULT_SUBSET<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.DEFAULT_SUBSET>`.
+  // Each field in default_subset is
+  // compared to the matching LbEndpoint.Metadata under the ``envoy.lb``
+  // namespace. It is valid for no hosts to match, in which case the behavior
+  // is the same as a fallback_policy of
+  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+  google.protobuf.Struct default_subset = 2;
+
+  // For each entry, LbEndpoint.Metadata's
+  // ``envoy.lb`` namespace is traversed and a subset is created for each unique
+  // combination of key and value. For example:
+  //
+  // .. code-block:: json
+  //
+  //   { "subset_selectors": [
+  //       { "keys": [ "version" ] },
+  //       { "keys": [ "stage", "hardware_type" ] }
+  //   ]}
+  //
+  // A subset is matched when the metadata from the selected route and
+  // weighted cluster contains the same keys and values as the subset's
+  // metadata. The same host may appear in multiple subsets.
+  repeated LbSubsetSelector subset_selectors = 3;
+
+  // If true, routing to subsets will take into account the localities and locality weights of the
+  // endpoints when making the routing decision.
+  //
+  // There are some potential pitfalls associated with enabling this feature, as the resulting
+  // traffic split after applying both a subset match and locality weights might be undesirable.
+  //
+  // Consider for example a situation in which you have 50/50 split across two localities X/Y
+  // which have 100 hosts each without subsetting. If the subset LB results in X having only 1
+  // host selected but Y having 100, then a lot more load is being dumped on the single host in X
+  // than originally anticipated in the load balancing assignment delivered via EDS.
+  bool locality_weight_aware = 4;
+
+  // When used with locality_weight_aware, scales the weight of each locality by the ratio
+  // of hosts in the subset vs hosts in the original subset. This aims to even out the load
+  // going to an individual locality if said locality is disproportionately affected by the
+  // subset predicate.
+  bool scale_locality_weight = 5;
+
+  // If true, when a fallback policy is configured and its corresponding subset fails to find
+  // a host this will cause any host to be selected instead.
+  //
+  // This is useful when using the default subset as the fallback policy, given the default
+  // subset might become empty. With this option enabled, if that happens the LB will attempt
+  // to select a host from the entire cluster.
+  bool panic_mode_any = 6;
+
+  // If true, metadata specified for a metadata key will be matched against the corresponding
+  // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
+  // and any of the elements in the list matches the criteria.
+  bool list_as_any = 7;
+
+  // Fallback mechanism that allows to try different route metadata until a host is found.
+  // If load balancing process, including all its mechanisms (like
+  // :ref:`fallback_policy<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.subset.fallback_policy>`)
+  // fails to select a host, this policy decides if and how the process is repeated using another metadata.
+  //
+  // The value defaults to
+  // :ref:`METADATA_NO_FALLBACK
+  // <envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.subset.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
+  LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
+      [(validate.rules).enum = {defined_only: true}];
+
+  // The child LB policy to create for endpoint-picking within the chosen subset.
+  config.cluster.v3.LoadBalancingPolicy subset_lb_policy = 9
+      [(validate.rules).message = {required: true}];
+}

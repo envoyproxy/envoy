@@ -90,7 +90,7 @@ private:
 class SuccessRateMonitor {
 public:
   SuccessRateMonitor(envoy::data::cluster::v3::OutlierEjectionType ejection_type)
-      : ejection_type_(ejection_type), success_rate_(-1) {
+      : ejection_type_(ejection_type) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
@@ -111,7 +111,7 @@ private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
   envoy::data::cluster::v3::OutlierEjectionType ejection_type_;
-  double success_rate_;
+  double success_rate_{-1};
 };
 
 class DetectorImpl;

@@ -833,6 +833,18 @@ message RouteAction {
       type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
+    // CookieAttribute defines an API for adding additional attributes for a HTTP cookie.
+    message CookieAttribute {
+      // The name of the cookie attribute.
+      string name = 1
+          [(validate.rules).string =
+               {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+      // The optional value of the cookie attribute.
+      string value = 2 [(validate.rules).string =
+                            {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    }
+
     // Envoy supports two types of cookie affinity:
     //
     // 1. Passive. Envoy takes a cookie that's present in the cookies header and
@@ -864,6 +876,9 @@ message RouteAction {
       // The name of the path for the cookie. If no path is specified here, no path
       // will be set for the cookie.
       string path = 3;
+
+      // Additional attributes for the cookie. They will be used when generating a new cookie.
+      repeated CookieAttribute attributes = 4;
     }
 
     message ConnectionProperties {
@@ -1188,7 +1203,8 @@ message RouteAction {
   // :ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
   // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
   // causes the original value of the host header, if any, to be appended to the
-  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header if it is different to the last value appended.
+  // This can be disabled by setting the runtime guard `envoy_reloadable_features_append_xfh_idempotent` to false.
   bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1772,7 +1788,7 @@ message Tracing {
   // Target percentage of requests managed by this HTTP connection manager that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
   // header is set. This field is a direct analog for the runtime variable
-  // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+  // 'tracing.client_enabled' in the :ref:`HTTP Connection Manager
   // <config_http_conn_man_runtime>`.
   // Default: 100%
   type.v3.FractionalPercent client_sampling = 1;
@@ -2375,7 +2391,6 @@ message InternalRedirectPolicy {
 // :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`,
 // or :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
 // to add additional flags to the filter.
-// [#not-implemented-hide:]
 message FilterConfig {
   // The filter config.
   google.protobuf.Any config = 1;
@@ -2384,4 +2399,20 @@ message FilterConfig {
   // not support the specified filter, it may ignore the map entry rather
   // than rejecting the config.
   bool is_optional = 2;
+
+  // If true, the filter is disabled in the route or virtual host and the ``config`` field is ignored.
+  //
+  // .. note::
+  //
+  //   This field will take effect when the request arrive and filter chain is created for the request.
+  //   If initial route is selected for the request and a filter is disabled in the initial route, then
+  //   the filter will not be added to the filter chain.
+  //   And if the request is mutated later and re-match to another route, the disabled filter by the
+  //   initial route will not be added back to the filter chain because the filter chain is already
+  //   created and it is too late to change the chain.
+  //
+  //   This field only make sense for the downstream HTTP filters for now.
+  //
+  // [#not-implemented-hide:]
+  bool disabled = 3;
 }

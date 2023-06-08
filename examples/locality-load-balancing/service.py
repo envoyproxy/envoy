@@ -1,32 +1,37 @@
-from flask import Flask
+import logging
 import os
 
-app = Flask(__name__)
+from aiohttp import web
+
+routes = web.RouteTableDef()
 healthy = True
 
 
-@app.route('/')
-def hello():
+@routes.get("/")
+async def get(request):
     global healthy
     if healthy:
-        return f"Hello from {os.environ['HOST']}!\n"
+        return web.Response(text=f"Hello from {os.environ['HOST']}!\n")
     else:
-        return "Unhealthy", 503
+        raise web.HTTPServiceUnavailable(reason="Unhealthy")
 
 
-@app.route('/healthy')
-def healthy():
+@routes.get("/healthy")
+async def healthy(request):
     global healthy
     healthy = True
-    return f"[{os.environ['HOST']}] Set to healthy\n", 201
+    return web.Response(text=f"[{os.environ['HOST']}] Set to healthy\n", status=201)
 
 
-@app.route('/unhealthy')
-def unhealthy():
+@routes.get("/unhealthy")
+async def unhealthy(request):
     global healthy
     healthy = False
-    return f"[{os.environ['HOST']}] Set to unhealthy\n", 201
+    return web.Response(text=f"[{os.environ['HOST']}] Set to unhealthy\n", status=201)
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8000)
+    app = web.Application()
+    logging.basicConfig(level=logging.DEBUG)
+    app.add_routes(routes)
+    web.run_app(app, host='0.0.0.0', port=8080)

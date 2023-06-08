@@ -101,20 +101,13 @@ Specify the interval at which Envoy should timeout a DNS query.
 ``addDNSPreresolveHostnames``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. attention::
-
-  This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
-  project.
-  :issue:`#1581 <1581>` tracks enhancing this API.
-
 Add a list of hostnames to preresolve on Engine startup.
-The configuration is expected as a JSON list.
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames(listOf("lyft.com", "google.com"))
 
   // Swift
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames(["lyft.com", "google.com"])
 
 ~~~~~~~~~~~~~~~
 ``addLogLevel``
@@ -232,45 +225,27 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~~
-``addVirtualClusters``
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+``addNativeFilter``
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Specify the virtual clusters config for Envoy Mobile's configuration.
-The configuration is expected as a JSON list.
-This functionality is used for stat segmentation.
+Add a C++ filter to the Envoy Mobile filter chain
 
 .. attention::
 
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this project.
-    :issue:`#770 <770>` tracks enhancing this API.
+    This will only work if the C++ filter specified is linked into your Envoy Mobile build.
+    For C++ and Android testing, calling addNativeFilter and linking the Envoy library by adding the
+    library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
+    For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
+    also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
 
 **Example**::
 
   // Kotlin
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
   // Swift
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
-
-~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableAdminInterface``
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Enable admin interface on 127.0.0.1:9901 address.
-
-.. attention::
-
-    Admin interface is intended to be used for development/debugging purposes only.
-    Enabling it in production may open your app to security vulnerabilities.
-
-**Example**::
-
-  // Kotlin
-  builder.enableAdminInterface()
-
-  // Swift
-  builder.enableAdminInterface()
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
@@ -354,47 +329,39 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
-
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableGzip``
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Gzip decompression. Defaults to true.
 
 **Example**::
 
   // Kotlin
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
   // Swift
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableBrotli``
-~~~~~~~~~~~~~~~~~~~~~~~
+Default values from the `gzip decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Brotli decompression. Defaults to false.
 
 **Example**::
 
   // Kotlin
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
 
   // Swift
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
+
+Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
+are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
@@ -511,6 +478,120 @@ A maximum of 100 entries will be stored.
   // Swift
   builder.enableDNSCache(true, saveInterval: 60)
 
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setRuntimeGuard``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
+rather than the fully qualified "envoy.reloadable_features.feature"
+Note that Envoy will fail to start up in debug mode if an unknown guard is specified.
+
+**Example**::
+
+  // Kotlin
+  builder.setRuntimeGuard("feature", true)
+
+  // Swift
+  builder.setRuntimeGuard("feature", true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addRtdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds an RTDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
+
+**Example**::
+
+  // Kotlin
+  builder.addRtdsLayer(layerName = "rtds_layer_name", timeoutSeconds = 10)
+
+  // Swift
+  builder.addRTDSLayer(layerName: "rtds_layer_name", timeoutSeconds: 10)
+
+  // C++
+  builder.addRtdsLayer("rtds_layer_name", 10)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addCdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a CDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds
+
+**Example**::
+
+  // Kotlin
+  builder.addCdsLayer(resourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
+
+  // Swift
+  builder.addCDSLayer(resourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
+
+  // C++
+  builder.addCdsLayer("xdstp://td-location.com/cluster_location", 10)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setAggregatedDiscoveryService``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS layers.
+Optional params allow configuring a JWT token and SSL. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
+
+Parameters:
+address, port, (optional) jwt_token, (optional) jwt_token_lifetime_seconds, (optional) ssl_root_certs
+
+**Example**::
+
+  // Kotlin
+  builder.setAggregatedDiscoveryService(address = "192.168.1.1", port = 0)
+
+  // Swift
+  builder.setAggregatedDiscoveryService(address: "192.168.1.1", port: 0)
+
+  // C++
+  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeId``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.id field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeId(nodeId = "my_test_node")
+
+  // Swift
+  builder.setNodeID("my_test_node")
+
+  // C++
+  builder.setNodeId("my_test_node")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeLocality``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.locality field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
+
+  // Swift
+  builder.setNodeLocality(region: "us-west-1", zone: "some_zone", subZone: "some_sub_zone")
+
+  // C++
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
 
 ----------------------
 Advanced configuration

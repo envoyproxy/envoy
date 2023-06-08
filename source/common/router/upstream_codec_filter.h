@@ -93,9 +93,10 @@ public:
   };
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
+  OptRef<Http::RequestHeaderMap> latched_headers_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_headers_ : 1;
   bool deferred_reset_ : 1;
-  OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::optional<bool> latched_end_stream_;
 
 private:

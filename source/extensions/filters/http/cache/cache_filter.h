@@ -54,7 +54,7 @@ class CacheFilter : public Http::PassThroughFilter,
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              HttpCache& http_cache);
+              OptRef<HttpCache> http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;
   void onStreamComplete() override;
@@ -127,7 +127,7 @@ private:
   InsertStatus insertStatus() const;
 
   TimeSource& time_source_;
-  HttpCache& cache_;
+  OptRef<HttpCache> cache_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;

@@ -12,21 +12,12 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   auto filter_iter = query_.find("filter");
   if (filter_iter != query_.end()) {
     filter_string_ = filter_iter->second;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.admin_stats_filter_use_re2")) {
-      re2::RE2::Options options;
-      options.set_log_errors(false);
-      re2_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
-      filter_.reset();
-      if (!re2_filter_->ok()) {
-        response.add("Invalid re2 regex");
-        return Http::Code::BadRequest;
-      }
-    } else {
-      if (Utility::filterParam(query_, response, filter_)) {
-        re2_filter_.reset();
-      } else {
-        return Http::Code::BadRequest;
-      }
+    re2::RE2::Options options;
+    options.set_log_errors(false);
+    re2_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
+    if (!re2_filter_->ok()) {
+      response.add("Invalid re2 regex");
+      return Http::Code::BadRequest;
     }
   }
 
@@ -59,6 +50,20 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
+  const absl::optional<std::string> hidden_value = Utility::queryParam(query_, "hidden");
+  if (hidden_value.has_value()) {
+    if (hidden_value.value() == "include") {
+      hidden_ = HiddenFlag::Include;
+    } else if (hidden_value.value() == "only") {
+      hidden_ = HiddenFlag::ShowOnly;
+    } else if (hidden_value.value() == "exclude") {
+      hidden_ = HiddenFlag::Exclude;
+    } else {
+      response.add("usage: /stats?hidden=(include|only|exclude)\n\n");
+      return Http::Code::BadRequest;
+    }
+  }
+
   const absl::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
@@ -74,8 +79,15 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
       response.add("HTML output was disabled by building with --define=admin_html=disabled");
       return Http::Code::BadRequest;
 #endif
+    } else if (format_value.value() == "active-html") {
+#ifdef ENVOY_ADMIN_HTML
+      format_ = StatsFormat::ActiveHtml;
+#else
+      response.add("Active HTML output was disabled by building with --define=admin_html=disabled");
+      return Http::Code::BadRequest;
+#endif
     } else {
-      response.add("usage: /stats?format=(html|json|prometheus|text)\n\n");
+      response.add("usage: /stats?format=(html|active-html|json|prometheus|text)\n\n");
       return Http::Code::BadRequest;
     }
   }

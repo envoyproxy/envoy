@@ -289,14 +289,14 @@ void HdsDelegate::onReceiveMessage(
                           server_context_.messageValidationContext().dynamicValidationVisitor());
   }
   END_TRY
-  catch (const ProtoValidationException& ex) {
+  CATCH(const ProtoValidationException& ex, {
     // Increment error count
     stats_.errors_.inc();
     ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());
 
     // Do not continue processing message
     return;
-  }
+  });
 
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
@@ -516,8 +516,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.server_context_, params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.stats_,
-      params.server_context_.messageValidationVisitor());
+      params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory =

@@ -24,10 +24,11 @@ public:
   }
 
   void set(absl::string_view) override {}
-  std::string value() const override { return std::string(); }
+  std::string value() const override { return {}; }
 
   // Metric
   bool used() const override { return false; }
+  bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   // RefcountInterface

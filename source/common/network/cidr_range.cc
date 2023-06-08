@@ -101,7 +101,7 @@ std::string CidrRange::asString() const {
 // static
 CidrRange CidrRange::create(InstanceConstSharedPtr address, int length) {
   InstanceConstSharedPtr ptr = truncateIpAddressAndLength(std::move(address), &length);
-  return CidrRange(std::move(ptr), length);
+  return {std::move(ptr), length};
 }
 
 // static
@@ -132,7 +132,7 @@ CidrRange CidrRange::create(const std::string& range) {
       }
     }
   }
-  return CidrRange(nullptr, -1);
+  return {nullptr, -1};
 }
 
 // static

@@ -42,7 +42,7 @@
       dispatch_queue_create("io.envoyproxy.envoymobile.EnvoyNetworkMonitor", attrs);
   nw_path_monitor_set_queue(_path_monitor, queue);
 
-  __block envoy_network_t previousNetworkType = -1;
+  __block envoy_network_t previousNetworkType = (envoy_network_t)-1;
   envoy_engine_t engineHandle = _engineHandle;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;

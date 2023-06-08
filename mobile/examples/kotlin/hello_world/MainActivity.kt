@@ -14,7 +14,6 @@ import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
 import io.envoyproxy.envoymobile.shared.Success
@@ -104,13 +103,12 @@ class MainActivity : Activity() {
   }
 
   private fun makeRequest() {
-    // Note: this request will use an h2 stream for the upstream request.
-    // The Java example uses http/1.1. This is done on purpose to test both paths in end-to-end
-    // tests in CI.
+    // Note: this request will use an h2 stream for the upstream request due to https scheme.
+    // The Java example uses http so http/1.1. This is done on purpose to test both paths in
+    // end-to-end tests in CI.
     val requestHeaders = RequestHeadersBuilder(
       RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
     engine
       .streamClient()

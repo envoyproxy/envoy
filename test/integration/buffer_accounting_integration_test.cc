@@ -120,7 +120,8 @@ public:
   }
 
   Http2BufferWatermarksTest()
-      : HttpIntegrationTest(
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        HttpIntegrationTest(
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
@@ -229,7 +230,9 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
   // Check the expected number of buffers per account
   if (streamBufferAccounting()) {
-    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+    // Wait for a short period less than the request timeout time.
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(
+        1, 4, std::chrono::milliseconds(2000)));
   } else {
     EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
   }
@@ -810,6 +813,13 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 }
 
 TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  // This test is not applicable if expand_agnostic_stream_lifetime is enabled
+  // as the gap between lifetimes of the codec level and envoy level stream
+  // shrinks.
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    return;
+  }
+
   useAccessLog("%RESPONSE_CODE%");
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(

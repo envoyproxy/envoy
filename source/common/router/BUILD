@@ -58,6 +58,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:hash_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/common:packed_struct_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
@@ -225,6 +226,7 @@ envoy_cc_library(
         "//envoy/config:config_provider_interface",
         "//envoy/config:subscription_interface",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:scopes_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
@@ -429,7 +431,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "header_formatter_lib",
-    srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
     external_deps = ["abseil_optional"],
     deps = [

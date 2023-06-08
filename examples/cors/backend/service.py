@@ -1,12 +1,14 @@
-from flask import Flask
+from aiohttp import web
 
-app = Flask(__name__)
+routes = web.RouteTableDef()
 
 
-@app.route('/cors/<status>')
-def cors_enabled(status):
-    return 'Success!'
+@routes.get("/cors/{status}")
+async def get(request):
+    return web.Response(text="Success!")
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8000)
+    app = web.Application()
+    app.add_routes(routes)
+    web.run_app(app, host='0.0.0.0', port=8080)

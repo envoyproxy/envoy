@@ -16,14 +16,25 @@
 #include "gtest/gtest.h"
 #include "utility.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 namespace {
 
+using LocalResponsePolicyProto =
+    envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
+using RedirectPolicyProto =
+    envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
+
 class CustomResponseFilterTest : public testing::Test {
 public:
+  void SetUp() override {
+    EXPECT_CALL(context_, scope()).WillRepeatedly(::testing::ReturnRef(scope_));
+  }
+
   void setupFilterAndCallback() {
     filter_ = std::make_unique<CustomResponseFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -42,6 +53,8 @@ public:
         server_name);
   }
 
+  Stats::TestUtil::TestStore stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<::Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -130,6 +143,67 @@ TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             ::Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ("200", response_headers.getStatusValue());
+}
+
+TEST_F(CustomResponseFilterTest, InvalidHostRedirect) {
+  // Create config with invalid host_redirect field
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+          redirect_action:
+            host_redirect: "global_storage"
+          status_code: 292
+)EOF");
+  setupFilterAndCallback();
+
+  setServerName("server1.example.foo");
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  // Verify Continue was called, i.e. the redirect policy becomes a no-op.
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  // Verify we get the original response
+  EXPECT_EQ("200", response_headers.getStatusValue());
+  EXPECT_EQ(
+      1U,
+      stats_store_.findCounterByString("stats.custom_response_invalid_uri").value().get().value());
+}
+
+TEST_F(CustomResponseFilterTest, InvalidSchemeRedirect) {
+  // Create config with invalid scheme field.
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+          redirect_action:
+            scheme_redirect: x&#$
+            path_redirect: "/abc"
+          status_code: 292
+)EOF");
+  setupFilterAndCallback();
+
+  setServerName("server1.example.foo");
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"Host", "example.foo"}};
+  // Verify Continue was called, i.e. the redirect policy becomes a no-op.
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  // Verify we get the original response
+  EXPECT_EQ("200", response_headers.getStatusValue());
+  EXPECT_EQ(
+      1U,
+      stats_store_.findCounterByString("stats.custom_response_invalid_uri").value().get().value());
 }
 
 } // namespace

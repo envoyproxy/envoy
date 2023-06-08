@@ -89,6 +89,12 @@ public:
   ProcessorState& operator=(const ProcessorState&) = delete;
 
   envoy::config::core::v3::TrafficDirection trafficDirection() const { return traffic_direction_; }
+  const std::string trafficDirectionDebugStr() const {
+    if (trafficDirection() == envoy::config::core::v3::TrafficDirection::INBOUND) {
+      return "INBOUND";
+    }
+    return "OUTBOUND";
+  }
   CallbackState callbackState() const { return callback_state_; }
   void setPaused(bool paused) { paused_ = paused; }
 
@@ -115,6 +121,7 @@ public:
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
+  bool restartMessageTimer(const uint32_t message_timeout_ms);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;
@@ -195,9 +202,15 @@ protected:
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
+  // Flag to track whether Envoy already received the new timeout message.
+  // Envoy should receive at most one such message in one particular state.
+  bool new_timeout_received_{false};
   ChunkQueue chunk_queue_;
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
+
+private:
+  void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse& common_response);
 };
 
 class DecodingProcessorState : public ProcessorState {

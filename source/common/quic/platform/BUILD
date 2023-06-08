@@ -120,15 +120,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_udp_socket_platform_impl_lib",
-    hdrs = select({
-        "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
-        "//conditions:default": [],
-    }),
-    tags = ["nofips"],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_mem_slice_impl_lib",
     srcs = [
         "quiche_mem_slice_impl.cc",

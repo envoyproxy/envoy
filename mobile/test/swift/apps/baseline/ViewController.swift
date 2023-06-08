@@ -20,8 +20,15 @@ final class ViewController: UITableViewController {
     let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addPlatformFilter(DemoFilter.init)
-      // swiftlint:disable:next line_length
-      .addNativeFilter(name: "envoy.filters.http.buffer", typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
+      .addNativeFilter(
+        name: "envoy.filters.http.buffer",
+        typedConfig: """
+            {\
+            "@type":"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",\
+            "max_request_bytes":5242880\
+            }
+            """
+      )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
@@ -54,12 +61,8 @@ final class ViewController: UITableViewController {
 
     NSLog("starting request to '\(kRequestPath)'")
 
-    // Note: this request will use an h2 stream for the upstream request.
-    // The Objective-C example uses http/1.1. This is done on purpose to test both paths in
-    // end-to-end tests in CI.
     let headers = RequestHeadersBuilder(method: .get, scheme: kRequestScheme,
                                         authority: kRequestAuthority, path: kRequestPath)
-      .addUpstreamHttpProtocol(.http2)
       .build()
 
     streamClient

@@ -170,6 +170,11 @@ public:
   virtual const std::string& logFormat() const PURE;
 
   /**
+   * @return whether or not a log format was set by CLI option.
+   */
+  virtual bool logFormatSet() const PURE;
+
+  /**
    * @return const bool indicating whether to escape c-style escape sequences in logs.
    */
   virtual bool logFormatEscaped() const PURE;
@@ -266,11 +271,6 @@ public:
    * responsibility of the caller to handle the duplicates.
    */
   virtual const Stats::TagVector& statsTags() const PURE;
-
-  /**
-   * @return the type of listener manager to create.
-   */
-  virtual const std::string& listenerManager() const PURE;
 };
 
 } // namespace Server

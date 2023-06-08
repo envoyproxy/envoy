@@ -53,32 +53,6 @@ class RequestHeadersBuilderTest {
   }
 
   @Test
-  fun `adds H1 to headers`() {
-    val headers = RequestHeadersBuilder(
-      method = RequestMethod.POST, scheme = "https",
-      authority = "envoyproxy.io", path = "/mock"
-    )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP1)
-      .build()
-
-    assertThat(headers.value("x-envoy-mobile-upstream-protocol")).containsExactly("http1")
-    assertThat(headers.upstreamHttpProtocol).isEqualTo(UpstreamHttpProtocol.HTTP1)
-  }
-
-  @Test
-  fun `adds H2 to headers`() {
-    val headers = RequestHeadersBuilder(
-      method = RequestMethod.POST, scheme = "https",
-      authority = "envoyproxy.io", path = "/mock"
-    )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
-      .build()
-
-    assertThat(headers.value("x-envoy-mobile-upstream-protocol")).containsExactly("http2")
-    assertThat(headers.upstreamHttpProtocol).isEqualTo(UpstreamHttpProtocol.HTTP2)
-  }
-
-  @Test
   fun `joins header values with the same key`() {
     val headers = RequestHeadersBuilder(
       method = RequestMethod.POST, scheme = "https",
@@ -129,13 +103,10 @@ class RequestHeadersBuilderTest {
       method = RequestMethod.POST, scheme = "https",
       authority = "envoyproxy.io", path = "/mock"
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .remove(":path")
-      .remove("x-envoy-mobile-upstream-protocol")
       .build()
 
     assertThat(headers.value(":path")).contains("/mock")
-    assertThat(headers.value("x-envoy-mobile-upstream-protocol")).contains("http2")
   }
 
   @Test
@@ -238,13 +209,5 @@ class RequestHeadersBuilderTest {
       .isEqualTo(RequestMethod.PUT)
     assertThat(RequestMethod.enumValue(RequestMethod.TRACE.stringValue))
       .isEqualTo(RequestMethod.TRACE)
-  }
-
-  @Test
-  fun `converting http protocol to string and back creates the same http protocol`() {
-    assertThat(UpstreamHttpProtocol.enumValue(UpstreamHttpProtocol.HTTP1.stringValue))
-      .isEqualTo(UpstreamHttpProtocol.HTTP1)
-    assertThat(UpstreamHttpProtocol.enumValue(UpstreamHttpProtocol.HTTP2.stringValue))
-      .isEqualTo(UpstreamHttpProtocol.HTTP2)
   }
 }

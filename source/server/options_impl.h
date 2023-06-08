@@ -32,10 +32,8 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(
-      int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
-      spdlog::level::level_enum default_log_level,
-      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
+  OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
@@ -44,10 +42,8 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(
-      std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
-      spdlog::level::level_enum default_log_level,
-      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
+  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
 
   // Default constructor; creates "reasonable" defaults, but desired values should be set
   // explicitly.
@@ -82,7 +78,10 @@ public:
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
-  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogFormat(const std::string& log_format) {
+    log_format_ = log_format;
+    log_format_set_ = true;
+  }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
@@ -117,8 +116,6 @@ public:
 
   void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
 
-  void setListenerManager(absl::string_view manager) { listener_manager_ = std::string(manager); }
-
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -146,6 +143,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatSet() const override { return log_format_set_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
   bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
@@ -170,7 +168,6 @@ public:
   }
   uint32_t count() const;
   const std::string& socketPath() const override { return socket_path_; }
-  const std::string& listenerManager() const override { return listener_manager_; }
   mode_t socketMode() const override { return socket_mode_; }
 
   /**
@@ -208,6 +205,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
+  bool log_format_set_{false};
   bool log_format_escaped_{false};
   std::string log_path_;
   uint64_t restart_epoch_{0};
@@ -232,7 +230,6 @@ private:
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
   std::string socket_path_{"@envoy_domain_socket"};
-  std::string listener_manager_ = Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   mode_t socket_mode_{0};
 };
 

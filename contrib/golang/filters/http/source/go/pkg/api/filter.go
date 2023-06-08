@@ -24,12 +24,10 @@ type StreamDecoderFilter interface {
 	DecodeHeaders(RequestHeaderMap, bool) StatusType
 	DecodeData(BufferInstance, bool) StatusType
 	DecodeTrailers(RequestTrailerMap) StatusType
-	// TODO add more for metadata
 }
 
-// TODO merge it to StreamFilterConfigFactory
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) interface{}
+	Parse(any *anypb.Any) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -51,14 +49,33 @@ type StreamEncoderFilter interface {
 	EncodeHeaders(ResponseHeaderMap, bool) StatusType
 	EncodeData(BufferInstance, bool) StatusType
 	EncodeTrailers(ResponseTrailerMap) StatusType
-	// TODO add more for metadata
 }
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
 type StreamInfo interface {
 	GetRouteName() string
-	// TODO add more for stream info
+	FilterChainName() string
+	// Protocol return the request's protocol.
+	Protocol() (string, bool)
+	// ResponseCode return the response code.
+	ResponseCode() (uint32, bool)
+	// ResponseCodeDetails return the response code details.
+	ResponseCodeDetails() (string, bool)
+	// AttemptCount return the number of times the request was attempted upstream.
+	AttemptCount() uint32
+	// Get the dynamic metadata of the request
+	DynamicMetadata() DynamicMetadata
+	// DownstreamLocalAddress return the downstream local address.
+	DownstreamLocalAddress() string
+	// DownstreamRemoteAddress return the downstream remote address.
+	DownstreamRemoteAddress() string
+	// UpstreamHostAddress return the upstream host address.
+	UpstreamHostAddress() (string, bool)
+	// UpstreamClusterName return the upstream host cluster.
+	UpstreamClusterName() (string, bool)
+	// FilterState return the filter state interface.
+	FilterState() FilterState
 }
 
 type StreamFilterCallbacks interface {
@@ -70,9 +87,46 @@ type FilterCallbacks interface {
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
 	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
+	RecoverPanic()
+	Log(level LogType, msg string)
+	LogLevel() LogType
 	// TODO add more for filter callbacks
 }
 
 type FilterCallbackHandler interface {
 	FilterCallbacks
+}
+
+type DynamicMetadata interface {
+	// TODO: Get(filterName string) map[string]interface{}
+	Set(filterName string, key string, value interface{})
+}
+
+type StateType int
+
+const (
+	StateTypeReadOnly StateType = 0
+	StateTypeMutable  StateType = 1
+)
+
+type LifeSpan int
+
+const (
+	LifeSpanFilterChain LifeSpan = 0
+	LifeSpanRequest     LifeSpan = 1
+	LifeSpanConnection  LifeSpan = 2
+	LifeSpanTopSpan     LifeSpan = 3
+)
+
+type StreamSharing int
+
+const (
+	None                             StreamSharing = 0
+	SharedWithUpstreamConnection     StreamSharing = 1
+	SharedWithUpstreamConnectionOnce StreamSharing = 2
+)
+
+type FilterState interface {
+	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 }

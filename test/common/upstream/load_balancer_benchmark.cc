@@ -6,10 +6,10 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/memory/stats.h"
-#include "source/common/upstream/maglev_lb.h"
-#include "source/common/upstream/ring_hash_lb.h"
-#include "source/common/upstream/subset_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
@@ -554,10 +554,12 @@ public:
     *selector->mutable_keys()->Add() = std::string(metadata_key);
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
-    lb_ = std::make_unique<SubsetLoadBalancer>(
-        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_scope_,
-        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
-        absl::nullopt, common_config_, simTime());
+    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
+        LoadBalancerType::Random, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt,
+        common_config_);
+    lb_ = std::make_unique<SubsetLoadBalancer>(*subset_info_, std::move(child_lb_creator),
+                                               priority_set_, &local_priority_set_, stats_,
+                                               stats_scope_, runtime_, random_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);

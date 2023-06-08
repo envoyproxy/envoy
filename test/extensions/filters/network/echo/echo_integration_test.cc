@@ -25,6 +25,8 @@ public:
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
         name: envoy.filters.network.echo
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
       )EOF");
   }
 
@@ -57,6 +59,8 @@ address:
 filter_chains:
 - filters:
   - name: envoy.filters.network.echo
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
   )EOF",
                                                        GetParam());
 
@@ -115,9 +119,8 @@ filter_chains:
     auto connection2 = createConnectionDriver(
         new_listener_port, "hello",
         [](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); });
-    connection2->waitForConnection();
-    if (connection2->connection().state() == Network::Connection::State::Closed) {
-      connect_fail = true;
+    connect_fail = !connection2->waitForConnection();
+    if (!connect_fail) {
       break;
     } else {
       connection2->close();

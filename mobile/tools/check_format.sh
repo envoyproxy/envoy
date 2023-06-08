@@ -27,7 +27,7 @@ FORMAT_ARGS=(
     --config_path ../tools/code_format/config.yaml
     --add-excluded-prefixes
     ./envoy/ ./envoy_build_config/extensions_build_config.bzl ./WORKSPACE
-    ./Envoy.xcodeproj/ ./dist/ ./library/common/config_template.cc
+    ./Envoy.xcodeproj/ ./dist/
     ./bazel/envoy_mobile_swift_bazel_support.bzl
     ./bazel/envoy_mobile_repositories.bzl
     ./examples/swift/swiftpm/Packages/Envoy.xcframework

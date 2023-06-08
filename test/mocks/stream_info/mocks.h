@@ -79,11 +79,16 @@ public:
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
+  MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, currentDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addBytesRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, bytesRetransmitted, (), (const));
+  MOCK_METHOD(void, addPacketsRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
@@ -135,6 +140,8 @@ public:
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   MOCK_METHOD(bool, isShadow, (), (const, override));
+  MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -143,6 +150,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
@@ -158,6 +166,7 @@ public:
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
+  std::string downstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

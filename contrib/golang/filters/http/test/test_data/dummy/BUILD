@@ -10,7 +10,9 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
+    deps = [
+        "//contrib/golang/filters/http/source/go/pkg/http",
+    ],
 )
 
 go_binary(
@@ -21,7 +23,9 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
+    deps = [
+        "//contrib/golang/filters/http/source/go/pkg/http",
+    ],
 )
 
 go_binary(
@@ -32,7 +36,22 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
+    deps = [
+        "//contrib/golang/filters/http/source/go/pkg/http",
+    ],
+)
+
+go_binary(
+    name = "simple.so",
+    srcs = ["plugin.go"],
+    out = "simple.so",
+    cgo = True,
+    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
+    linkmode = "c-shared",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//contrib/golang/filters/http/source/go/pkg/http",
+    ],
 )
 
 filegroup(
@@ -41,6 +60,7 @@ filegroup(
         ":my_configurable_plugin.so",
         ":my_other_plugin.so",
         ":my_plugin.so",
+        ":simple.so",
     ],
     visibility = ["//visibility:public"],
 )

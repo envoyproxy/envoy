@@ -234,7 +234,7 @@ genrule(
     . $(location //bazel:volatile_env) \
     && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --build_sha="$${BUILD_DOCS_SHA:-$${BUILD_SCM_REVISION}}" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \\

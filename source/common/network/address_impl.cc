@@ -268,6 +268,13 @@ InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
   return nullptr;
 }
 
+InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::addressWithoutScopeId() const {
+  struct sockaddr_in6 ret_addr = address_;
+  ret_addr.sin6_scope_id = 0;
+  auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(ret_addr, v6only_);
+  return addr.ok() ? addr.value() : nullptr;
+}
+
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {

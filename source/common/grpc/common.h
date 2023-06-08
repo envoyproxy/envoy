@@ -38,6 +38,18 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether Connect-Protocol-Version is present.
+   */
+  static bool hasConnectProtocolVersionHeader(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is connect streaming.
+   */
+  static bool hasConnectStreamingContentType(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @return bool indicating whether content-type is Protobuf.
    */
   static bool hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers);
@@ -49,6 +61,20 @@ public:
    * content type, and have a path header.
    */
   static bool isGrpcRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Buf Connect request header.
+   * This is determined by checking for the connect protocol version header and a path header.
+   */
+  static bool isConnectRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Buf Connect streaming request header.
+   * This is determined by checking for the connect streaming content type and a path header.
+   */
+  static bool isConnectStreamingRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
@@ -64,6 +90,12 @@ public:
    * @return bool indicating whether the header is a gRPC response header
    */
   static bool isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Buf Connect streaming response header.
+   */
+  static bool isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.

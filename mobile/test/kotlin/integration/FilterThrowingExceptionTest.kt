@@ -95,17 +95,25 @@ class FilterThrowingExceptionTest {
   fun `registers a filter that throws an exception and performs an HTTP request`() {
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
+    val onJNIExceptionEventLatch = CountDownLatch(2)
+
+    var expectedMessages = mutableListOf(
+      "Simulated onRequestHeaders exception||onRequestHeaders||",
+      "Simulated onResponseHeaders exception||onResponseHeaders||")
 
     val context = ApplicationProvider.getApplicationContext<Context>()
     val builder = AndroidEngineBuilder(context)
     val engine = builder
       .addLogLevel(LogLevel.DEBUG)
+      .setEventTracker { event ->
+        if (event["name"] == "event_log" && event["log_name"] == "jni_cleared_pending_exception") {
+          assertThat(event["message"]).contains(expectedMessages.removeFirst())
+          onJNIExceptionEventLatch.countDown()
+        }
+      }
       .addPlatformFilter(::ThrowingFilter)
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
       .build()
-
-    onEngineRunningLatch.await(10, TimeUnit.SECONDS)
-    assertThat(onEngineRunningLatch.count).isEqualTo(0)
 
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
@@ -128,6 +136,9 @@ class FilterThrowingExceptionTest {
 
     onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
+
+    onJNIExceptionEventLatch.await(15, TimeUnit.SECONDS)
+    assertThat(onJNIExceptionEventLatch.count).isEqualTo(0)
 
     engine.terminate()
   }

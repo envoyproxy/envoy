@@ -90,9 +90,14 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
+  // Since descriptors tokens are refilled whenever the remainder of dividing refill_counter_
+  // by descriptor.multiplier_ is zero and refill_counter_ is initialized to zero, it must be
+  // incremented before executing the onFillTimerDescriptorHelper() method to prevent all
+  // descriptors tokens from being refilled at the first time hit, regardless of its fill
+  // interval configuration.
+  refill_counter_++;
   onFillTimerHelper(tokens_, token_bucket_);
   onFillTimerDescriptorHelper();
-  refill_counter_++;
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
@@ -167,29 +172,24 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-
-  bool allow = requestAllowedHelper(tokens_);
-  // Global token is not enough. Since global token is not sorted, so we suggest it should be
-  // larger than other descriptors.
-  if (!allow) {
-    return allow;
-  }
-
+  // Matched descriptors will be sorted by tokens per second and tokens consumed in order.
+  // In most cases, if one of them is limited the remaining descriptors will not consume
+  // their tokens.
   if (!descriptors_.empty() && !request_descriptors.empty()) {
     for (const auto& descriptor : sorted_descriptors_) {
       for (const auto& request_descriptor : request_descriptors) {
         if (descriptor == request_descriptor) {
-          allow &= requestAllowedHelper(*descriptor.token_state_);
           // Descriptor token is not enough.
-          if (!allow) {
-            return allow;
+          if (!requestAllowedHelper(*descriptor.token_state_)) {
+            return false;
           }
           break;
         }
       }
     }
   }
-  return allow;
+  // Since global tokens are not sorted, it should be larger than other descriptors.
+  return requestAllowedHelper(tokens_);
 }
 
 int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {

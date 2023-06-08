@@ -11,7 +11,7 @@ def _release_version_for(version):
 
 def envoy_pkg_distros(
         name,
-        envoy_bin = ":envoy-bin",
+        envoy_bin = ":envoy-binary",
         version = None,
         maintainer = None,
         config = "//configs:envoyproxy_io_proxy.yaml"):
@@ -52,25 +52,12 @@ def envoy_pkg_distros(
     native.genrule(
         name = name,
         cmd = """
-        SIGNING_ARGS=() \
-        && if [[ -n $${PACKAGES_GEN_KEY+x} ]]; then \
-               SIGNING_ARGS+=("--gen-key"); \
-           fi \
-        && if [[ -n $${PACKAGES_MAINTAINER_NAME+x} ]]; then \
-               SIGNING_ARGS+=("--maintainer-name" "$${PACKAGES_MAINTAINER_NAME}"); \
-           fi \
-        && if [[ -n $${PACKAGES_MAINTAINER_EMAIL+x} ]]; then \
-               SIGNING_ARGS+=("--maintainer-email" "$${PACKAGES_MAINTAINER_EMAIL}"); \
-           fi \
-        && $(location //tools/distribution:sign) \
-            --extract \
-            --tar $@ \
-            "$${SIGNING_ARGS[@]}" \
+        $(location //tools/distribution:sign) \
+            --out $@ \
             $(location :distro_packages)
         """,
         outs = ["%s.tar.gz" % name],
         srcs = [":distro_packages"],
-        tools = [
-            "//tools/distribution:sign",
-        ],
+        tools = ["//tools/distribution:sign"],
+        tags = ["no-remote"],
     )

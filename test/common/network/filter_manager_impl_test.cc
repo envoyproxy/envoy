@@ -29,7 +29,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Network {
