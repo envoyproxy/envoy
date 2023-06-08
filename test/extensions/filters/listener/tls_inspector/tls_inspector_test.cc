@@ -58,16 +58,29 @@ public:
     filter_->onAccept(cb_);
   }
 
-  void mockSysCallForPeek(std::vector<uint8_t>& client_hello) {
+  void mockSysCallForPeek(std::vector<uint8_t>& client_hello, bool windows_recv = false) {
 #ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-        .WillOnce(Invoke(
-            [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-              const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
-              memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
-              return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+    // In some cases the syscall used for windows is recv, not readv.
+    if (windows_recv) {
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+          .WillOnce(Invoke([=, &client_hello](os_fd_t, void* buffer, size_t length,
+                                              int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, client_hello.size());
+            memcpy(buffer, client_hello.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          }));
+    } else {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Invoke(
+              [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
+                memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
+                return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
 #else
+    (void)windows_recv;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(Invoke(
             [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -263,7 +276,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
-  mockSysCallForPeek(client_hello);
+  mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -447,7 +460,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
 
   for (size_t i = 0; i < num_iterations; ++i) {
     // Trigger the event to copy the client hello message into buffer
-    mockSysCallForPeek(client_hello);
+    mockSysCallForPeek(client_hello, true);
     file_event_callback_(Event::FileReadyType::Read);
 
     auto state = filter_->onData(*buffer_);
@@ -482,14 +495,14 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
 
-  mockSysCallForPeek(client_hello);
+  mockSysCallForPeek(client_hello, true);
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
   buffer_->resetCapacity(2 * initial_buffer_size);
 
-  mockSysCallForPeek(client_hello);
+  mockSysCallForPeek(client_hello, true);
   file_event_callback_(Event::FileReadyType::Read);
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
@@ -498,7 +511,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
 
   // The filter should not request a larger buffer as we've reached the max.
   // It should close the connection.
-  mockSysCallForPeek(client_hello);
+  mockSysCallForPeek(client_hello, true);
   file_event_callback_(Event::FileReadyType::Read);
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
