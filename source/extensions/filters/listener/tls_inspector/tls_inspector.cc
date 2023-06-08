@@ -55,8 +55,10 @@ Config::Config(
       enable_ja3_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
       max_client_hello_size_(max_client_hello_size),
-      initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config, initial_read_buffer_size, max_client_hello_size)) {
+      initial_read_buffer_size_(
+          std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
+                                                   max_client_hello_size),
+                   max_client_hello_size)) {
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -95,8 +97,7 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 
 Filter::Filter(const ConfigSharedPtr& config)
     : config_(config), ssl_(config_->newSsl()),
-      requested_read_bytes_(
-          std::min(config->initialReadBufferSize(), config->maxClientHelloSize())) {
+      requested_read_bytes_(config->initialReadBufferSize()) {
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
