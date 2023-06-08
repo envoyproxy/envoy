@@ -22,17 +22,17 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
     std::unique_ptr<Protobuf::Message> inner_message;
     absl::string_view target_type_url;
 
-    if (message.GetDescriptor()->full_name() == "google.protobuf.Any") {
+    if (message.GetTypeName() == "google.protobuf.Any") {
       auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
       // inner_message must be valid as parsing would have already failed to load if there was an
       // invalid type_url.
       MessageUtil::unpackTo(*any_message, *inner_message);
-    } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
+    } else if (message.GetTypeName() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
           Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
-    } else if (message.GetDescriptor()->full_name() == "udpa.type.v1.TypedStruct") {
+    } else if (message.GetTypeName() == "udpa.type.v1.TypedStruct") {
       std::tie(inner_message, target_type_url) =
           Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message);
     }
