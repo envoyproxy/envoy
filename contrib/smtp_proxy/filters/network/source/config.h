@@ -18,7 +18,7 @@ namespace SmtpProxy {
 class SmtpConfigFactory : public Common::FactoryBase<
                               envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy> {
 public:
-  SmtpConfigFactory() : FactoryBase{NetworkFilterNames::get().SmtpProxy} {}
+  SmtpConfigFactory() : FactoryBase{"envoy.filters.network.smtp_proxy"} {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
