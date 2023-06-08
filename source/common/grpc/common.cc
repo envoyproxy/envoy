@@ -123,25 +123,25 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
   //   1. trailers gRPC status, if it exists.
   //   2. headers gRPC status, if it exists.
   //   3. Inferred from info HTTP status, if it exists.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
-      {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
-      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
-                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt},
-  }};
+  // const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+  //     {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
+  //     {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
+  //     {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+  //                                Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+  //                          : absl::nullopt},
+  // }};
   absl::optional<Grpc::Status::GrpcStatus> optional_status;
-  optional_status = Grpc::Common::getGrpcStatus(trailers, allow_user_defined)
+  optional_status = Grpc::Common::getGrpcStatus(trailers, allow_user_defined);
     if (optional_status.has_value()) {
       return optional_status;
     }
-    optional_status = Grpc::Common::getGrpcStatus(headers, allow_user_defined)
+    optional_status = Grpc::Common::getGrpcStatus(headers, allow_user_defined);
     if (optional_status.has_value()) {
       return optional_status;
     }
     optional_status = info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
                                  Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt
+                           : absl::nullopt;
                            if (optional_status.has_value()) {
                              return optional_status;
                            }
