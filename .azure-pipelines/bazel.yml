@@ -24,6 +24,9 @@ parameters:
 - name: cacheKeyDockerTmpDir
   type: string
   default: /mnt/docker_cache
+- name: cacheKeyDockerNoTmpfs
+  type: string
+  default: ''
 - name: cacheKey
   type: string
   default: $(cacheKeyBazelFiles)
@@ -151,6 +154,7 @@ steps:
     name: "${{ parameters.cacheKeyDockerName }}"
     path: "${{ parameters.cacheKeyDockerPath }}"
     tmpDirectory: "${{ parameters.cacheKeyDockerTmpDir }}"
+    tmpNoTmpfs: "${{ parameters.cacheKeyDockerNoTmpfs }}"
     arch: "${{ parameters.artifactSuffix }}"
 
 - ${{ each step in parameters.stepsPre }}:
