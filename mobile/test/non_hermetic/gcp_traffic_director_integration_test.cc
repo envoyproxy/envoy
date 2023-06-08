@@ -134,7 +134,20 @@ TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
   initialize();
 
   // Wait for the xDS cluster resources to be retrieved and loaded.
-  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 3));
+  //
+  // There are 5 total active clusters after the Envoy engine has finished initialization.
+  //
+  // (A) There are three dynamic clusters retrieved from Traffic Director:
+  //      1. cloud-internal-istio:cloud_mp_798832730858_1578897841695688881
+  //      2. cloud-internal-istio:cloud_mp_798832730858_523871542841416155
+  //      3. cloud-internal-istio:cloud_mp_798832730858_4497773746904456309
+  // (B) There are two static clusters added by the EngineBuilder by default:
+  //      4. base
+  //      5. base_clear
+  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 5));
+
+  // TODO(abeyad): Once we have a Envoy Mobile stats/admin API, we can use it to check the
+  // actual cluster names.
 }
 
 } // namespace
