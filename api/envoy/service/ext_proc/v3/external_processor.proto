@@ -279,8 +279,11 @@ message CommonResponse {
 
   // Replace the body of the last message sent to the remote server on this
   // stream. If responding to an HttpBody request, simply replace or clear
-  // the body chunk that was sent with that request. Body mutations only take
-  // effect in response to ``body`` messages and are ignored otherwise.
+  // the body chunk that was sent with that request. Body mutations may take
+  // effect in response either to ``header`` or ``body`` messages. When it is
+  // in response to ``header`` messages, it only take effect if the
+  // :ref:`status <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.status>`
+  // is set to CONTINUE_AND_REPLACE.
   BodyMutation body_mutation = 3;
 
   // [#not-implemented-hide:]
