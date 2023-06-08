@@ -78,7 +78,7 @@ std::string jwtToken() {
 // Tests that Envoy Mobile can connect to Traffic Director (an xDS management server offered by GCP)
 // via a test GCP project, and can pull down xDS config for the given project.
 class GcpTrafficDirectorIntegrationTest
-    : public Envoy::BaseClientIntegrationTest,
+    : public BaseClientIntegrationTest,
       public testing::TestWithParam<std::tuple<IpVersion, SotwOrDelta>> {
 public:
   GcpTrafficDirectorIntegrationTest() : BaseClientIntegrationTest(ip_version()) {
@@ -98,11 +98,11 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
 
     // TODO(abeyad): switch to using API key authentication instead of a JWT token.
-    builder_.addLogLevel(Envoy::Platform::LogLevel::trace)
+    builder_.addLogLevel(Platform::LogLevel::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
         .addCdsLayer()
         .setAggregatedDiscoveryService(std::string(TD_API_ENDPOINT), /*port=*/443, jwtToken(),
-                                       Envoy::Platform::DefaultJwtTokenLifetimeSeconds,
+                                       Platform::DefaultJwtTokenLifetimeSeconds,
                                        std::move(root_certs));
 
     // Other test knobs.
@@ -126,7 +126,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(
     GrpcOptions, GcpTrafficDirectorIntegrationTest,
-    testing::Combine(testing::ValuesIn(Envoy::TestEnvironment::getIpVersionsForTest()),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(SotwOrDelta::Sotw, SotwOrDelta::UnifiedSotw)));
 
 TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
