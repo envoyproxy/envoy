@@ -55,6 +55,7 @@ std::string jwtToken() {
   const std::string cert_url = absl::Substitute("https://www.googleapis.com/robot/v1/metadata/x509/"
                                                 "$0-compute%40developer.gserviceaccount.com",
                                                 PROJECT_ID);
+
   const char* private_key = std::getenv("GCP_JWT_PRIVATE_KEY");
   RELEASE_ASSERT(private_key != nullptr, "GCP_JWT_PRIVATE_KEY environment variable not set.");
 
@@ -97,7 +98,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
 
     // TODO(abeyad): switch to using API key authentication instead of a JWT token.
-    builder_
+    builder_.addLogLevel(Envoy::Platform::LogLevel::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
         .addCdsLayer()
         .setAggregatedDiscoveryService(std::string(TD_API_ENDPOINT), /*port=*/443, jwtToken(),
