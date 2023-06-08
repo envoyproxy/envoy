@@ -31,7 +31,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }

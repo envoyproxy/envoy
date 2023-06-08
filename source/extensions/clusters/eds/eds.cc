@@ -125,6 +125,14 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list;
+  if (!lb_endpoint.endpoint().additional_addresses().empty()) {
+    address_list.push_back(address);
+    for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
+      address_list.emplace_back(parent_.resolveProtoAddress(additional_address.address()));
+    }
+  }
+
   // When the configuration contains duplicate hosts, only the first one will be retained.
   const auto address_as_string = address->asString();
   if (all_new_hosts.count(address_as_string) > 0) {
@@ -132,7 +140,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   }
 
   priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
-                                                 locality_lb_endpoint, lb_endpoint,
+                                                 address_list, locality_lb_endpoint, lb_endpoint,
                                                  parent_.time_source_);
   all_new_hosts.emplace(address_as_string);
 }

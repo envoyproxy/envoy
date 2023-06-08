@@ -1234,6 +1234,7 @@ public:
   // lb_endpoint health status is unhealthy, draining or timeout.
   void registerHostForPriority(
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
 
