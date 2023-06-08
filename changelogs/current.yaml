@@ -326,6 +326,11 @@ new_features:
 - area: http
   change: |
     added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
+- area: health_check
+  change: |
+    added host related information :ref:`metadata <envoy_api_field_data.core.v3.HealthCheckEvent.metadata>` and
+    :ref:`locality <envoy_api_field_data.core.v3.HealthCheckEvent.locality>`to the :ref:`health check event
+    <envoy_api_msg_data.core.v3.HealthCheckEvent>` definition.
 
 deprecated:
 - area: access_log
