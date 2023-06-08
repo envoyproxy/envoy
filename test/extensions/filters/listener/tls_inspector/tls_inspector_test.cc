@@ -66,8 +66,7 @@ public:
               const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
               memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }))
-        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+            }));
 #else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(Invoke(
