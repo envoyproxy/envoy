@@ -69,12 +69,13 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
+  ENVOY_CONN_LOG(debug, "hc tcp total pending buffer={}", *client_, data.length());
   // TODO(lilika): The TCP health checker does generic pattern matching so we can't differentiate
   // between wrong data and not enough data. We could likely do better here and figure out cases in
   // which a match is not possible but that is not done now.
   if (PayloadMatcher::match(parent_.receive_bytes_, data)) {
-    ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
+    ENVOY_CONN_LOG(debug, "hc tcp healthcheck passed, health_check_address={}", *client_,
+                   host_->healthCheckAddress()->asString());
     data.drain(data.length());
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
@@ -88,6 +89,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (!expect_close_) {
+      ENVOY_CONN_LOG(debug, "hc tcp connection unexpected closed, health_check_address={}",
+                     *client_, host_->healthCheckAddress()->asString());
       handleFailure(envoy::data::core::v3::NETWORK);
     }
     parent_.dispatcher_.deferredDelete(std::move(client_));
@@ -108,7 +111,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
-    ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
+    ENVOY_CONN_LOG(debug, "hc tcp healthcheck passed, health_check_address={}", *client_,
+                   host_->healthCheckAddress()->asString());
     expect_close_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
     handleSuccess(false);
@@ -143,6 +147,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  ENVOY_CONN_LOG(debug, "hc tcp connection timeout, health_flags={}, health_check_address={}",
+                 *client_, HostUtility::healthFlagsToString(*host_),
+                 host_->healthCheckAddress()->asString());
   expect_close_ = true;
   client_->close(Network::ConnectionCloseType::Abort);
 }
