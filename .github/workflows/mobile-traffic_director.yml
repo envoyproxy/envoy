@@ -31,7 +31,7 @@ jobs:
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
-        fetch-depth: 2
+        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run GcpTrafficDirectorIntegrationTest'
