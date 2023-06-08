@@ -309,6 +309,10 @@ new_features:
     This works with dynamic secrets when
     :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
     is delivered via SDS.
+- area: profiling
+  change: |
+    Added support for profiling wasm code with Intel® VTune™ Amplifier which can be enabled with `--define vtune_profile=true`. 
+    This is supported for v8 wasm engine.
 
 deprecated:
 - area: access_log
