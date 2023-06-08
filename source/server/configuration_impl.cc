@@ -90,7 +90,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
 
   // stats_config_ should be set before creating the ClusterManagers so that it is available
   // from the ServerFactoryContext when creating the static clusters and stats sinks, where
-  // stats lazy-init setting is read.
+  // stats deferred instantiation setting is read.
   stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
 
   const auto& secrets = bootstrap.static_resources().secrets();

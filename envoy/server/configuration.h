@@ -86,7 +86,7 @@ public:
   virtual bool flushOnAdmin() const PURE;
 
   /**
-   * When true, enable lazy-init of stats.
+   * When true, enable deferred creation of stats.
    */
   virtual bool enableDeferredCreationStats() const PURE;
 };
