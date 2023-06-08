@@ -1123,7 +1123,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
   auto id = config_->getConfigId();
   for (auto it : route_config_list) {
     auto route_config = *it;
-    id = route_config.getPluginConfigId(id, config_->pluginName(), config_->soId());
+    id = route_config.getPluginConfigId(id, config_->pluginName());
   }
 
   return id;
@@ -1138,33 +1138,29 @@ FilterConfig::FilterConfig(
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
-  ENVOY_LOG(debug, "initilizing golang filter config");
-  // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
-};
-
-uint64_t FilterConfig::getConfigId() {
-  if (config_id_ != 0) {
-    return config_id_;
-  }
+  ENVOY_LOG(debug, "initializing golang filter config");
 
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
-  ASSERT(res, "SerializeToString is always successful");
+  ASSERT(res, "SerializeToString should always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
                                                           buf.length());
-  ASSERT(config_id_, "config id is always grows");
+  if (config_id_ == 0) {
+    throw EnvoyException(fmt::format("golang filter failed to parse plugin config: {} {}",
+                                     proto_config.library_id(), proto_config.library_path()));
+  }
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+};
 
-  return config_id_;
-}
+uint64_t FilterConfig::getConfigId() { return config_id_; }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& config,
     Server::Configuration::ServerFactoryContext&) {
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
-  ENVOY_LOG(debug, "initilizing per route golang filter config");
+  ENVOY_LOG(debug, "initializing per route golang filter config");
 
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;
@@ -1176,40 +1172,70 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   }
 }
 
-uint64_t FilterConfigPerRoute::getPluginConfigId(uint64_t parent_id, std::string plugin_name,
-                                                 std::string so_id) const {
+uint64_t FilterConfigPerRoute::getPluginConfigId(uint64_t parent_id,
+                                                 std::string plugin_name) const {
   auto it = plugins_config_.find(plugin_name);
   if (it != plugins_config_.end()) {
-    return it->second->getMergedConfigId(parent_id, so_id);
+    return it->second->getMergedConfigId(parent_id);
   }
   ENVOY_LOG(debug, "golang filter not found plugin config: {}", plugin_name);
   // not found
   return parent_id;
 }
 
-uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so_id) {
+RoutePluginConfig::RoutePluginConfig(
+    const std::string plugin_name,
+    const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
+    : plugin_name_(plugin_name), plugin_config_(config.config()) {
+
+  ENVOY_LOG(debug, "initializing golang filter route plugin config, plugin_name: {}, type_url: {}",
+            plugin_name_, config.config().type_url());
+
+  dso_lib_ = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name_);
+  if (dso_lib_ == nullptr) {
+    // RoutePluginConfig may be created before FilterConfig, so dso_lib_ may be null.
+    // i.e. per route config is used in LDS route_config.
+    return;
+  }
+
+  config_id_ = getConfigId();
+  if (config_id_ == 0) {
+    throw EnvoyException(
+        fmt::format("golang filter failed to parse plugin config: {}", plugin_name_));
+  }
+  ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
+            config_id_);
+};
+
+uint64_t RoutePluginConfig::getConfigId() {
+  if (config_id_ > 0) {
+    return config_id_;
+  }
+  if (dso_lib_ == nullptr) {
+    dso_lib_ = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name_);
+    ASSERT(dso_lib_ != nullptr, "load at the request time, so it should not be null");
+  }
+
+  std::string buf;
+  auto res = plugin_config_.SerializeToString(&buf);
+  ASSERT(res, "SerializeToString is always successful");
+  auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
+  auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
+  return dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
+                                                    buf.length());
+};
+
+uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   if (merged_config_id_ > 0) {
     return merged_config_id_;
   }
 
+  config_id_ = getConfigId();
+  RELEASE_ASSERT(config_id_, "TODO: terminate request or passthrough");
+
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id);
-  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
-
-  if (config_id_ == 0) {
-    std::string buf;
-    auto res = plugin_config_.SerializeToString(&buf);
-    ASSERT(res, "SerializeToString is always successful");
-    auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
-    config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                        buf.length());
-    ASSERT(config_id_, "config id is always grows");
-    ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
-              config_id_);
-  }
-
-  merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(name_ptr, plugin_name_.length(),
-                                                               parent_id, config_id_);
+  merged_config_id_ = dso_lib_->envoyGoFilterMergeHttpPluginConfig(name_ptr, plugin_name_.length(),
+                                                                   parent_id, config_id_);
   ASSERT(merged_config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter merge '{}' plugin config, from {} + {} to {}", plugin_name_,
             parent_id, config_id_, merged_config_id_);
