@@ -203,12 +203,13 @@ public:
   void onAccept(Request* req, int32_t result, bool injected) override;
 
 private:
+  void close(bool keep_fd_open, IoUringSocketOnClosedCb cb, bool posted);
+
   const uint32_t accept_size_;
   // These are used to track the current submitted accept requests.
-  mutable absl::Mutex mutex_;
-  std::vector<Request*> requests_ ABSL_GUARDED_BY(mutex_);
-  size_t request_count_ ABSL_GUARDED_BY(mutex_){0};
-  bool closed_ ABSL_GUARDED_BY(mutex_){false};
+  std::vector<Request*> requests_;
+  size_t request_count_{0};
+  bool closed_{false};
 
   void submitRequests();
 };
