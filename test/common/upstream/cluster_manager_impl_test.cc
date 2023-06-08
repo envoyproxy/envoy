@@ -5486,7 +5486,7 @@ TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      {}, 100);
+      absl::nullopt, 100);
 
   // Using RR LB get a pool for each host.
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
@@ -5558,7 +5558,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      {}, 100);
+      absl::nullopt, 100);
 
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
