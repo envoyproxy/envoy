@@ -181,13 +181,10 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
   framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE, std::make_unique<FuzzEncrypter>(p));
 }
 
-std::vector<QuicPacketizer::QuicPacket>
-QuicPacketizer::serializePackets(const QuicH3FuzzCase& input, size_t max_packets) {
-  std::vector<QuicPacketizer::QuicPacket> packets;
-  packets.reserve(max_packets);
+std::vector<QuicPacketizer::QuicPacketPtr>
+QuicPacketizer::serializePackets(const QuicH3FuzzCase& input) {
+  std::vector<QuicPacketizer::QuicPacketPtr> packets;
   for (auto& quic_frame_or_junk : input.frames()) {
-    if (packets.size() >= max_packets)
-      return packets;
     if (quic_frame_or_junk.has_qframe()) {
       auto packet = serializePacket(quic_frame_or_junk.qframe());
       if (packet) {
@@ -209,7 +206,7 @@ void QuicPacketizer::reset() {
   open_unidirectional_streams_.clear();
 }
 
-QuicPacketizer::QuicPacket QuicPacketizer::serializePacket(const QuicFrame& frame) {
+QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& frame) {
   switch (frame.frame_case()) {
   case QuicFrame::kPadding: {
     int padding = frame.padding().num_padding_bytes() & 0xff;
@@ -331,7 +328,7 @@ QuicPacketizer::QuicPacket QuicPacketizer::serializePacket(const QuicFrame& fram
   return nullptr;
 }
 
-QuicPacketizer::QuicPacket QuicPacketizer::serializeJunkPacket(const std::string& data) {
+QuicPacketizer::QuicPacketPtr QuicPacketizer::serializeJunkPacket(const std::string& data) {
   char* buffer = new char[kMaxPacketSize];
 
   quic::QuicPacketHeader header;
@@ -356,7 +353,7 @@ QuicPacketizer::QuicPacket QuicPacketizer::serializeJunkPacket(const std::string
   return std::make_unique<quic::QuicEncryptedPacket>(buffer, writer.length(), true);
 }
 
-QuicPacketizer::QuicPacket QuicPacketizer::serialize(quic::QuicFrame frame) {
+QuicPacketizer::QuicPacketPtr QuicPacketizer::serialize(quic::QuicFrame frame) {
   char* buffer = new char[kMaxPacketSize];
   quic::QuicFrames frames = {frame};
   quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
@@ -373,7 +370,7 @@ QuicPacketizer::QuicPacket QuicPacketizer::serialize(quic::QuicFrame frame) {
   return std::make_unique<quic::QuicEncryptedPacket>(buffer, size, true);
 }
 
-QuicPacketizer::QuicPacket
+QuicPacketizer::QuicPacketPtr
 QuicPacketizer::serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame) {
   bool unidirectional = frame.unidirectional();
   uint32_t type = frame.type();
@@ -395,7 +392,7 @@ QuicPacketizer::serializeStreamFrame(const test::common::quic::QuicStreamFrame& 
   return nullptr;
 }
 
-QuicPacketizer::QuicPacket
+QuicPacketizer::QuicPacketPtr
 QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame) {
   char buffer[1024];
   size_t len = std::min(frame.token().size(), sizeof(buffer));
@@ -405,7 +402,7 @@ QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFra
   return serialize(quic::QuicFrame(&new_token));
 }
 
-QuicPacketizer::QuicPacket
+QuicPacketizer::QuicPacketPtr
 QuicPacketizer::serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame) {
   char buffer[1024];
   auto message = frame.data();
@@ -415,7 +412,7 @@ QuicPacketizer::serializeMessageFrame(const test::common::quic::QuicMessageFrame
   return serialize(quic::QuicFrame(&message_frame));
 }
 
-QuicPacketizer::QuicPacket
+QuicPacketizer::QuicPacketPtr
 QuicPacketizer::serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame) {
   char buffer[1024];
   auto data = frame.data();
@@ -426,7 +423,7 @@ QuicPacketizer::serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& 
   return serialize(quic::QuicFrame(&crypto_frame));
 }
 
-QuicPacketizer::QuicPacket
+QuicPacketizer::QuicPacketPtr
 QuicPacketizer::serializeAckFrame(const test::common::quic::QuicAckFrame& frame) {
   auto largest_acked = quic::QuicPacketNumber(clampU64(frame.largest_acked()));
   quic::QuicAckFrame ack_frame;
@@ -440,7 +437,7 @@ QuicPacketizer::serializeAckFrame(const test::common::quic::QuicAckFrame& frame)
   return serialize(quic::QuicFrame(&ack_frame));
 }
 
-QuicPacketizer::QuicPacket QuicPacketizer::serializeNewConnectionIdFrame(
+QuicPacketizer::QuicPacketPtr QuicPacketizer::serializeNewConnectionIdFrame(
     const test::common::quic::QuicNewConnectionIdFrame& frame) {
   quic::QuicNewConnectionIdFrame new_connection_id_frame;
   new_connection_id_frame.control_frame_id = frame.control_frame_id();

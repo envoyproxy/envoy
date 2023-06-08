@@ -32,23 +32,22 @@ private:
 class QuicPacketizer {
 public:
   static constexpr size_t kMaxPacketSize = 1460;
-  using QuicPacket = std::unique_ptr<quic::QuicEncryptedPacket>;
+  using QuicPacketPtr = std::unique_ptr<quic::QuicEncryptedPacket>;
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
-  std::vector<QuicPacket> serializePackets(const test::common::quic::QuicH3FuzzCase& input,
-                                           size_t max_packets);
+  std::vector<QuicPacketPtr> serializePackets(const test::common::quic::QuicH3FuzzCase& input);
   void reset();
 
 private:
-  QuicPacket serializePacket(const test::common::quic::QuicFrame& frame);
-  QuicPacket serializeJunkPacket(const std::string& data);
-  QuicPacket serialize(quic::QuicFrame frame);
-  QuicPacket serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame);
-  QuicPacket serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame);
-  QuicPacket serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame);
-  QuicPacket serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame);
-  QuicPacket serializeAckFrame(const test::common::quic::QuicAckFrame& frame);
-  QuicPacket
+  QuicPacketPtr serializePacket(const test::common::quic::QuicFrame& frame);
+  QuicPacketPtr serializeJunkPacket(const std::string& data);
+  QuicPacketPtr serialize(quic::QuicFrame frame);
+  QuicPacketPtr serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame);
+  QuicPacketPtr serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame);
+  QuicPacketPtr serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame);
+  QuicPacketPtr serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame);
+  QuicPacketPtr serializeAckFrame(const test::common::quic::QuicAckFrame& frame);
+  QuicPacketPtr
   serializeNewConnectionIdFrame(const test::common::quic::QuicNewConnectionIdFrame& frame);
 
   quic::ParsedQuicVersion quic_version_;

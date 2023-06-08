@@ -169,8 +169,7 @@ struct Harness {
     setQuicConfigWithDefaultValues(session->config());
     session->OnConfigNegotiated();
 
-    const size_t max_packets_count = 10;
-    auto packets = packetizer_.serializePackets(input, max_packets_count);
+    auto packets = packetizer_.serializePackets(input);
     for (auto& p : packets) {
       auto receipt_time = connection_helper_->GetClock()->Now();
       // We have to make sure that the server only receives the correct
