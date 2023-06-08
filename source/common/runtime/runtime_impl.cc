@@ -323,26 +323,35 @@ void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
                                               absl::string_view raw_string) {
   Entry entry;
+  entry.raw_string_value_ = value.string_value();
+  if (!raw_string.empty()) {
+    entry.raw_string_value_ = raw_string;
+  }
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.number_value());
+    }
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+    }
     break;
   case ProtobufWkt::Value::kStructValue:
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = value.struct_value().DebugString();
+    }
     parseFractionValue(entry, value.struct_value());
     break;
   case ProtobufWkt::Value::kStringValue:
-    entry.raw_string_value_ = value.string_value();
     parseEntryDoubleValue(entry);
     // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
     // functions and see if we can remove the special casing.
     parseEntryBooleanValue(entry);
     parseEntryFractionalPercentValue(entry);
-    if (!raw_string.empty()) {
-      entry.raw_string_value_ = raw_string;
-    }
   default:
     break;
   }
@@ -409,6 +418,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
@@ -690,13 +700,13 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
           ++disk_layers;
         }
         END_TRY
-        catch (EnvoyException& e) {
+        CATCH(EnvoyException & e, {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
-        }
+        });
       }
       break;
     }
