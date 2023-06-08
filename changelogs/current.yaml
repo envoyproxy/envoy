@@ -189,6 +189,9 @@ removed_config_or_runtime:
 - area: config
   change: |
     removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
 - area: access_log
