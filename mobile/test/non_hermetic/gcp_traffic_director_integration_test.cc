@@ -1,3 +1,5 @@
+// This test is not meant to be run on the command line, because it depends on a
+
 #include <string>
 #include <tuple>
 #include <vector>
@@ -24,6 +26,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/engine_handle.h"
 #include "library/common/types/c_types.h"
+#include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
 namespace {
@@ -51,7 +54,9 @@ std::string jwtToken() {
   const std::string cert_url = absl::Substitute("https://www.googleapis.com/robot/v1/metadata/x509/"
                                                 "$0-compute%40developer.gserviceaccount.com",
                                                 PROJECT_ID);
-  const std::string private_key(TestEnvironment::getCheckedEnvVar("GCP_JWT_PRIVATE_KEY"));
+  const char* private_key = std::getenv("GCP_JWT_PRIVATE_KEY");
+  RELEASE_ASSERT(private_key != nullptr, "GCP_JWT_PRIVATE_KEY environment variable not set.");
+  std::cerr << "==> AAB private_key=" << private_key << std::endl; // TODO:rm
 
   return absl::Substitute(
       R"json({
@@ -134,3 +139,20 @@ TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
 
 } // namespace
 } // namespace Envoy
+
+int main(int argc, char** argv) {
+  Envoy::TestEnvironment::initializeOptions(argc, argv);
+  std::string error;
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
+      bazel::tools::cpp::runfiles::Runfiles::Create(argv[0], &error));
+  RELEASE_ASSERT(runfiles != nullptr, error);
+  Envoy::TestEnvironment::setRunfiles(runfiles.get());
+
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_context(spdlog::level::level_enum::trace,
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  Envoy::Event::Libevent::Global::initialize();
+
+  testing::InitGoogleTest();
+  return RUN_ALL_TESTS();
+}
