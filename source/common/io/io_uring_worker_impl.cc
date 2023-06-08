@@ -333,6 +333,8 @@ void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
 
 void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb, bool posted) {
   // Ensure the close is done by the thread of socket running.
+  // TODO (soulxu): This fixes the race problem, but it has performance penalty.
+  // Thinking of a way to close the socket on its own thread in the listener.
   if (!posted) {
     parent_.dispatcher().post([this, keep_fd_open, cb]() { close(keep_fd_open, cb, true); });
     return;
