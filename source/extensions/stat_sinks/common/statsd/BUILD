@@ -30,6 +30,5 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
-        "//source/common/stats:deferred_creation",
     ],
 )

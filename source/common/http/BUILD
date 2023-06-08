@@ -45,7 +45,6 @@ envoy_cc_library(
     hdrs = ["async_client_utility.h"],
     deps = [
         "//envoy/http:async_client_interface",
-        "//source/common/stats:deferred_creation",
     ],
 )
 
@@ -77,7 +76,6 @@ envoy_cc_library(
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
         "//source/common/runtime:runtime_features_lib",
-        "//source/common/stats:deferred_creation",
     ] + envoy_select_enable_http3([
         "//source/common/quic:client_codec_lib",
     ]),

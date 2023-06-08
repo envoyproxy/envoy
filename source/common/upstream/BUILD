@@ -166,7 +166,6 @@ envoy_cc_library(
     hdrs = ["conn_pool_map_impl.h"],
     deps = [
         ":conn_pool_map",
-        "//source/common/stats:deferred_creation",
     ],
 )
 
@@ -271,7 +270,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
-        "//source/common/stats:deferred_creation",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",

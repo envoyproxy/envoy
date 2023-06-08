@@ -24,7 +24,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
-#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/edf_scheduler.h"
 
 namespace Envoy {
