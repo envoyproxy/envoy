@@ -24,6 +24,8 @@ namespace Upstreams {
 namespace Http {
 namespace Udp {
 
+// Creates a UDP socket for a UDP upstream connection. When a new UDP upstream is requested by the
+// UpstreamRequest of Router, creates a UDPUpstream object and hands over the created socket to it.
 class UdpConnPool : public Router::GenericConnPool {
 public:
   UdpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -53,6 +55,9 @@ private:
   Upstream::HostConstSharedPtr host_;
 };
 
+// Maintains data relevant to a UDP upstream connection including the socket for the upstream.
+// When a CONNECT-UDP request comes in, connects the socket to a node in the upstream cluster.
+// Also, adds appropriate header entries to the CONNECT-UDP response.
 class UdpUpstream : public Router::GenericUpstream,
                     public Network::UdpPacketProcessor,
                     public quiche::CapsuleParser::Visitor {

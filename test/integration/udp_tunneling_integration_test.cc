@@ -66,14 +66,16 @@ public:
 
   void exchangeValidCapsules() {
     const std::string sent_capsule_fragment =
-        absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                               "08"               // capsule length
-                               "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+        absl::HexStringToBytes("00"             // DATAGRAM Capsule Type
+                               "08"             // Capsule Length
+                               "00"             // Context ID
+                               "a1a2a3a4a5a6a7" // UDP Proxying Payload
         );
     const std::string received_capsule_fragment =
-        absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                               "08"               // capsule length
-                               "00b1b2b3b4b5b6b7" // UDP Proxying HTTP Datagram payload
+        absl::HexStringToBytes("00"             // DATAGRAM Capsule Type
+                               "08"             // Capsule Length
+                               "00"             // Context ID
+                               "b1b2b3b4b5b6b7" // UDP Proxying Payload
         );
 
     sendBidirectionalData(sent_capsule_fragment, absl::HexStringToBytes("a1a2a3a4a5a6a7"),
@@ -232,18 +234,20 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
   setUpConnection();
   Network::UdpRecvData request_datagram;
   const std::string unknown_capsule_fragment =
-      absl::HexStringToBytes("01"               // DATAGRAM capsule type
-                             "08"               // capsule length
-                             "00a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      absl::HexStringToBytes("01"             // DATAGRAM Capsule Yype
+                             "08"             // Capsule Length
+                             "00"             // Context ID
+                             "a1a2a3a4a5a6a7" // UDP Proxying Payload
       );
   codec_client_->sendData(*request_encoder_, unknown_capsule_fragment, false);
   ASSERT_FALSE(
       fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
 
   const std::string unknown_context_id =
-      absl::HexStringToBytes("00"               // DATAGRAM capsule type
-                             "08"               // capsule length
-                             "01a1a2a3a4a5a6a7" // UDP Proxying HTTP Datagram payload
+      absl::HexStringToBytes("00"             // DATAGRAM Capsule Yype
+                             "08"             // Capsule Length
+                             "01"             // Context ID
+                             "a1a2a3a4a5a6a7" // UDP Proxying Payload
       );
   codec_client_->sendData(*request_encoder_, unknown_context_id, false);
   ASSERT_FALSE(

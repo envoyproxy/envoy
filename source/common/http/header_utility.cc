@@ -20,24 +20,6 @@
 namespace Envoy {
 namespace Http {
 
-namespace {
-
-static bool isIpv6(absl::string_view ip_address) {
-  ASSERT(!ip_address.empty());
-  // Removes the Zone ID in the IPv6 address.
-  std::vector<absl::string_view> ip_address_split = absl::StrSplit(ip_address, '%');
-  if (ip_address_split.empty()) {
-    return false;
-  }
-  sockaddr_in6 addr_in;
-  return inet_pton(AF_INET6,
-                   ip_address_split.size() == 1 ? ip_address_split[0].data()
-                                                : std::string(ip_address_split[0]).c_str(),
-                   &addr_in.sin6_addr) == 1;
-}
-
-} // namespace
-
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
   const absl::string_view ConnectUnsupported = "http.connect_not_supported";
@@ -274,23 +256,42 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
 }
 
 bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
+  // Per RFC 9298, the URI template must only contain ASCII characters in the range 0x21-0x7E.
   absl::string_view path = headers.getPathValue();
+  for (char c : path) {
+    unsigned char ascii_code = static_cast<unsigned char>(c);
+    if (ascii_code < 0x21 || ascii_code > 0x7e) {
+      ENVOY_LOG_MISC(error, "CONNECT-UDP request with a bad character in the path {}", path);
+      return false;
+    }
+  }
+
   // Extract target host and port from path using default template.
   std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
   if (path_split.size() != 7 || !path_split[0].empty() || path_split[1] != ".well-known" ||
       path_split[2] != "masque" || path_split[3] != "udp" || path_split[4].empty() ||
       path_split[5].empty() || !path_split[6].empty()) {
-    ENVOY_LOG_MISC(error, "CONNECT-UDP request with bad path {}", path);
+    ENVOY_LOG_MISC(error, "CONNECT-UDP request with a malformed URI template in the path {}", path);
     return false;
   }
 
   // Utility::PercentEncoding::decode never returns an empty string if the input argument is not
   // empty.
   std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
+  // Per RFC 9298, IPv6 Zone ID is not supported.
+  if (target_host.find('%') != std::string::npos) {
+    ENVOY_LOG_MISC(error, "CONNECT-UDP request with a non-escpaed char (%) in the path {}", path);
+    return false;
+  }
   std::string target_port = Utility::PercentEncoding::decode(path_split[5]);
-  std::string new_host = absl::StrCat(
-      (isIpv6(target_host) ? absl::StrCat("[", target_host, "]") : target_host), ":", target_port);
+
+  // If the host is an IPv6 address, surround the address with square brackets.
+  in6_addr sin6_addr;
+  bool is_ipv6 = (inet_pton(AF_INET6, target_host.c_str(), &sin6_addr) == 1);
+  std::string new_host =
+      absl::StrCat((is_ipv6 ? absl::StrCat("[", target_host, "]") : target_host), ":", target_port);
   headers.setHost(new_host);
+
   return true;
 }
 

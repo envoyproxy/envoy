@@ -62,22 +62,33 @@ void UdpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
-                                               bool /*end_stream*/) {
-  Api::SysCallIntResult rc = socket_->connect(host_->address());
-  if (SOCKET_FAILURE(rc.return_value_)) {
-    return absl::InternalError("Upstream socket connect failure.");
-  }
-  // Synthesize the 200 response headers downstream to complete the CONNECT-UDP handshake.
-  Envoy::Http::ResponseHeaderMapPtr headers{
+Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap& /*headers*/,
+                                               bool end_stream) {
+  // For successful CONNECT-UDP handshakes, synthesizes the 200 response headers downstream.
+  Envoy::Http::ResponseHeaderMapPtr response_headers{
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"},
            {Envoy::Http::Headers::get().CapsuleProtocol, "?1"}})};
-  upstream_to_downstream_->decodeHeaders(std::move(headers), false);
+  if (end_stream) {
+    // If the request header is the end of the stream, responds with 400 Bad Request. Does not
+    // return an error code to avoid replying with 503 Service Unavailable.
+    response_headers->setStatus("400");
+    response_headers->remove(Envoy::Http::Headers::get().CapsuleProtocol);
+  } else {
+    Api::SysCallIntResult rc = socket_->connect(host_->address());
+    if (SOCKET_FAILURE(rc.return_value_)) {
+      return absl::InternalError("Upstream socket connect failure.");
+    }
+  }
+  // Indicates the end of stream for the subsequent filters in the chain.
+  upstream_to_downstream_->decodeHeaders(std::move(response_headers), end_stream);
   return Envoy::Http::okStatus();
 }
 
-void UdpUpstream::resetStream() { upstream_to_downstream_ = nullptr; }
+void UdpUpstream::resetStream() {
+  upstream_to_downstream_ = nullptr;
+  socket_->close();
+}
 
 void UdpUpstream::onSocketReadReady() {
   uint32_t packets_dropped = 0;
@@ -103,7 +114,7 @@ void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local
   Buffer::InstancePtr capsule_data = std::make_unique<Buffer::OwnedImpl>();
   capsule_data->add(serialized_capsule.AsStringView());
   bytes_meter_->addWireBytesReceived(capsule_data->length());
-  upstream_to_downstream_->decodeData(*capsule_data, false);
+  upstream_to_downstream_->decodeData(*capsule_data, /*end_stream=*/false);
 }
 
 bool UdpUpstream::OnCapsule(const quiche::Capsule& capsule) {
