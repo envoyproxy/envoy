@@ -19,7 +19,7 @@ public:
   // This method serializes an `HTTP/3` frame given by `h3frame` to `std::string`.
   // If `unidirectional` is true, `type` will give the type of unidirectional
   // stream to be opened. `id` identifies an `HTTP/3` frame and is used to track
-  // the wether the stream is already in flight.
+  // the whether the stream is already in flight.
   std::string serialize(bool unidirectional, uint32_t type, uint32_t id,
                         const test::common::quic::H3Frame& h3frame);
 
