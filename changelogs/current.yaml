@@ -305,7 +305,7 @@ new_features:
   change: |
     Added support for the route/virtual host level
     :ref:`disabled <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` field.
-    A route/virtual host level per filter config can be marked as disabled, which means that if
+    A route/virtual host level per filter config can be marked as disabled, which means that
     the filter will be disabled in a specific route/virtual host.
 
 
