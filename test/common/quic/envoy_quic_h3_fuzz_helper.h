@@ -14,9 +14,14 @@ namespace Quic {
 // would be sent over the wire.
 class H3Serializer {
 public:
+  static constexpr size_t kMaxPacketSize = 1024;
   H3Serializer(std::set<uint32_t>& streams) : open_unidirectional_streams_(streams){};
-  size_t serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id,
-                   const test::common::quic::H3Frame& h3frame);
+  // This method serializes an `HTTP/3` frame given by `h3frame` to `std::string`.
+  // If `unidirectional` is true, `type` will give the type of unidirectional
+  // stream to be opened. `id` identifies an `HTTP/3` frame and is used to track
+  // the wether the stream is already in flight.
+  std::string serialize(bool unidirectional, uint32_t type, uint32_t id,
+                        const test::common::quic::H3Frame& h3frame);
 
 private:
   std::set<uint32_t>& open_unidirectional_streams_;
@@ -26,29 +31,25 @@ private:
 // would be sent over the wire.
 class QuicPacketizer {
 public:
-  struct QuicPacket {
-    size_t size{0};
-    char payload[1460];
-  };
-
+  static constexpr size_t kMaxPacketSize = 1460;
+  using QuicPacket = std::unique_ptr<quic::QuicEncryptedPacket>;
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
-  size_t serializePackets(const test::common::quic::QuicH3FuzzCase& input, QuicPacket* packets,
-                          size_t max_packets);
+  std::vector<QuicPacket> serializePackets(const test::common::quic::QuicH3FuzzCase& input,
+                                           size_t max_packets);
   void reset();
 
 private:
-  bool serializePacket(const test::common::quic::QuicFrame& frame, QuicPacket* packet);
-  bool serializeJunkPacket(const std::string& data, QuicPacket* packet);
-  void serialize(quic::QuicFrame, QuicPacket* packet);
-  void serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame, QuicPacket* packet);
-  void serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame,
-                              QuicPacket* packet);
-  void serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame, QuicPacket* packet);
-  void serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame, QuicPacket* packet);
-  void serializeAckFrame(const test::common::quic::QuicAckFrame& frame, QuicPacket* packet);
-  void serializeNewConnectionIdFrame(const test::common::quic::QuicNewConnectionIdFrame& frame,
-                                     QuicPacket* packet);
+  QuicPacket serializePacket(const test::common::quic::QuicFrame& frame);
+  QuicPacket serializeJunkPacket(const std::string& data);
+  QuicPacket serialize(quic::QuicFrame frame);
+  QuicPacket serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame);
+  QuicPacket serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame);
+  QuicPacket serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame);
+  QuicPacket serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame);
+  QuicPacket serializeAckFrame(const test::common::quic::QuicAckFrame& frame);
+  QuicPacket
+  serializeNewConnectionIdFrame(const test::common::quic::QuicNewConnectionIdFrame& frame);
 
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;
