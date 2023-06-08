@@ -105,6 +105,9 @@ message ClusterLoadAssignment {
     // hosts to determine the health of the priority level. If false, use the number of healthy and unhealthy hosts
     // to determine the health of the priority level, or in other words assume each host has a weight of 1 for
     // this calculation.
+    //
+    // Note: this is not currently implemented for
+    // :ref:`locality weighted load balancing <arch_overview_load_balancing_locality_weighted_lb>`.
     bool weighted_priority_health = 6;
   }
 
