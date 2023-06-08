@@ -239,7 +239,6 @@ private:
                       const HostVector& hosts_added, const HostVector& hosts_removed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
           ->update(matching_hosts, hosts_added, hosts_removed);
-
       runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
