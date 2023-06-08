@@ -309,6 +309,11 @@ new_features:
     Added bootstrap option
     :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`
     to enable setting application log format as JSON structure.
+- area: application_logs
+  change: |
+    Added bootstrap option
+    :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format>`
+    to enable setting application log text format from config.
 - area: ext_proc
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
