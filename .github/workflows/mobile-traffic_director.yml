@@ -43,7 +43,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw run
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=remote-ci-linux \
             --config=ci \
             --test_output=all \
             //test/non_hermetic:gcp_traffic_director_integration_test
