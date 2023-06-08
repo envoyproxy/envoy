@@ -41,7 +41,8 @@ jobs:
         GCP_JWT_PRIVATE_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
         ENVOY_IP_TEST_VERSIONS: v4only
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
             --test_output=all \
