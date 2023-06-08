@@ -1,10 +1,6 @@
 name: mobile_traffic_director
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
   schedule:
   # Once a day at midnight.
   - cron: '0 0 * * *'
@@ -42,8 +38,7 @@ jobs:
     - name: 'Run GcpTrafficDirectorIntegrationTest'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # GCP_JWT_PRIVATE_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
-        GCP_JWT_PRIVATE_KEY: nirvana
+        GCP_JWT_PRIVATE_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
         ENVOY_IP_TEST_VERSIONS: v4only
       run: |
         cd mobile && ./bazelw run \

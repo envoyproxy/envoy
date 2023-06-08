@@ -1,4 +1,5 @@
-// This test is not meant to be run on the command line, because it depends on a
+// This test is not meant to be run on the command line, because it depends on a GCP
+// authentication token provided as a GitHub encrypted secret through a GitHub actions workflow.
 
 #include <string>
 #include <tuple>
@@ -56,7 +57,6 @@ std::string jwtToken() {
                                                 PROJECT_ID);
   const char* private_key = std::getenv("GCP_JWT_PRIVATE_KEY");
   RELEASE_ASSERT(private_key != nullptr, "GCP_JWT_PRIVATE_KEY environment variable not set.");
-  std::cerr << "==> AAB private_key=" << private_key << std::endl; // TODO:rm
 
   return absl::Substitute(
       R"json({
