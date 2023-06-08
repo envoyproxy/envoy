@@ -1,4 +1,4 @@
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "gtest/gtest.h"
 

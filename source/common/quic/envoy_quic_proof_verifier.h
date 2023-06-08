@@ -54,13 +54,6 @@ public:
                   std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
 private:
-  // TODO(danzh) remove when deprecating envoy.reloadable_features.tls_async_cert_validation.
-  bool doVerifyCertChain(const std::string& hostname, const uint16_t port,
-                         const std::vector<std::string>& certs, const std::string& ocsp_response,
-                         const std::string& cert_sct, const quic::ProofVerifyContext* context,
-                         std::string* error_details, uint8_t* out_alert,
-                         std::unique_ptr<quic::ProofVerifierCallback> callback);
-
   Envoy::Ssl::ClientContextSharedPtr context_;
 };
 

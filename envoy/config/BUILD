@@ -135,7 +135,6 @@ envoy_cc_library(
         ":subscription_interface",
         ":typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
-        "//source/common/config:update_ack_lib",
         "//source/common/protobuf",
         "@com_google_googleapis//google/rpc:status_cc_proto",
     ],

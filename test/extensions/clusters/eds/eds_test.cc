@@ -23,7 +23,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1832,9 +1831,6 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
 // Validate that onConfigUpdate() propagates locality weights to the host set when the cluster uses
 // load balancing policy extensions.
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   expectLocalityWeightsPresentForClusterConfig(R"EOF(
@@ -1846,6 +1842,8 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
         policies:
         - typed_extension_config:
             name: envoy.load_balancers.custom_lb
+            typed_config:
+              "@type": type.googleapis.com/test.integration.custom_lb.CustomLbConfig
       eds_cluster_config:
         service_name: fare
         eds_config:

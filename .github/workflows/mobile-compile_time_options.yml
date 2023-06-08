@@ -17,49 +17,27 @@ jobs:
     secrets: inherit
 
   cc_test:
-    if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
     name: cc_test
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
     steps:
     - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Build C++ library'
+    - name: 'Building C++ library'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
       run: |
-      # Envoy Mobile build which verifies that the build configuration where HTTP/3 is enabled and
-      # HTTP Datagrams are disabled works.
-        cd mobile
-        ./bazelw test \
+        cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
-            --define=signal_trace=disabled \
-            --define=admin_html=enabled \
-            --define=envoy_mobile_request_compression=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
-            --define=google_grpc=disabled \
-            --@envoy//bazel:http3=False \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/cc/...
-        # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
-        ./bazelw test \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --config=ci \
-            --fat_apk_cpu=x86_64 \
-            --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
-            --define=google_grpc=disabled \
             --define=envoy_yaml=disabled \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/java/integration:android_engine_socket_tag_test \
-            //test/java/integration:android_engine_start_test \
-            //test/java/io/envoyproxy/envoymobile/utilities:certificate_verification_tests \
-            //test/common/integration:client_integration_test
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            //test/common/integration:client_integration_test --test_output=all
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
