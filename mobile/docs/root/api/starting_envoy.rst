@@ -226,23 +226,26 @@ This information is sent as metadata when flushing stats.
   builder.addAppId("com.mydomain.myapp)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableAdminInterface``
+``addNativeFilter``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Enable admin interface on 127.0.0.1:9901 address.
+Add a C++ filter to the Envoy Mobile filter chain
 
 .. attention::
 
-    Admin interface is intended to be used for development/debugging purposes only.
-    Enabling it in production may open your app to security vulnerabilities.
+    This will only work if the C++ filter specified is linked into your Envoy Mobile build.
+    For C++ and Android testing, calling addNativeFilter and linking the Envoy library by adding the
+    library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
+    For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
+    also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
 
 **Example**::
 
   // Kotlin
-  builder.enableAdminInterface()
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
   // Swift
-  builder.enableAdminInterface()
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``

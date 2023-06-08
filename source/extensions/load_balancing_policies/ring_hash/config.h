@@ -13,12 +13,14 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace RingHash {
 
-class Factory : public Upstream::TypedLoadBalancerFactoryBase<
-                    envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash> {
+using RingHashLbProto = envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash;
+
+class Factory : public Upstream::TypedLoadBalancerFactoryBase<RingHashLbProto> {
 public:
   Factory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.ring_hash") {}
 
-  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo& cluster_info,
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                              const Upstream::ClusterInfo& cluster_info,
                                               const Upstream::PrioritySet& priority_set,
                                               Runtime::Loader& runtime,
                                               Random::RandomGenerator& random,

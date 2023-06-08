@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+
 	xds "github.com/cncf/xds/go/xds/type/v3"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
@@ -40,12 +42,15 @@ func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 		return nil, err
 	}
 
-	v := configStruct.Value
 	conf := &config{}
-	if remove, ok := v.AsMap()["remove"].(string); ok {
+	m := configStruct.Value.AsMap()
+	if _, ok := m["invalid"].(string); ok {
+		return nil, errors.New("testing invalid config")
+	}
+	if remove, ok := m["remove"].(string); ok {
 		conf.removeHeader = remove
 	}
-	if set, ok := v.AsMap()["set"].(string); ok {
+	if set, ok := m["set"].(string); ok {
 		conf.setHeader = set
 	}
 	return conf, nil

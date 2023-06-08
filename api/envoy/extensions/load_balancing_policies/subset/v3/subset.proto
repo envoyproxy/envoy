@@ -18,7 +18,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Subset Load Balancing Policy]
 // [#extension: envoy.load_balancing_policies.subset]
-// [#not-implemented-hide:]
 
 // Optionally divide the endpoints in this cluster into subsets defined by
 // endpoint metadata and selected by route and weighted cluster metadata.
@@ -104,7 +103,7 @@ message Subset {
 
       // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
       // keys reduced to
-      // :ref:`fallback_keys_subset<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+      // :ref:`fallback_keys_subset<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.fallback_keys_subset>`.
       // It allows for a fallback to a different, less specific selector if some of the keys of
       // the selector are considered optional.
       KEYS_SUBSET = 4;
@@ -130,30 +129,30 @@ message Subset {
         [(validate.rules).enum = {defined_only: true}];
 
     // Subset of
-    // :ref:`keys<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used by
-    // :ref:`KEYS_SUBSET<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+    // :ref:`keys<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.keys>` used by
+    // :ref:`KEYS_SUBSET<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
     // fallback policy.
     // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
     // For any other fallback policy the parameter is not used and should not be set.
     // Only values also present in
-    // :ref:`keys<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are allowed, but
+    // :ref:`keys<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.keys>` are allowed, but
     // ``fallback_keys_subset`` cannot be equal to ``keys``.
     repeated string fallback_keys_subset = 3;
   }
 
   // The behavior used when no endpoint subset matches the selected route's
   // metadata. The value defaults to
-  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.NO_FALLBACK>`.
   LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies the default subset of endpoints used during fallback if
   // fallback_policy is
-  // :ref:`DEFAULT_SUBSET<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.DEFAULT_SUBSET>`.
+  // :ref:`DEFAULT_SUBSET<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.DEFAULT_SUBSET>`.
   // Each field in default_subset is
   // compared to the matching LbEndpoint.Metadata under the ``envoy.lb``
   // namespace. It is valid for no hosts to match, in which case the behavior
   // is the same as a fallback_policy of
-  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+  // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.NO_FALLBACK>`.
   google.protobuf.Struct default_subset = 2;
 
   // For each entry, LbEndpoint.Metadata's
@@ -210,7 +209,7 @@ message Subset {
   //
   // The value defaults to
   // :ref:`METADATA_NO_FALLBACK
-  // <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.subset.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
+  // <envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.subset.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
   LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
       [(validate.rules).enum = {defined_only: true}];
 
