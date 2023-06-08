@@ -71,6 +71,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason);
 
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
                                                  int life_span, int stream_sharing);
+CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value);
 
 #ifdef __cplusplus
 } // extern "C"

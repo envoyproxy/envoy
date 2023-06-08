@@ -35,6 +35,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
@@ -263,14 +264,26 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI api.HttpCAPI = &httpCApiImpl{}
+var cAPI HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api api.HttpCAPI) {
+func SetHttpCAPI(api HttpCAPI) {
 	cAPI = api
 }
 
 func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
 	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
 	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+	var value string
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	atomic.AddInt32(&r.waitingOnEnvoy, 1)
+	r.sema.Wait()
+	atomic.AddInt32(&r.waitingOnEnvoy, -1)
+
+	return strings.Clone(value)
 }
