@@ -310,7 +310,7 @@ message QueryParameter {
   string value = 2;
 }
 
-// Header name/value pair.
+// Header name/value pair with header value as string.
 message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
 
@@ -326,6 +326,25 @@ message HeaderValue {
   // unknown header values are replaced with the empty string instead of ``-``.
   string value = 2 [
     (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+  ];
+}
+
+// Header name/value pair with header value as bytes.
+message HeaderValueBytes {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
+
+  // Header name.
+  string key = 1
+      [(validate.rules).string =
+           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // Header value.
+  //
+  // The same :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` applies here, however
+  // unknown header values are replaced with the empty string instead of ``-``.
+  bytes value = 2 [
+      (validate.rules).bytes =  {min_len:0, max_len:16384}
   ];
 }
 
@@ -377,11 +396,18 @@ message HeaderValueOption {
   bool keep_empty_value = 4;
 }
 
-// Wrapper for a set of headers.
+// Wrapper for a set of headers with headver value as string.
 message HeaderMap {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
 
   repeated HeaderValue headers = 1;
+}
+
+// Wrapper for a set of headers with header value as bytes.
+message HeaderMapBytes {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMapBytes";
+
+  repeated HeaderValueBytes headers = 1;
 }
 
 // A directory that is watched for changes, e.g. by inotify on Linux. Move/rename

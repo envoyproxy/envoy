@@ -574,7 +574,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
             {":method", "GET"},
             {"host", "host"},
             {":path", "/"},
-            {"x-bad-utf8", "valid_prefix!(valid_suffix"},
+            {"x-bad-utf8", "valid_prefix?(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           ENVOY_LOG_MISC(critical, "{}", header.value());

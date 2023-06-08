@@ -195,7 +195,7 @@ message ProcessingResponse {
 message HttpHeaders {
   // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
-  config.core.v3.HeaderMap headers = 1;
+  config.core.v3.HeaderMapBytes headers = 1;
 
   // [#not-implemented-hide:]
   // The values of properties selected by the ``request_attributes``
@@ -219,7 +219,7 @@ message HttpBody {
 
 // This message contains the trailers.
 message HttpTrailers {
-  config.core.v3.HeaderMap trailers = 1;
+  config.core.v3.HeaderMapBytes trailers = 1;
 }
 
 // The following are messages that may be sent back by the server.

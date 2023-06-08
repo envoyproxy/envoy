@@ -32,13 +32,13 @@ bool MutationUtils::headerInAllowList(
 
 void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
                                    const std::vector<Matchers::StringMatcherPtr>& header_matchers,
-                                   envoy::config::core::v3::HeaderMap& proto_out) {
+                                   envoy::config::core::v3::HeaderMapBytes& proto_out) {
   headers_in.iterate([&proto_out,
                       &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
-      new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+      new_header->set_value(std::string(e.value().getStringView()));
     }
     return Http::HeaderMap::Iterate::Continue;
   });
