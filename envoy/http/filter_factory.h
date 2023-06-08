@@ -38,7 +38,7 @@ struct FilterContext {
 /**
  * Additional options for creating HTTP filter chain.
  * TODO(wbpcode): it is possible to add more options to customize HTTP filter chain creation.
- * For example, we can add upgrade related options here to tell FilterChainFactory to create
+ * For example, we can add related options here to tell FilterChainFactory to create
  * upgrade filter chain or not.
  */
 class FilterChainOptions {
