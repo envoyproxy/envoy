@@ -170,6 +170,9 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+  change: |
+    added support for CONNECT-UDP (RFC 9298). Can be disabled by setting runtime feature
+    ``envoy.reloadable_features.enable_connect_udp_support`` to false.
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
