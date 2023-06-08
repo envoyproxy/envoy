@@ -170,9 +170,9 @@ snowballstemmer==2.2.0 \
 Sphinx==7.0.0 \
     --hash=sha256:283c44aa28922bb4223777b44ac0d59af50a279ac7690dfe945bb2b9575dc41b \
     --hash=sha256:3cfc1c6756ef1b132687b813ec6ea2214cb7a7e5d1dcb2772006cb895a0fa469
-sphinx-rtd-theme==1.2.0 \
-    --hash=sha256:a0d8bd1a2ed52e0b338cbe19c4b2eef3c5e7a048769753dac6a9f059c7b641b8 \
-    --hash=sha256:f823f7e71890abe0ac6aaa6013361ea2696fc8d3e1fa798f463e82bdb77eeff2
+sphinx-rtd-theme==1.2.2 \
+    --hash=sha256:01c5c5a72e2d025bd23d1f06c59a4831b06e6ce6c01fdd5ebfe9986c0a880fc7 \
+    --hash=sha256:6a7e7d8af34eb8fc57d52a09c6b6b9c46ff44aea5951bc831eeb9245378f3689
 sphinxcontrib-applehelp==1.0.4 \
     --hash=sha256:29d341f67fb0f6f586b23ad80e072c8e6ad0b48417db2bde114a4c9746feb228 \
     --hash=sha256:828f867945bbe39817c210a1abfd1bc4895c8b73fcaade56d45357a348a07d7e
