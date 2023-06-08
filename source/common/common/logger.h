@@ -525,7 +525,8 @@ public:
 #define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,\
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
                           ##__VA_ARGS__);                                                          \
     }                                                                                              \
   } while (0)

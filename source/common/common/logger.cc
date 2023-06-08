@@ -315,7 +315,7 @@ std::string serializeLogTags(std::map<std::string, std::string> tags) {
   std::stringstream string_stream;
   string_stream << "[Tags: ";
   for (const auto& tag : tags) {
-      string_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+    string_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
   }
 
   std::string serialized = string_stream.str();
