@@ -76,8 +76,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/http:93.8"
 "source/extensions/health_checkers/grpc:92.0"
-"source/extensions/load_balancing_policies:95.5"
-"source/extensions/load_balancing_policies/subset:94.3"
+"source/extensions/load_balancing_policies:96.4"
+"source/extensions/load_balancing_policies/subset:96.0"
 "source/extensions/config_subscription/rest:94.3"
 "source/extensions/matching/input_matchers/cel_matcher:90.7" #Death tests don't report LCOV
 )
