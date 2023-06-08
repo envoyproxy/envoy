@@ -79,7 +79,6 @@ envoy_cc_library(
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
-        "//source/common/config:null_grpc_mux_lib",
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":host_utility_lib",
@@ -101,6 +100,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
@@ -399,6 +399,7 @@ envoy_cc_library(
         ":transport_socket_match_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//source/common/stats:deferred_creation",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
