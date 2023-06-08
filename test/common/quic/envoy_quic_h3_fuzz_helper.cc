@@ -81,9 +81,9 @@ size_t H3Serializer::serialize(char* buffer, size_t buffer_len, bool unidirectio
                                uint32_t id, const H3Frame& h3frame) {
   quiche::QuicheDataWriter dw(buffer_len, buffer);
   if (unidirectional) {
-    if (open_h3_streams_.find(id) == open_h3_streams_.end()) {
+    if (open_unidirectional_streams_.find(id) == open_unidirectional_streams_.end()) {
       dw.WriteVarInt62(static_cast<uint64_t>(type));
-      open_h3_streams_.insert(id);
+      open_unidirectional_streams_.insert(id);
     }
   }
   switch (h3frame.frame_case()) {
@@ -165,7 +165,7 @@ QuicPacketizer::QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
       destination_connection_id_(quic::test::TestConnectionId()),
       framer_({quic_version_}, connection_helper_->GetClock()->Now(), quic::Perspective::IS_CLIENT,
               quic::kQuicDefaultConnectionIdLength),
-      h3serializer_(open_h3_streams_) {
+      h3serializer_(open_unidirectional_streams_) {
   quic::Perspective p = quic::Perspective::IS_CLIENT;
   framer_.SetEncrypter(quic::ENCRYPTION_INITIAL, std::make_unique<FuzzEncrypter>(p));
   framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE, std::make_unique<FuzzEncrypter>(p));
@@ -196,7 +196,7 @@ size_t QuicPacketizer::serializePackets(const QuicH3FuzzCase& input,
 
 void QuicPacketizer::reset() {
   packet_number_ = quic::QuicPacketNumber(0);
-  open_h3_streams_.clear();
+  open_unidirectional_streams_.clear();
 }
 
 bool QuicPacketizer::serializePacket(const QuicFrame& frame, QuicPacketizer::QuicPacket* packet) {

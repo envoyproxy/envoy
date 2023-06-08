@@ -14,12 +14,12 @@ namespace Quic {
 // would be sent over the wire.
 class H3Serializer {
 public:
-  H3Serializer(std::set<uint32_t>& streams) : open_h3_streams_(streams){};
+  H3Serializer(std::set<uint32_t>& streams) : open_unidirectional_streams_(streams){};
   size_t serialize(char* buffer, size_t buffer_len, bool unidirectional, uint32_t type, uint32_t id,
                    const test::common::quic::H3Frame& h3frame);
 
 private:
-  std::set<uint32_t>& open_h3_streams_;
+  std::set<uint32_t>& open_unidirectional_streams_;
 };
 
 // This class serializes structured protobuf `QUIC + HTTP/3` messages to bytes as they
@@ -58,10 +58,14 @@ private:
   quic::QuicFramer framer_;
 
   H3Serializer h3serializer_;
-  // Unidirectional streams are started by sending a varint indicating the stream type.
-  // This set tracks which stream ids have already been established so that the stream type
-  // is not inserted into a previously opened stream. RFC9114, Sec. 6.2
-  std::set<uint32_t> open_h3_streams_;
+
+  // Unidirectional streams are started by sending a variable-length integer
+  // indicating the stream type (RFC9114, Sec. 6.2). H3Serializer serializes the
+  // stream type into the stream payload upon seeing the stream for the first
+  // time. This set tracks opened unidirectional streams in this flight. So that
+  // multiple stream frames on the same stream will not cause the stream type to
+  // be serialized again.
+  std::set<uint32_t> open_unidirectional_streams_;
 };
 
 // The following two classes handle the encryption and decryption in the fuzzer
