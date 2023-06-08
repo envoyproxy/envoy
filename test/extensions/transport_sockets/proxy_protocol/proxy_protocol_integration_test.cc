@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
@@ -24,10 +26,10 @@ public:
   }
 
   void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks,
-             std::string inner_socket) {
+             bool inner_tls) {
     version_ = version;
     health_checks_ = health_checks;
-    inner_socket_ = inner_socket;
+    inner_tls_ = inner_tls;
   }
 
   void initialize() override {
@@ -36,7 +38,15 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name(inner_socket_);
+      if (inner_tls_) {
+        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls;
+        inner_socket.set_name("tls");
+        inner_socket.mutable_typed_config()->PackFrom(tls);
+      } else {
+        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+        inner_socket.set_name("raw");
+        inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      }
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
@@ -70,7 +80,7 @@ public:
 private:
   envoy::config::core::v3::ProxyProtocolConfig_Version version_;
   bool health_checks_;
-  std::string inner_socket_;
+  bool inner_tls_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTcpIntegrationTest,
@@ -79,8 +89,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTcpIntegrationTest,
 
 // Test sending proxy protocol v1
 TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, false);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -113,8 +122,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
     return;
   }
 
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, false);
   initialize();
   auto listener_port = lookupPort("listener_0");
 
@@ -140,7 +148,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
 
 // Test header is sent unencrypted using a TLS inner socket
 TEST_P(ProxyProtocolTcpIntegrationTest, TestTLSSocket) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, "envoy.transport_sockets.tls");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, true);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -163,8 +171,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestTLSSocket) {
 
 // Test sending proxy protocol health check
 TEST_P(ProxyProtocolTcpIntegrationTest, TestProxyProtocolHealthCheck) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true, false);
   FakeRawConnectionPtr fake_upstream_health_connection;
   on_server_init_function_ = [&](void) -> void {
     std::string observed_data;
@@ -187,8 +194,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestProxyProtocolHealthCheck) {
 
 // Test sending proxy protocol v2
 TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V2, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V2, false, false);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -246,11 +252,9 @@ public:
     fake_upstreams_.clear();
   }
 
-  void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks,
-             std::string inner_socket) {
+  void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks) {
     version_ = version;
     health_checks_ = health_checks;
-    inner_socket_ = inner_socket;
   }
 
   void initialize() override {
@@ -259,7 +263,9 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name(inner_socket_);
+      envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+      inner_socket.set_name("raw");
+      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
@@ -289,7 +295,6 @@ public:
 private:
   envoy::config::core::v3::ProxyProtocolConfig_Version version_;
   bool health_checks_;
-  std::string inner_socket_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolHttpIntegrationTest,
@@ -298,8 +303,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolHttpIntegrationTest,
 
 // Test sending proxy protocol over http
 TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false);
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("http"));
@@ -344,8 +348,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
     return;
   }
 
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false);
   initialize();
   auto listener_port = lookupPort("http");
   auto tcp_client = makeTcpConnection(listener_port);
@@ -375,8 +378,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
 
 // Test sending proxy protocol http health check
 TEST_P(ProxyProtocolHttpIntegrationTest, TestProxyProtocolHealthCheck) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true);
   FakeRawConnectionPtr fake_upstream_health_connection;
   on_server_init_function_ = [&](void) -> void {
     std::string observed_data;
@@ -443,7 +445,9 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name("envoy.transport_sockets.raw_buffer");
+      envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+      inner_socket.set_name("raw");
+      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
 
       envoy::config::core::v3::ProxyProtocolConfig proxy_protocol;
       proxy_protocol.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
