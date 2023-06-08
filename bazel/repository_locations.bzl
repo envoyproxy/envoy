@@ -1052,20 +1052,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-10-12",
         cpe = "N/A",
     ),
-    v8_ittapi = dict(
+    intel_ittapi = dict(
         project_name = "ittapi",
-        project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
-        project_url = "https://v8.dev",
-        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
+        project_desc = "Intel® Instrumentation and Tracing Technology (ITT) and Just-In-Time (JIT) API",
+        project_url = "https://github.com/intel/ittapi",
         version = "3.24.0",
-        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "36c42d3f2446ddfaa2d7dfa02dfaa79615933f1a68a72d7e4f1d70de7b56e2c9",
-        strip_prefix = "ittapi-3.24.0",
-        urls = ["https://github.com/intel/ittapi/archive/refs/tags/v3.24.0.tar.gz"],
+        strip_prefix = "ittapi-{version}",
+        urls = ["https://github.com/intel/ittapi/archive/refs/tags/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-10-12",
-        cpe = "cpe:2.3:a:google:v8:*",
+        extensions = [],
+        release_date = "2023-01-10",
+        cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/intel/ittapi/blob/v{version}/LICENSES/BSD-3-Clause.txt",
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
