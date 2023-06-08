@@ -396,7 +396,7 @@ message HeaderValueOption {
   bool keep_empty_value = 4;
 }
 
-// Wrapper for a set of headers with headver value as string.
+// Wrapper for a set of headers with header value as string.
 message HeaderMap {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
 
