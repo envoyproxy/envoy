@@ -78,7 +78,10 @@ public:
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
-  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogFormat(const std::string& log_format) {
+    log_format_ = log_format;
+    log_format_set_ = true;
+  }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
@@ -140,6 +143,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatSet() const override { return log_format_set_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
   bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
@@ -201,6 +205,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
+  bool log_format_set_{false};
   bool log_format_escaped_{false};
   std::string log_path_;
   uint64_t restart_epoch_{0};

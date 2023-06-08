@@ -126,7 +126,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
-  MOCK_METHOD(const ProtobufTypes::MessagePtr&, loadBalancingPolicy, (), (const));
+  MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
@@ -254,7 +254,6 @@ public:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  ProtobufTypes::MessagePtr load_balancing_policy_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
