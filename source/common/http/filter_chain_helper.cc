@@ -36,7 +36,7 @@ void FilterChainUtility::createFilterChainForFactories(
     const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
-    // If this filter is disabled explicitly, and skip trying to create it.
+    // If this filter is disabled explicitly, skip trying to create it.
     if (options.filterDisabled(filter_config_provider->name())) {
       continue;
     }
