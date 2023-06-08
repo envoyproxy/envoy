@@ -35,7 +35,7 @@ message ClusterLoadAssignment {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.ClusterLoadAssignment";
 
   // Load balancing policy settings.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message Policy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.ClusterLoadAssignment.Policy";
