@@ -43,9 +43,13 @@ fi
 echo "Starting Docker daemon ..."
 systemctl start docker
 
-echo "Unmount cache tmp ${DOCKER_CACHE_PATH} ..."
-umount "${DOCKER_CACHE_PATH}"
-
+if mountpoint -q "${DOCKER_CACHE_PATH}"; then
+    echo "Unmount cache tmp ${DOCKER_CACHE_PATH} ..."
+    umount "${DOCKER_CACHE_PATH}"
+else
+    echo "Remove cache tmp ${DOCKER_CACHE_PATH} ..."
+    rm -rf "${DOCKER_CACHE_PATH}"
+fi
 docker images
 df -h
 

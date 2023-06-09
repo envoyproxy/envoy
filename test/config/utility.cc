@@ -928,7 +928,15 @@ void ConfigHelper::configureUpstreamTls(
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
-  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+
+  if (value == "true") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(true);
+  } else if (value == "false") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
+  } else {
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
+  }
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
