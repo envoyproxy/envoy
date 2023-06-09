@@ -911,7 +911,7 @@ void Filter::disableIdleTimer() {
 }
 
 Filter::HttpStreamDecoderFilterCallbacks::HttpStreamDecoderFilterCallbacks(Filter* parent)
-    : parent_(parent) {}
+    : parent_(parent), request_trailer_map_(Http::RequestTrailerMapImpl::create()) {}
 
 UpstreamDrainManager::~UpstreamDrainManager() {
   // If connections aren't closed before they are destructed an ASSERT fires,

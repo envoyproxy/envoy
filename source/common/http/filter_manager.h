@@ -519,7 +519,7 @@ public:
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
   /**
-   * Returns if close from the upstream is to be handled with half-close sematics.
+   * Returns if close from the upstream is to be handled with half-close semantics.
    * This is used for HTTP/1.1 codec.
    */
   virtual bool isHalfCloseEnabled() PURE;
