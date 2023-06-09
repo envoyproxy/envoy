@@ -156,12 +156,15 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     switch (parse_state) {
     case ParseState::Error:
       cb_->socket().ioHandle().close();
+      ENVOY_LOG(trace, "Parse state error, closed connection");
       return Network::FilterStatus::StopIteration;
     case ParseState::Done:
       // Finish the inspect.
+      ENVOY_LOG(trace, "Parse state done, continue iteration");
       return Network::FilterStatus::Continue;
     case ParseState::Continue:
       // Do nothing but wait for the next event.
+      ENVOY_LOG(trace, "Parse state continue, stopping iteration");
       return Network::FilterStatus::StopIteration;
     }
     IS_ENVOY_BUG("unexpected tcp filter parse_state");
@@ -189,6 +192,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
     switch (SSL_get_error(ssl_.get(), ret)) {
     case SSL_ERROR_WANT_READ:
       if (read_ == maxConfigReadBytes()) {
+        ENVOY_LOG(trace, "maxConfigReadBytes {} read_ {}", maxConfigReadBytes(), read_);
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
@@ -196,11 +200,13 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
       }
       if (read_ == requested_read_bytes_) {
         // Double requested bytes up to the maximum configured.
+        ENVOY_LOG(trace, "doubling requested read bytes to {}", 2 * requested_read_bytes_);
         requested_read_bytes_ = std::min<uint32_t>(2 * requested_read_bytes_, maxConfigReadBytes());
       }
       return ParseState::Continue;
     case SSL_ERROR_SSL:
       if (clienthello_success_) {
+        ENVOY_LOG(trace, "clienthello success");
         config_->stats().tls_found_.inc();
         if (alpn_found_) {
           config_->stats().alpn_found_.inc();
@@ -209,10 +215,12 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         }
         cb_->socket().setDetectedTransportProtocol("tls");
       } else {
+        ENVOY_LOG(trace, "tls not found");
         config_->stats().tls_not_found_.inc();
       }
       return ParseState::Done;
     default:
+      ENVOY_LOG(trace, "default clause");
       return ParseState::Error;
     }
   }();
