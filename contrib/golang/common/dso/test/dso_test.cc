@@ -63,7 +63,7 @@ TEST(DsoManagerTest, Pub) {
 
     // first time load network filter dso
     auto res = DsoManager<NetworkFilterDsoImpl>::load(id, path);
-    EXPECT_NE(dso, nullptr);
+    EXPECT_NE(res, nullptr);
 
     // get after load network filter dso
     dso = DsoManager<NetworkFilterDsoImpl>::getDsoByID(id);
