@@ -444,9 +444,6 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
   const uint32_t initial_buffer_size = 64;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
-  buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-      *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-      cfg_->initialReadBufferSize());
   const uint16_t tls_min_version = std::get<0>(GetParam());
   const uint16_t tls_max_version = std::get<1>(GetParam());
   std::vector<uint8_t> client_hello =
@@ -486,9 +483,6 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   const size_t max_size = 50;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config, max_size);
-  buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-      *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-      cfg_->initialReadBufferSize());
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "\x02h2");
 

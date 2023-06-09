@@ -152,6 +152,9 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     const size_t len = raw_slice.len_ - read_;
     const uint64_t bytes_already_processed = read_;
     read_ = raw_slice.len_;
+    ENVOY_LOG(trace, "TLS onData: len {} bytes_already_processed {} read_ {}", len,
+              bytes_already_processed, read_);
+    ENVOY_LOG(trace, "Data: {}", absl::string_view(reinterpret_cast<const char*>(data), len));
     ParseState parse_state = parseClientHello(data, len, bytes_already_processed);
     switch (parse_state) {
     case ParseState::Error:
