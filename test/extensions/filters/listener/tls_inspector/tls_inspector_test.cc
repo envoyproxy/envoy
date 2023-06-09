@@ -66,6 +66,8 @@ public:
           .WillOnce(Invoke([=, &client_hello](os_fd_t, void* buffer, size_t length,
                                               int) -> Api::SysCallSizeResult {
             const size_t amount_to_copy = std::min(length, client_hello.size());
+            ENVOY_LOG_MISC(debug, "mock recv length: {} client_hello {}", length,
+                           client_hello.size());
             memcpy(buffer, client_hello.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
@@ -84,6 +86,8 @@ public:
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(Invoke(
             [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              ENVOY_LOG_MISC(debug, "mock recv length: {} client_hello {}", length,
+                             client_hello.size());
               const size_t amount_to_copy = std::min(length, client_hello.size());
               memcpy(buffer, client_hello.data(), amount_to_copy);
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
@@ -448,6 +452,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
   const uint16_t tls_max_version = std::get<1>(GetParam());
   std::vector<uint8_t> client_hello =
       Tls::Test::generateClientHello(tls_min_version, tls_max_version, "example.com", "\x02h2");
+  std::cerr << "kbaichoo: client hello size:" << client_hello.size() << std::endl;
 
   init();
   EXPECT_CALL(socket_, setRequestedServerName(_));
