@@ -184,7 +184,7 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
 
   io_uring_->injectCompletion(fd, &fd, -11);
   io_uring_->injectCompletion(fd2, &fd2, -22);
-  io_uring_->removeInjectedCompletion(fd2);
+  io_uring_->removeInjectedCompletion(fd2, [](void*) {});
   file_event->activate(Event::FileReadyType::Read);
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -209,7 +209,7 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
                 EXPECT_EQ(&fd, user_data);
                 EXPECT_EQ(-11, res);
               } else {
-                io_uring_->removeInjectedCompletion(fd2);
+                io_uring_->removeInjectedCompletion(fd2, [](void*) {});
               }
               completions_nr++;
             });
