@@ -224,7 +224,7 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
  * process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then the
 Envoy
  * bootstrap configuration can be set to defer the instantiation of those block. Note that when the
- * blocks of stats are created, they carry an extra ~160 byte overhead (depending on worker thread
+ * blocks of stats are created, they carry an extra 60~100 byte overhead (depending on worker thread
  * count) due to internal bookkeeping data structures. The overhead when deferred stats are disabled
  * is just 8 bytes.
 * See more context: https://github.com/envoyproxy/envoy/issues/23575
