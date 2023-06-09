@@ -30,8 +30,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
                Server::Configuration::FactoryContext& context);
-  // TODO: delete config in Go
-  virtual ~FilterConfig() = default;
+  ~FilterConfig();
 
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
@@ -57,8 +56,7 @@ class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
 public:
   RoutePluginConfig(const std::string plugin_name,
                     const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
-  // TODO: delete plugin config in Go
-  ~RoutePluginConfig() = default;
+  ~RoutePluginConfig();
   uint64_t getConfigId();
   uint64_t getMergedConfigId(uint64_t parent_id);
 

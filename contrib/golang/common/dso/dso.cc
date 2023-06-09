@@ -50,6 +50,9 @@ HttpFilterDsoImpl::HttpFilterDsoImpl(const std::string dso_name) : HttpFilterDso
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
       envoy_go_filter_merge_http_plugin_config_, handler_, dso_name,
       "envoyGoFilterMergeHttpPluginConfig");
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_destroy_http_plugin_config_)>(
+      envoy_go_filter_destroy_http_plugin_config_, handler_, dso_name,
+      "envoyGoFilterDestroyHttpPluginConfig");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
       envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
@@ -68,6 +71,11 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUi
                                                                GoUint64 p2, GoUint64 p3) {
   ASSERT(envoy_go_filter_merge_http_plugin_config_ != nullptr);
   return envoy_go_filter_merge_http_plugin_config_(p0, p1, p2, p3);
+}
+
+void HttpFilterDsoImpl::envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) {
+  ASSERT(envoy_go_filter_destroy_http_plugin_config_ != nullptr);
+  return envoy_go_filter_destroy_http_plugin_config_(p0);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
