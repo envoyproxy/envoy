@@ -54,10 +54,10 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       }
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
-    }
+    CATCH(const EnvoyException& e,
+          { exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what())); });
   }
+
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
