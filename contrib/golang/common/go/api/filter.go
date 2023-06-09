@@ -24,10 +24,8 @@ type StreamDecoderFilter interface {
 	DecodeHeaders(RequestHeaderMap, bool) StatusType
 	DecodeData(BufferInstance, bool) StatusType
 	DecodeTrailers(RequestTrailerMap) StatusType
-	// TODO add more for metadata
 }
 
-// TODO merge it to StreamFilterConfigFactory
 type StreamFilterConfigParser interface {
 	Parse(any *anypb.Any) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
@@ -51,7 +49,6 @@ type StreamEncoderFilter interface {
 	EncodeHeaders(ResponseHeaderMap, bool) StatusType
 	EncodeData(BufferInstance, bool) StatusType
 	EncodeTrailers(ResponseTrailerMap) StatusType
-	// TODO add more for metadata
 }
 
 // stream info

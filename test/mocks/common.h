@@ -143,4 +143,16 @@ public:
   std::string name() const override { return "mock_key_value_store_factory"; }
 };
 
+struct MockLogSink : Logger::SinkDelegate {
+  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~MockLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
+};
+
 } // namespace Envoy

@@ -48,6 +48,8 @@ public:
                     - not_id:
                         any: true
        -  name: envoy.filters.network.echo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
 )EOF");
   }
 

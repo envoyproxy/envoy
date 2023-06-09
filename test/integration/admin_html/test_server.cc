@@ -20,8 +20,13 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
                         Server::AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
   auto iter = query_params.find("file");
-  if (iter == query_params.end()) {
-    response.add("query param 'file' missing");
+  std::string prefix;
+  if (iter != query_params.end()) {
+    prefix = "test/integration/admin_html/";
+  } else if (iter = query_params.find("src"); iter != query_params.end()) {
+    prefix = "source/server/admin/html/";
+  } else {
+    response.add("query param 'file' or 'src' missing");
     return Http::Code::BadRequest;
   }
   absl::string_view leaf = iter->second;
@@ -33,7 +38,7 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
   }
 
   Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("test/integration/admin_html/", iter->second);
+  std::string path = absl::StrCat(prefix, leaf);
   TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
   END_TRY
   catch (EnvoyException& e) {
@@ -44,6 +49,8 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   } else if (absl::EndsWith(path, ".js")) {
     response_headers.setReferenceContentType("text/javascript");
+  } else if (absl::EndsWith(path, ".css")) {
+    response_headers.setReferenceContentType("text/css");
   }
   return Http::Code::OK;
 }
