@@ -22,20 +22,25 @@ namespace Stats {
  * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is enabled.
  */
 template <typename StatsStructType>
-class DeferredCreation : public DeferredCreationCompatibleInterface<StatsStructType> {
+class DeferredStats : public DeferredCreationCompatibleInterface<StatsStructType> {
 public:
   // Capture the stat names object and the scope with a ctor, that can be used to instantiate a
   // StatsStructType object later.
   // Caller should make sure scope and stat_names outlive this object.
-  DeferredCreation(const typename StatsStructType::StatNameType& stat_names,
-                   Stats::ScopeSharedPtr scope)
-      : initialized_([&scope]() -> Gauge& {
-          Stats::StatNamePool pool(scope->symbolTable());
-          return Stats::Utility::gaugeFromElements(
-              *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
-              Stats::Gauge::ImportMode::HiddenAccumulate);
-        }()),
-        ctor_([this, stats_scope = std::move(scope)]() -> StatsStructType* {
+  DeferredStats(const typename StatsStructType::StatNameType& stat_names,
+                Stats::ScopeSharedPtr scope)
+      : initialized_(
+            /* A lambda is used as we need to register the name into the symbol table.
+            Note: there is no issue to capture a reference of the scope here as this lambda is only
+            used to initalize the 'initialized_' Gauge.
+            */
+            [&scope]() -> Gauge& {
+              Stats::StatNamePool pool(scope->symbolTable());
+              return Stats::Utility::gaugeFromElements(
+                  *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
+                  Stats::Gauge::ImportMode::HiddenAccumulate);
+            }()),
+        ctor_([this, &stat_names, stats_scope = std::move(scope)]() -> StatsStructType* {
           initialized_.inc();
           // Reset ctor_ to save some RAM.
           Cleanup reset_ctor([this] { ctor_ = nullptr; });
@@ -45,7 +50,7 @@ public:
       instantiate();
     }
   }
-  ~DeferredCreation() {
+  ~DeferredStats() {
     if (ctor_ == nullptr) {
       initialized_.dec();
     }
@@ -76,7 +81,7 @@ private:
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct> internal_stats_;
 };
 
-// Non-DeferredCreation wrapper over StatsStructType. This is used when
+// Non-deferred wrapper over StatsStructType. This is used when
 // :ref:`enable_deferred_creation_stats
 // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is not
 // enabled.
@@ -97,7 +102,7 @@ createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
                               const typename StatsStructType::StatNameType& stat_names,
                               bool deferred_creation) {
   if (deferred_creation) {
-    return {std::make_unique<DeferredCreation<StatsStructType>>(stat_names, scope)};
+    return {std::make_unique<DeferredStats<StatsStructType>>(stat_names, scope)};
   } else {
     return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
   }
