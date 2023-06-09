@@ -21,7 +21,8 @@ using FilterConfigSharedPtr =
 
 class FilterCallbacks {
 public:
-  virtual ~FilterCallbacks() = default virtual void onComplete() PURE;
+  virtual ~FilterCallbacks() = default;
+  virtual void onComplete() PURE;
 };
 
 class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply> {
