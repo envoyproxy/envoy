@@ -439,6 +439,7 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
 }
 
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
+  LogLevelSetter save_levels{spdlog::level::trace};
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const uint32_t initial_buffer_size = 1;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
