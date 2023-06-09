@@ -181,7 +181,13 @@ message Bootstrap {
   // Optional set of stats sinks.
   repeated metrics.v3.StatsSink stats_sinks = 6;
 
-  // When true, enable deferred creation feature for compatible stats types.
+  // To save memory and CPU consumption on blocks of stats that are never referenced throughout
+  // the process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then
+  // the Envoy bootstrap configuration can be set to defer the instantiation of those blocks. Note that
+  // when the blocks of stats are created, they carry an extra overhead (around 60-100 bytes depending
+  // on worker thread count) due to internal bookkeeping data structures.
+  //
+  // When set to true, Envoy will defer initializing selected blocks of stats until the first time they are updated.
   bool enable_deferred_creation_stats = 39;
 
   // Configuration for internal processing of stats.
