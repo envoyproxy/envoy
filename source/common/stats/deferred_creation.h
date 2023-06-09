@@ -72,8 +72,6 @@ private:
   // TODO(#26106): See #14610. The initialized_ gauge could be disabled in a
   // corner case where a user disables stats with suffix "initialized". In which case, the
   // initialized_ will be a NullGauge, which breaks the above scenario 2.
-  // TODO(#26106): Consider hiding this Gauge from being exported, through using the
-  // stats flags mask.
   Gauge& initialized_;
   // TODO(#26957): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
   // the setter lambda when the nested object is created.
