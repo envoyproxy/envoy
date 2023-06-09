@@ -338,7 +338,7 @@ new_features:
     the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
 - area: zookeeper
   change: |
-    Add "addWatch" opcode support to the ZooKeeper proxy filter.
+    Added the "addWatch" opcode support to the ZooKeeper proxy filter.
 
 deprecated:
 - area: access_log
