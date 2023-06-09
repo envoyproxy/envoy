@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -180,6 +180,9 @@ message Bootstrap {
 
   // Optional set of stats sinks.
   repeated metrics.v3.StatsSink stats_sinks = 6;
+
+  // When true, enable deferred creation feature for compatible stats types.
+  bool enable_deferred_creation_stats = 39;
 
   // Configuration for internal processing of stats.
   metrics.v3.StatsConfig stats_config = 13;

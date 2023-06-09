@@ -60,7 +60,8 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+    : enable_deferred_creation_stats_(bootstrap.enable_deferred_creation_stats()) {
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
@@ -87,6 +88,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   // tracing configuration is missing from the bootstrap config.
   initializeTracers(bootstrap.tracing(), server);
 
+  // stats_config_ should be set before creating the ClusterManagers so that it is available
+  // from the ServerFactoryContext when creating the static clusters and stats sinks, where
+  // stats deferred instantiation setting is read.
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -103,18 +109,15 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     ENVOY_LOG(debug, "listener #{}:", i);
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
-
   initializeWatchdogs(bootstrap, server);
+  // This has to happen after ClusterManager initialization, as it depends on config from
+  // ClusterManager.
   initializeStatsConfig(bootstrap, server);
 }
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
-  ENVOY_LOG(info, "loading stats configuration");
-
-  // stats_config_ should be set before populating the sinks so that it is available
-  // from the ServerFactoryContext when creating the stats sinks.
-  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+  ENVOY_LOG(info, "loading stats sinks configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.
