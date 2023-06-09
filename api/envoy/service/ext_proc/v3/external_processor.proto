@@ -129,7 +129,7 @@ message ProcessingResponse {
 
     // The server must send back this message in response to a message with the
     // ``request_headers`` field set.
-    DownstreamHeadersResponse request_headers = 1;
+    RequestHeadersResponse request_headers = 1;
 
     // The server must send back this message in response to a message with the
     // ``response_headers`` field set.
@@ -137,7 +137,7 @@ message ProcessingResponse {
 
     // The server must send back this message in response to a message with
     // the ``request_body`` field set.
-    DownstreamBodyResponse request_body = 3;
+    RequestBodyResponse request_body = 3;
 
     // The server must send back this message in response to a message with
     // the ``response_body`` field set.
@@ -229,8 +229,8 @@ message HeadersResponse {
   CommonResponse response = 1;
 }
 
-// This message must be sent in response to a downstream HttpHeaders message.
-message DownstreamHeadersResponse {
+// This message must be sent in response to a HttpHeaders request message.
+message RequestHeadersResponse {
   CommonResponse response = 1;
   // Clear the route cache for the current request.
   // This is necessary if the remote server
@@ -244,13 +244,13 @@ message TrailersResponse {
   HeaderMutation header_mutation = 1;
 }
 
-// This message must be sent in response to an upstream HttpBody message.
+// This message must be sent in response to a HttpBody response message.
 message BodyResponse {
   CommonResponse response = 1;
 }
 
-// This message must be sent in response to a downstream HttpBody message.
-message DownstreamBodyResponse {
+// This message must be sent in response to a HttpBody request message.
+message RequestBodyResponse {
   CommonResponse response = 1;
   // Clear the route cache for the current request.
   // This is necessary if the remote server
