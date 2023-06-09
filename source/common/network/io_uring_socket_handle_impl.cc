@@ -70,8 +70,8 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
-  io_uring_socket_.ref().close(false);
   SET_SOCKET_INVALID(fd_);
+  io_uring_socket_.ref().close(false);
   return Api::ioCallUint64ResultNoError();
 }
 

@@ -328,6 +328,7 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 }
 
 void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
+  IoUringSocketEntry::close(keep_fd_open, cb);
   close(keep_fd_open, cb, false);
 }
 
@@ -342,8 +343,6 @@ void IoUringAcceptSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb, b
 
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}, request_count_ = {}, closed_ = {}", fd_,
             status_, request_count_, closed_);
-
-  IoUringSocketEntry::close(keep_fd_open, cb);
 
   // We didn't implement keep_fd_open for accept socket.
   ASSERT(!keep_fd_open);
