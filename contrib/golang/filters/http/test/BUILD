@@ -29,6 +29,7 @@ envoy_cc_test(
     srcs = ["golang_filter_test.cc"],
     data = [
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [

@@ -328,6 +328,14 @@ public:
    */
   static uint64_t readSampleCount(Event::Dispatcher& main_dispatcher,
                                   const Stats::ParentHistogram& histogram);
+  /**
+   * Read a histogram's sum from the main thread.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @return double the sample sum.
+   */
+  static double readSampleSum(Event::Dispatcher& main_dispatcher,
+                              const Stats::ParentHistogram& histogram);
 
   /**
    * Find a readout in a stats store.
