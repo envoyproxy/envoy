@@ -801,8 +801,12 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
-        read_callbacks_->upstreamHost()->outlierDetector().putResult(
-            Upstream::Outlier::Result::LocalOriginConnectFailed);
+        // upstreamHost can be nullptr if we received a disconnect from the upstream before
+        // receiving any response
+        if (read_callbacks_->upstreamHost() != nullptr) {
+          read_callbacks_->upstreamHost()->outlierDetector().putResult(
+              Upstream::Outlier::Result::LocalOriginConnectFailed);
+        }
       }
       if (!downstream_closed_) {
         route_ = pickRoute();
