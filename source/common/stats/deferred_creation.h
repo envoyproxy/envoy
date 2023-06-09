@@ -35,7 +35,7 @@ public:
               *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
               Stats::Gauge::ImportMode::HiddenAccumulate);
         }()),
-        ctor_([stats_scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
+        ctor_([&, stats_scope = std::move(scope)]() -> StatsStructType* {
           initialized_.inc();
           // Reset ctor_ to save some RAM.
           Cleanup reset_ctor([&] { ctor_ = nullptr; });
@@ -78,8 +78,7 @@ private:
   // TODO(#26957): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
   // the setter lambda when the nested object is created.
   std::function<StatsStructType*()> ctor_;
-  Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      internal_stats_{};
+  Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct> internal_stats_;
 };
 
 // Non-DeferredCreation wrapper over StatsStructType. This is used when

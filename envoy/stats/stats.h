@@ -220,7 +220,7 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 /**
  * Interface for stats lazy initialization.
- * To reduce memory and CPU consumption, Envoy can enable the bootstrap config
+ * To save memory and CPU consumption from unused stats, Envoy can enable the bootstrap config
  * :ref:`enable_deferred_creation_stats
  * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
  * A 'StatsStructType' is only created when any of its field is referenced.
