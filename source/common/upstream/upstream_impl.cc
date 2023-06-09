@@ -1274,10 +1274,12 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
-      load_balancing_policy_ = factory->createEmptyConfigProto();
+      auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(),
-                                             *load_balancing_policy_);
+                                             context.messageValidationVisitor(), *proto_message);
+
+      load_balancer_config_ =
+          factory->loadConfig(std::move(proto_message), context.messageValidationVisitor());
 
       load_balancer_factory_ = factory;
       break;
@@ -1623,7 +1625,7 @@ const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
   END_TRY
-  catch (EnvoyException& e) {
+  CATCH(EnvoyException & e, {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
@@ -1631,7 +1633,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
                                        e.what()));
     }
     throw e;
-  }
+  });
 }
 
 void ClusterImplBase::validateEndpointsForZoneAwareRouting(
