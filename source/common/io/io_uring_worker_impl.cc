@@ -506,7 +506,10 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
   ASSERT(!shutdown_.has_value());
 
-  write_buf_.move(data);
+  // We need to reset the drain trackers, since the write and close is async in
+  // the io-uring. When the write is actually finished the above layer may already
+  // release the drain trackers.
+  write_buf_.move(data, data.length(), true);
 
   submitWriteOrShutdownRequest();
 }
