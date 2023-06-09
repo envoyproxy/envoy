@@ -35,10 +35,10 @@ public:
               *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
               Stats::Gauge::ImportMode::HiddenAccumulate);
         }()),
-        ctor_([&, stats_scope = std::move(scope)]() -> StatsStructType* {
+        ctor_([this, stats_scope = std::move(scope)]() -> StatsStructType* {
           initialized_.inc();
           // Reset ctor_ to save some RAM.
-          Cleanup reset_ctor([&] { ctor_ = nullptr; });
+          Cleanup reset_ctor([this] { ctor_ = nullptr; });
           return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {

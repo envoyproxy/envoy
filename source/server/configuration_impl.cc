@@ -117,7 +117,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
-  ENVOY_LOG(info, "loading stats sinks configuration");
+  ENVOY_LOG(info, "loading stats configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.

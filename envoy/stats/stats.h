@@ -220,11 +220,14 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 /**
  * Interface for stats lazy initialization.
- * To save memory and CPU consumption from unused stats, Envoy can enable the bootstrap config
- * :ref:`enable_deferred_creation_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
- * A 'StatsStructType' is only created when any of its field is referenced.
- * See more context: https://github.com/envoyproxy/envoy/issues/23575
+ * To save memory and CPU consumption on blocks of stats that are never referenced throughout the
+ * process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then the
+Envoy
+ * bootstrap configuration can be set to defer the instantiation of those block. Note that when the
+ * blocks of stats are created, they carry an extra ~160 byte overhead (depending on worker thread
+ * count) due to internal bookkeeping data structures. The overhead when deferred stats are disabled
+ * is just 8 bytes.
+* See more context: https://github.com/envoyproxy/envoy/issues/23575
  */
 template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:

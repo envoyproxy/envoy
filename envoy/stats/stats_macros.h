@@ -158,6 +158,7 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
  */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
+    /* Also referenced in Stats::createDeferredCompatibleStats. */                                 \
     using StatNameType = StatNamesStruct;                                                          \
     static const absl::string_view typeName() { return #StatsStruct; }                             \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
