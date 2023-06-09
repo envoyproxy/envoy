@@ -21,15 +21,7 @@ using FilterConfigSharedPtr =
 
 class FilterCallbacks {
 public:
-  virtual ~FilterCallbacks() = default;
-
-  /**
-   * Called on completion of request.
-   *
-   * @param response the pointer to the response message. Null response pointer means the request
-   *        was completed with error.
-   */
-  virtual void onComplete() PURE;
+  virtual ~FilterCallbacks() = default virtual void onComplete() PURE;
 };
 
 class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply> {
@@ -132,10 +124,11 @@ public:
   ServerFactoryContextFilterFactory() : FactoryBase("server-factory-context-filter") {}
 
 private:
+  // Only the creation from serverFactoryContext is implemented, returns nullptr in
+  // `createFilterFactoryFromProtoTyped`
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig&, const std::string&,
       Server::Configuration::FactoryContext&) override {
-
     return nullptr;
   }
 
