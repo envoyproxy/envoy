@@ -99,6 +99,8 @@ public:
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
+  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(void, onResponseDataTooLarge, ());
   MOCK_METHOD(void, onRequestDataTooLarge, ());
@@ -227,6 +229,8 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
 
   std::shared_ptr<Router::MockRoute> route_;
 };

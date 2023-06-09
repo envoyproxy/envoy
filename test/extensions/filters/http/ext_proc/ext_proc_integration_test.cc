@@ -376,6 +376,21 @@ protected:
     verifyDownstreamResponse(*response, 500);
   }
 
+  void addMutationSetHeaders(const int count, envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+    for (int i = 0; i < count; i++) {
+      auto* headers = mutation.add_set_headers();
+      auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
+      headers->mutable_header()->set_key(str);
+      headers->mutable_header()->set_value(str);
+    }
+  }
+
+  void addMutationRemoveHeaders(const int count, envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+    for (int i = 0; i < count; i++) {
+      mutation.add_remove_headers(absl::StrCat("x-test-header-internal-", std::to_string(i)));
+    }
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -2084,6 +2099,101 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
         return true;
       });
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseSetHeaderCountTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The set header count 150 > default HCM limit 100.
+        addMutationSetHeaders(150, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderCountTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The remove header count 101 > default HCM limit 100.
+        addMutationRemoveHeaders(101, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseSetHeaderSizeTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Config HCM header limit.
+        hcm.mutable_max_request_headers_kb()->set_value(1);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(200);
+      });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Set header count 150 is within limit 200, but the size is over limit 1kb.
+        addMutationSetHeaders(150, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderSizeTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(1);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(200);
+      });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Remove header count 150 is within limit 200, but size is over limit 1kb.
+        addMutationRemoveHeaders(150, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(10);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(10);
+      });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The set header counter 8 is smaller than HCM limit 10, add size is smaller than 10kb.
+        // It passed the mutation check, but failed the end result header size check.
+        addMutationSetHeaders(8, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
 }
 
 } // namespace Envoy

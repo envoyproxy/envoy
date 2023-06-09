@@ -331,6 +331,13 @@ private:
     void refreshIdleTimeout();
     void refreshAccessLogFlushTimer();
 
+    uint32_t maxRequestHeadersKb() const override {
+      return connection_manager_.config_.maxRequestHeadersKb();
+    }
+    uint32_t maxRequestHeadersCount() const override {
+      return connection_manager_.config_.maxRequestHeadersCount();
+    }
+
     // All state for the stream. Put here for readability.
     struct State {
       State()

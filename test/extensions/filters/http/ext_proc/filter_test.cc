@@ -117,6 +117,10 @@ protected:
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, maxRequestHeadersKb())
+        .WillRepeatedly(Return(60));
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, maxRequestHeadersCount())
+        .WillRepeatedly(Return(100));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
   }

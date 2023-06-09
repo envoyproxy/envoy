@@ -228,6 +228,8 @@ public:
     filter_callbacks_ = &callbacks;
   }
 
+  Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() { return *decoder_callbacks_; }
+
   const Buffer::Instance* bufferedData() const override {
     return decoder_callbacks_->decodingBuffer();
   }
@@ -297,6 +299,8 @@ public:
     encoder_callbacks_ = &callbacks;
     filter_callbacks_ = &callbacks;
   }
+
+  Http::StreamEncoderFilterCallbacks& getEncoderFilterCallbacks() { return *encoder_callbacks_; }
 
   const Buffer::Instance* bufferedData() const override {
     return encoder_callbacks_->encodingBuffer();

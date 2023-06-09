@@ -319,6 +319,9 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  virtual uint32_t maxRequestHeadersKb() const PURE;
+  virtual uint32_t maxRequestHeadersCount() const PURE;
 };
 
 /**

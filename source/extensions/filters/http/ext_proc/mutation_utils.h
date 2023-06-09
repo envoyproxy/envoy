@@ -27,11 +27,11 @@ public:
   // configured to reject failed mutations. The "rejected_mutations" counter
   // will be incremented with the number of invalid mutations, regardless of
   // whether an error is returned.
-  static absl::Status
-  applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
-                       Http::HeaderMap& headers, bool replacing_message,
-                       const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations);
+  static absl::Status applyHeaderMutations(
+      const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+      const envoy::service::ext_proc::v3::HeaderMutation& mutation, Http::HeaderMap& headers,
+      bool replacing_message, const Filters::Common::MutationRules::Checker& rule_checker,
+      Stats::Counter& rejected_mutations);
 
   // Modify a buffer based on a set of mutations from a protobuf
   static void applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
@@ -44,6 +44,17 @@ private:
   // Check whether header:key is in header_matchers.
   static bool headerInAllowList(absl::string_view key,
                                 const std::vector<Matchers::StringMatcherPtr>& header_matchers);
+  // Check whether the header mutations in the response is over the HCM size config.
+  static absl::Status
+  responseHeaderSizeCheck(const uint32_t max_request_headers_kb,
+                          const uint32_t max_request_headers_count,
+                          const envoy::service::ext_proc::v3::HeaderMutation& mutation,
+                          Stats::Counter& rejected_mutations);
+  // Check whether the header size after mutation is over the HCM size config.
+  static absl::Status headerMutationResultCheck(const uint32_t max_request_headers_kb,
+                                                const uint32_t max_request_headers_count,
+                                                const Http::HeaderMap& headers,
+                                                Stats::Counter& rejected_mutations);
 };
 
 } // namespace ExternalProcessing

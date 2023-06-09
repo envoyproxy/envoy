@@ -256,6 +256,16 @@ public:
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
+  uint32_t maxRequestHeadersKb() {
+    return decoding_state_.getDecoderFilterCallbacks().downstreamCallbacks()->maxRequestHeadersKb();
+  }
+
+  uint32_t maxRequestHeadersCount() {
+    return decoding_state_.getDecoderFilterCallbacks()
+        .downstreamCallbacks()
+        ->maxRequestHeadersCount();
+  }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();

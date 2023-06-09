@@ -782,8 +782,8 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
-          response.headers(), headers, false, immediateResponseChecker().checker(),
-          stats_.rejected_header_mutations_);
+          maxRequestHeadersKb(), maxRequestHeadersCount(), response.headers(), headers, false,
+          immediateResponseChecker().checker(), stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
