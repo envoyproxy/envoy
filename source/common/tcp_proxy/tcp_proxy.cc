@@ -532,7 +532,13 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
-  read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+    read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
+  } else {
+    generic_conn_pool_.reset();
+  }
+
   read_callbacks_->upstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
@@ -563,9 +569,7 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   // No need to set information using address_provider in case routing via Router::UpstreamRequest
   // because in that case, information is already set by the
   // Router::UpstreamRequest::onPoolReady() method before reaching here.
-  if ((!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) ||
-      (upstream_info.upstreamLocalAddress() == nullptr)) {
+  if (upstream_info.upstreamLocalAddress() == nullptr) {
     upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
     upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   }
@@ -786,7 +790,12 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+      read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
+    } else {
+      upstream_.reset();
+    }
     disableIdleTimer();
 
     if (connecting) {

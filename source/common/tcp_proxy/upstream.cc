@@ -139,7 +139,7 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 void HttpUpstream::onUpstreamReset(Http::StreamResetReason, absl::string_view, UpstreamRequest&) {
-  upstream_callbacks_.onEvent(Network::ConnectionEvent::LocalClose);
+  upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {

@@ -23,6 +23,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
@@ -484,7 +485,7 @@ public:
       return parent_->read_callbacks_->connection().dispatcher();
     }
     void resetStream(Http::StreamResetReason, absl::string_view) override {
-      PANIC("not implemented");
+      IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
     };
     Router::RouteConstSharedPtr route() override { return nullptr; }
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
@@ -501,7 +502,9 @@ public:
     void continueDecoding() override {}
     void addDecodedData(Buffer::Instance&, bool) override {}
     void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
-    Http::RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
+    Http::RequestTrailerMap& addDecodedTrailers() override {
+      throw std::runtime_error("addDecodedTrailers() not implemented");
+    }
     Http::MetadataMapVector& addDecodedMetadata() override {
       static Http::MetadataMapVector metadata_map_vector;
       return metadata_map_vector;
@@ -550,7 +553,9 @@ public:
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override {
-      DUMP_STATE_UNIMPLEMENTED(HttpStreamDecoderFilterCallbacks);
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "TcpProxy " << this << DUMP_MEMBER(streamId()) << "\n";
+      DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
     }
     Filter* parent_{};
   };

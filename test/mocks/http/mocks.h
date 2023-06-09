@@ -109,7 +109,7 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
-  MOCK_METHOD(bool, isTcpTunnelingEnabled, ());
+  MOCK_METHOD(bool, isHalfCloseEnabled, ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;

@@ -109,6 +109,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+// TODO(vikaschoudhary16) reset this to true after 2 releases (1.29)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_upstream_http_filters_with_tcp_proxy);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.

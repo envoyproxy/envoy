@@ -519,9 +519,10 @@ public:
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
   /**
-   * Returns if tcp tunneling is enabled for this stream.
+   * Returns if close from the upstream is to be handled with half-close sematics.
+   * This is used for HTTP/1.1 codec.
    */
-  virtual bool isTcpTunnelingEnabled() PURE;
+  virtual bool isHalfCloseEnabled() PURE;
 };
 
 /**
