@@ -38,11 +38,3 @@ Histograms are written as they are received. Note: what were previously referred
 become histograms as the only difference between the two representations was the units.
 
 * :ref:`v3 API reference <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`.
-
-Deferred Initialization of Stats
-================================
-
-When :ref:`enable_deferred_creation_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`
-is enabled in Bootstrap, for stats that are deferred creation compatible, the actual stats struct creation
-is deferred to first access of any member of that stats, i.e. instantiation only happens when an invocation on
-operator "*" or "->" happens.

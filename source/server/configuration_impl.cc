@@ -112,11 +112,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   initializeWatchdogs(bootstrap, server);
   // This has to happen after ClusterManager initialization, as it depends on config from
   // ClusterManager.
-  loadSinksIntoStatsConfig(bootstrap, server);
+  initializeStatsConfig(bootstrap, server);
 }
 
-void MainImpl::loadSinksIntoStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                        Instance& server) {
+void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
   ENVOY_LOG(info, "loading stats sinks configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {

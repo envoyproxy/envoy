@@ -86,7 +86,7 @@ public:
   virtual bool flushOnAdmin() const PURE;
 
   /**
-   * When true, enable deferred creation of stats.
+   * @return true if deferred creation of stats is enabled.
    */
   virtual bool enableDeferredCreationStats() const PURE;
 };
