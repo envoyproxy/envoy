@@ -51,7 +51,7 @@ TEST(DsoManagerTest, Pub) {
   {
     // first time load cluster specifier dso
     auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
-    EXPECT_NE(dso, nullptr);
+    EXPECT_NE(cluster_dso, nullptr);
 
     EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
   }
@@ -63,7 +63,7 @@ TEST(DsoManagerTest, Pub) {
 
     // first time load network filter dso
     auto res = DsoManager<NetworkFilterDsoImpl>::load(id, path);
-    EXPECT_EQ(res, true);
+    EXPECT_NE(dso, nullptr);
 
     // get after load network filter dso
     dso = DsoManager<NetworkFilterDsoImpl>::getDsoByID(id);
@@ -72,7 +72,7 @@ TEST(DsoManagerTest, Pub) {
 
     // second time load network filter dso
     res = DsoManager<NetworkFilterDsoImpl>::load(id, path);
-    EXPECT_EQ(res, true);
+    EXPECT_NE(dso, nullptr);
   }
 }
 
