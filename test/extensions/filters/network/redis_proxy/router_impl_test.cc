@@ -96,7 +96,45 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
 }
 
-TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
+TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
+  auto upstream_catch_all = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "catchAllEnv", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_catchAllCluster", upstream_catch_all);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_catch_all_route();
+    route->set_cluster("fake_catchAllCluster");
+    route->set_remove_prefix(true);
+    route->set_prefix("removeMe_");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  router.setReadFilterCallback(&filter_callbacks);
+  std::string key("removeMe_catchAllKey");
+  EXPECT_EQ(upstream_catch_all, router.upstreamPool(key)->upstream());
+  EXPECT_EQ("{catchAllKey}-catchAllEnv-subjectCN-{catchAllKey}", key);
+}
+
+TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
   auto upstream_c = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Network::MockConnection> connection;

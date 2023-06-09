@@ -87,7 +87,7 @@ private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
-  RouteSharedPtr catch_all_route_;
+  PrefixSharedPtr catch_all_route_;
   Network::ReadFilterCallbacks* callbacks_{};
   const std::string redis_key_formatter_command_ = "%KEY%";
 };
