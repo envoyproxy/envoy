@@ -209,7 +209,7 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
-	if atomic.LoadInt32(&req.waitingOnEnvoy) != 0 {
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
 		req.sema.Done()
 	}
 
@@ -225,5 +225,7 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
 	defer req.RecoverPanic()
-	req.sema.Done()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
+	}
 }

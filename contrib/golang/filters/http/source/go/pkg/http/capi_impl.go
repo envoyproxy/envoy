@@ -280,10 +280,13 @@ func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) stri
 	var value string
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
-	handleCApiStatus(res)
-	atomic.AddInt32(&r.waitingOnEnvoy, 1)
-	r.sema.Wait()
-	atomic.AddInt32(&r.waitingOnEnvoy, -1)
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
 
 	return strings.Clone(value)
 }

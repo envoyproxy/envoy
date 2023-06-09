@@ -38,6 +38,7 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPINotInGo = -3,
   CAPIInvalidPhase = -4,
   CAPIValueNotFound = -5,
+  CAPIYield = -6,
 } CAPIStatus;
 
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
