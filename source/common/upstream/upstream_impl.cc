@@ -2095,7 +2095,24 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       // If we are depending on a health checker, we initialize to unhealthy.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.keep_endpoint_active_hc_status")) {
+          if (existing_host_found && !health_check_address_changed &&
+              !active_health_check_flag_changed) {
+            // If there's an existing host, use the same active health-status.
+            if (existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+              host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+            }
+            if (existing_host->second->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+              host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+            }
+          } else {
+            // No previous known host, mark it as failed active HC.
+            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+          }
+        } else {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        }
 
         // If we want to exclude hosts until they have been health checked, mark them with
         // a flag to indicate that they have not been health checked yet.
