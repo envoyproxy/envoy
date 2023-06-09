@@ -58,7 +58,7 @@ const (
 type httpCApiImpl struct{}
 
 // Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
-// panic here and it will be recover in the Go entry function (TODO).
+// panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
 	case C.CAPIOK:
@@ -253,6 +253,10 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+}
+
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.LogType(C.envoyGoFilterHttpLogLevel())
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {

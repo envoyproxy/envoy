@@ -33,7 +33,13 @@ namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
 basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(config, bootstrap);
+#else
+  UNREFERENCED_PARAMETER(config);
+  UNREFERENCED_PARAMETER(bootstrap);
+  PANIC("JSON compiled out: can't load config");
+#endif
   return bootstrap;
 }
 } // namespace
@@ -201,7 +207,7 @@ std::string ConfigHelper::testInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.test"
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
 )EOF";
 }
 
@@ -513,7 +519,6 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(protocol_options);
-
   return cluster;
 }
 
@@ -576,7 +581,6 @@ ConfigHelper::buildTlsCluster(const std::string& name,
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
   socket->set_name("envoy.transport_sockets.tls");
   socket->mutable_typed_config()->PackFrom(tls_socket);
-
   return cluster;
 }
 
@@ -623,6 +627,7 @@ envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
   API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(
                                 R"EOF(
       name: {}
@@ -636,6 +641,12 @@ ConfigHelper::buildBaseListener(const std::string& name, const std::string& addr
                                 name, address, filter_chains),
                             listener);
   return listener;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(address);
+  UNREFERENCED_PARAMETER(filter_chains);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
@@ -667,6 +678,7 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 envoy::config::route::v3::RouteConfiguration
 ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: "{}"
       virtual_hosts:
@@ -679,6 +691,11 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                         name, cluster),
                             route);
   return route;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(cluster);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
@@ -770,6 +787,7 @@ void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::
 
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
+#ifdef ENVOY_ENABLE_YAML
   RELEASE_ASSERT(!finalized_, "");
   ProtobufWkt::Struct cluster_metadata;
   TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
@@ -787,6 +805,11 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
     }
     break;
   }
+#else
+  UNREFERENCED_PARAMETER(metadata_yaml);
+  UNREFERENCED_PARAMETER(cluster_name);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 void ConfigHelper::setConnectConfig(
@@ -905,7 +928,15 @@ void ConfigHelper::configureUpstreamTls(
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
-  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+
+  if (value == "true") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(true);
+  } else if (value == "false") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
+  } else {
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
+  }
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
@@ -1163,7 +1194,13 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     loadHttpConnectionManager(hcm_config);
 
     auto* filter_list_back = hcm_config.add_http_filters();
+#ifdef ENVOY_ENABLE_YAML
     TestUtility::loadFromYaml(config, *filter_list_back);
+#else
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(filter_list_back);
+    PANIC("YAML support compiled out");
+#endif
 
     // Now move it to the front.
     for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
@@ -1188,7 +1225,12 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
       old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
+#ifdef ENVOY_ENABLE_YAML
     TestUtility::loadFromYaml(config, *filter_list_back);
+#else
+    UNREFERENCED_PARAMETER(filter_list_back);
+    PANIC("YAML support compiled out");
+#endif
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
       old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
     }
@@ -1400,7 +1442,12 @@ void ConfigHelper::initializeTls(
           filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
+#ifdef ENVOY_ENABLE_YAML
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+#else
+      UNREFERENCED_PARAMETER(cert_yaml);
+      PANIC("YAML support compiled out");
+#endif
       if (options.max_verify_depth_.has_value()) {
         validation_context->mutable_max_verify_depth()->set_value(
             options.max_verify_depth_.value());
@@ -1478,7 +1525,13 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   auto* filter_list_back = filter_chain->add_filters();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+#else
+  UNREFERENCED_PARAMETER(filter_list_back);
+  UNREFERENCED_PARAMETER(filter_yaml);
+  PANIC("YAML support compiled out");
+#endif
 
   // Now move it to the front.
   for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
@@ -1490,7 +1543,13 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   RELEASE_ASSERT(!finalized_, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_list_back = listener->add_listener_filters();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+#else
+  UNREFERENCED_PARAMETER(filter_list_back);
+  UNREFERENCED_PARAMETER(filter_yaml);
+  PANIC("YAML support compiled out");
+#endif
 
   // Now move it to the front.
   for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
@@ -1501,7 +1560,13 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
 void ConfigHelper::addBootstrapExtension(const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   auto* extension = bootstrap_.add_bootstrap_extensions();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(config, *extension);
+#else
+  UNREFERENCED_PARAMETER(extension);
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 bool ConfigHelper::loadHttpConnectionManager(
@@ -1548,9 +1613,14 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 
   const std::string lds_filename =
       bootstrap().dynamic_resources().lds_config().path_config_source().path();
+#ifdef ENVOY_ENABLE_YAML
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessageOrError(lds));
   TestEnvironment::renameFile(file, lds_filename);
+#else
+  UNREFERENCED_PARAMETER(lds_filename);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 void ConfigHelper::setDownstreamOutboundFramesLimits(uint32_t max_all_frames,

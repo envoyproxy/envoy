@@ -75,21 +75,6 @@ stages:
       bucketGCP: $(GcsArtifactBucket)
       checkDeps: variables['CHECK_DEPS']
 
-- stage: sync
-  condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
-  dependsOn: []
-  jobs:
-  - template: stage/sync.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      authSSHDataPlaneApiKeyPublic: $(DataPlaneApiPublicKey)
-      authSSHDataPlaneApiKey: $(DataPlaneApiPrivateKey)
-      authSSHGoControlPlaneKeyPublic: $(GoControlPlanePublicKey)
-      authSSHGoControlPlaneKey: $(GoControlPlanePrivateKey)
-      authSSHFilterExampleKeyPublic: $(FilterExamplePublicKey)
-      authSSHFilterExampleKey: $(FilterExamplePrivateKey)
-      authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
-
 - stage: linux_x64
   displayName: Linux x64
   dependsOn: ${{ parameters.buildStageDeps }}
@@ -137,6 +122,7 @@ stages:
     RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
+    PUBLISH_GITHUB_RELEASE_DRY_RUN: $[stageDependencies.env.repo.outputs['publish.githubReleaseDryRun']]
     PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
     PUBLISH_DOCS: $[stageDependencies.env.repo.outputs['publish.docs']]
     PUBLISH_DOCS_LATEST: $[stageDependencies.env.repo.outputs['publish.docsLatest']]
@@ -148,6 +134,9 @@ stages:
       authDockerPassword: $(DockerPassword)
       authGCP: $(GcpServiceAccountKey)
       authGithub: $(GitHubPublicRepoOnlyAccessToken)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
@@ -165,6 +154,7 @@ stages:
       publishDocsRelease: variables['PUBLISH_DOCS_RELEASE']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
+      publishGithubReleaseDryRun: variables['PUBLISH_GITHUB_RELEASE_DRY_RUN']
 
 - stage: verify
   displayName: Verify
@@ -175,11 +165,6 @@ stages:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
-      bucketGCP: $(GcsArtifactBucket)
-      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
-      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
-      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
-      runDocker: variables['RUN_DOCKER']
 
 - stage: macos
   displayName: macOS

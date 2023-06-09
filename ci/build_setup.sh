@@ -7,6 +7,10 @@
 
 set -e
 
+if [[ -n "$NO_BUILD_SETUP" ]]; then
+    return
+fi
+
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
@@ -196,3 +200,5 @@ if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
 else
   echo "Skip setting up Envoy Filter Example."
 fi
+
+export NO_BUILD_SETUP=1

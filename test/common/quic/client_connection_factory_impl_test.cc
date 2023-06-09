@@ -41,9 +41,6 @@ protected:
               protocol_options->max_concurrent_streams().value());
     EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
               protocol_options->initial_stream_window_size().value());
-    ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
-    EXPECT_TRUE(
-        quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kRVCM));
 
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
