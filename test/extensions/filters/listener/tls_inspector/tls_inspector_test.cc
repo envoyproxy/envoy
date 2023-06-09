@@ -441,42 +441,43 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
   LogLevelSetter save_levels{spdlog::level::trace};
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  const uint32_t initial_buffer_size = 1;
+  const uint32_t initial_buffer_size = 64;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
       cfg_->initialReadBufferSize());
-  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
-      std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "\x02h2");
+  const uint16_t tls_min_version = std::get<0>(GetParam());
+  const uint16_t tls_max_version = std::get<1>(GetParam());
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(tls_min_version, tls_max_version, "example.com", "\x02h2");
 
   init();
   EXPECT_CALL(socket_, setRequestedServerName(_));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(_));
 
-  // The number of iterations is based on how many times we'll have to double
-  // the buffer to read the full client hello.
-  const size_t num_iterations = absl::bit_width(client_hello.size()) + 1;
+  mockSysCallForPeek(client_hello, true);
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(*buffer_));
+  EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
+  // The listener filter chain will resize the buffer given the adjusted
+  // maxReadBytes.
+  buffer_->resetCapacity(2 * initial_buffer_size);
 
-  for (size_t i = 0; i < num_iterations; ++i) {
-    // Trigger the event to copy the client hello message into buffer
+  if (tls_max_version > TLS1_1_VERSION) {
     mockSysCallForPeek(client_hello, true);
     file_event_callback_(Event::FileReadyType::Read);
-
-    auto state = filter_->onData(*buffer_);
-
-    if (const bool is_final_iteration = i == (num_iterations - 1); is_final_iteration) {
-      EXPECT_EQ(Network::FilterStatus::Continue, state);
-    } else {
-      EXPECT_EQ(Network::FilterStatus::StopIteration, state);
-      const uint32_t expected_max_read_size = (1 << (i + 1)) * initial_buffer_size;
-      EXPECT_EQ(expected_max_read_size, filter_->maxReadBytes());
-      // The listener filter chain will resize the buffer given the adjusted
-      // maxReadBytes.
-      buffer_->resetCapacity(expected_max_read_size);
-    }
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(*buffer_));
+    EXPECT_EQ(4 * initial_buffer_size, filter_->maxReadBytes());
+    // The listener filter chain will resize the buffer given the adjusted
+    // maxReadBytes.
+    buffer_->resetCapacity(4 * initial_buffer_size);
   }
+
+  mockSysCallForPeek(client_hello, true);
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(*buffer_));
 }
 
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
