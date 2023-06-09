@@ -45,7 +45,7 @@ public:
   IoUringResult prepareShutdown(os_fd_t fd, int how, void* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, void* user_data, int32_t result) override;
-  void removeInjectedCompletion(os_fd_t fd) override;
+  void removeInjectedCompletion(os_fd_t fd, InjectedCompletionUserDataReleasor releasor) override;
 
 private:
   const uint32_t io_uring_size_;

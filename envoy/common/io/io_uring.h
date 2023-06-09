@@ -17,6 +17,8 @@ namespace Io {
  */
 using CompletionCb = std::function<void(void* user_data, int32_t result, bool injected)>;
 
+using InjectedCompletionUserDataReleasor = std::function<void(void* user_data)>;
+
 enum class IoUringResult { Ok, Busy, Failed };
 
 /**
@@ -122,7 +124,8 @@ public:
   /**
    * Remove the injected completion for specific fd.
    */
-  virtual void removeInjectedCompletion(os_fd_t fd) PURE;
+  virtual void removeInjectedCompletion(os_fd_t fd,
+                                        InjectedCompletionUserDataReleasor releasor) PURE;
 };
 
 using IoUringPtr = std::unique_ptr<IoUring>;

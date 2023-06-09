@@ -232,11 +232,14 @@ void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) 
             fmt::ptr(user_data), injected_completions_.size());
 }
 
-void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd,
+                                           InjectedCompletionUserDataReleasor releasor) {
   ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
             injected_completions_.size());
-  injected_completions_.remove_if(
-      [fd](InjectedCompletion& completion) { return fd == completion.fd_; });
+  injected_completions_.remove_if([fd, releasor](InjectedCompletion& completion) {
+    releasor(completion.user_data_);
+    return fd == completion.fd_;
+  });
 }
 
 } // namespace Io
