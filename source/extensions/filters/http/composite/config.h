@@ -6,7 +6,6 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
-#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"

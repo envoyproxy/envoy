@@ -1,60 +1,73 @@
 #include <string>
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
-#include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/grpc/async_client.h"
-#include "source/common/grpc/typed_async_client.h"
 
+#include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
-#include "test/proto/helloworld.pb.h"
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
 #include "test/integration/filters/server_factory_context_filter_config.pb.validate.h"
+#include "test/proto/helloworld.pb.h"
 
 namespace Envoy {
 
-using test::integration::filters::TestRequest;
-using test::integration::filters::TestResponse;
 using ResponsePtr = std::unique_ptr<helloworld::HelloReply>;
+using FilterConfigSharedPtr =
+    std::shared_ptr<const test::integration::filters::ServerFactoryContextFilterConfig>;
 
-// A test filter that is created from server factory context.
-class ServerFactoryContextFilter
-    : public Http::PassThroughFilter,
-      public Grpc::AsyncStreamCallbacks<helloworld::HelloReply> {
+class FilterCallbacks {
 public:
-  ServerFactoryContextFilter(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope,
-                             const envoy::config::core::v3::GrpcService& grpc_service)
-      : client_manager_(client_manager), scope_(scope),
-        client_(client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true)), method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+  virtual ~FilterCallbacks() = default;
+
+  /**
+   * Called on completion of request.
+   *
+   * @param response the pointer to the response message. Null response pointer means the request
+   *        was completed with error.
+   */
+  virtual void onComplete() PURE;
+};
+
+class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply> {
+public:
+  TestGrpcClient(Server::Configuration::ServerFactoryContext& context,
+                 const envoy::config::core::v3::GrpcService& grpc_service)
+      : client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+            grpc_service, context.scope(), true)),
+        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+
+  // AsyncStreamCallbacks
+  void onReceiveMessage(ResponsePtr&&) override { filter_callback_->onComplete(); }
+
+  // RawAsyncStreamCallbacks
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
+    stream_closed_ = true;
+    filter_callback_->onComplete();
+  }
 
   void startStream() {
     Http::AsyncClient::StreamOptions options;
     stream_ = client_.start(*method_descriptor_, *this, options);
   }
 
-  // void send(helloworld::HelloRequest&& request, bool end_stream) override;
-  // // Close the stream. This is idempotent and will return true if we
-  // // actually closed it.
-  // bool close() override;
-
-  // AsyncStreamCallbacks
-  void onReceiveMessage(ResponsePtr&& message) override;
-
-  // RawAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
-  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {}
-  // const StreamInfo::StreamInfo& streamInfo() const override { return stream_.streamInfo(); }
-
-  void send(helloworld::HelloRequest&& request, bool end_stream) {
-    stream_->sendMessage(std::move(request), end_stream);
+  void sendMessage(FilterCallbacks& callbacks) {
+    filter_callback_ = &callbacks;
+    helloworld::HelloRequest request;
+    request.set_name("hello");
+    send(std::move(request), false);
   }
 
+  bool isStreamClosed() { return stream_closed_; }
+
   void close() {
-    if (stream_!= nullptr && !stream_closed_) {
+    if (stream_ != nullptr && !stream_closed_) {
       stream_->closeStream();
       stream_closed_ = true;
       stream_->resetStream();
@@ -62,24 +75,66 @@ public:
   }
 
 private:
-  Grpc::AsyncClientManager& client_manager_;
-  Stats::Scope& scope_;
+  void send(helloworld::HelloRequest&& request, bool end_stream) {
+    stream_->sendMessage(std::move(request), end_stream);
+  }
   Grpc::AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::AsyncStream<helloworld::HelloRequest> stream_;
   bool stream_closed_ = false;
+  FilterCallbacks* filter_callback_;
 };
 
-class ServerFactoryContextFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                       test::integration::filters::ServerFactoryContextFilterConfig> {
+// A test filter that is created from server factory context. This filter communicate with
+// external server via gRPC.
+class ServerFactoryContextFilter : public Http::PassThroughFilter, public FilterCallbacks {
+public:
+  ServerFactoryContextFilter(FilterConfigSharedPtr config,
+                             Server::Configuration::ServerFactoryContext& context)
+      : filter_config_(std::move(config)), context_(context),
+        test_client_(std::make_unique<TestGrpcClient>(context_, filter_config_->grpc_service())) {}
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    test_client_->startStream();
+    if (!test_client_->isStreamClosed()) {
+      test_client_->sendMessage(*this);
+    } else {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  void onComplete() override {
+    if (!filter_chain_continued_) {
+      filter_chain_continued_ = true;
+      decoder_callbacks_->continueDecoding();
+    }
+  }
+
+  void onDestroy() override { test_client_->close(); }
+
+private:
+  FilterConfigSharedPtr filter_config_;
+  Server::Configuration::ServerFactoryContext& context_;
+  std::unique_ptr<TestGrpcClient> test_client_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  bool filter_chain_continued_ = false;
+};
+
+class ServerFactoryContextFilterFactory
+    : public Extensions::HttpFilters::Common::FactoryBase<
+          test::integration::filters::ServerFactoryContextFilterConfig> {
 public:
   ServerFactoryContextFilterFactory() : FactoryBase("server-factory-context-filter") {}
 
 private:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::filters::ServerFactoryContextFilterConfig&,
-                                    const std::string&,
-                                    Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::filters::ServerFactoryContextFilterConfig&, const std::string&,
+      Server::Configuration::FactoryContext&) override {
 
     return nullptr;
   }
@@ -87,15 +142,17 @@ private:
   Http::FilterFactoryCb createFilterServerFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
-
-    return [&server_context, grpc_service = proto_config.grpc_service()](
+    FilterConfigSharedPtr filter_config =
+        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfig>(
+            proto_config);
+    return [&server_context, filter_config = std::move(filter_config)](
                Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
-          server_context.clusterManager().grpcAsyncClientManager(), server_context.scope(),
-          grpc_service));
+      callbacks.addStreamFilter(
+          std::make_shared<ServerFactoryContextFilter>(filter_config, server_context));
     };
   }
 };
 
-REGISTER_FACTORY(ServerFactoryContextFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(ServerFactoryContextFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 } // namespace Envoy

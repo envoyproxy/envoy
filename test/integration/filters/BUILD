@@ -516,21 +516,22 @@ envoy_cc_test_library(
     ],
     deps = [
         ":server_factory_context_filter_config_proto_cc_proto",
-        "//test/proto:helloworld_proto_cc_proto",
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:async_client_manager_interface",
-        "//source/common/grpc:typed_async_client_lib",
         "//envoy/http:filter_interface",
         "//envoy/registry",
+        "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
 envoy_proto_library(
     name = "server_factory_context_filter_config_proto",
-    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
     srcs = [":server_factory_context_filter_config.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
 envoy_proto_library(

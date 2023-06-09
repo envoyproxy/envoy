@@ -7,9 +7,3 @@ import "envoy/config/core/v3/grpc_service.proto";
 message ServerFactoryContextFilterConfig {
   envoy.config.core.v3.GrpcService grpc_service = 1;
 }
-
-message TestRequest {
-}
-
-message TestResponse {
-}

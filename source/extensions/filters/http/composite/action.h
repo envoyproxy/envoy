@@ -42,6 +42,9 @@ public:
         composite_action.typed_config().typed_config(), validation_visitor, factory);
 
     Envoy::Http::FilterFactoryCb callback = nullptr;
+
+    // TODO(tyxia) Update the logic later to create the filter from the `factoryContext` first if it
+    // is present.
     try {
       if (context.server_factory_context_.has_value()) {
         callback = factory.createFilterServerFactoryFromProto(
