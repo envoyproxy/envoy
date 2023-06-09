@@ -56,8 +56,9 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const uint32_t max_request_h
               "limit. Returning error.",
               remove_headers.size(), remove_headers.SpaceUsedExcludingSelf());
     rejected_mutations.inc();
-    return absl::InvalidArgumentError(
-        "Remove header counter or remove header size may exceed the limit.");
+    return absl::InvalidArgumentError(absl::StrCat("Remove header count ", std::to_string(remove_headers.size()),
+                                                   " or remove header size ", std::to_string(remove_headers.SpaceUsedExcludingSelf()),
+                                                   " exceed the HCM header size limit."));
   }
 
   const auto& set_headers = mutation.set_headers();
@@ -68,8 +69,9 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const uint32_t max_request_h
               "Returning error.",
               set_headers.size(), set_headers.SpaceUsedExcludingSelf());
     rejected_mutations.inc();
-    return absl::InvalidArgumentError(
-        "Set header counter or set header size may exceed the limit.");
+    return absl::InvalidArgumentError(absl::StrCat("Set header count ", std::to_string(set_headers.size()),
+                                                   " or set header size ", std::to_string(set_headers.SpaceUsedExcludingSelf()),
+                                                   " exceed the HCM header size limit."));
   }
   return absl::OkStatus();
 }

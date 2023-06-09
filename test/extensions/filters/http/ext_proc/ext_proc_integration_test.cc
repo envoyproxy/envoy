@@ -2174,7 +2174,7 @@ TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderSizeTest) {
   verifyDownstreamResponse(*response, 500);
 }
 
-TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultTest) {
+TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultCountTest) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   config_helper_.addConfigModifier(
@@ -2189,6 +2189,33 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultTest) {
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
         // The set header counter 8 is smaller than HCM limit 10, add size is smaller than 10kb.
+        // It passed the mutation check, but failed the end result header count check.
+        addMutationSetHeaders(8, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(2);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
+      });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) {
+        std::string header_key(1900, 'a');
+        headers.addCopy(LowerCaseString(header_key), "yes");
+      });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The set header counter 5 is smaller than HCM limit 100, add size is smaller than 1kb.
         // It passed the mutation check, but failed the end result header size check.
         addMutationSetHeaders(8, *headers_resp.mutable_response()->mutable_header_mutation());
         return true;
