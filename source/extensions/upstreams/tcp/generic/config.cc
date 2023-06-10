@@ -32,7 +32,8 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret =
-      std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks);
+      std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks,
+                                              downstream_info);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
