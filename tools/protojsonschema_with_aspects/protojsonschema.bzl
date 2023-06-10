@@ -14,16 +14,15 @@ protojsonschema_aspect = api_proto_plugin_aspect(
 )
 
 def _protojsonschema_rule_impl(ctx):
-    deps = []
-    for dep in ctx.attr.deps:
-        for path in dep[OutputGroupInfo].proto.to_list():
-            deps.append(path)
-
     return [
         DefaultInfo(
             files = depset(
                 transitive = [
-                    depset(deps),
+                    depset([
+                        path
+                        for dep in ctx.attr.deps
+                        for path in dep[OutputGroupInfo].proto.to_list()
+                    ]),
                 ],
             ),
         ),
