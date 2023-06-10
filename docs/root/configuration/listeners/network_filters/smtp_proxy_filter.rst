@@ -8,7 +8,7 @@ between a SMTP client (downstream) and a SMTP server (upstream) to
 determine if the session will upgrade to TLS. It terminates TLS and
 then enters a "passthrough" mode like tcp_proxy.
 
-* SMTP :ref:`architecture overview <arch_overview_smtp>`
+* SMTP :ref:`architecture overview <config_contrib_smtp>`
 
 .. attention::
 
