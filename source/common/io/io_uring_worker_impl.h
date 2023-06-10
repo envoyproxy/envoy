@@ -187,6 +187,8 @@ public:
   }
   const OptRef<WriteParam>& getWriteParam() const override { return write_param_; }
 
+  void clearAcceptedSocketParam() override { accepted_socket_param_ = absl::nullopt; }
+
 protected:
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;

@@ -333,6 +333,8 @@ public:
   virtual const OptRef<ReadParam>& getReadParam() const PURE;
   virtual const OptRef<AcceptedSocketParam>& getAcceptedSocketParam() const PURE;
   virtual const OptRef<WriteParam>& getWriteParam() const PURE;
+
+  virtual void clearAcceptedSocketParam() PURE;
 };
 
 /**

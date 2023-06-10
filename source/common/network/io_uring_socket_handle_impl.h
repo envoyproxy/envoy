@@ -90,10 +90,6 @@ protected:
 
   Event::FileReadyCb cb_;
 
-  OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
-  OptRef<Io::ReadParam> read_param_{absl::nullopt};
-  OptRef<Io::WriteParam> write_param_{absl::nullopt};
-
   // TODO(soulxu): This is for debug, it will be deleted after the
   // io_uring implemented.
   std::unique_ptr<IoHandle> shadow_io_handle_;
