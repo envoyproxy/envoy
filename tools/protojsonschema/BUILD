@@ -5,10 +5,6 @@ licenses(["notice"])  # Apache 2
 
 proto_plugin(
     name = "protoc_gen_jsonschema_proto_plugin",
-    options = [
-        "--jsonschema_opt=file_extension=schema.json",
-        "--jsonschema_opt=debug",
-    ],
     output_directory = True,
     tool = "@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema",
 )
