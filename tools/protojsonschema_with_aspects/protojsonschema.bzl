@@ -3,9 +3,12 @@ load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_prot
 
 def _protojsonschema_impl(target, ctx):
     return api_proto_plugin_impl(
-        target, ctx,
-        "proto", "protojsonschema",
-        [], "jsonschema",
+        target = target,
+        ctx = ctx,
+        output_group = "proto",
+        mnemonic = "protojsonschema",
+        output_suffixes = [],
+        output_dir = "jsonschema",
     )
 
 protojsonschema_aspect = api_proto_plugin_aspect(
