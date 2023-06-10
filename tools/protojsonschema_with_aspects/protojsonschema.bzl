@@ -8,7 +8,7 @@ def create_protojsonschema_aspect(aspect_impl):
             cfg = "exec",
         ),
         "_protoc_plugin": attr.label(
-            default = Label("@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema:protoc-gen-jsonschema"),
+            default = Label("@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema"),
             executable = True,
             cfg = "exec",
         ),
@@ -44,9 +44,7 @@ def _protojsonschema_impl(target, ctx):
     proto_sources = [
         f
         for f in target[ProtoInfo].direct_sources
-        if (f.path.startswith("external/envoy_api") or
-            f.path.startswith("tools/testdata/protoxform/envoy") or
-            f.path.startswith("external/com_github_cncf_udpa/xds"))
+        if (f.path.startswith("external/envoy_api"))
     ]
 
     if not proto_sources:
@@ -56,26 +54,20 @@ def _protojsonschema_impl(target, ctx):
     for f in target[ProtoInfo].transitive_sources.to_list():
         import_paths.append("{}={}".format(_path_ignoring_repository(f), f.path))
 
-    # TODO: problem here => not 1 output per file and name can't be inferred
-    # e.g. resource.proto => ResourceAnnotation.json
-    outputs = []
-    for f in proto_sources:
-        f_path_split = f.path.split("/")
-        output_file = ctx.label.name + "/" + f_path_split[len(f_path_split) - 1] + ".json"
-        outputs.append(ctx.actions.declare_file(output_file))
+    output = ctx.actions.declare_directory("jsonschema")
 
     # Create the protoc command-line args.
     inputs = [target[ProtoInfo].transitive_sources]
-
-    ctx_path = ctx.label.package + "/" + ctx.label.name
-    output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
 
     args = ctx.actions.args()
     args.add(ctx.label.workspace_root, format = "-I./%s")
     args.add_all(import_paths, format_each = "-I%s")
     args.add(ctx.executable._protoc_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
-    args.add(output_path, format = "--api_proto_plugin_out=%s")
+    args.add("--api_proto_plugin_opt=file_extension=schema.json")
+    args.add(output.path, format = "--api_proto_plugin_out=%s")
     args.add_all(target[ProtoInfo].direct_sources)
+
+    outputs = [output]
 
     ctx.actions.run(
         inputs = depset(transitive = inputs),
@@ -94,11 +86,7 @@ def _protojsonschema_rule_impl(ctx):
     deps = []
     for dep in ctx.attr.deps:
         for path in dep[OutputGroupInfo].proto.to_list():
-            envoy_api = (
-                path.short_path.startswith("../envoy_api") or
-                path.short_path.startswith("../com_github_cncf_udpa") or
-                path.short_path.startswith("tools/testdata")
-            )
+            envoy_api = path.short_path.startswith("../envoy_api")
             if envoy_api:
                 deps.append(path)
 

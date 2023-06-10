@@ -6,8 +6,7 @@ protojsonschema_rule(
     name = "api_protojsonschema",
     visibility = ["//visibility:public"],
     deps = [
-        #"@envoy_api//versioning:active_protos",
-        #"@envoy_api//versioning:frozen_protos",
-        "@envoy_api//envoy/annotations:pkg",  # just for testing
+        "@envoy_api//envoy/config/bootstrap/v2:pkg",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg",
     ],
 )
