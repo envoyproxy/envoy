@@ -178,6 +178,21 @@ class IoUringWorker;
 
 using IoUringSocketOnClosedCb = std::function<void()>;
 
+struct AcceptedSocketParam {
+  os_fd_t fd_;
+  sockaddr_storage* remote_addr_;
+  socklen_t remote_addr_len_;
+};
+
+struct ReadParam {
+  Buffer::Instance& buf_;
+  int32_t result_;
+};
+
+struct WriteParam {
+  int32_t result_;
+};
+
 /**
  * Abstract for each socket.
  */
@@ -314,21 +329,10 @@ public:
    * @return the status.
    */
   virtual IoUringSocketStatus getStatus() const PURE;
-};
 
-struct AcceptedSocketParam {
-  os_fd_t fd_;
-  sockaddr_storage* remote_addr_;
-  socklen_t remote_addr_len_;
-};
-
-struct ReadParam {
-  Buffer::Instance& buf_;
-  int32_t result_;
-};
-
-struct WriteParam {
-  int32_t result_;
+  virtual const OptRef<ReadParam>& getReadParam() const PURE;
+  virtual const OptRef<AcceptedSocketParam>& getAcceptedSocketParam() const PURE;
+  virtual const OptRef<WriteParam>& getWriteParam() const PURE;
 };
 
 /**

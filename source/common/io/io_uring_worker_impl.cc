@@ -416,7 +416,9 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
     if (result != -ECANCELED) {
       ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
       AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
+      accepted_socket_param_ = param;
       io_uring_handler_.onAcceptSocket(param);
+      accepted_socket_param_ = absl::nullopt;
     }
   }
 }
@@ -598,12 +600,16 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     if (read_buf_.length() > 0) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
       ReadParam param{read_buf_, static_cast<int32_t>(read_buf_.length())};
+      read_param_ = param;
       io_uring_handler_.onRead(param);
+      read_param_ = absl::nullopt;
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
     } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{read_buf_, read_error_.value()};
+      read_param_ = param;
       io_uring_handler_.onRead(param);
+      read_param_ = absl::nullopt;
       // Needn't to submit new read request if remote is closed.
       if (read_error_ == 0) {
         read_error_.reset();
@@ -638,7 +644,9 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
                 fd_, read_error_.value());
       status_ = RemoteClosed;
       WriteParam param{0};
+      write_param_ = param;
       io_uring_handler_.onWrite(param);
+      write_param_ = absl::nullopt;
       read_error_.reset();
       return;
     }
@@ -678,7 +686,9 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     // since the I/O handle or connection may be released after closing.
     if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
+      write_param_ = param;
       io_uring_handler_.onWrite(param);
+      write_param_ = absl::nullopt;
     }
     return;
   }
@@ -691,7 +701,9 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     write_buf_.drain(write_buf_.length());
     if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
+      write_param_ = param;
       io_uring_handler_.onWrite(param);
+      write_param_ = absl::nullopt;
     }
   }
 

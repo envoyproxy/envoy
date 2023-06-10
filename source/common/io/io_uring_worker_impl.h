@@ -181,6 +181,12 @@ public:
   void injectCompletion(uint32_t type) override;
   IoUringSocketStatus getStatus() const override { return status_; }
 
+  const OptRef<ReadParam>& getReadParam() const override { return read_param_; }
+  const OptRef<AcceptedSocketParam>& getAcceptedSocketParam() const override {
+    return accepted_socket_param_;
+  }
+  const OptRef<WriteParam>& getWriteParam() const override { return write_param_; }
+
 protected:
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
@@ -189,6 +195,10 @@ protected:
   IoUringSocketStatus status_{Initialized};
   bool enable_close_event_;
   IoUringSocketOnClosedCb on_closed_cb_;
+
+  OptRef<ReadParam> read_param_;
+  OptRef<AcceptedSocketParam> accepted_socket_param_;
+  OptRef<WriteParam> write_param_;
 };
 
 class IoUringAcceptSocket : public IoUringSocketEntry {
