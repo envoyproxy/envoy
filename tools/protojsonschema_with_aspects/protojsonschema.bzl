@@ -1,24 +1,5 @@
 load("@rules_proto//proto:defs.bzl", "ProtoInfo")
-
-def create_protojsonschema_aspect(aspect_impl):
-    _attrs = {
-        "_protoc": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            cfg = "exec",
-        ),
-        "_protoc_plugin": attr.label(
-            default = Label("@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema"),
-            executable = True,
-            cfg = "exec",
-        ),
-    }
-
-    return aspect(
-        attr_aspects = ["deps"],
-        attrs = _attrs,
-        implementation = aspect_impl,
-    )
+load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect")
 
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
 def _path_ignoring_repository(f):
@@ -62,7 +43,7 @@ def _protojsonschema_impl(target, ctx):
     protoc_cli_args = ctx.actions.args()
     protoc_cli_args.add(ctx.label.workspace_root, format = "-I./%s")
     protoc_cli_args.add_all(import_paths, format_each = "-I%s")
-    protoc_cli_args.add(ctx.executable._protoc_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
+    protoc_cli_args.add(ctx.executable._api_proto_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
     protoc_cli_args.add("--api_proto_plugin_opt=file_extension=schema.json")
     protoc_cli_args.add(output.path, format = "--api_proto_plugin_out=%s")
     protoc_cli_args.add_all(direct_sources)
@@ -75,13 +56,16 @@ def _protojsonschema_impl(target, ctx):
         outputs = outputs,
         executable = ctx.executable._protoc,
         arguments = [protoc_cli_args],
-        tools = [ctx.executable._protoc_plugin],
+        tools = [ctx.executable._api_proto_plugin],
     )
 
     transitive_outputs = depset(outputs, transitive = [transitive_outputs])
     return [OutputGroupInfo(**{output_group: transitive_outputs})]
 
-protojsonschema_aspect = create_protojsonschema_aspect(_protojsonschema_impl)
+protojsonschema_aspect = api_proto_plugin_aspect(
+    "@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema",
+    _protojsonschema_impl,
+)
 
 def _protojsonschema_rule_impl(ctx):
     deps = []
