@@ -358,7 +358,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/cryptomb/ @giantcroc @soulxu
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
-/contrib/language/ @diceride @diceride
+/contrib/language/ @realtimetodie @realtimetodie
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch
