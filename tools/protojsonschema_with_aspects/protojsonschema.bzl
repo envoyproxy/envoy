@@ -36,44 +36,45 @@ def _path_ignoring_repository(f):
 def _protojsonschema_impl(target, ctx):
     output_group = "proto"
 
-    transitive_outputs = depset(transitive = [dep.output_groups[output_group] for dep in ctx.rule.attr.deps])
+    transitive_outputs = depset(transitive = [
+        dep.output_groups[output_group]
+        for dep in ctx.rule.attr.deps
+    ])
 
-    if ProtoInfo not in target:
-        return [OutputGroupInfo(**{output_group: transitive_outputs})]
-
-    proto_sources = [
+    direct_sources = target[ProtoInfo].direct_sources
+    direct_envoy_sources = [
         f
-        for f in target[ProtoInfo].direct_sources
-        if (f.path.startswith("external/envoy_api"))
+        for f in direct_sources
+        if f.path.startswith("external/envoy_api")
     ]
 
-    if not proto_sources:
+    if not direct_envoy_sources:
         return [OutputGroupInfo(**{output_group: transitive_outputs})]
 
+    transitive_sources = target[ProtoInfo].transitive_sources
+
     import_paths = []
-    for f in target[ProtoInfo].transitive_sources.to_list():
+    for f in transitive_sources.to_list():
         import_paths.append("{}={}".format(_path_ignoring_repository(f), f.path))
 
     output = ctx.actions.declare_directory("jsonschema")
 
-    # Create the protoc command-line args.
-    inputs = [target[ProtoInfo].transitive_sources]
+    protoc_cli_args = ctx.actions.args()
+    protoc_cli_args.add(ctx.label.workspace_root, format = "-I./%s")
+    protoc_cli_args.add_all(import_paths, format_each = "-I%s")
+    protoc_cli_args.add(ctx.executable._protoc_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
+    protoc_cli_args.add("--api_proto_plugin_opt=file_extension=schema.json")
+    protoc_cli_args.add(output.path, format = "--api_proto_plugin_out=%s")
+    protoc_cli_args.add_all(direct_sources)
 
-    args = ctx.actions.args()
-    args.add(ctx.label.workspace_root, format = "-I./%s")
-    args.add_all(import_paths, format_each = "-I%s")
-    args.add(ctx.executable._protoc_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
-    args.add("--api_proto_plugin_opt=file_extension=schema.json")
-    args.add(output.path, format = "--api_proto_plugin_out=%s")
-    args.add_all(target[ProtoInfo].direct_sources)
-
+    inputs = depset(transitive = [transitive_sources])
     outputs = [output]
 
     ctx.actions.run(
-        inputs = depset(transitive = inputs),
+        inputs = inputs,
         outputs = outputs,
         executable = ctx.executable._protoc,
-        arguments = [args],
+        arguments = [protoc_cli_args],
         tools = [ctx.executable._protoc_plugin],
     )
 
@@ -86,9 +87,7 @@ def _protojsonschema_rule_impl(ctx):
     deps = []
     for dep in ctx.attr.deps:
         for path in dep[OutputGroupInfo].proto.to_list():
-            envoy_api = path.short_path.startswith("../envoy_api")
-            if envoy_api:
-                deps.append(path)
+            deps.append(path)
 
     return [
         DefaultInfo(
