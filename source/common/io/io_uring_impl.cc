@@ -237,7 +237,9 @@ void IoUringImpl::removeInjectedCompletion(os_fd_t fd,
   ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
             injected_completions_.size());
   injected_completions_.remove_if([fd, releasor](InjectedCompletion& completion) {
-    releasor(completion.user_data_);
+    if (fd == completion.fd_) {
+      releasor(completion.user_data_);
+    }
     return fd == completion.fd_;
   });
 }
