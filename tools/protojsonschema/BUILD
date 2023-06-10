@@ -1,5 +1,3 @@
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@aspect_bazel_lib//lib:write_source_files.bzl", "write_source_files")
 load("@rules_proto_grpc//:defs.bzl", "proto_plugin")
 load(":generate.bzl", "jsonschema_compile")
 
