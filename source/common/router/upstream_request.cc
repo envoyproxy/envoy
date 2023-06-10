@@ -651,6 +651,13 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstreamLog(AccessLog::AccessLogType::UpstreamPoolReady);
   }
 
+  if (address_provider.connectionID() &&
+      stream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              address_provider.connectionID().value(),
+              stream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
   }
