@@ -37,7 +37,7 @@ public:
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
   private:
-    Matcher::MatchCallbackStatus callback_status_;
+    Matcher::MatchCallbackStatus callback_status_ = Matcher::MatchCallbackStatus::Continue;
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
     const bool has_match_tree_{};
     Envoy::Http::StreamFilterBase* base_filter_{};
