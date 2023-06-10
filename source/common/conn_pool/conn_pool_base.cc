@@ -207,7 +207,6 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   traffic_stats.upstream_rq_active_.inc();
   host_->cluster().resourceManager(priority_).requests().inc();
 
-  ENVOY_CONN_LOG(debug, "Attached to downstream [C{}]", client, context.connection_id_);
   onPoolReady(client, context);
 }
 
