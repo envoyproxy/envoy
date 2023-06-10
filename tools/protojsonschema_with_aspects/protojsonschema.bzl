@@ -1,4 +1,3 @@
-load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_proto//proto:defs.bzl", "ProtoInfo")
 
 def create_protojsonschema_aspect(aspect_impl):
@@ -62,7 +61,7 @@ def _protojsonschema_impl(target, ctx):
     outputs = []
     for f in proto_sources:
         f_path_split = f.path.split("/")
-        output_file = ctx.label.name + "/" + f_path_split[len(f_path_split)-1] + ".json"
+        output_file = ctx.label.name + "/" + f_path_split[len(f_path_split) - 1] + ".json"
         outputs.append(ctx.actions.declare_file(output_file))
 
     # Create the protoc command-line args.
@@ -77,7 +76,7 @@ def _protojsonschema_impl(target, ctx):
     args.add(ctx.executable._protoc_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
     args.add(output_path, format = "--api_proto_plugin_out=%s")
     args.add_all(target[ProtoInfo].direct_sources)
-        
+
     ctx.actions.run(
         inputs = depset(transitive = inputs),
         outputs = outputs,

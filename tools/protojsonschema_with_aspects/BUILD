@@ -8,6 +8,6 @@ protojsonschema_rule(
     deps = [
         #"@envoy_api//versioning:active_protos",
         #"@envoy_api//versioning:frozen_protos",
-        "@envoy_api//envoy/annotations:pkg", # just for testing
+        "@envoy_api//envoy/annotations:pkg",  # just for testing
     ],
 )

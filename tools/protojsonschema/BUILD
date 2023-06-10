@@ -6,7 +6,6 @@ load(":protos.bzl", "PROTOS")
 
 licenses(["notice"])  # Apache 2
 
-
 genquery(
     name = "proto_targets_txt",
     expression = """filter(
@@ -50,13 +49,14 @@ proto_plugin(
         "--jsonschema_opt=debug",
     ],
     output_directory = True,
-    tool = "@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema:protoc-gen-jsonschema",
+    tool = "@com_github_chrusty_protoc_gen_jsonschema//cmd/protoc-gen-jsonschema",
 )
 
 [
     # example: "@envoy_api//contrib/envoy/extensions/filters/http/dynamo/v3:pkg" => "contrib_envoy_extensions_filters_http_dynamo_v3_jsonschema"
     jsonschema_compile(
         name = proto.replace("@envoy_api//", "").replace("/", "_").replace(":pkg", "") + "_jsonschema",
-        protos = [proto]
-    ) for proto in PROTOS
+        protos = [proto],
+    )
+    for proto in PROTOS
 ]
