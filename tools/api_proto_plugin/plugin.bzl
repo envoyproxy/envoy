@@ -62,12 +62,12 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, 
         outputs = []
         for output_suffix in output_suffixes:
             outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _path_ignoring_repository(f) +
-                                                output_suffix) for f in proto_sources]
+                                                 output_suffix) for f in proto_sources]
 
         ctx_path = ctx.label.package + "/" + ctx.label.name
         output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
     elif output_dir:
-        outputs += [ctx.actions.declare_directory(output_dir)]
+        outputs.append(ctx.actions.declare_directory(output_dir))
         output_path = outputs[0].path
 
     # Create the protoc command-line args.
