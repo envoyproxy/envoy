@@ -90,6 +90,10 @@ parameters:
   displayName: "Publish Github release"
   type: string
   default: false
+- name: publishGithubReleaseDryRun
+  displayName: "Publish Github release (dry run)"
+  type: string
+  default: false
 
 
 jobs:
@@ -118,6 +122,7 @@ jobs:
       cacheKeyDocker: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
       cacheKeyDockerName: publish_docker
       cacheKeyDockerTmpDir: /var/azpcache
+      cacheKeyDockerNoTmpfs: true
       cacheKeyDockerPath: ""
       cacheKeyDockerVersion: "$(cacheKeyDockerBuild)"
       env:
@@ -185,7 +190,7 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache
+      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
@@ -392,6 +397,7 @@ jobs:
   dependsOn: ["success"]
   condition: |
     and(not(canceled()),
+        in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
         eq(${{ parameters.publishGithubRelease }}, 'true'))
   pool:
     vmImage: "ubuntu-20.04"
@@ -408,3 +414,5 @@ jobs:
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
+      env:
+        ENVOY_PUBLISH_DRY_RUN: ${{ parameters.publishGithubReleaseDryRun }}

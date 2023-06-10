@@ -5,7 +5,8 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace ClusterProvided {
 
-Upstream::ThreadAwareLoadBalancerPtr Factory::create(const Upstream::ClusterInfo&,
+Upstream::ThreadAwareLoadBalancerPtr Factory::create(OptRef<const Upstream::LoadBalancerConfig>,
+                                                     const Upstream::ClusterInfo&,
                                                      const Upstream::PrioritySet&, Runtime::Loader&,
                                                      Random::RandomGenerator&, TimeSource&) {
   // Cluster provided load balancer has empty implementation. Because it is a special case to

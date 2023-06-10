@@ -61,7 +61,7 @@ public:
   virtual bool includeCounter(const Counter& counter) PURE;
 
   /**
-   * @return true if @param gague needs to be flushed to sinks.
+   * @return true if @param gauge needs to be flushed to sinks.
    */
   virtual bool includeGauge(const Gauge& gauge) PURE;
 
