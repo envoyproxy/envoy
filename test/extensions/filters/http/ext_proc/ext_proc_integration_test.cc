@@ -376,7 +376,8 @@ protected:
     verifyDownstreamResponse(*response, 500);
   }
 
-  void addMutationSetHeaders(const int count, envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+  void addMutationSetHeaders(const int count,
+                             envoy::service::ext_proc::v3::HeaderMutation& mutation) {
     for (int i = 0; i < count; i++) {
       auto* headers = mutation.add_set_headers();
       auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
@@ -385,7 +386,8 @@ protected:
     }
   }
 
-  void addMutationRemoveHeaders(const int count, envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+  void addMutationRemoveHeaders(const int count,
+                                envoy::service::ext_proc::v3::HeaderMutation& mutation) {
     for (int i = 0; i < count; i++) {
       mutation.add_remove_headers(absl::StrCat("x-test-header-internal-", std::to_string(i)));
     }
@@ -2207,11 +2209,10 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
       });
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(
-      [](Http::HeaderMap& headers) {
-        std::string header_key(1900, 'a');
-        headers.addCopy(LowerCaseString(header_key), "yes");
-      });
+  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+    std::string header_key(1900, 'a');
+    headers.addCopy(LowerCaseString(header_key), "yes");
+  });
 
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
