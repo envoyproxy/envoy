@@ -323,6 +323,9 @@ new_features:
 - area: http
   change: |
     added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
+- area: config
+  change: |
+    added a statistic :ref:`warming_state <config_cluster_stats>` to indicate the current warming state of a cluster.
 
 deprecated:
 - area: access_log
