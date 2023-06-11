@@ -1767,15 +1767,16 @@ max_ejection_time_jitter: 13s
       cluster_, outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_, random_));
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-  loadRq(hosts_[0], 5, 500);
-  loadRq(hosts_[1], 5, 500);
-  loadRq(hosts_[2], 5, 500);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   // Expect only one ejection.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+
+  loadRq(hosts_[0], 5, 500);
+  loadRq(hosts_[1], 5, 500);
+  loadRq(hosts_[2], 5, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_FALSE(hosts_[2]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
