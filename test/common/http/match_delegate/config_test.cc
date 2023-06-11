@@ -11,6 +11,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Common {
 namespace Http {
@@ -640,6 +642,39 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             delegating_filter->decodeHeaders(*request_headers, true));
   delegating_filter->decodeComplete();
+}
+
+// Verify that filter iteration is stopped and a local reply is issued when something goes wrong
+// with onMatchCallback
+TEST(DelegatingFilterTest, MatchTreeFailedCallback) {
+
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onMatchCallback(_))
+      .WillOnce(Return(Matcher::MatchCallbackStatus::StopAndFailStream));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, TestAction>(
+          "match-header", "match");
+
+  auto delegating_filter =
+      std::make_shared<DelegatingStreamFilter>(match_tree, decoder_filter, nullptr);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{
+      new Envoy::Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                                {":path", "/"},
+                                                {":method", "GET"},
+                                                {"match-header", "match"},
+                                                {"content-type", "application/grpc"}}};
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Envoy::Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            delegating_filter->decodeHeaders(*request_headers, true));
 }
 
 } // namespace
