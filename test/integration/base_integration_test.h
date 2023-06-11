@@ -531,7 +531,7 @@ protected:
 private:
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
-  // True if initialized() has been called.
+  // True if initialize() has been called.
   bool initialized_{};
   // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
   // the proxy uses the default watermark buffer factory to create buffers.
