@@ -481,7 +481,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   // Note: at-least one host is ejected, we ignore max ejection percentage when ejecting first host.
-  if ((ejections_active_helper_.value() == 0) || (ejected_percent <= max_ejection_percent)) {
+  if (ejected_percent <= max_ejection_percent) {
     if (type == envoy::data::cluster::v3::CONSECUTIVE_5XX ||
         type == envoy::data::cluster::v3::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
