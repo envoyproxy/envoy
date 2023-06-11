@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -178,12 +179,19 @@ private:
   void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
                        int32_t error);
   bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);
+  std::chrono::milliseconds fetchControlRequestData(const int32_t xid, OpCodes& opcode);
+  std::chrono::milliseconds fetchDataRequestData(const int32_t xid, OpCodes& opcode);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;
   BufferHelper helper_;
   TimeSource& time_source_;
   absl::node_hash_map<int32_t, RequestBegin> requests_by_xid_;
+  // Different from transaction ids of data requests, the transaction ids (XidCodes) of same kind of
+  // control requests are always the same. Therefore, we use a queue for each kind of control
+  // request, so we can differentiate different control requests with the same xid and calculate
+  // their response latency.
+  absl::node_hash_map<int32_t, std::queue<RequestBegin>> control_requests_by_xid_;
   Buffer::OwnedImpl zk_filter_read_buffer_;
   Buffer::OwnedImpl zk_filter_write_buffer_;
 };

@@ -1367,6 +1367,29 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithOneOnDataCall) {
                config_->stats().create_resp_slow_, 1001, 2001, 2);
 }
 
+// |REQ1|REQ2|
+// (onData1  )
+TEST_F(ZooKeeperFilterTest, MultipleControlRequestsWithOneOnDataCall) {
+  initialize();
+
+  // Request (onData1).
+  Buffer::OwnedImpl data = encodeAuth("digest");
+  data.add(encodeAuth("digest"));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(2UL, store_.counter("test.zookeeper.auth.digest_rq").value());
+  EXPECT_EQ(72UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Responses.
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().auth_resp_, config_->stats().auth_resp_fast_,
+               config_->stats().auth_resp_slow_, enumToSignedInt(XidCodes::AuthXid), 2000);
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().auth_resp_, config_->stats().auth_resp_fast_,
+               config_->stats().auth_resp_slow_, enumToSignedInt(XidCodes::AuthXid), 2001, 2);
+}
+
 // |REQ1 -------|REQ2 ---------|
 // (onData1)(onData2  )(onData3)
 TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
