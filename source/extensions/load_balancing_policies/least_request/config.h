@@ -12,17 +12,17 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace LeastRequest {
 
+using LeastRequestLbProto =
+    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest;
+
 struct LeastRequestCreator : public Logger::Loggable<Logger::Id::upstream> {
-  Upstream::LoadBalancerPtr operator()(Upstream::LoadBalancerParams params,
-                                       const Upstream::ClusterInfo& cluster_info,
-                                       const Upstream::PrioritySet& priority_set,
-                                       Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                       TimeSource& time_source);
+  Upstream::LoadBalancerPtr
+  operator()(Upstream::LoadBalancerParams params, OptRef<const LeastRequestLbProto> lb_config,
+             const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet& priority_set,
+             Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source);
 };
 
-class Factory : public Common::FactoryBase<
-                    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest,
-                    LeastRequestCreator> {
+class Factory : public Common::FactoryBase<LeastRequestLbProto, LeastRequestCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.least_request") {}
 };

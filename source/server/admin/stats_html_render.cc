@@ -23,9 +23,27 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
     : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
   AdminHtmlUtil::renderHead(response_headers, response);
+  if (!active_) {
+    StatsParams json_params(params);
+    json_params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+    json_response_headers_ = Http::ResponseHeaderMapImpl::create();
+    histogram_json_render_ =
+        std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);
+  }
 }
 
-void StatsHtmlRender::finalize(Buffer::Instance& response) { AdminHtmlUtil::finalize(response); }
+void StatsHtmlRender::finalize(Buffer::Instance& response) {
+  // Render all the histograms here using the JSON data we've accumulated
+  // for them.
+  if (!active_) {
+    histogram_json_render_->finalize(json_data_);
+    response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst json = \n");
+    response.add(json_data_);
+    response.add(";\nrenderHistograms(document.getElementById('histograms'), json);\n</script\n");
+  }
+
+  AdminHtmlUtil::finalize(response);
+}
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
@@ -36,12 +54,14 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
     response.add(AdminHtmlUtil::getResource("active_params.html", buf));
   }
   AdminHtmlUtil::renderTableEnd(response);
+  std::string buf;
   if (active_) {
-    std::string buf;
-    response.addFragments(
-        {"<script>\n", AdminHtmlUtil::getResource("active_stats.js", buf), "</script>\n"});
+    std::string buf2;
+    response.addFragments({"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf),
+                           AdminHtmlUtil::getResource("active_stats.js", buf2), "</script>\n"});
   } else {
-    response.add("<pre>\n");
+    response.addFragments(
+        {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf), "</script>\n<pre>\n"});
   }
 }
 

@@ -258,7 +258,7 @@ typed_config:
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
-  EXPECT_FALSE(headers.get(Http::LowerCaseString(name)).empty()) << "Mising " << name;
+  EXPECT_FALSE(headers.get(Http::LowerCaseString(name)).empty()) << "Missing " << name;
   int64_t val;
   if (!headers.get(Http::LowerCaseString(name)).empty() &&
       absl::SimpleAtoi(headers.get(Http::LowerCaseString(name))[0]->value().getStringView(),
@@ -488,6 +488,34 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
+// Regression test a bug where the host header was used for cache lookups rather than host:port key
+TEST_P(ProxyFilterIntegrationTest, CacheSansPort) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "localhost"}};
+
+  // Send a request to localhost, with no port specified. The cluster will
+  // default to localhost:443, and the connection will fail.
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started"));
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+
+  // Now try a second request and make sure it encounters the same error rather
+  // than dns_resolution_failure.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("upstream_reset_before_response_started"));
+}
+
 // Verify that `override_auto_sni_header` can be used along with auto_sni to set
 // SNI from an arbitrary header.
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithAltHeaderSni) {
@@ -611,8 +639,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
 
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_multiple_dns_addresses",
-                                    "true");
   use_cache_file_ = true;
   // Prepend a bad address
   if (GetParam() == Network::Address::IpVersion::v4) {

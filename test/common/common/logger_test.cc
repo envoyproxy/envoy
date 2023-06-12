@@ -4,6 +4,7 @@
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
@@ -176,17 +177,6 @@ TEST_P(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
       "StreamAggregatedResources gRPC config stream closed: 14, connection error: desc = "
       "\\\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\\\"");
 }
-
-struct MockLogSink : SinkDelegate {
-  MockLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setDelegate(); }
-  ~MockLogSink() override { restoreDelegate(); }
-
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
-  MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  void flush() override {}
-};
-
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
@@ -268,6 +258,130 @@ TEST(LoggerTest, LogWithLogDetails) {
     EXPECT_EQ(log.logger_name, "misc");
   }));
   ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST(LoggerTest, TestJsonFormatError) {
+  ProtobufWkt::Any log_struct;
+  log_struct.set_type_url("type.googleapis.com/bad.type.url");
+  log_struct.set_value("asdf");
+
+  // This scenario shouldn't happen in production, the test is added mainly for coverage.
+  auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("INVALID_ARGUMENT: Provided struct cannot be serialized as JSON string",
+            status.ToString());
+}
+
+TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+
+  {
+    ProtobufWkt::Struct log_struct;
+    (*log_struct.mutable_fields())["Message"].set_string_value("%v");
+    (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+
+    auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ("INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats",
+              status.ToString());
+  }
+
+  {
+    ProtobufWkt::Struct log_struct;
+    (*log_struct.mutable_fields())["Message"].set_string_value("%_");
+    (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+
+    auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ("INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats",
+              status.ToString());
+  }
+}
+
+TEST(LoggerTest, TestJsonFormatEmptyStruct) {
+  ProtobufWkt::Struct log_struct;
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("{}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Message"].set_string_value("%j");
+  (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
+  (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
+    EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
+    EXPECT_THAT(msg, HasSubstr("\"NullField\":null"));
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST(LoggerTest, TestJsonFormat) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Level"].set_string_value("%l");
+  (*log_struct.mutable_fields())["Message"].set_string_value("%j");
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto& log) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
+        EXPECT_EQ(log.logger_name, "misc");
+      }))
+      .WillOnce(Invoke([](auto msg, auto& log) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\nlo\""));
+        EXPECT_EQ(log.logger_name, "misc");
+      }))
+      .WillOnce(Invoke([](auto msg, auto& log) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\\"lo\""));
+        EXPECT_EQ(log.logger_name, "misc");
+      }));
+
+  ENVOY_LOG_MISC(info, "hello");
+  ENVOY_LOG_MISC(info, "hel\nlo");
+  ENVOY_LOG_MISC(info, "hel\"lo");
+}
+
+TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Level"].set_string_value("%l");
+  (*log_struct.mutable_fields())["Message"].set_string_value("%j");
+  (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+    EXPECT_THAT(msg, HasSubstr("\"Message\":\"{\\\"nested_message\\\":\\\"hello\\\"}\""));
+    EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "{\"nested_message\":\"hello\"}");
 }
 
 } // namespace

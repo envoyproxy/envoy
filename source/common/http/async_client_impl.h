@@ -374,6 +374,7 @@ private:
         std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
     const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+    bool filterDisabled(absl::string_view) const override { return false; }
 
     RouteEntryImpl route_entry_;
     const envoy::config::core::v3::Metadata metadata_;

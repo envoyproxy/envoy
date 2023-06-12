@@ -35,7 +35,10 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    env = {
+        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
+        "GODEBUG": "cgocheck=0",
+    },
     deps = [
         ":example_configs_test_lib",
     ],
