@@ -237,13 +237,6 @@ public:
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
 
-// Template that lazily initializes a StatsStruct.
-// The bootstrap config :ref:`enable_deferred_creation_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
-// stats lazy initialzation is enabled or not.
-template <typename StatsStructType> class DeferredCreation;
-template <typename StatsStructType> class DirectStats;
-
 // A helper class for a lazy compatible stats struct type.
 template <typename StatsStructType> class DeferredCreationCompatibleStats {
 public:
@@ -251,8 +244,8 @@ public:
       std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
       : data_(std::move(d)) {}
   // Allows move construct and assign.
-  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) = default;
-  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) = default;
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) noexcept = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) noexcept = default;
 
   inline StatsStructType* operator->() { return &data_->instantiate(); };
   inline StatsStructType& operator*() { return data_->instantiate(); };

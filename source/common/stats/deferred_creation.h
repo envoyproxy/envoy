@@ -47,7 +47,7 @@ public:
           return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {
-      instantiate();
+      getOrCreate();
     }
   }
   ~DeferredStats() {
@@ -57,7 +57,10 @@ public:
   }
 
 private:
-  inline StatsStructType& instantiate() override { return *internal_stats_.get(ctor_); }
+  // We can't call instantiate directly from constructor, otherwise the compiler complains about
+  // bypassing virtual dispatch even tho it's fine.
+  inline StatsStructType& getOrCreate() { return *internal_stats_.get(ctor_); }
+  inline StatsStructType& instantiate() override { return getOrCreate(); }
 
   // In order to preserve stat value continuity across a config reload, we need to automatically
   // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
@@ -96,6 +99,10 @@ private:
   StatsStructType stats_;
 };
 
+// Template that lazily initializes a StatsStruct.
+// The bootstrap config :ref:`enable_deferred_creation_stats
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
+// stats lazy initialzation is enabled or not.
 template <typename StatsStructType>
 DeferredCreationCompatibleStats<StatsStructType>
 createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
