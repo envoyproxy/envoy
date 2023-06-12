@@ -24,7 +24,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123
-/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @matklein123
+/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
