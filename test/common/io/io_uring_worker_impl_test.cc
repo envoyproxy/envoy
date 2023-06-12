@@ -408,10 +408,9 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
   EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  bool is_read = false;
   IoUringServerSocket socket(
       0, worker,
-      [this, &is_read](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0,
+      [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0,
       true);
   socket.disable();
 
