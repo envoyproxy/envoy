@@ -121,3 +121,18 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "inline_map_registry",
+    hdrs = [
+        "inline_map_registry.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/common:utility_lib",
+    ],
+)
