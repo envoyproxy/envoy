@@ -1120,9 +1120,6 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
     return CAPIStatus::CAPINotInGo;
   }
 
-  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(config_->pluginName());
-  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
-
   if (state.isThreadSafe()) {
     auto go_filter_state =
         state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key);
@@ -1134,7 +1131,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
   } else {
     auto key_str = std::string(key);
     auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str, dlib] {
+    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
         auto go_filter_state =
@@ -1144,7 +1141,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
           value_str->p = req_->strValue.data();
           value_str->n = req_->strValue.length();
         }
-        dlib->envoyGoRequestSemaDec(req_);
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
       }
