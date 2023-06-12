@@ -7,7 +7,7 @@ routing PRs, questions, etc. to the right place.
 
 # Senior maintainers
 
-* Matt Klein ([mattklein123](https://github.com/mattklein123)) (mklein@lyft.com)
+* Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
