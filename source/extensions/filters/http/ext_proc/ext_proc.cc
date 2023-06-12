@@ -147,6 +147,9 @@ void Filter::closeStream() {
     if (grpc_service_.has_envoy_grpc()) {
       logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
       logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+      if (!logging_info_->upstreamHost()) {
+        logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+      }
     }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
@@ -659,15 +662,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     break;
   }
 
-  if (!logging_info_upstream_host_set_ && stream_) {
-    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-    // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-      logging_info_upstream_host_set_ = true;
-    }
-  }
-
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
   } else if (absl::IsFailedPrecondition(processing_status)) {
@@ -701,15 +695,6 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
   stats_.streams_failed_.inc();
 
-  if (!logging_info_upstream_host_set_ && stream_) {
-    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-    // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-      logging_info_upstream_host_set_ = true;
-    }
-  }
-
   if (processing_complete_) {
     return;
   }
@@ -736,15 +721,6 @@ void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
   processing_complete_ = true;
   stats_.streams_closed_.inc();
-  if (!logging_info_upstream_host_set_ && stream_) {
-    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-    // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-      logging_info_upstream_host_set_ = true;
-    }
-  }
-
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
