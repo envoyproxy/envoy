@@ -23,6 +23,8 @@ jobs:
               || !contains(github.actor, '[bot]'))
       }}
     name: cc_test
+    permissions:
+      packages: read
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     steps:
