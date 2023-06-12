@@ -265,39 +265,41 @@ void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
 }
 
 // Handle corner cases in parsing: negatives and decimals aren't always parsed as doubles.
-void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   double converted_double;
   if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
     setNumberValue(entry, converted_double);
+    return true;
   }
+  return false;
 }
 
 // Handle an awful corner case where we explicitly shove a yaml percent in a proto string
 // value. Basically due to prior parsing logic we have to handle any combination
 // of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
 // E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
-void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
-    return;
+    return false;
   }
 
   const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
 
   std::string match_string;
   if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
-    return;
+    return false;
   }
 
   uint32_t numerator;
   if (!absl::SimpleAtoi(match_string, &numerator)) {
-    return;
+    return false;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   converted_fractional_percent.set_numerator(numerator);
   entry.fractional_percent_value_ = converted_fractional_percent;
 
   if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
-    return;
+    return true;
   }
   if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
     entry.fractional_percent_value_->set_denominator(
@@ -306,42 +308,79 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
     entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   }
+  return true;
 }
 
 // Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
-void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
   if (absl::EqualsIgnoreCase(stripped, "true")) {
     entry.bool_value_ = true;
+    return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
     entry.bool_value_ = false;
+    return true;
+  }
+  return false;
+}
+
+void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
+                            const ProtobufWkt::Value& value, absl::string_view raw_string) {
+  const char* error_message = nullptr;
+  values.emplace(key, SnapshotImpl::createEntry(value, raw_string, error_message));
+  if (error_message != nullptr) {
+    IS_ENVOY_BUG(
+        absl::StrCat(error_message, "\n[ key:", key, ", value: ", value.DebugString(), "]"));
   }
 }
 
+static const char* kBoolError =
+    "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
+    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
+    "working "
+    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
+static const char* kFractionError =
+    "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
+    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
+    "working "
+    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
+
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
-                                              absl::string_view raw_string) {
+                                              absl::string_view raw_string,
+                                              const char*& error_message) {
   Entry entry;
+  entry.raw_string_value_ = value.string_value();
+  if (!raw_string.empty()) {
+    entry.raw_string_value_ = raw_string;
+  }
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.number_value());
+    }
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+    }
     break;
   case ProtobufWkt::Value::kStructValue:
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = value.struct_value().DebugString();
+    }
     parseFractionValue(entry, value.struct_value());
     break;
   case ProtobufWkt::Value::kStringValue:
-    entry.raw_string_value_ = value.string_value();
     parseEntryDoubleValue(entry);
-    // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
-    // functions and see if we can remove the special casing.
-    parseEntryBooleanValue(entry);
-    parseEntryFractionalPercentValue(entry);
-    if (!raw_string.empty()) {
-      entry.raw_string_value_ = raw_string;
+    if (parseEntryBooleanValue(entry)) {
+      error_message = kBoolError;
+    }
+    if (parseEntryFractionalPercentValue(entry)) {
+      error_message = kFractionError;
     }
   default:
     break;
@@ -355,8 +394,7 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
-      values_.emplace(kv.first,
-                      SnapshotImpl::createEntry(ValueUtil::loadFromYaml(kv.second), kv.second));
+      SnapshotImpl::addEntry(values_, kv.first, ValueUtil::loadFromYaml(kv.second), kv.second);
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
@@ -409,6 +447,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
@@ -425,8 +464,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
 #ifdef ENVOY_ENABLE_YAML
-      values_.insert(
-          {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
+      SnapshotImpl::addEntry(values_, full_prefix, ValueUtil::loadFromYaml(value), value);
 #else
       IS_ENVOY_BUG("Runtime admin reload requires YAML support");
       UNREFERENCED_PARAMETER(value);
@@ -451,7 +489,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
-    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
@@ -460,13 +498,13 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
     }
-    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
   case ProtobufWkt::Value::kStructValue: {
     const ProtobufWkt::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
-      values_.emplace(prefix, SnapshotImpl::createEntry(v));
+      SnapshotImpl::addEntry(values_, prefix, v, "");
       break;
     }
     for (const auto& f : s.fields()) {

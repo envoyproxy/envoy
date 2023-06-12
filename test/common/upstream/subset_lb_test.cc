@@ -68,11 +68,11 @@ public:
               legacy_child_lb_creator->lbLeastRequestConfig() != absl::nullopt);
   }
 
+  static void testWrapper();
+
 private:
   std::shared_ptr<SubsetLoadBalancer> lb_;
 };
-
-namespace SubsetLoadBalancerTest {
 
 class TestMetadataMatchCriterion : public Router::MetadataMatchCriterion {
 public:
@@ -160,6 +160,38 @@ public:
 private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
+
+void SubsetLoadBalancerInternalStateTester::testWrapper() {
+  MockLoadBalancerContext inner;
+  TestMetadataMatchCriteria test_criteria(std::map<std::string, std::string>{});
+
+  EXPECT_CALL(inner, metadataMatchCriteria)
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(Return(&test_criteria));
+  const std::set<std::string> filtered_metadata_match_criteria_names;
+  SubsetLoadBalancer::LoadBalancerContextWrapper wrapper(&inner,
+                                                         filtered_metadata_match_criteria_names);
+
+  EXPECT_CALL(inner, computeHashKey());
+  wrapper.computeHashKey();
+
+  EXPECT_CALL(inner, downstreamConnection());
+  wrapper.downstreamConnection();
+
+  EXPECT_CALL(inner, downstreamHeaders());
+  wrapper.downstreamHeaders();
+
+  EXPECT_CALL(inner, upstreamSocketOptions());
+  wrapper.upstreamSocketOptions();
+
+  EXPECT_CALL(inner, upstreamTransportSocketOptions());
+  wrapper.upstreamTransportSocketOptions();
+
+  EXPECT_CALL(inner, overrideHostToSelect());
+  wrapper.overrideHostToSelect();
+}
+
+namespace SubsetLoadBalancerTest {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -2858,6 +2890,11 @@ TEST_P(SubsetLoadBalancerSingleHostPerSubsetTest, Update) {
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b)); // fallback
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_b)); // fallback
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_b)); // fallback
+}
+
+TEST(LoadBalancerContextWrapper, LoadBalancerContextWrapperTest) {
+  // Test private helper class via friend class.
+  SubsetLoadBalancerInternalStateTester::testWrapper();
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerSingleHostPerSubsetTest,
