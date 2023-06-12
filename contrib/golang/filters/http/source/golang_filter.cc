@@ -1133,7 +1133,6 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
     auto weak_ptr = weak_from_this();
     state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        Thread::LockGuard lock(mutex_);
         auto go_filter_state =
             state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key_str);
         if (go_filter_state) {
