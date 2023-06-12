@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: cors
+  change: |
+    Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
+    request header decoding and response header encoding.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
