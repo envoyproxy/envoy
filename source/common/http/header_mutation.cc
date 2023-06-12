@@ -37,6 +37,11 @@ public:
         headers.addReferenceKey(header_name_, value);
         break;
       }
+      case HeaderValueOption::OVERWRITE_IF_EXISTS:
+        if (headers.get(header_name_).empty()) {
+          return;
+        }
+        FALLTHRU;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers.setReferenceKey(header_name_, value);
         break;

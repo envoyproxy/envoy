@@ -336,6 +336,9 @@ new_features:
     added host related information :ref:`metadata <envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata>` and
     :ref:`locality <envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality>` to
     the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
+- area: http
+  change: |
+    added OVERWRITE_IF_EXISTS header manipulation keyword to overwrite a header only when it exists before manipulation.
 
 deprecated:
 - area: access_log
