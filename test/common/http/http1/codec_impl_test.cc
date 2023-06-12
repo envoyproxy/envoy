@@ -4723,5 +4723,30 @@ TEST_P(Http1ServerConnectionImplTest, ExtendedAsciiInHeaderName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
+// TODO(bencebeky): Fix BalsaParser behavior.
+TEST_P(Http1ServerConnectionImplTest, RequiredBodyNoContentLength) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  } else {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  }
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
+                           "host: example.com\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: REQUIRED_BODY_BUT_NO_CONTENT_LENGTH");
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
