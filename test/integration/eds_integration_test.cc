@@ -57,8 +57,9 @@ public:
     }
   }
 
-  void sendPlainEds(envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment,
-                    bool await_update = true) {
+  void
+  sendPlainEds(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,
+               bool await_update = true) {
     if (await_update) {
       eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
     } else {
@@ -352,7 +353,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
   cleanupUpstreamAndDownstream();
 
   // After the first hc there should be no upstream healthy host, and any
-  // downstream request will fail), until the update-merge-window ends.
+  // downstream request will fail, until the update-merge-window ends.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
@@ -421,12 +422,13 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
 
 // Validates that updating a locality of an actively checked endpoint, does
 // not reuse the previously determined health status.
-// The test should be removed once envoy.reloadable_features.keep_endpoint_active_hc_status
+// The test should be removed once
+// envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update
 // is deprecated.
 TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusNoReuse) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.keep_endpoint_active_hc_status", "false"}});
+      {{"envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update", "false"}});
   // setup with active-HC.
   initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
     // Disable the healthy panic threshold, preventing using a non-healthy host.
@@ -464,7 +466,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusNoReuse) {
   cleanupUpstreamAndDownstream();
 
   // After the first hc there should be no upstream healthy host, and any
-  // downstream request will fail), until the update-merge-window ends.
+  // downstream request will fail, until the update-merge-window ends.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
@@ -519,7 +521,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusNoReuse) {
   cleanupUpstreamAndDownstream();
 
   // After the first hc there should be no upstream healthy host, and any
-  // downstream request will fail), until the update-merge-window ends.
+  // downstream request will fail, until the update-merge-window ends.
   //
   // when reusing health-status, Envoy will be able to connect to the upstream
   // even before receiving the HC response, because the endpoint was already

@@ -2094,9 +2094,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       // If we are depending on a health checker, we initialize to unhealthy.
+      // If there's an existing host with the same health checker, the
+      // health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
         if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.keep_endpoint_active_hc_status")) {
+                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
           if (existing_host_found && !health_check_address_changed &&
               !active_health_check_flag_changed) {
             // If there's an existing host, use the same active health-status.
