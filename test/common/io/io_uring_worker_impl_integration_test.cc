@@ -19,7 +19,7 @@ class IoUringTestSocket : public IoUringSocketEntry {
 public:
   IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent)
       : IoUringSocketEntry(
-            fd, parent, [this](uint32_t) {}, false) {}
+            fd, parent, [](uint32_t) {}, false) {}
 
   void onAccept(Request* req, int32_t result, bool injected) override {
     IoUringSocketEntry::onAccept(req, result, injected);
