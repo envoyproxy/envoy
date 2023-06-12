@@ -1,5 +1,7 @@
 #include "source/common/network/io_uring_socket_handle_impl.h"
 
+#include <openssl/ssl.h>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
@@ -34,8 +36,15 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_fa
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   ENVOY_LOG(trace, "~IoUringSocketHandleImpl, type = {}", ioUringSocketTypeStr());
   if (SOCKET_VALID(fd_)) {
-    if (io_uring_socket_type_ != IoUringSocketType::Unknown && io_uring_socket_.has_value()) {
-      io_uring_socket_.ref().close(false);
+    // In the accept socket case, the socket is owned by main thread. Then the IoUringWorker
+    // can be destruct before the IoUringSocketHandleImpl when shutdown the envoy. So need to
+    // check the current thread is registered or not to ensure the worker thread is down or
+    // not.
+    if (io_uring_socket_type_ != IoUringSocketType::Unknown &&
+        io_uring_factory_.currentThreadRegistered() && io_uring_socket_.has_value()) {
+      if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::Closed) {
+        io_uring_socket_.ref().close(false);
+      }
     } else {
       // The TLS slot has been shut down by this moment with IoUring wiped out, thus
       // better use this posix system call instead of IoUringSocketHandleImpl::close().
@@ -72,6 +81,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
 
   SET_SOCKET_INVALID(fd_);
   io_uring_socket_.ref().close(false);
+  io_uring_socket_.reset();
   return Api::ioCallUint64ResultNoError();
 }
 
@@ -393,6 +403,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
               io_uring_factory_.getIoUringWorker()->dispatcher().name());
     if (&io_uring_socket_->getIoUringWorker().dispatcher() ==
         &io_uring_factory_.getIoUringWorker()->dispatcher()) {
+      io_uring_socket_->setFileReadyCb(std::move(cb));
       io_uring_socket_->enable();
       io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
     } else {
@@ -422,9 +433,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       mutex.unlock();
 
       io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
-          fd, buf, *this, events & Event::FileReadyType::Closed);
+          fd, buf, std::move(cb), events & Event::FileReadyType::Closed);
     }
-    cb_ = std::move(cb);
     return;
   }
 
@@ -438,7 +448,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     }
 
     io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
-        fd_, *this, events & Event::FileReadyType::Closed);
+        fd_, std::move(cb), events & Event::FileReadyType::Closed);
     break;
   }
   case IoUringSocketType::Accept: {
@@ -449,7 +459,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       return;
     } else {
       io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addAcceptSocket(
-          fd_, *this, events & Event::FileReadyType::Closed);
+          fd_, std::move(cb), events & Event::FileReadyType::Closed);
     }
     break;
   }
@@ -465,8 +475,6 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       return;
     }
   }
-
-  cb_ = std::move(cb);
 }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
@@ -532,43 +540,6 @@ IoHandlePtr IoUringSocketHandleImpl::duplicate() {
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
                                                          domain_, &io_uring_factory_);
-}
-
-void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam&) {
-  ENVOY_LOG(trace, "before on accept socket");
-  cb_(Event::FileReadyType::Read);
-  ENVOY_LOG(trace, "after on accept socket");
-}
-
-void IoUringSocketHandleImpl::onRead(Io::ReadParam&) {
-  ENVOY_LOG(trace,
-            "calling event callback since pending read buf has {} size data, data = {}, "
-            "io_uring_socket_type = {}, fd = {}",
-            io_uring_socket_->getReadParam()->buf_.length(),
-            io_uring_socket_->getReadParam()->buf_.toString(), ioUringSocketTypeStr(), fd_);
-  if (!SOCKET_VALID(fd_)) {
-    ENVOY_LOG(trace, "The socket already closed, ignore this read event");
-    return;
-  }
-  ASSERT(cb_ != nullptr);
-  cb_(Event::FileReadyType::Read);
-}
-
-void IoUringSocketHandleImpl::onWrite(Io::WriteParam&) {
-  ENVOY_LOG(trace, "call event callback for write since result = {}",
-            io_uring_socket_->getWriteParam()->result_);
-  cb_(Event::FileReadyType::Write);
-}
-
-void IoUringSocketHandleImpl::onRemoteClose() {
-  ASSERT(cb_ != nullptr);
-  ENVOY_LOG(trace, "onRemoteClose fd = {}", fd_);
-  cb_(Event::FileReadyType::Closed);
-}
-
-void IoUringSocketHandleImpl::onLocalClose() {
-  ENVOY_LOG(trace, "onLocalClose fd = {}", fd_);
-  io_uring_socket_.reset();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,

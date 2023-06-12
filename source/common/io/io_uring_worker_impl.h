@@ -62,13 +62,13 @@ public:
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
-  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+  IoUringSocket& addAcceptSocket(os_fd_t fd, Event::FileReadyCb cb,
                                  bool enable_close_event) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+  IoUringSocket& addServerSocket(os_fd_t fd, Event::FileReadyCb cb,
                                  bool enable_close_event) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringHandler& handler,
+  IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf, Event::FileReadyCb cb,
                                  bool enable_close_event) override;
-  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+  IoUringSocket& addClientSocket(os_fd_t fd, Event::FileReadyCb cb,
                                  bool enable_close_event) override;
 
   Event::Dispatcher& dispatcher() override;
@@ -115,7 +115,7 @@ class IoUringSocketEntry : public IoUringSocket,
                            public Event::DeferredDeletable,
                            protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
+  IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
                      bool enable_close_event);
 
   // IoUringSocket
@@ -128,7 +128,7 @@ public:
     // reference to the IoUringSocket. The new IoUringSocket will be
     // replaced with it.
     if (!keep_fd_open) {
-      io_uring_handler_.onLocalClose();
+      onLocalClose();
     }
   }
   void enable() override { status_ = Enabled; }
@@ -190,10 +190,17 @@ public:
 
   void clearAcceptedSocketParam() override { accepted_socket_param_ = absl::nullopt; }
 
+  void setFileReadyCb(Event::FileReadyCb cb) override { cb_ = std::move(cb); }
+
+  void onAcceptCompleted();
+  void onReadCompleted();
+  void onWriteCompleted();
+  void onRemoteClose();
+  void onLocalClose();
+
 protected:
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
-  IoUringHandler& io_uring_handler_;
   uint32_t injected_completions_{0};
   IoUringSocketStatus status_{Initialized};
   bool enable_close_event_;
@@ -202,11 +209,13 @@ protected:
   OptRef<ReadParam> read_param_;
   OptRef<AcceptedSocketParam> accepted_socket_param_;
   OptRef<WriteParam> write_param_;
+
+  Event::FileReadyCb cb_;
 };
 
 class IoUringAcceptSocket : public IoUringSocketEntry {
 public:
-  IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
+  IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
                       uint32_t accept_size, bool enable_close_event);
 
   void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
@@ -229,11 +238,10 @@ private:
 
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
-  IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
+  IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
                       uint32_t write_timeout_ms, bool enable_close_event);
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
-                      IoUringHandler& io_uring_handler, uint32_t write_timeout_ms,
-                      bool enable_close_event);
+                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event);
   ~IoUringServerSocket() override;
 
   // IoUringSocket

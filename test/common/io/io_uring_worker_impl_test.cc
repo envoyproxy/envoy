@@ -21,23 +21,14 @@ class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, 1000, dispatcher) {}
-  IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
-    IoUringSocketEntryPtr socket =
-        std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler, false);
+  IoUringSocket& addTestSocket(os_fd_t fd) {
+    IoUringSocketEntryPtr socket = std::make_unique<IoUringSocketEntry>(
+        fd, *this, [](uint32_t) {}, false);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
   }
 
   const std::list<IoUringSocketEntryPtr>& getSockets() const { return sockets_; }
-};
-
-class TestIoUringHandler : public IoUringHandler {
-public:
-  void onAcceptSocket(AcceptedSocketParam&) override {}
-  void onRead(ReadParam&) override {}
-  void onWrite(WriteParam&) override {}
-  void onRemoteClose() override {}
-  void onLocalClose() override {}
 };
 
 TEST(IoUringWorkerImplTest, CleanupSocket) {
@@ -51,9 +42,8 @@ TEST(IoUringWorkerImplTest, CleanupSocket) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
-  auto& io_uring_socket = worker.addTestSocket(fd, handler);
+  auto& io_uring_socket = worker.addTestSocket(fd);
 
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
@@ -78,9 +68,8 @@ TEST(IoUringWorkerImplTest, DelaySubmit) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
-  auto& io_uring_socket = worker.addTestSocket(fd, handler);
+  auto& io_uring_socket = worker.addTestSocket(fd);
 
   // The submit only be invoked one time.
   EXPECT_CALL(mock_io_uring, submit());
@@ -118,7 +107,6 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
 
   void* read_req = nullptr;
@@ -126,7 +114,8 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
+  auto& io_uring_socket = worker.addServerSocket(
+      fd, [](uint32_t) {}, false);
 
   // Add a write request.
   std::string data = "Hello";
@@ -209,7 +198,6 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
 
   // The read request added by server socket constructor.
@@ -217,7 +205,8 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
+  auto& io_uring_socket = worker.addServerSocket(
+      fd, [](uint32_t) {}, false);
 
   // Fake an injected completion.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -280,7 +269,6 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
       std::make_unique<IoUringWorkerTestImpl>(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
 
   // The read request added by server socket constructor.
@@ -288,7 +276,8 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker->addServerSocket(fd, handler, false);
+  worker->addServerSocket(
+      fd, [](uint32_t) {}, false);
 
   // The IoUringWorker will close all the existing sockets.
   void* cancel_req = nullptr;
@@ -345,7 +334,6 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
-  TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
 
   // The read request added by server socket constructor.
@@ -353,7 +341,8 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
+  auto& io_uring_socket = worker.addServerSocket(
+      fd, [](uint32_t) {}, false);
 
   // Disable the socket, then there will be no new read request.
   io_uring_socket.disable();
@@ -414,13 +403,16 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  MockIoUringHandler handler;
 
   void* read_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  IoUringServerSocket socket(0, worker, handler, 0, true);
+  bool is_read = false;
+  IoUringServerSocket socket(
+      0, worker,
+      [this, &is_read](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0,
+      true);
   socket.disable();
 
   // Consumes the first read request.
@@ -429,8 +421,6 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
       .WillOnce(DoAll(SaveArg<4>(&read_req2), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   socket.onRead(static_cast<Request*>(read_req), 1, false);
-  // Trigger a further remote close.
-  EXPECT_CALL(handler, onRemoteClose());
   socket.onRead(nullptr, 0, false);
 
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
@@ -446,12 +436,12 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInShutdownWriteSocketInjection) 
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  MockIoUringHandler handler;
   void* read_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  IoUringServerSocket socket(0, worker, handler, 0, false);
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) {}, 0, false);
 
   // Shutdown and then shutdown completes.
   EXPECT_CALL(mock_io_uring, submit());
@@ -477,13 +467,13 @@ TEST(IoUringWorkerImplTest, AcceptSocketAvoidDuplicateCancel) {
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  MockIoUringHandler handler;
 
   void* accept_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareAccept(_, _, _, _))
       .WillOnce(DoAll(SaveArg<3>(&accept_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  IoUringAcceptSocket socket(0, worker, handler, 1, true);
+  IoUringAcceptSocket socket(
+      0, worker, [](uint32_t) {}, 1, true);
 
   // Close the socket.
   void* cancel_req = nullptr;

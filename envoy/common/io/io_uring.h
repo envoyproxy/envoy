@@ -335,20 +335,7 @@ public:
   virtual const OptRef<WriteParam>& getWriteParam() const PURE;
 
   virtual void clearAcceptedSocketParam() PURE;
-};
-
-/**
- * The handler for io_uring request completion.
- */
-class IoUringHandler {
-public:
-  virtual ~IoUringHandler() = default;
-
-  virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
-  virtual void onRead(ReadParam& param) PURE;
-  virtual void onWrite(WriteParam& param) PURE;
-  virtual void onRemoteClose() PURE;
-  virtual void onLocalClose() PURE;
+  virtual void setFileReadyCb(Event::FileReadyCb cb) PURE;
 };
 
 /**
@@ -361,24 +348,24 @@ public:
   /**
    * Add an accept socket socket to the worker.
    */
-  virtual IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+  virtual IoUringSocket& addAcceptSocket(os_fd_t fd, Event::FileReadyCb cb,
                                          bool enable_close_event) PURE;
 
   /**
    * Add an server socket socket to the worker.
    */
-  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, Event::FileReadyCb cb,
                                          bool enable_close_event) PURE;
 
   /**
    * Add an server socket through an existing socket from another thread.
    */
   virtual IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
-                                         IoUringHandler& handler, bool enable_close_event) PURE;
+                                         Event::FileReadyCb cb, bool enable_close_event) PURE;
   /**
    * Add an client socket socket to the worker.
    */
-  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, Event::FileReadyCb cb,
                                          bool enable_close_event) PURE;
 
   /**

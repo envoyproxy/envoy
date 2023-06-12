@@ -27,7 +27,7 @@ enum class IoUringSocketType {
 /**
  * IoHandle derivative for sockets.
  */
-class IoUringSocketHandleImpl : public IoSocketHandleBaseImpl, public Io::IoUringHandler {
+class IoUringSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_factory, os_fd_t fd = INVALID_SOCKET,
                           bool socket_v6only = false, absl::optional<int> domain = absl::nullopt,
@@ -61,13 +61,6 @@ public:
   void resetFileEvents() override;
 
   IoHandlePtr duplicate() override;
-
-  // IoUringHandler
-  void onAcceptSocket(Io::AcceptedSocketParam& param) override;
-  void onRead(Io::ReadParam& param) override;
-  void onWrite(Io::WriteParam& param) override;
-  void onRemoteClose() override;
-  void onLocalClose() override;
 
 protected:
   std::string ioUringSocketTypeStr() {

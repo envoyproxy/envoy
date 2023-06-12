@@ -26,10 +26,9 @@ WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& 
   }
 }
 
-IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent,
-                                       IoUringHandler& io_uring_handler, bool enable_close_event)
-    : fd_(fd), parent_(parent), io_uring_handler_(io_uring_handler),
-      enable_close_event_(enable_close_event) {}
+IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
+                                       bool enable_close_event)
+    : fd_(fd), parent_(parent), enable_close_event_(enable_close_event), cb_(std::move(cb)) {}
 
 void IoUringSocketEntry::cleanup() {
   parent_.removeInjectedCompletion(*this);
@@ -48,6 +47,35 @@ void IoUringSocketEntry::injectCompletion(uint32_t type) {
   }
   injected_completions_ |= type;
   parent_.injectCompletion(*this, type, -EAGAIN);
+}
+
+void IoUringSocketEntry::onAcceptCompleted() {
+  ENVOY_LOG(trace, "before on accept socket");
+  cb_(Event::FileReadyType::Read);
+  ENVOY_LOG(trace, "after on accept socket");
+}
+
+void IoUringSocketEntry::onReadCompleted() {
+  ENVOY_LOG(trace,
+            "calling event callback since pending read buf has {} size data, data = {}, "
+            "fd = {}",
+            getReadParam()->buf_.length(), getReadParam()->buf_.toString(), fd_);
+  cb_(Event::FileReadyType::Read);
+}
+
+void IoUringSocketEntry::onWriteCompleted() {
+  ENVOY_LOG(trace, "call event callback for write since result = {}", getWriteParam()->result_);
+  cb_(Event::FileReadyType::Write);
+}
+
+void IoUringSocketEntry::onRemoteClose() {
+  ENVOY_LOG(trace, "onRemoteClose fd = {}", fd_);
+  cb_(Event::FileReadyType::Closed);
+}
+
+void IoUringSocketEntry::onLocalClose() {
+  ENVOY_LOG(trace, "onLocalClose fd = {}", fd_);
+  // io_uring_socket_.reset();
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
@@ -90,35 +118,34 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, Event::FileReadyCb cb,
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
-  std::unique_ptr<IoUringAcceptSocket> socket =
-      std::make_unique<IoUringAcceptSocket>(fd, *this, handler, accept_size_, enable_close_event);
+  std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(
+      fd, *this, std::move(cb), accept_size_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler,
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb cb,
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, *this, handler, write_timeout_ms_, enable_close_event);
+      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
 IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
-                                                  IoUringHandler& handler,
-                                                  bool enable_close_event) {
+                                                  Event::FileReadyCb cb, bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, read_buf, *this, handler, write_timeout_ms_, enable_close_event);
+      fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&, bool) {
+IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb, bool) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   PANIC("not implemented");
 }
@@ -322,10 +349,10 @@ void IoUringWorkerImpl::submit() {
 }
 
 IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
-                                         IoUringHandler& io_uring_handler, uint32_t accept_size,
+                                         Event::FileReadyCb cb, uint32_t accept_size,
                                          bool enable_close_event)
-    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
-      accept_size_(accept_size), requests_(std::vector<Request*>(accept_size_, nullptr)) {
+    : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event), accept_size_(accept_size),
+      requests_(std::vector<Request*>(accept_size_, nullptr)) {
   enable();
 }
 
@@ -418,7 +445,7 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
       ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
       AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
       accepted_socket_param_ = param;
-      io_uring_handler_.onAcceptSocket(param);
+      onAcceptCompleted();
       accepted_socket_param_ = absl::nullopt;
     }
   }
@@ -435,18 +462,17 @@ void IoUringAcceptSocket::submitRequests() {
 }
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
-                                         IoUringHandler& io_uring_handler,
-                                         uint32_t write_timeout_ms, bool enable_close_event)
-    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
+                                         Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         bool enable_close_event)
+    : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
       write_timeout_ms_(write_timeout_ms) {
   enable();
 }
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
-                                         IoUringWorkerImpl& parent,
-                                         IoUringHandler& io_uring_handler,
+                                         IoUringWorkerImpl& parent, Event::FileReadyCb cb,
                                          uint32_t write_timeout_ms, bool enable_close_event)
-    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
+    : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
       write_timeout_ms_(write_timeout_ms) {
   read_buf_.move(read_buf);
   enable();
@@ -594,14 +620,14 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
       ReadParam param{read_buf_, static_cast<int32_t>(read_buf_.length())};
       read_param_ = param;
-      io_uring_handler_.onRead(param);
+      onReadCompleted();
       read_param_ = absl::nullopt;
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
     } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{read_buf_, read_error_.value()};
       read_param_ = param;
-      io_uring_handler_.onRead(param);
+      onReadCompleted();
       read_param_ = absl::nullopt;
       // Needn't to submit new read request if remote is closed.
       if (read_error_ == 0) {
@@ -622,7 +648,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
                 "{}, result = {}",
                 fd_, read_error_.value());
       status_ = RemoteClosed;
-      io_uring_handler_.onRemoteClose();
+      IoUringSocketEntry::onRemoteClose();
       read_error_.reset();
       return;
     } else {
@@ -638,7 +664,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       status_ = RemoteClosed;
       WriteParam param{0};
       write_param_ = param;
-      io_uring_handler_.onWrite(param);
+      IoUringSocketEntry::onWriteCompleted();
       write_param_ = absl::nullopt;
       read_error_.reset();
       return;
@@ -680,7 +706,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
       write_param_ = param;
-      io_uring_handler_.onWrite(param);
+      IoUringSocketEntry::onWriteCompleted();
       write_param_ = absl::nullopt;
     }
     return;
@@ -695,7 +721,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
       write_param_ = param;
-      io_uring_handler_.onWrite(param);
+      IoUringSocketEntry::onWriteCompleted();
       write_param_ = absl::nullopt;
     }
   }

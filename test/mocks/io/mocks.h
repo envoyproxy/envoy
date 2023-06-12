@@ -61,26 +61,17 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
 };
 
-class MockIoUringHandler : public IoUringHandler {
-public:
-  MOCK_METHOD(void, onAcceptSocket, (AcceptedSocketParam & param));
-  MOCK_METHOD(void, onRead, (ReadParam & param));
-  MOCK_METHOD(void, onWrite, (WriteParam & param));
-  MOCK_METHOD(void, onRemoteClose, ());
-  MOCK_METHOD(void, onLocalClose, ());
-};
-
 class MockIoUringWorker : public IoUringWorker {
 public:
   MOCK_METHOD(IoUringSocket&, addAcceptSocket,
-              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addServerSocket,
-              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addServerSocket,
-              (os_fd_t fd, Buffer::Instance& read_buf, IoUringHandler& handler,
+              (os_fd_t fd, Buffer::Instance& read_buf, Event::FileReadyCb cb,
                bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addClientSocket,
-              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Request*, submitAcceptRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitConnectRequest,
