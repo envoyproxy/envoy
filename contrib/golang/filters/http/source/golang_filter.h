@@ -66,7 +66,11 @@ private:
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  uint64_t merged_config_id_{0};
+  // since these two fields are updated in worker threads, we need to protect them with a mutex.
+  uint64_t merged_config_id_ ABSL_GUARDED_BY(mutex_){0};
+  uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
+
+  absl::Mutex mutex_;
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;

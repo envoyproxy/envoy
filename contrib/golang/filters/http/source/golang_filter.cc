@@ -1214,6 +1214,7 @@ RoutePluginConfig::RoutePluginConfig(
 };
 
 RoutePluginConfig::~RoutePluginConfig() {
+  absl::WriterMutexLock lock(&mutex_);
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
@@ -1238,8 +1239,20 @@ uint64_t RoutePluginConfig::getConfigId() {
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
+  {
+    // this is the fast path for most cases.
+    absl::ReaderMutexLock lock(&mutex_);
+    if (merged_config_id_ > 0 && cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+  }
+  absl::WriterMutexLock lock(&mutex_);
   if (merged_config_id_ > 0) {
-    return merged_config_id_;
+    if (cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+    // upper level config changed, merged_config_id_ is outdated.
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
   }
 
   if (config_id_ == 0) {
@@ -1253,6 +1266,8 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   ASSERT(merged_config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter merge '{}' plugin config, from {} + {} to {}", plugin_name_,
             parent_id, config_id_, merged_config_id_);
+
+  cached_parent_id_ = parent_id;
   return merged_config_id_;
 };
 
