@@ -200,6 +200,16 @@ void Filter::StreamFilterWrapper::onDestroy() {
   }
 }
 
+void onStreamComplete() {
+  if (decoder_filter_) {
+    decoder_filter_->onStreamComplete();
+  }
+
+  if (encoder_filter_) {
+    encoder_filter_->onStreamComplete();
+  }
+}
+
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions
