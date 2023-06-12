@@ -974,12 +974,13 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         bool only_create_if_configured) const override {
+  bool createFilterChain(Http::FilterChainManager& manager, bool only_create_if_configured,
+                         const Http::FilterChainOptions&) const override {
     if (!has_configured_http_filters_ && only_create_if_configured) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+    Http::FilterChainUtility::createFilterChainForFactories(
+        manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
