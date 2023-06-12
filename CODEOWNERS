@@ -13,11 +13,11 @@
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
-/*/extensions/filters/http/original_src @klarose
+/*/extensions/filters/http/original_src @klarose @mattklein123
 # original_src listener filter extension
-/*/extensions/filters/listener/original_src @klarose
+/*/extensions/filters/listener/original_src @klarose @mattklein123
 # original_src common extension
-extensions/filters/common/original_src @klarose
+extensions/filters/common/original_src @klarose @mattklein123
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
 # cdn_loop extension
@@ -28,7 +28,7 @@ extensions/filters/common/original_src @klarose
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
-/*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher
+/*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @adisuissa @yangminzhu
 # tcp_stats transport socket extension
@@ -73,11 +73,11 @@ extensions/filters/common/original_src @klarose
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
-/*/extensions/filters/http/composite @mattklein123
+/*/extensions/filters/http/composite @mattklein123 @mattklein123
 # omit_canary_hosts retry predicate
-/*/extensions/retry/host/omit_canary_hosts @sriduth
+/*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
-/*/extensions/retry/host/previous_hosts @alyssawilk
+/*/extensions/retry/host/previous_hosts @alyssawilk @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
@@ -107,7 +107,7 @@ extensions/filters/common/original_src @klarose
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
-/*/extensions/filters/http/grpc_http1_bridge @jose
+/*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
@@ -116,7 +116,7 @@ extensions/filters/common/original_src @klarose
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
 /*/extensions/filters/http/connect_grpc_bridge @UNOWNED @UNOWNED
-/*/extensions/filters/common/original_src @klarose
+/*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
@@ -132,16 +132,16 @@ extensions/filters/common/original_src @klarose
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
-/*/extensions/retry/priority @alyssawilk
-/*/extensions/retry/priority/previous_priorities @alyssawilk
-/*/extensions/retry/host @alyssawilk
+/*/extensions/retry/priority @alyssawilk @mattklein123
+/*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
+/*/extensions/retry/host @alyssawilk @mattklein123
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
 /*/extensions/filters/udp/dns_filter @abaptiste @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
-/*/extensions/clusters/aggregate @yxue
+/*/extensions/clusters/aggregate @yxue @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
@@ -164,13 +164,13 @@ extensions/filters/http/oauth2 @derekargueta
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
-/*/extensions/matching/input_matchers/consistent_hashing @donyu
+/*/extensions/matching/input_matchers/consistent_hashing @donyu @mattklein123
 # runtime fraction input matcher
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @UNOWNED
 # CEL input matcher
 /*/extensions/matching/input_matchers/cel_matcher @tyxia @UNOWNED
 # environment generic input
-/*/extensions/matching/common_inputs/environment @donyu
+/*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # CEL data input
@@ -199,7 +199,7 @@ extensions/filters/http/oauth2 @derekargueta
 /*/extensions/formatter/metadata @cpakulski @lizan
 /*/extensions/formatter/cel @kyessenov @zirain
 # IP address input matcher
-/*/extensions/matching/input_matchers/ip @aguinet
+/*/extensions/matching/input_matchers/ip @aguinet @mattklein123
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
@@ -306,7 +306,7 @@ extensions/filters/http/oauth2 @derekargueta
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
-/*/extensions/matching/network/ @kyessenov
+/*/extensions/matching/network/ @kyessenov @mattklein123
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
@@ -318,7 +318,7 @@ extensions/filters/http/oauth2 @derekargueta
 # IP Geolocation
 /*/extensions/filters/http/geoip @nezdolik @ravenblackx
 
-/*/extensions/health_checkers/common @zuercher
+/*/extensions/health_checkers/common @zuercher @botengyao
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
