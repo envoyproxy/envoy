@@ -35,27 +35,6 @@ static const std::string ErrorPrefix = "ext_proc_error";
 static const int DefaultImmediateStatus = 200;
 static const std::string FilterName = "envoy.filters.http.ext_proc";
 
-// Changes to headers are normally tested against the MutationRules supplied
-// with configuration. When writing an immediate response message, however,
-// we want to support a more liberal set of rules so that filters can create
-// custom error messages, and we want to prevent the MutationRules in the
-// configuration from making that impossible. This is a fixed, permissive
-// set of rules for that purpose.
-class ImmediateMutationChecker {
-public:
-  ImmediateMutationChecker() {
-    HeaderMutationRules rules;
-    rules.mutable_allow_all_routing()->set_value(true);
-    rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Checker>(rules);
-  }
-
-  const Checker& checker() const { return *rule_checker_; }
-
-private:
-  std::unique_ptr<Checker> rule_checker_;
-};
-
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
@@ -765,10 +744,6 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
   encoding_state_.onFinishProcessorCall(call_status);
 }
 
-static const ImmediateMutationChecker& immediateResponseChecker() {
-  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
-}
-
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
@@ -782,7 +757,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
-          response.headers(), headers, false, immediateResponseChecker().checker(),
+          response.headers(), headers, false, config().mutationChecker(),
           stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
