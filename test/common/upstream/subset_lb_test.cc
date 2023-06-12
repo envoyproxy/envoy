@@ -179,8 +179,7 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
-private:
-  const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
+  std::shared_ptr<Router::MetadataMatchCriteria> matches_;
 };
 
 enum class UpdateOrder { RemovesFirst, Simultaneous };
@@ -2490,6 +2489,15 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
   const auto version1_host = host_set_.hosts_[0];
   const auto version2_host = host_set_.hosts_[1];
   const auto version3_host = host_set_.hosts_[2];
+
+  // No context.
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+
+  TestLoadBalancerContext context_without_metadata({{"key", "value"}});
+  context_without_metadata.matches_ = nullptr;
+
+  // No metadata in context.
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_without_metadata));
 
   TestLoadBalancerContext context_with_fallback({{"fallback_list", valueFromJson(R""""(
     [
