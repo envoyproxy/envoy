@@ -64,14 +64,6 @@ public:
     }
   }
 
-  void onStreamComplete() override {
-    if (delegated_filter_) {
-      // We need to explicitly specify which base class to the conversion via due
-      // to the diamond inheritance between StreamFilter and StreamFilterBase.
-      static_cast<Http::StreamDecoderFilter&>(*delegated_filter_).onStreamComplete();
-    }
-  }
-
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
@@ -126,7 +118,6 @@ private:
 
     // Http::StreamFilterBase
     void onDestroy() override;
-    void onStreamComplete() override;
 
   private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
