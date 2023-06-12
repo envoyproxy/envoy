@@ -50,6 +50,11 @@ var (
 
 //export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
+	if !api.CgoCheckDisabled() {
+		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
+		return 0
+	}
+
 	buf := utils.BytesToSlice(configPtr, configLen)
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
@@ -62,8 +67,6 @@ func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uin
 		parsedConfig, err := configParser.Parse(&any)
 		if err != nil {
 			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
-			// TODO: we should reject the config in the Envoy side when Go returning 0.
-			// https://github.com/envoyproxy/envoy/issues/25369
 			return 0
 		}
 		configCache.Store(configNum, parsedConfig)

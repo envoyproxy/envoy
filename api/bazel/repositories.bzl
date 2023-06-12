@@ -49,6 +49,10 @@ def api_dependencies():
         build_file_content = BUF_BUILD_CONTENT,
     )
 
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
+    )
+
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
