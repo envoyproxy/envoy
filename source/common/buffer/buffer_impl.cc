@@ -57,6 +57,11 @@ void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   slices_.emplace_back(fragment);
 }
 
+void OwnedImpl::addSlice(Slice&& slice) {
+  length_ += slice.dataSize();
+  slices_.emplace_back(std::move(slice));
+}
+
 void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {

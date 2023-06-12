@@ -679,6 +679,8 @@ public:
   // LibEventInstance
   void postProcess() override;
 
+  void addSlice(Slice&& slice);
+
   /**
    * Create a new slice at the end of the buffer, and copy the supplied content into it.
    * @param data start of the content to copy.

@@ -38,9 +38,10 @@ class ReadRequest : public BaseRequest {
 public:
   ReadRequest(IoUringSocket& socket, uint32_t size);
 
-  std::unique_ptr<uint8_t[]> buf_;
+  Buffer::Slice::SizedStorage buf_;
   std::unique_ptr<struct iovec> iov_;
 };
+
 class WriteRequest : public BaseRequest {
 public:
   WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices);
