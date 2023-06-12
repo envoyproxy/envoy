@@ -9,6 +9,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Json {
 class Object;
@@ -26,6 +28,8 @@ public:
   Exception(const std::string& message) : EnvoyException(message) {}
 };
 
+using Value = absl::variant<bool, int64_t, double, std::string>;
+
 /**
  * Wraps an individual JSON node.
  */
@@ -39,6 +43,13 @@ public:
    * @return std::vector<ObjectSharedPtr> the converted object.
    */
   virtual std::vector<ObjectSharedPtr> asObjectArray() const PURE;
+
+  /**
+   * Get a bool, integer, double or string value by name.
+   * @param name supplies the key name.
+   * @return bool the value.
+   */
+  virtual Value getValue(const std::string& name) const PURE;
 
   /**
    * Get a boolean value by name.

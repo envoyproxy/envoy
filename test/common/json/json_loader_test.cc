@@ -48,6 +48,9 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_TRUE(json->getBoolean("hello"));
     EXPECT_TRUE(json->getBoolean("hello", false));
     EXPECT_FALSE(json->getBoolean("world", false));
+
+    EXPECT_TRUE(absl::get<bool>(json->getValue("hello")));
+    EXPECT_THROW(json->getValue("world"), Exception);
   }
 
   {
@@ -60,6 +63,8 @@ TEST_F(JsonLoaderTest, Basic) {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\":123}");
     EXPECT_EQ(123, json->getInteger("hello", 456));
     EXPECT_EQ(456, json->getInteger("world", 456));
+
+    EXPECT_EQ(123, absl::get<int64_t>(json->getValue("hello")));
   }
 
   {
@@ -96,8 +101,10 @@ TEST_F(JsonLoaderTest, Basic) {
 
       if (key == "1") {
         EXPECT_EQ("111", value.getString("11"));
+        EXPECT_EQ("111", absl::get<std::string>(value.getValue("11")));
       } else {
         EXPECT_EQ("222", value.getString("22"));
+        EXPECT_EQ("222", absl::get<std::string>(value.getValue("22")));
       }
 
       pos++;
@@ -152,6 +159,9 @@ TEST_F(JsonLoaderTest, Basic) {
     ObjectSharedPtr config = Factory::loadFromString(json);
     std::vector<ObjectSharedPtr> array = config->getObjectArray("descriptors");
     EXPECT_THROW(array[0]->asObjectArray(), Exception);
+
+    // Object Array is not supported as an value.
+    EXPECT_THROW(config->getValue("descriptors"), Exception);
   }
 
   {
@@ -268,11 +278,16 @@ TEST_F(JsonLoaderTest, Double) {
     ObjectSharedPtr json = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
     EXPECT_EQ(10.5, json->getDouble("value1"));
     EXPECT_EQ(-12.3, json->getDouble("value2"));
+
+    EXPECT_EQ(10.5, absl::get<double>(json->getValue("value1")));
+    EXPECT_EQ(-12.3, absl::get<double>(json->getValue("value2")));
   }
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"foo\": 13.22}");
     EXPECT_EQ(13.22, json->getDouble("foo", 0));
     EXPECT_EQ(0, json->getDouble("bar", 0));
+
+    EXPECT_EQ(13.22, absl::get<double>(json->getValue("foo")));
   }
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"foo\": \"bar\"}");

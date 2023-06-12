@@ -60,6 +60,7 @@ public:
 
   uint64_t hash() const override;
 
+  Value getValue(const std::string& name) const override;
   bool getBoolean(const std::string& name) const override;
   bool getBoolean(const std::string& name, bool default_value) const override;
   double getDouble(const std::string& name) const override;
@@ -382,6 +383,27 @@ nlohmann::json Field::asJsonDocument() const {
 }
 
 uint64_t Field::hash() const { return HashUtil::xxHash64(asJsonString()); }
+
+Value Field::getValue(const std::string& name) const {
+  auto value_itr = value_.object_value_.find(name);
+  if (value_itr == value_.object_value_.end()) {
+    throw Exception(fmt::format("key '{}' missing from lines {}-{}", name, line_number_start_,
+                                line_number_end_));
+  }
+  switch (value_itr->second->type_) {
+  case Type::Boolean:
+    return value_itr->second->booleanValue();
+  case Type::Double:
+    return value_itr->second->doubleValue();
+  case Type::Integer:
+    return value_itr->second->integerValue();
+  case Type::String:
+    return value_itr->second->stringValue();
+  default:
+    throw Exception(fmt::format("key '{}' not a value type from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
+  }
+}
 
 bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
