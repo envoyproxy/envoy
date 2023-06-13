@@ -199,11 +199,11 @@ public:
   void onLocalClose();
 
 protected:
-  os_fd_t fd_;
+  os_fd_t fd_{INVALID_SOCKET};
   IoUringWorkerImpl& parent_;
   uint32_t injected_completions_{0};
   IoUringSocketStatus status_{Initialized};
-  bool enable_close_event_;
+  bool enable_close_event_{false};
   IoUringSocketOnClosedCb on_closed_cb_;
 
   OptRef<ReadParam> read_param_;
@@ -227,7 +227,7 @@ public:
 private:
   void close(bool keep_fd_open, IoUringSocketOnClosedCb cb, bool posted);
 
-  const uint32_t accept_size_;
+  const uint32_t accept_size_{0};
   // These are used to track the current submitted accept requests.
   std::vector<Request*> requests_;
   size_t request_count_{0};

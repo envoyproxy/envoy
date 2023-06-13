@@ -81,11 +81,9 @@ protected:
   IoUringSocketType io_uring_socket_type_{IoUringSocketType::Unknown};
   OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
 
-  Event::FileReadyCb cb_;
-
   // TODO(soulxu): This is for debug, it will be deleted after the
   // io_uring implemented.
-  std::unique_ptr<IoHandle> shadow_io_handle_;
+  std::unique_ptr<IoHandle> shadow_io_handle_{nullptr};
   bool enable_server_socket_{true};
   bool enable_client_socket_{false};
   bool enable_accept_socket_{true};
