@@ -21,15 +21,9 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
   // unloaded.
   // TODO: unload DSO when filter updated.
-  auto res = Envoy::Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::load(so_id_, so_path_);
-  if (!res) {
-    throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: load library failed: {} {}",
-                                     so_id_, so_path_));
-  }
-
-  dynamic_lib_ = Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::getDsoByID(so_id_);
+  dynamic_lib_ = Envoy::Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::load(so_id_, so_path_);
   if (dynamic_lib_ == nullptr) {
-    throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: get library failed: {} {}",
+    throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: load library failed: {} {}",
                                      so_id_, so_path_));
   }
 

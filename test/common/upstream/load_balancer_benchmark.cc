@@ -66,6 +66,10 @@ public:
 
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
+
+  // The following are needed to create a load balancer by the load balancer factory.
+  LoadBalancerParams lb_params_{priority_set_, &local_priority_set_};
+
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   ClusterLbStatNames stat_names_{stats_store_.symbolTable()};
@@ -321,7 +325,7 @@ void benchmarkRingHashLoadBalancerChooseHost(::benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(2);
     RingHashTester tester(num_hosts, min_ring_size);
     tester.ring_hash_lb_->initialize();
-    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
+    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create(tester.lb_params_);
     absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
     state.ResumeTiming();
@@ -359,7 +363,7 @@ void benchmarkMaglevLoadBalancerChooseHost(::benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(1);
     MaglevTester tester(num_hosts);
     tester.maglev_lb_->initialize();
-    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
     state.ResumeTiming();
@@ -398,7 +402,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     RingHashTester tester(num_hosts, min_ring_size);
     tester.ring_hash_lb_->initialize();
-    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
+    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
@@ -408,7 +412,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
 
     RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
     tester2.ring_hash_lb_->initialize();
-    lb = tester2.ring_hash_lb_->factory()->create();
+    lb = tester2.ring_hash_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
@@ -446,7 +450,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
 
     MaglevTester tester(num_hosts);
     tester.maglev_lb_->initialize();
-    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
@@ -456,7 +460,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
 
     MaglevTester tester2(num_hosts - hosts_to_lose);
     tester2.maglev_lb_->initialize();
-    lb = tester2.maglev_lb_->factory()->create();
+    lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
@@ -493,7 +497,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
 
     MaglevTester tester(num_hosts, weighted_subset_percent, before_weight);
     tester.maglev_lb_->initialize();
-    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
@@ -503,7 +507,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
 
     MaglevTester tester2(num_hosts, weighted_subset_percent, after_weight);
     tester2.maglev_lb_->initialize();
-    lb = tester2.maglev_lb_->factory()->create();
+    lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);

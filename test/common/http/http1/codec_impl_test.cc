@@ -549,18 +549,8 @@ TEST_P(Http1ServerConnectionImplTest, UnsupportedEncoding) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: gzip\r\n\r\n");
-#ifdef ENVOY_ENABLE_UHV
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
                                       "http1.invalid_transfer_encoding"));
-#else
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
-                                        "http1.invalid_transfer_encoding"));
-  } else {
-    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, "http1.codec_error"));
-  }
-#endif
   auto status = codec_->dispatch(buffer);
 #ifdef ENVOY_ENABLE_UHV
   EXPECT_TRUE(status.ok());
@@ -4542,18 +4532,8 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
         decoder.setResponseEncoder(&encoder);
         return decoder;
       }));
-#ifdef ENVOY_ENABLE_UHV
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
                                       "http1.invalid_transfer_encoding"));
-#else
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  } else {
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
-                                        "http1.invalid_transfer_encoding"));
-  }
-#endif
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: foo.bar\r\n"
                            "Transfer-Encoding: chunked\r\n"
                            "Transfer-Encoding: chunked\r\n"
@@ -4566,13 +4546,8 @@ TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
 #else
   EXPECT_TRUE(isCodecProtocolError(status));
 
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: MULTIPLE_TRANSFER_ENCODING_KEYS");
-  } else {
-    EXPECT_EQ("http1.invalid_transfer_encoding", response_encoder->getStream().responseDetails());
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
-  }
+  EXPECT_EQ("http1.invalid_transfer_encoding", response_encoder->getStream().responseDetails());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
 #endif
 }
 
