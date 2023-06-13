@@ -147,9 +147,7 @@ void Filter::closeStream() {
     if (grpc_service_.has_envoy_grpc()) {
       logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
       logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
-      if (!logging_info_->upstreamHost()) {
-        logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-      }
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
