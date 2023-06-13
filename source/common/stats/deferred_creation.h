@@ -31,8 +31,8 @@ public:
                 Stats::ScopeSharedPtr scope)
       : initialized_(
             // A lambda is used as we need to register the name into the symbol table.
-            // Note: there is no issue to capture a reference of the scope here as this lambda is only
-            // used to initialize the 'initialized_' Gauge.
+            // Note: there is no issue to capture a reference of the scope here as this lambda is
+            // only used to initialize the 'initialized_' Gauge.
             [&scope]() -> Gauge& {
               Stats::StatNamePool pool(scope->symbolTable());
               return Stats::Utility::gaugeFromElements(
