@@ -45,5 +45,9 @@ func envoyGoOnClusterSpecify(pluginPtr uint64, headerPtr uint64, pluginId uint64
 	return 0
 }
 
+//export envoyGoRequestSemaDec
+func envoyGoRequestSemaDec(r *C.httpRequest) {
+}
+
 func main() {
 }
