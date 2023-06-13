@@ -924,16 +924,7 @@ TEST_P(IntegrationTest, TestInvalidTransferEncoding) {
   const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                               "identity\r\ntransfer-encoding: chunked \r\n\r\n";
   sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-#ifdef ENVOY_ENABLE_UHV
   EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
-#else
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
-    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
-  } else {
-    EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
-  }
-#endif
 }
 
 TEST_P(IntegrationTest, TestPipelinedResponses) {

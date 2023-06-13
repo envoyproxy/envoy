@@ -1,0 +1,50 @@
+name: mobile_traffic_director
+
+on:
+  schedule:
+  # Once a day at midnight.
+  - cron: '0 0 * * *'
+  # Allows manual triggering in the UI. Makes it easier to test.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-github.workflow
+  cancel-in-progress: true
+
+jobs:
+  cc_test:
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    name: cc_test
+    permissions:
+      packages: read
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        # We must fetch at least the immediate parents so that if this is
+        # a pull request then we can checkout the head.
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run GcpTrafficDirectorIntegrationTest'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GCP_JWT_PRIVATE_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
+        ENVOY_IP_TEST_VERSIONS: v4only
+      run: |
+        cd mobile
+        ./bazelw run \
+            --config=remote-ci-linux \
+            --config=ci \
+            --test_output=all \
+            //test/non_hermetic:gcp_traffic_director_integration_test

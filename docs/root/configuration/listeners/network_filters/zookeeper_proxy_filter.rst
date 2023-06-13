@@ -63,6 +63,7 @@ The following counters are available:
   reconfig_rq, Counter, Number of reconfig requests
   setwatches_rq, Counter, Number of setwatches requests
   setwatches2_rq, Counter, Number of setwatches2 requests
+  addwatch_rq, Counter, Number of addwatch requests
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
   getephemerals_rq, Counter, Number of getephemerals requests
@@ -91,6 +92,7 @@ The following counters are available:
   setauth_resp, Counter, Number of setauth responses
   setwatches_resp, Counter, Number of setwatches responses
   setwatches2_resp, Counter, Number of setwatches2 responses
+  addwatch_resp, Counter, Number of addwatch responses
   checkwatches_resp, Counter, Number of checkwatches responses
   removewatches_resp, Counter, Number of removewatches responses
   getephemerals_resp, Counter, Number of getephemerals responses
@@ -119,6 +121,7 @@ The following counters are available:
   setauth_resp_fast, Counter, Number of setauth responses faster than or equal to the threshold
   setwatches_resp_fast, Counter, Number of setwatches responses faster than or equal to the threshold
   setwatches2_resp_fast, Counter, Number of setwatches2 responses faster than or equal to the threshold
+  addwatch_resp_fast, Counter, Number of addwatch responses faster than or equal to the threshold
   checkwatches_resp_fast, Counter, Number of checkwatches responses faster than or equal to the threshold
   removewatches_resp_fast, Counter, Number of removewatches responses faster than or equal to the threshold
   getephemerals_resp_fast, Counter, Number of getephemerals responses faster than or equal to the threshold
@@ -146,6 +149,7 @@ The following counters are available:
   setauth_resp_slow, Counter, Number of setauth responses slower than the threshold
   setwatches_resp_slow, Counter, Number of setwatches responses slower than the threshold
   setwatches2_resp_slow, Counter, Number of setwatches2 responses slower than the threshold
+  addwatch_resp_slow, Counter, Number of addwatch responses slower than the threshold
   checkwatches_resp_slow, Counter, Number of checkwatches responses slower than the threshold
   removewatches_resp_slow, Counter, Number of removewatches responses slower than the threshold
   getephemerals_resp_slow, Counter, Number of getephemerals responses slower than the threshold
@@ -190,6 +194,7 @@ Latency stats are in milliseconds:
   setauth_resp_latency, Histogram, Opcode execution time in milliseconds
   setwatches_resp_latency, Histogram, Opcode execution time in milliseconds
   setwatches2_resp_latency, Histogram, Opcode execution time in milliseconds
+  addwatch_resp_latency, Histogram, Opcode execution time in milliseconds
   checkwatches_resp_latency, Histogram, Opcode execution time in milliseconds
   removewatches_resp_latency, Histogram, Opcode execution time in milliseconds
   check_resp_latency, Histogram, Opcode execution time in milliseconds
