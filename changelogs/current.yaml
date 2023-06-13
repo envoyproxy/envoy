@@ -10,6 +10,10 @@ behavior_changes:
   change: |
     Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
     need to include the new config_subscriptions explicitly.
+- area: build
+    Substitution formatter extension interface is changed to receive the factory context.
+- area: build
+    Access log filter  extension interface is changed to receive the factory context.
 - area: http
   change: |
     When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
