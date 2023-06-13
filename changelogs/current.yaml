@@ -345,6 +345,11 @@ new_features:
 - area: zookeeper
   change: |
     Added the "addWatch" opcode support to the ZooKeeper proxy filter.
+- area: access_log
+  change: |
+    added bytes snapshotting for upstream and downstream logging that will be reset after every periodic log. Downstream
+    periodic loggers should read BytesMeter::bytesAtLastDownstreamPeriodicLog(), and upstream periodic loggers should read
+    BytesMeter::bytesAtLastUpstreamPeriodicLog().
 
 deprecated:
 - area: access_log
