@@ -28,8 +28,10 @@ public:
   }
 
   void TearDown() override {
-    instance_.shutdownGlobalThreading();
-    instance_.shutdownThread();
+    if (!thread_is_shutdown_) {
+      instance_.shutdownGlobalThreading();
+      instance_.shutdownThread();
+    }
   }
 
   void threadRoutine() { second_dispatcher_->run(Event::Dispatcher::RunType::Block); }
@@ -76,6 +78,7 @@ public:
   IoHandlePtr peer_io_handle_;
   Thread::ThreadPtr second_thread_;
   Event::DispatcherPtr second_dispatcher_;
+  bool thread_is_shutdown_{false};
 };
 
 TEST_F(IoUringSocketHandleImplIntegrationTest, Close) {
@@ -885,11 +888,9 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReleaseIoUringWorkerEarlyThanIoha
   io_handle_->initializeFileEvent(
       *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-  instance_.shutdownThread()
-
-      while (fcntl(fd_, F_GETFD, 0) >= 0) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  thread_is_shutdown_ = true;
+  instance_.shutdownGlobalThreading();
+  instance_.shutdownThread();
 }
 
 TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread) {
@@ -963,6 +964,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread)
           ret = server_io_handler->read(read_buffer, absl::nullopt);
           EXPECT_TRUE(ret.wouldBlock());
           read_done = true;
+          server_io_handler->close();
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     initialized_in_new_thread = true;

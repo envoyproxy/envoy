@@ -31,7 +31,9 @@ void IoUringFactoryImpl::onWorkerThreadInitialized() {
   });
 }
 
-bool IoUringFactoryImpl::currentThreadRegistered() { return tls_.currentThreadRegistered(); }
+bool IoUringFactoryImpl::currentThreadRegistered() {
+  return !tls_.isShutdown() && tls_.currentThreadRegistered();
+}
 
 } // namespace Io
 } // namespace Envoy
