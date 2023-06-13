@@ -1200,6 +1200,14 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
+   * Check if the filter is disabled for this route.
+   * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
+   * may be different from the filter extension qualified name.
+   * @return true if the filter is disabled for this route, false otherwise.
+   */
+  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+
+  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */

@@ -117,7 +117,6 @@ paths:
     - source/common/network/lc_trie.h
     - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/formatter/substitution_formatter.cc
     - source/common/formatter/substitution_format_string.cc
     - source/common/stats/tag_extractor_impl.cc
@@ -131,7 +130,6 @@ paths:
     - source/common/http/filter_chain_helper.h
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
-    - source/common/http/http_server_properties_cache_manager_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/visitor_helper.h
     - source/common/protobuf/visitor.cc

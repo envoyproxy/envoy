@@ -70,6 +70,13 @@ typed_config:
                hcm) {
           auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
+          // Another route that disables downstream header mutation.
+          auto* another_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+          *another_route = *route;
+
+          route->mutable_match()->set_path("/default/route");
+          another_route->mutable_match()->set_path("/disable/filter/route");
+
           // Per route header mutation for downstream.
           PerRouteProtoConfig header_mutation_1;
           auto response_mutation =
@@ -103,6 +110,18 @@ typed_config:
 
           route->mutable_typed_per_filter_config()->insert(
               {"upstream-header-mutation", per_route_config_2});
+
+          // Per route disable downstream header mutation.
+          envoy::config::route::v3::FilterConfig filter_config;
+          filter_config.mutable_config();
+          filter_config.set_disabled(true);
+          ProtobufWkt::Any per_route_config_3;
+          per_route_config_3.PackFrom(filter_config);
+          another_route->mutable_typed_per_filter_config()->insert(
+              {"donwstream-header-mutation", per_route_config_3});
+          // Try disable upstream header mutation but this is not supported and should not work.
+          another_route->mutable_typed_per_filter_config()->insert(
+              {"upstream-header-mutation", per_route_config_3});
         });
     HttpIntegrationTest::initialize();
   }
@@ -116,7 +135,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-
+  default_request_headers_.setPath("/default/route");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
@@ -154,6 +173,47 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
   EXPECT_EQ("upstream-per-route-flag-header-value",
             response->headers()
                 .get(Http::LowerCaseString("upstream-per-route-flag-header"))[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("GET", response->headers()
+                       .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
+                       ->value()
+                       .getStringView());
+  codec_client_->close();
+}
+
+TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/disable/filter/route");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(0, upstream_request_->headers()
+                   .get(Http::LowerCaseString("downstream-request-global-flag-header"))
+                   .size());
+
+  EXPECT_EQ("upstream-request-global-flag-header-value",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(0,
+            response->headers().get(Http::LowerCaseString("downstream-global-flag-header")).size());
+  EXPECT_EQ(
+      0, response->headers().get(Http::LowerCaseString("downstream-per-route-flag-header")).size());
+
+  EXPECT_EQ("upstream-global-flag-header-value",
+            response->headers()
+                .get(Http::LowerCaseString("upstream-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ("GET", response->headers()
