@@ -193,6 +193,9 @@ removed_config_or_runtime:
 - area: config
   change: |
     removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -310,6 +313,11 @@ new_features:
     Added bootstrap option
     :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`
     to enable setting application log format as JSON structure.
+- area: application_logs
+  change: |
+    Added bootstrap option
+    :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format>`
+    to enable setting application log text format from config.
 - area: ext_proc
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
@@ -327,6 +335,20 @@ new_features:
 - area: http
   change: |
     added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
+- area: http
+  change: |
+    Added support for the route/virtual host level
+    :ref:`disabled <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` field.
+    A route/virtual host level per filter config can be marked as disabled, which means that
+    the filter will be disabled in a specific route/virtual host.
+- area: health_check
+  change: |
+    added host related information :ref:`metadata <envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata>` and
+    :ref:`locality <envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality>` to
+    the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
+- area: zookeeper
+  change: |
+    Added the "addWatch" opcode support to the ZooKeeper proxy filter.
 
 deprecated:
 - area: access_log

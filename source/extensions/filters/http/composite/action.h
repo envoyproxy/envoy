@@ -23,7 +23,8 @@ private:
 };
 
 class ExecuteFilterActionFactory
-    : public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
+    : public Logger::Loggable<Logger::Id::filter>,
+      public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "composite-action"; }
   Matcher::ActionFactoryCb
@@ -39,8 +40,31 @@ public:
             composite_action.typed_config());
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         composite_action.typed_config().typed_config(), validation_visitor, factory);
-    auto callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                         context.factory_context_);
+
+    Envoy::Http::FilterFactoryCb callback = nullptr;
+
+    // TODO(tyxia) Update the logic later to create the filter from the `factoryContext` first if it
+    // is present.
+    try {
+      if (context.server_factory_context_.has_value()) {
+        callback = factory.createFilterServerFactoryFromProto(
+            *message, context.stat_prefix_, context.server_factory_context_.value());
+      }
+    } catch (EnvoyException& e) {
+      // First, we try to create the delegated filter creation callback from server factory context.
+      // If it failed (i.e., the corresponding filter doesn't support this method), we log this
+      // message and fallback to creating the filter from factory context.
+      ENVOY_LOG(trace,
+                absl::StrCat(e.what(), ", fallback to creating the filter from factory context."));
+    }
+
+    if (callback == nullptr) {
+      RELEASE_ASSERT(context.factory_context_.has_value(),
+                     "The factory context must exist here to create the delegated filter");
+      callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                      context.factory_context_.value());
+    }
+
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterAction>(cb);
     };
