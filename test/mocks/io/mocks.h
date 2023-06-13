@@ -40,6 +40,7 @@ public:
 };
 
 class MockIoUringSocket : public IoUringSocket {
+public:
   MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(void, close, (bool, IoUringSocketOnClosedCb));
   MOCK_METHOD(void, shutdown, (int32_t how));
@@ -59,6 +60,11 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(void, injectCompletion, (uint32_t type));
   MOCK_METHOD(IoUringSocketStatus, getStatus, (), (const));
   MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
+  MOCK_METHOD(const OptRef<ReadParam>&, getReadParam, (), (const));
+  MOCK_METHOD(const OptRef<AcceptedSocketParam>&, getAcceptedSocketParam, (), (const));
+  MOCK_METHOD(const OptRef<WriteParam>&, getWriteParam, (), (const));
+  MOCK_METHOD(void, clearAcceptedSocketParam, ());
+  MOCK_METHOD(void, setFileReadyCb, (Event::FileReadyCb cb));
 };
 
 class MockIoUringWorker : public IoUringWorker {
