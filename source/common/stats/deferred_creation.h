@@ -102,7 +102,7 @@ private:
 // Template that lazily initializes a StatsStruct.
 // The bootstrap config :ref:`enable_deferred_creation_stats
 // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
-// stats lazy initialzation is enabled or not.
+// stats lazy initialization is enabled or not.
 template <typename StatsStructType>
 DeferredCreationCompatibleStats<StatsStructType>
 createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
