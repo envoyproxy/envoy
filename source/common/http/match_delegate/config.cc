@@ -260,7 +260,9 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
-  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context,
+                                                                context.getServerFactoryContext()};
+
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
       matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);

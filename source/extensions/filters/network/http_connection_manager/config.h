@@ -136,7 +136,9 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool = false) const override;
+  bool createFilterChain(
+      Http::FilterChainManager& manager, bool = false,
+      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {

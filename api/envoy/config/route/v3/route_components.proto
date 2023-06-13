@@ -2412,7 +2412,5 @@ message FilterConfig {
   //   created and it is too late to change the chain.
   //
   //   This field only make sense for the downstream HTTP filters for now.
-  //
-  // [#not-implemented-hide:]
   bool disabled = 3;
 }

@@ -42,7 +42,6 @@ private:
         : proto_config_(proto_config), cluster_info_(cluster_info), priority_set_(priority_set),
           runtime_(runtime), random_(random), time_source_(time_source) {}
 
-    Upstream::LoadBalancerPtr create() override { PANIC("not implemented"); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return Impl()(params, proto_config_, cluster_info_, priority_set_, runtime_, random_,
                     time_source_);

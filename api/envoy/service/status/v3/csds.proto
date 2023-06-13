@@ -85,6 +85,11 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
+
+  // If true, the server will not include the resource contents in the response
+  // (i.e., the generic_xds_configs.xds_config field will not be populated).
+  // [#not-implemented-hide:]
+  bool exclude_resource_contents = 3;
 }
 
 // Detailed config (per xDS) with status.
