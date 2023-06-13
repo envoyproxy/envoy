@@ -1255,6 +1255,44 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
   EXPECT_EQ("{\"reason\": \"Because\"}", response->body());
 }
 
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with system header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Mutating system header :scheme is not allowed.
+    hdr->mutable_header()->set_key(":scheme");
+    hdr->mutable_header()->set_value("HTTP");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), HasNoHeader(":scheme"));
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is not allowed.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
+}
+
 // Test the filter with request body buffering enabled using
 // an ext_proc server that responds to the request_body message
 // by modifying a header that should cause an error.
