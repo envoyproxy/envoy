@@ -217,8 +217,8 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
         decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
       } else if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
-	// if we're doing upstream but not downstream, strip the
-	// capability so the client doesn't try to send it to us.
+        // if we're doing upstream but not downstream, strip the
+        // capability so the client doesn't try to send it to us.
         decoder_->RemoveEsmtpCapability("STARTTLS", downstream_caps);
       }
       downstream_esmtp_capabilities_ = Buffer::OwnedImpl(downstream_caps);
@@ -234,9 +234,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
         state_ = DOWNSTREAM_STARTTLS;
       } else {
-	// i.e. we're doing neither upstream nor downstream
-	config_->stats_.sessions_esmtp_unencrypted_.inc();
-	state_ = PASSTHROUGH;
+        // i.e. we're doing neither upstream nor downstream
+        config_->stats_.sessions_esmtp_unencrypted_.inc();
+        state_ = PASSTHROUGH;
       }
     }
     return Network::FilterStatus::StopIteration;
