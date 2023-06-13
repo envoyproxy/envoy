@@ -164,6 +164,16 @@ envoy_entry_point(
     script = "envoy.project",
 )
 
+envoy_entry_point(
+    name = "trigger",
+    args = [
+        "trigger",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
 ''')
 
 _envoy_repo = repository_rule(
@@ -1260,8 +1270,6 @@ filegroup(
     visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
 )
 """,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
@@ -1300,6 +1308,10 @@ filegroup(
     external_http_archive(
         name = "edenhill_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
+        # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
+        # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
+        patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "librdkafka",

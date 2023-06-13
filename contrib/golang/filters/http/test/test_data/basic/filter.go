@@ -111,6 +111,9 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		md.Set("filter.go", "foo", "bar")
 	}
 
+	fs := f.callbacks.StreamInfo().FilterState()
+	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
@@ -193,6 +196,10 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	trailers.Set("x-test-trailer-0", "bar")
 	trailers.Del("x-test-trailer-1")
 
+	if trailers.GetRaw("existed-trailer") == "foo" {
+		trailers.Add("x-test-trailer-2", "bar")
+	}
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}
@@ -249,6 +256,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("test-method", f.method)
 	header.Set("test-path", f.path)
 	header.Set("test-host", f.host)
+	header.Set("test-log-level", f.callbacks.LogLevel().String())
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))

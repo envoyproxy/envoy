@@ -10,6 +10,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
@@ -117,6 +118,8 @@ private:
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(EdsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

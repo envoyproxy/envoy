@@ -117,7 +117,6 @@ paths:
     - source/common/network/lc_trie.h
     - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/formatter/substitution_formatter.cc
     - source/common/formatter/substitution_format_string.cc
     - source/common/stats/tag_extractor_impl.cc
@@ -131,7 +130,6 @@ paths:
     - source/common/http/filter_chain_helper.h
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
-    - source/common/http/http_server_properties_cache_manager_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/visitor_helper.h
     - source/common/protobuf/visitor.cc
@@ -208,6 +206,7 @@ paths:
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/server.cc
+    - source/server/utils.cc
     - source/server/configuration_impl.h
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
@@ -436,6 +435,7 @@ visibility_excludes:
 - source/extensions/quic/server_preferred_address/BUILD
 - source/extensions/listener_managers/listener_manager/BUILD
 - source/extensions/upstreams/tcp/BUILD
+- source/extensions/health_check/event_sinks/BUILD
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD

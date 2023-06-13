@@ -2814,8 +2814,8 @@ virtual_hosts:
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
 protected:
   RouterMatcherHashPolicyTest()
-      : add_cookie_nop_(
-            [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
+      : add_cookie_nop_([](const std::string&, const std::string&, std::chrono::seconds,
+                           const Http::CookieAttributeRefVector) { return ""; }) {
     const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2977,16 +2977,19 @@ TEST_F(RouterMatcherCookieHashPolicyTest, DifferentCookies) {
 TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(42);
 
-  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
-                                      std::chrono::seconds ttl) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl.count());
+  MockFunction<std::string(const std::string&, const std::string&, long,
+                           const Http::CookieAttributeRefVector)>
+      mock_cookie_cb;
+  auto add_cookie =
+      [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
+                        const Http::CookieAttributeRefVector& attributes) -> std::string {
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42, _));
     EXPECT_TRUE(
         route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie, nullptr));
   }
@@ -2994,7 +2997,7 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42, _));
     EXPECT_TRUE(
         route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie, nullptr));
   }
@@ -3010,7 +3013,7 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     {
       Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       Router::RouteConstSharedPtr route = config().route(headers, 0);
-      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42)).WillOnce(Return("AAAAAAA"));
+      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42, _)).WillOnce(Return("AAAAAAA"));
       hash_1 = route->routeEntry()
                    ->hashPolicy()
                    ->generateHash(nullptr, headers, add_cookie, nullptr)
@@ -3019,7 +3022,7 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     {
       Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       Router::RouteConstSharedPtr route = config().route(headers, 0);
-      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42)).WillOnce(Return("BBBBBBB"));
+      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42, _)).WillOnce(Return("BBBBBBB"));
       hash_2 = route->routeEntry()
                    ->hashPolicy()
                    ->generateHash(nullptr, headers, add_cookie, nullptr)
@@ -3036,17 +3039,19 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
 
 TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
-
-  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
-                                      std::chrono::seconds ttl) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl.count());
+  MockFunction<std::string(const std::string&, const std::string&, long,
+                           const Http::CookieAttributeRefVector)>
+      mock_cookie_cb;
+  auto add_cookie =
+      [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
+                        const Http::CookieAttributeRefVector attributes) -> std::string {
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 0));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 0, _));
     EXPECT_TRUE(
         route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie, nullptr));
   }
@@ -3055,17 +3060,19 @@ TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
 TEST_F(RouterMatcherCookieHashPolicyTest, SetCookiePath) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
   firstRouteHashPolicy()->mutable_cookie()->set_path("/");
-
-  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
-                                      std::chrono::seconds ttl) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl.count());
+  MockFunction<std::string(const std::string&, const std::string&, long,
+                           const Http::CookieAttributeRefVector)>
+      mock_cookie_cb;
+  auto add_cookie =
+      [&mock_cookie_cb](const std::string& name, const std::string& path, std::chrono::seconds ttl,
+                        const Http::CookieAttributeRefVector attributes) -> std::string {
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", "/", 0));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "/", 0, _));
     EXPECT_TRUE(
         route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie, nullptr));
   }
@@ -10288,6 +10295,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10330,6 +10342,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10369,6 +10386,11 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10406,7 +10428,12 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -10423,6 +10450,121 @@ virtual_hosts:
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
   checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                     optional_http_filters),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAny) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.default.filter:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        seconds: 123
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.default.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                seconds: 123
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  filter.unknown:
+    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+    is_optional: true
+    config:
+      "@type": type.googleapis.com/google.protobuf.BoolValue
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+            config:
+              "@type": type.googleapis.com/google.protobuf.BoolValue
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.BoolValue
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, FilterConfigWithoutConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            is_optional: true
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, false),
+      EnvoyException,
+      "Empty route/virtual host per filter configuration for filter.unknown filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
@@ -10601,6 +10743,84 @@ virtual_hosts:
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
   // Factories is obtained by type here by default, so route config can be loaded correctly.
   checkEach(yaml, 123, expected_traveled_config, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, RouteFilterDisabledTest) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type":  type.googleapis.com/envoy.config.route.v3.FilterConfig
+    disabled: true
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/route1" }
+        route: { cluster: baz }
+        # test.filter will be enabled for this route because this config
+        # will override virtual host level config.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+      - match: { prefix: "/route2" }
+        route: { cluster: baz }
+        # test.filter will be disabled for this route.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        disabled: true
+  - name: bar
+    domains: ["host2"]
+    routes:
+      # test.filter will be disabled for this route because the virtual host
+      # level config.
+      - match: { prefix: "/route3" }
+        route: { cluster: baz }
+      - match: { prefix: "/route4" }
+        route: { cluster: baz }
+        # test.filter will be enabled for this route but no valid route level config
+        # is provided in this route.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            # Provide an empty config to enable the filter.
+            config: {}
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        disabled: true
+  - name: bar
+    domains: ["host3"]
+    routes:
+      # test.filter will be disabled for this route because the global route config.
+      - match: { prefix: "/route5" }
+        route: { cluster: baz }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
+  const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
+  EXPECT_FALSE(route1->filterDisabled("test.filter"));
+
+  const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
+  EXPECT_TRUE(route2->filterDisabled("test.filter"));
+
+  const auto route3 = config.route(genHeaders("host2", "/route3", "GET"), 0);
+  EXPECT_TRUE(route3->filterDisabled("test.filter"));
+
+  const auto route4 = config.route(genHeaders("host2", "/route4", "GET"), 0);
+  EXPECT_FALSE(route4->filterDisabled("test.filter"));
+
+  const auto route5 = config.route(genHeaders("host3", "/route5", "GET"), 0);
+  EXPECT_TRUE(route5->filterDisabled("test.filter"));
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};

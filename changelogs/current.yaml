@@ -70,6 +70,13 @@ minor_behavior_changes:
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
+- area: overload manager
+  change: |
+    Changed behavior of the overload manager to error on unknown overload
+    manager actions. Prior it would silently fail.  This change can be reverted
+    temporarily by setting the runtime guard
+    ``envoy.reloadable_features.overload_manager_error_unknown_action`` to
+    false.
 - area: router
   change: |
     Added check for existing metadata before setting metadata due to 'auto_sni', 'auto_san_validation', or
@@ -83,6 +90,10 @@ minor_behavior_changes:
   change: |
     Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
     to the name of the ext_proc filter.
+- area: stats
+  change: |
+    Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
+    query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
 - area: ext_authz
   change: |
     forward :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
@@ -114,6 +125,18 @@ bug_fixes:
     Fixed the bug that updating :ref:`scope_key_builder
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
     of SRDS config doesn't work and multiple HCM share the same ``scope_key_builder``.
+- area: http
+  change: |
+    The :ref:`is_optional
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`
+    field of HTTP filter can only be used for configuration loading of
+    :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>`
+    and will be ignored for loading of route or virtual host level filter config. This behavioral change
+    can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`` to false.
+    You can also use
+    :ref:`route/virtual host optional flag <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>`
+    as a replacement of the feature.
 - area: logging
   change: |
     Do not display GRPC_STATUS_NUMBER for non gRPC requests.
@@ -122,6 +145,25 @@ bug_fixes:
 - area: boringssl
   change: |
     Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+- area: oauth2
+  change: |
+    The httpOnly attribute for Set-Cookie for tokens in HTTP response header was missing,
+    causing tokens to be accessible from the JavaScript making the apps vulnerable.
+    This was fixed now by marking the cookie as httpOnly.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to false.
+- area: dependency
+  change: |
+    update Wasmtime and related deps -> 9.0.3 to resolve
+    `CVE-2023-30624 <https://nvd.nist.gov/vuln/detail/CVE-2023-30624>`_.
+- area: dependency
+  change: |
+    update C-ares -> 1.91.1 to resolve:
+
+    - `CVE-2023-31130 <https://nvd.nist.gov/vuln/detail/CVE-2023-31130>`_.
+    - `CVE-2023-31147 <https://nvd.nist.gov/vuln/detail/CVE-2023-31147>`_.
+    - `CVE-2023-31124 <https://nvd.nist.gov/vuln/detail/CVE-2023-31124>`_.
+    - `CVE-2023-32067 <https://nvd.nist.gov/vuln/detail/CVE-2023-32067>`_.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -149,9 +191,15 @@ removed_config_or_runtime:
 - area: header_formatters
   change: |
     removed runtime key ``envoy.reloadable_features.unified_header_formatter`` and legacy code paths.
+- area: tls
+  change: |
+    remove runtime key ``envoy.reloadable_features.tls_async_cert_validation`` and legacy code paths.
 - area: config
   change: |
     removed runtime key ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` and legacy code paths.
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -161,6 +209,9 @@ new_features:
 - area: access_log
   change: |
     added :ref:`CEL <envoy_v3_api_msg_extensions.formatter.cel.v3.Cel>` access log formatter to print CEL expression.
+- area: access_log
+  change: |
+    (QUIC only) Added support for %BYTES_RETRANSMITTED% and %PACKETS_RETRANSMITTED%.
 - area: dynamic_forward_proxy
   change: |
     added :ref:`sub_clusters_config
@@ -201,6 +252,13 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: tls_inspector
+  change: |
+    added histogram ``bytes_processed`` which records the number of bytes of
+    the tls_inspector processed while analyzing for tls usage. In cases where
+    the connection uses tls this records the tls client hello size. In cases
+    where the connection doesn't use tls this records the amount of bytes the
+    tls_inspector processed until it realized the connection was not using tls.
 - area: access_log
   change: |
     added access log filter :ref:`log_type_filter <envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.log_type_filter>`
@@ -211,6 +269,20 @@ new_features:
     :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
     to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the
     clear_route_cache_disabled stat.
+- area: ext_proc
+  change: |
+    added new configuration field
+    :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+    If set to true, the filter config
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    can be overridden by the
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    in the response message from the external processing server.
+    If not set, the ``mode_override`` API in the response message will be ignored.
+- area: ext_proc
+  change: |
+    :ref:`forward_rules <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.forward_rules>`
+    to only allow headers matchinging the forward rules to be forwarded to the external processing server.
 - area: redis_proxy
   change: |
     added new field :ref:`connection_rate_limit
@@ -225,6 +297,12 @@ new_features:
 - area: admin
   change: |
     Adds a new admin stats html bucket-mode ``detailed`` to generate all recorded buckets and summary percentiles.
+- area: http
+  change: |
+    Add support to the route/virtual host level
+    :ref:`is_optional <envoy_v3_api_field_config.route.v3.FilterConfig.is_optional>` field.
+    A route/virtual host level per filter config can be marked as optional, which means that if
+    the filter fails to load, the configuration will no be rejected.
 - area: upstream
   change: |
     Added :ref:`cluster provided extension
@@ -234,13 +312,51 @@ new_features:
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: application_logs
+  change: |
+    Added bootstrap option
+    :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`
+    to enable setting application log format as JSON structure.
+- area: application_logs
+  change: |
+    Added bootstrap option
+    :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format>`
+    to enable setting application log text format from config.
 - area: ext_proc
   change: |
     added new field ``filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProc.filter_metadata`` to aid in logging.
-    Metadata will be stored in StreamInfo filter state under a namespace corresponding to the name of the ext proc filter.
+    Metadata will be stored in StreamInfo filter metadata under a namespace corresponding to the name of the ext proc filter.
+- area: matching
+  change: |
+    added CEL(Common Expression Language) matcher support :ref:`CEL data input <extension_envoy.matching.inputs.cel_data_input>`
+    and :ref:`CEL input matcher <extension_envoy.matching.matchers.cel_matcher>`.
+- area: tls
+  change: |
+    Added support for hot-reloading CRL file when the file changes on disk.
+    This works with dynamic secrets when
+    :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+    is delivered via SDS.
+- area: http
+  change: |
+    added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
+- area: http
+  change: |
+    Added support for the route/virtual host level
+    :ref:`disabled <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` field.
+    A route/virtual host level per filter config can be marked as disabled, which means that
+    the filter will be disabled in a specific route/virtual host.
+- area: health_check
+  change: |
+    added host related information :ref:`metadata <envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata>` and
+    :ref:`locality <envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality>` to
+    the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
 
 deprecated:
 - area: access_log
   change: |
     deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
     in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.
+- area: health_check
+  change: |
+    deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
+    :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.

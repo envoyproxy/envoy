@@ -94,9 +94,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
-    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
-        .WillByDefault(Invoke(
-            [&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _, _))
+        .WillByDefault(
+            Invoke([&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured,
+                       const Envoy::Http::FilterChainOptions&) -> bool {
               if (only_create_if_configured) {
                 return false;
               }

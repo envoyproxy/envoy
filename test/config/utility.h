@@ -208,19 +208,23 @@ public:
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster
   buildStaticCluster(const std::string& name, int port, const std::string& address,
-                     const std::string& lb_policy = "ROUND_ROBIN");
+                     const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::cluster::v3::Cluster
-  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
-                                              const std::string& address,
-                                              const std::string& lb_policy = "ROUND_ROBIN");
+  static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
+      const std::string& name, int port, const std::string& address,
+      const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
-  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildCluster(const std::string& name,
+               const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                   envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::cluster::v3::Cluster
-  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildTlsCluster(const std::string& name,
+                  const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                      envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
@@ -420,14 +424,13 @@ public:
   static envoy::config::core::v3::Http3ProtocolOptions
   http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                               size_t http3_max_stream_receive_window);
-
-private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
 
+private:
   // Load the first FilterType struct from the first listener into a parsed proto.
   template <class FilterType> bool loadFilter(const std::string& name, FilterType& filter) {
     RELEASE_ASSERT(!finalized_, "");

@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -296,6 +298,11 @@ typed_config:
         true,
         upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
 
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-test-header-0", "foo"},
@@ -378,6 +385,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());

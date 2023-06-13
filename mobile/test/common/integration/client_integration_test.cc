@@ -97,7 +97,7 @@ void ClientIntegrationTest::trickleTest() {
 
   stream_prototype_->setOnData([this](envoy_data c_data, bool) {
     if (explicit_flow_control_) {
-      // Allow reading up to 100 bytes
+      // Allow reading up to 100 bytes.
       stream_->readData(100);
     }
     cc_.on_data_calls++;
