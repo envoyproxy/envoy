@@ -83,6 +83,29 @@ public:
 // buffer level.
 enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
 
+// Convert from test `proto` Headers to a variant of `TestHeaderMapImpl`.
+// In contrast to `Fuzz::fromHeaders`, invalid characters are replaced, so
+// that the fuzzer can proceed regardless.
+template <class T>
+inline T fromHeaders(
+    const test::fuzz::Headers& headers,
+    const absl::node_hash_set<std::string>& ignore_headers = absl::node_hash_set<std::string>(),
+    absl::node_hash_set<std::string> include_headers = absl::node_hash_set<std::string>()) {
+  T header_map;
+  for (const auto& header : headers.headers()) {
+    if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
+      header_map.addCopy(Fuzz::replaceInvalidCharacters(header.key()),
+                         Fuzz::replaceInvalidCharacters(header.value()));
+    }
+    include_headers.erase(absl::AsciiStrToLower(header.key()));
+  }
+  // Add dummy headers for non-present headers that must be included.
+  for (const auto& header : include_headers) {
+    header_map.addCopy(header, "dummy");
+  }
+  return header_map;
+}
+
 // This class mocks the downstream requests and serves as initial entry point
 // for the fuzzer
 class FuzzDownstream {
@@ -100,7 +123,7 @@ public:
     if (request_state_ == StreamState::PendingHeaders) {
       request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
-          Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(request_headers, {}, {"host"}));
+          fromHeaders<Http::TestRequestHeaderMapImpl>(request_headers, {}, {"host"}));
       if (headers->Method() == nullptr) {
         headers->setReferenceKey(Headers::get().Method, "GET");
       }
@@ -121,7 +144,7 @@ public:
   void sendTrailers(const test::fuzz::Headers& request_trailers) {
     if (request_state_ == StreamState::PendingDataOrTrailers) {
       auto trailers = std::make_unique<TestRequestTrailerMapImpl>(
-          Fuzz::fromHeaders<TestRequestTrailerMapImpl>(request_trailers));
+          fromHeaders<TestRequestTrailerMapImpl>(request_trailers));
       decoder_->decodeTrailers(std::move(trailers));
       request_state_ = StreamState::Closed;
     }
@@ -176,12 +199,7 @@ public:
 // requests
 class FuzzCluster {
 public:
-  FuzzCluster(FuzzConfig& cfg, absl::string_view path, bool internal_redirect_policy_enabled,
-              bool cross_scheme_redirect_allowed, bool allows_early_data_for_request)
-      : cfg_(cfg), name_(path), path_(path),
-        internal_redirect_policy_enabled_(internal_redirect_policy_enabled),
-        cross_scheme_redirect_allowed_(cross_scheme_redirect_allowed),
-        allows_early_data_for_request_(allows_early_data_for_request) {
+  FuzzCluster(FuzzConfig& cfg, absl::string_view path) : cfg_(cfg), name_(path), path_(path) {
 
     // `mock_route_` is still necessary to keep around when a direct response
     // entry is added to this cluster
@@ -215,11 +233,12 @@ public:
     upstreams_.push_back(std::move(upstream));
   }
 
-  void sendHeaders(uint32_t stream, const test::fuzz::Headers& response_headers, bool end_stream) {
+  void sendHeaders(uint32_t stream, const test::fuzz::Headers& response_headers,
+                   bool end_stream) const {
     FuzzUpstream* s = select(stream);
     if (s) {
       auto headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(response_headers, {}, {"status"}));
+          fromHeaders<Http::TestResponseHeaderMapImpl>(response_headers, {}, {"status"}));
       uint64_t rc;
       if (!absl::SimpleAtoi(headers->getStatusValue(), &rc)) {
         headers->setStatus(302);
@@ -228,7 +247,7 @@ public:
     }
   }
 
-  void sendData(uint32_t stream, const std::string& data, bool end_stream) {
+  void sendData(uint32_t stream, const std::string& data, bool end_stream) const {
     FuzzUpstream* s = select(stream);
     if (s) {
       Buffer::OwnedImpl buf(data);
@@ -236,7 +255,7 @@ public:
     }
   }
 
-  void sendTrailers(uint32_t stream, const test::fuzz::Headers& response_trailers) {
+  void sendTrailers(uint32_t stream, const test::fuzz::Headers& response_trailers) const {
     FuzzUpstream* s = select(stream);
     if (s) {
       auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>(
@@ -245,7 +264,7 @@ public:
     }
   }
 
-  FuzzUpstream* select(uint32_t stream) {
+  FuzzUpstream* select(uint32_t stream) const {
     if (upstreams_.empty()) {
       return nullptr;
     }
@@ -270,7 +289,13 @@ public:
 
   const absl::string_view getPath() const { return absl::string_view(path_); }
 
-  void reset() { upstreams_.clear(); }
+  void reset() {
+    internal_redirect_policy_enabled_ = true;
+    cross_scheme_redirect_allowed_ = true;
+    allows_early_data_for_request_ = true;
+    maintenance_ = false;
+    upstreams_.clear();
+  }
 
   void reconfigure(bool internal_redirect, bool allow_cross_scheme, bool allow_early_data,
                    bool maintenance) {
@@ -286,9 +311,9 @@ public:
   std::string name_;
   absl::string_view path_;
   Upstream::MockThreadLocalCluster tlc_;
-  bool internal_redirect_policy_enabled_;
-  bool cross_scheme_redirect_allowed_;
-  bool allows_early_data_for_request_;
+  bool internal_redirect_policy_enabled_{true};
+  bool cross_scheme_redirect_allowed_{true};
+  bool allows_early_data_for_request_{true};
 
   Router::MockRoute* mock_route_;
   Router::RouteConstSharedPtr route_;
@@ -310,14 +335,15 @@ public:
   using FuzzClusterPtr = std::unique_ptr<FuzzCluster>;
 
   void createDefaultClusters(FuzzConfig& cfg) {
-    // Create a set of clusters which allows to model most possible scenarios
-    FuzzClusterPtr default0 = std::make_unique<FuzzCluster>(cfg, "/default0", true, true, true);
+    // Create a set of clusters which allows to model most possible scenarios.
+    // Adding a cluster here needs to be reflected in the `hcm_router_fuzz_test.proto`.
+    FuzzClusterPtr default0 = std::make_unique<FuzzCluster>(cfg, "/default0");
     clusters_.push_back(std::move(default0));
 
-    FuzzClusterPtr default1 = std::make_unique<FuzzCluster>(cfg, "/default1", true, true, true);
+    FuzzClusterPtr default1 = std::make_unique<FuzzCluster>(cfg, "/default1");
     clusters_.push_back(std::move(default1));
 
-    FuzzClusterPtr default2 = std::make_unique<FuzzCluster>(cfg, "/default2", true, true, true);
+    FuzzClusterPtr default2 = std::make_unique<FuzzCluster>(cfg, "/default2");
     default2->addDirectResponse(Code::Found, "", "/default0", "/default0");
     clusters_.push_back(std::move(default2));
   }
@@ -486,21 +512,24 @@ public:
         const auto& a = action.advance_time();
         hcm_config_.time_system_.timeSystem().advanceTimeWait(
             std::chrono::milliseconds(a.milliseconds()));
-      } break;
+        break;
+      }
       case ActionCase::kReconfigureCluster: {
         const auto& a = action.reconfigure_cluster();
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         cluster.reconfigure(a.enable_internal_redirect(), a.allow_cross_scheme_redirect(),
                             a.allow_early_data(), a.maintenance_mode());
 
-      } break;
+        break;
+      }
       case ActionCase::kRequestHeader: {
-        const auto& a = action.request_header();
+        auto& a = action.request_header();
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         FuzzDownstreamPtr stream = std::make_unique<FuzzDownstream>(*hcm_);
         streams_.push_back(std::move(stream));
         streams_.back()->sendHeaders(a.headers(), a.end_stream(), cluster.getPath());
-      } break;
+        break;
+      }
       case ActionCase::kRequestData:
         if (!streams_.empty()) {
           const auto& a = action.request_data();
@@ -510,7 +539,7 @@ public:
         break;
       case ActionCase::kRequestTrailer:
         if (!streams_.empty()) {
-          const auto& a = action.request_trailer();
+          auto& a = action.request_trailer();
           FuzzDownstream& s = *streams_[a.stream() % streams_.size()];
           s.sendTrailers(a.trailers());
         }
@@ -519,17 +548,20 @@ public:
         const auto& a = action.respond_header();
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         cluster.sendHeaders(a.stream(), a.headers(), a.end_stream());
-      } break;
+        break;
+      }
       case ActionCase::kRespondData: {
         const auto& a = action.respond_data();
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         cluster.sendData(a.stream(), a.data(), a.end_stream());
-      } break;
+        break;
+      }
       case ActionCase::kRespondTrailer: {
         const auto& a = action.respond_trailer();
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         cluster.sendTrailers(a.stream(), a.trailers());
-      } break;
+        break;
+      }
       default:
         break;
       }
@@ -555,7 +587,7 @@ private:
 
 static std::unique_ptr<Harness> harness = nullptr;
 static void cleanup() { harness = nullptr; }
-DEFINE_PROTO_FUZZER(const FuzzCase& input) {
+DEFINE_PROTO_FUZZER(FuzzCase& input) {
   if (harness == nullptr) {
     harness = std::make_unique<Harness>();
     atexit(cleanup);
