@@ -168,6 +168,40 @@ TEST_F(SmtpFilterTest, NoStarttls) {
   ASSERT_THAT(filter_->getStats().sessions_esmtp_unencrypted_.value(), 1);
 }
 
+// upstream and downstream starttls disabled: filter should pass through caps and client invocation
+TEST_F(SmtpFilterTest, DisabledUpstreamDownstreamTls) {
+  Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+                                                      /*downstream_ssl=*/ConfigProto::DISABLE,
+                                                      /*upstream_ssl=*/ConfigProto::DISABLE});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
+  WriteExpectConsumed("220 upstream ESMTP\r\n");
+
+  absl::string_view ehlo_command = "ehlo example.com\r\n";
+  ExpectInjectReadData(ehlo_command, false);
+  ReadExpectConsumed(ehlo_command);
+
+  absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
+                                    "200-PIPELINING\r\n"
+                                    "200 STARTTLS\r\n";
+  ExpectInjectWriteData(ehlo_response, false);
+  WriteExpectConsumed(ehlo_response);
+
+  ReadExpectContinue("starttls\r\n");
+  WriteExpectContinue("220 upstream ready for tls\r\n");
+
+  // Filter now in passthrough state, TLS exchange is opaque/binary data.
+  ReadExpectContinue("\x01\x02\x03\x04");
+  WriteExpectContinue("\x05\x06\x07\x08");
+
+  ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_non_esmtp_.value(), 0);
+  ASSERT_THAT(filter_->getStats().sessions_downstream_terminated_ssl_.value(), 0);
+  ASSERT_THAT(filter_->getStats().sessions_upstream_terminated_ssl_.value(), 0);
+}
+
 TEST_F(SmtpFilterTest, DownstreamStarttls) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 

@@ -50,7 +50,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
   default:
     // client spoke out of turn -> hang up
     config_->stats_.sessions_downstream_desync_.inc();
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -71,7 +71,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     // length. This will break if the server advertises an extension
     // that allows a huge command line and the command immediately
     // after EHLO is that but that seems unlikely.
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
   case Decoder::Result::NeedMoreData:
@@ -87,7 +87,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
 
     Buffer::OwnedImpl err("503 bad pipeline\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -103,7 +103,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       config_->stats_.sessions_bad_ehlo_.inc();
       Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       return Network::FilterStatus::StopIteration;
     }
     read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
@@ -120,7 +120,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       if (config_->downstream_ssl_ == ConfigProto::REQUIRE) {
         Buffer::OwnedImpl err("530 TLS required\r\n"); // rfc3207
         write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-        read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
         return Network::FilterStatus::StopIteration;
       }
 
@@ -164,7 +164,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   default:
     // upstream spoke out of turn -> hang up
     config_->stats_.sessions_upstream_desync_.inc();
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -178,7 +178,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   case Decoder::Result::Bad: {
     Buffer::OwnedImpl err("451 upstream syntax error\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
   case Decoder::Result::NeedMoreData:
@@ -190,7 +190,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   if (response.wire_len != backend_buffer_.length()) {
     Buffer::OwnedImpl err("451 upstream bad pipeline\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -208,7 +208,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
         !decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
       Buffer::OwnedImpl err("400 upstream STARTTLS not offered\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       return Network::FilterStatus::StopIteration;
     }
 
@@ -216,7 +216,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       std::string downstream_caps = wire_resp.toString();
       if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
         decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
-      } else {
+      } else if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
+	// if we're doing upstream but not downstream, strip the
+	// capability so the client doesn't try to send it to us.
         decoder_->RemoveEsmtpCapability("STARTTLS", downstream_caps);
       }
       downstream_esmtp_capabilities_ = Buffer::OwnedImpl(downstream_caps);
@@ -229,7 +231,13 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     } else {
       write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities_,
                                                      /*end_stream=*/false);
-      state_ = DOWNSTREAM_STARTTLS;
+      if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
+        state_ = DOWNSTREAM_STARTTLS;
+      } else {
+	// i.e. we're doing neither upstream nor downstream
+	config_->stats_.sessions_esmtp_unencrypted_.inc();
+	state_ = PASSTHROUGH;
+      }
     }
     return Network::FilterStatus::StopIteration;
   }
@@ -240,7 +248,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       config_->stats_.sessions_upstream_ssl_command_err_.inc();
       Buffer::OwnedImpl err("400 upstream STARTTLS error\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     } else if (!read_callbacks_->startUpstreamSecureTransport()) {
       config_->stats_.sessions_upstream_ssl_err_.inc();
       ENVOY_CONN_LOG(info,
@@ -252,6 +260,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     } else {
       config_->stats_.sessions_upstream_terminated_ssl_.inc();
+
+      // TODO(jsbucy): this should resend the client's previous EHLO to the
+      // upstream and then -> passthrough?
 
       write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities_,
                                                      /*end_stream=*/false);
