@@ -342,6 +342,9 @@ new_features:
     added host related information :ref:`metadata <envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata>` and
     :ref:`locality <envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality>` to
     the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
+- area: lds
+  change: |
+    pause SRDS when LDS is updated
 
 deprecated:
 - area: access_log
