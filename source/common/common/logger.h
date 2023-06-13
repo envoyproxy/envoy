@@ -404,7 +404,7 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
  */
-std::string serializeLogTags(std::map<std::string, std::string> tags);
+std::string serializeLogTags(const std::map<std::string, std::string>& tags);
 
 } // namespace Utility
 

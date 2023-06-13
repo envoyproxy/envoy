@@ -384,6 +384,25 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
   ENVOY_LOG_MISC(info, "{\"nested_message\":\"hello\"}");
 }
 
+TEST(LoggerUtilityTest, TestSerializeLogTags) {
+  // No entries
+  EXPECT_EQ("", Envoy::Logger::Utility::serializeLogTags({}));
+
+  // Empty key or value
+  EXPECT_EQ("[Tags: \"\":\"\"] ", Envoy::Logger::Utility::serializeLogTags({{"", ""}}));
+  EXPECT_EQ("[Tags: \"\":\"value\"] ", Envoy::Logger::Utility::serializeLogTags({{"", "value"}}));
+  EXPECT_EQ("[Tags: \"key\":\"\"] ", Envoy::Logger::Utility::serializeLogTags({{"key", ""}}));
+
+  // Single entry
+  EXPECT_EQ("[Tags: \"key\":\"value\"] ",
+            Envoy::Logger::Utility::serializeLogTags({{"key", "value"}}));
+
+  // Multiple enties
+  EXPECT_EQ("[Tags: \"key1\":\"value1\",\"key2\":\"value2\",\"key3\":\"value3\"] ",
+            Envoy::Logger::Utility::serializeLogTags(
+                {{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}));
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy

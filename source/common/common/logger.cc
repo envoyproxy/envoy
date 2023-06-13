@@ -307,18 +307,18 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
   logger.set_formatter(std::move(formatter));
 }
 
-std::string serializeLogTags(std::map<std::string, std::string> tags) {
+std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
   if (tags.empty()) {
     return "";
   }
 
-  std::stringstream string_stream;
-  string_stream << "[Tags: ";
+  std::stringstream tags_stream;
+  tags_stream << "[Tags: ";
   for (const auto& tag : tags) {
-    string_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+    tags_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
   }
 
-  std::string serialized = string_stream.str();
+  std::string serialized = tags_stream.str();
   serialized.pop_back();
   serialized += "] ";
 
