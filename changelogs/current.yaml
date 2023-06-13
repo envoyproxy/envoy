@@ -344,7 +344,7 @@ new_features:
     the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
 - area: lds
   change: |
-    pause SRDS when LDS is updated
+    pause SRDS when LDS is updated.
 
 deprecated:
 - area: access_log
