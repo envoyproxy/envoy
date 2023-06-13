@@ -2113,4 +2113,55 @@ TEST_P(ExtProcIntegrationTest, SendHeaderAndSmallChunkBodyStreamedMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Test clear route cache in both upstream and downstream header and body processing.
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("13");
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        body_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        headers_resp.mutable_response()->mutable_header_mutation()->add_remove_headers(
+            "content-length");
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+  upstream_request_->encodeData(100, true);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_header()->set_key("x-testing-response-header");
+        header_add->mutable_header()->set_value("Yes");
+        body_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
