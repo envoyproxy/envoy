@@ -397,7 +397,7 @@ TEST(LoggerUtilityTest, TestSerializeLogTags) {
   EXPECT_EQ("[Tags: \"key\":\"value\"] ",
             Envoy::Logger::Utility::serializeLogTags({{"key", "value"}}));
 
-  // Multiple enties
+  // Multiple entries
   EXPECT_EQ("[Tags: \"key1\":\"value1\",\"key2\":\"value2\",\"key3\":\"value3\"] ",
             Envoy::Logger::Utility::serializeLogTags(
                 {{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}));
