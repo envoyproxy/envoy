@@ -885,9 +885,9 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReleaseIoUringWorkerEarlyThanIoha
   io_handle_->initializeFileEvent(
       *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-  io_uring_factory_.reset();
+  instance_.shutdownThread()
 
-  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+      while (fcntl(fd_, F_GETFD, 0) >= 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
