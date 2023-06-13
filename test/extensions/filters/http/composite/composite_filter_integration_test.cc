@@ -73,7 +73,7 @@ public:
 
   void addPerRouteResponseCodeFilter(const std::string& filter_name,
                                      const std::string& route_prefix, const int& code,
-                                     const bool& response_prefix = false) {
+                                     bool response_prefix = false) {
     SetResponseCodeFilterConfig set_response_code;
     set_response_code.set_code(code);
     if (response_prefix) {
