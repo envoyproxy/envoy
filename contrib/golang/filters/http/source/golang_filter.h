@@ -182,6 +182,7 @@ public:
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
+  CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
 
 private:
   bool hasDestroyed() {
