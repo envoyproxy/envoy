@@ -71,13 +71,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:profiler-lib:83"
-"source/extensions/load_balancing_policies/common:94.1" # Death tests don't report LCOV
 "source/server/config_validation:88.4"
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/http:93.8"
 "source/extensions/health_checkers/grpc:92.0"
-"source/extensions/load_balancing_policies:96.4"
-"source/extensions/load_balancing_policies/subset:96.0"
 "source/extensions/config_subscription/rest:94.3"
 "source/extensions/matching/input_matchers/cel_matcher:90.7" #Death tests don't report LCOV
 )

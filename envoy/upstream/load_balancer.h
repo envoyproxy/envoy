@@ -169,12 +169,6 @@ public:
 
   /**
    * @return LoadBalancerPtr a new worker local load balancer.
-   * TODO(wbpcode): remove this method in the future and used the new method below.
-   */
-  virtual LoadBalancerPtr create() PURE;
-
-  /**
-   * @return LoadBalancerPtr a new worker local load balancer.
    */
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
 };
