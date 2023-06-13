@@ -52,6 +52,7 @@ namespace ZooKeeperProxy {
   COUNTER(setauth_rq)                                                                              \
   COUNTER(setwatches_rq)                                                                           \
   COUNTER(setwatches2_rq)                                                                          \
+  COUNTER(addwatch_rq)                                                                             \
   COUNTER(checkwatches_rq)                                                                         \
   COUNTER(removewatches_rq)                                                                        \
   COUNTER(check_rq)                                                                                \
@@ -80,6 +81,7 @@ namespace ZooKeeperProxy {
   COUNTER(setauth_resp)                                                                            \
   COUNTER(setwatches_resp)                                                                         \
   COUNTER(setwatches2_resp)                                                                        \
+  COUNTER(addwatch_resp)                                                                           \
   COUNTER(checkwatches_resp)                                                                       \
   COUNTER(removewatches_resp)                                                                      \
   COUNTER(check_resp)                                                                              \
@@ -108,6 +110,7 @@ namespace ZooKeeperProxy {
   COUNTER(setauth_resp_fast)                                                                       \
   COUNTER(setwatches_resp_fast)                                                                    \
   COUNTER(setwatches2_resp_fast)                                                                   \
+  COUNTER(addwatch_resp_fast)                                                                      \
   COUNTER(checkwatches_resp_fast)                                                                  \
   COUNTER(removewatches_resp_fast)                                                                 \
   COUNTER(check_resp_fast)                                                                         \
@@ -135,6 +138,7 @@ namespace ZooKeeperProxy {
   COUNTER(setauth_resp_slow)                                                                       \
   COUNTER(setwatches_resp_slow)                                                                    \
   COUNTER(setwatches2_resp_slow)                                                                   \
+  COUNTER(addwatch_resp_slow)                                                                      \
   COUNTER(checkwatches_resp_slow)                                                                  \
   COUNTER(removewatches_resp_slow)                                                                 \
   COUNTER(check_resp_slow)
@@ -232,7 +236,8 @@ private:
                                        {LatencyThresholdOverride::SetWatches, 101},
                                        {LatencyThresholdOverride::GetEphemerals, 103},
                                        {LatencyThresholdOverride::GetAllChildrenNumber, 104},
-                                       {LatencyThresholdOverride::SetWatches2, 105}});
+                                       {LatencyThresholdOverride::SetWatches2, 105},
+                                       {LatencyThresholdOverride::AddWatch, 106}});
   }
 
   int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
@@ -284,6 +289,7 @@ public:
   void onReconfigRequest() override;
   void onSetWatchesRequest() override;
   void onSetWatches2Request() override;
+  void onAddWatchRequest(const std::string& path, const int32_t mode) override;
   void onCheckWatchesRequest(const std::string& path, int32_t type) override;
   void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
   void onGetEphemeralsRequest(const std::string& path) override;

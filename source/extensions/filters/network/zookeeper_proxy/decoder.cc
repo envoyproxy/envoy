@@ -149,6 +149,9 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   case OpCodes::SetWatches2:
     parseSetWatches2Request(data, offset, len);
     break;
+  case OpCodes::AddWatch:
+    parseAddWatchRequest(data, offset, len);
+    break;
   case OpCodes::CheckWatches:
     parseXWatchesRequest(data, offset, len, OpCodes::CheckWatches);
     break;
@@ -465,6 +468,15 @@ void DecoderImpl::parseSetWatches2Request(Buffer::Instance& data, uint64_t& offs
   skipStrings(data, offset);
 
   callbacks_.onSetWatches2Request();
+}
+
+void DecoderImpl::parseAddWatchRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
+
+  const std::string path = helper_.peekString(data, offset);
+  const int32_t mode = helper_.peekInt32(data, offset);
+
+  callbacks_.onAddWatchRequest(path, mode);
 }
 
 void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
