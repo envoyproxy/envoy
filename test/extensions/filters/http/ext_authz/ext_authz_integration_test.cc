@@ -87,7 +87,16 @@ public:
 
   void setDenyAtDisableRuntimeConfig(bool deny_at_disable, bool disable_with_metadata) {
     if (!disable_with_metadata) {
-      config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+        layer->set_name("enable layer");
+        ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+        bootstrap.mutable_layered_runtime()->mutable_layers(0)->set_name("base layer");
+
+        ProtobufWkt::Struct& enable =
+            *(*runtime.mutable_fields())["envoy.ext_authz.enable"].mutable_struct_value();
+        (*enable.mutable_fields())["numerator"].set_number_value(0);
+      });
     }
     if (deny_at_disable) {
       config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");

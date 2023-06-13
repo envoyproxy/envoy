@@ -36,6 +36,8 @@ public:
                     numerator: 100
                     denominator: HUNDRED
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           route_config:
             virtual_hosts:

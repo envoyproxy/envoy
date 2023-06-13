@@ -113,7 +113,7 @@ public:
   }
 };
 
-class JsonApplicationLogsValidationServerForbiddenFlag_Test : public ValidationServerTest {
+class JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest : public ValidationServerTest {
 public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     setupTestDirectory();
@@ -125,6 +125,23 @@ public:
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
     return {"json_application_logs_forbidden_flag_.yaml"};
+  }
+};
+
+class TextApplicationLogsValidationServerTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
+
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"text_application_logs.yaml"};
   }
 };
 
@@ -306,7 +323,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(
         JsonApplicationLogsValidationServerForbiddenFlagvTest::getAllConfigFiles()));
 
-TEST_P(JsonApplicationLogsValidationServerForbiddenFlag_Test, TestForbiddenFlag) {
+TEST_P(JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest, TestForbiddenFlag) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;
@@ -320,9 +337,33 @@ TEST_P(JsonApplicationLogsValidationServerForbiddenFlag_Test, TestForbiddenFlag)
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlag_Test,
+    AllConfigs, JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest,
     ::testing::ValuesIn(
-        JsonApplicationLogsValidationServerForbiddenFlag_Test::getAllConfigFiles()));
+        JsonApplicationLogsValidationServerForbiddenFlagUnderscoreTest::getAllConfigFiles()));
+
+TEST_P(TextApplicationLogsValidationServerTest, TextApplicationLogs) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+  server.shutdown();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, TextApplicationLogsValidationServerTest,
+    ::testing::ValuesIn(TextApplicationLogsValidationServerTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server

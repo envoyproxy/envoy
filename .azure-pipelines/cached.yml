@@ -15,6 +15,9 @@ parameters:
 - name: tmpDirectory
   type: string
   default: /mnt/docker_cache
+- name: tmpNoTmpfs
+  type: string
+  default:
 - name: path
   type: string
   default: /mnt/docker
@@ -27,7 +30,7 @@ parameters:
 
 
 steps:
-- script: sudo .azure-pipelines/docker/prepare_cache.sh "${{ parameters.tmpDirectory }}"
+- script: sudo .azure-pipelines/docker/prepare_cache.sh "${{ parameters.tmpDirectory }}" "${{ parameters.tmpNoTmpfs }}"
   displayName: "Cache/prepare (${{ parameters.name }})"
 - task: Cache@2
   env:

@@ -39,6 +39,7 @@ public:
   virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
+  virtual void envoyGoRequestSemaDec(httpRequest* p0) PURE;
 };
 
 class HttpFilterDsoImpl : public HttpFilterDso {
@@ -54,6 +55,7 @@ public:
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
+  void envoyGoRequestSemaDec(httpRequest* p0) override;
 
 private:
   GoUint64 (*envoy_go_filter_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
@@ -65,6 +67,7 @@ private:
   GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
+  void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
 };
 
 class ClusterSpecifierDso : public Dso {
@@ -98,6 +101,11 @@ private:
 using HttpFilterDsoPtr = std::shared_ptr<HttpFilterDso>;
 using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
 
+/*
+ * We do not unload a dynamic library once it is loaded. This is because
+ * Go shared library could not be unload by dlclose yet, see:
+ * https://github.com/golang/go/issues/11100
+ */
 template <class T> class DsoManager {
 
 public:
@@ -105,33 +113,54 @@ public:
    * Load the go plugin dynamic library.
    * @param dso_id is unique ID for dynamic library.
    * @param dso_name used to specify the absolute path of the dynamic library.
-   * @return false if load are invalid. Otherwise, return true.
+   * @param plugin_name used to specify the unique plugin name.
+   * @return nullptr if load are invalid.
    */
-  static bool load(std::string dso_id, std::string dso_name) {
-    ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
-    if (getDsoByID(dso_id) != nullptr) {
-      return true;
+  static std::shared_ptr<T> load(std::string dso_id, std::string dso_name,
+                                 std::string plugin_name) {
+    auto dso = load(dso_id, dso_name);
+    if (dso != nullptr) {
+      DsoStoreType& dsoStore = getDsoStore();
+      absl::WriterMutexLock lock(&dsoStore.mutex_);
+      dsoStore.plugin_name_to_dso_[plugin_name] = dso;
     }
-    DsoStoreType& dsoStore = getDsoStore();
-    absl::WriterMutexLock lock(&dsoStore.mutex_);
-    auto dso = std::make_shared<T>(dso_name);
-    if (!dso->loaded()) {
-      return false;
-    }
-    dsoStore.map_[dso_id] = std::move(dso);
-    return true;
+    return dso;
   };
 
   /**
-   * Get the go plugin dynamic library.
+   * Load the go plugin dynamic library.
    * @param dso_id is unique ID for dynamic library.
+   * @param dso_name used to specify the absolute path of the dynamic library.
+   * @return nullptr if load are invalid.
+   */
+  static std::shared_ptr<T> load(std::string dso_id, std::string dso_name) {
+    ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
+
+    DsoStoreType& dsoStore = getDsoStore();
+    absl::WriterMutexLock lock(&dsoStore.mutex_);
+    auto it = dsoStore.id_to_dso_.find(dso_id);
+    if (it != dsoStore.id_to_dso_.end()) {
+      return it->second;
+    }
+
+    auto dso = std::make_shared<T>(dso_name);
+    if (!dso->loaded()) {
+      return nullptr;
+    }
+    dsoStore.id_to_dso_[dso_id] = dso;
+    return dso;
+  };
+
+  /**
+   * Get the go plugin dynamic library by plugin name.
+   * @param plugin_name is unique ID for a plugin, one DSO may contains multiple plugins.
    * @return nullptr if get failed. Otherwise, return the DSO instance.
    */
-  static std::shared_ptr<T> getDsoByID(std::string dso_id) {
+  static std::shared_ptr<T> getDsoByPluginName(std::string plugin_name) {
     DsoStoreType& dsoStore = getDsoStore();
     absl::ReaderMutexLock lock(&dsoStore.mutex_);
-    auto it = dsoStore.map_.find(dso_id);
-    if (it != dsoStore.map_.end()) {
+    auto it = dsoStore.plugin_name_to_dso_.find(plugin_name);
+    if (it != dsoStore.plugin_name_to_dso_.end()) {
       return it->second;
     }
     return nullptr;
@@ -140,7 +169,10 @@ public:
 private:
   using DsoMapType = absl::flat_hash_map<std::string, std::shared_ptr<T>>;
   struct DsoStoreType {
-    DsoMapType map_ ABSL_GUARDED_BY(mutex_){{
+    DsoMapType id_to_dso_ ABSL_GUARDED_BY(mutex_){{
+        {"", nullptr},
+    }};
+    DsoMapType plugin_name_to_dso_ ABSL_GUARDED_BY(mutex_){{
         {"", nullptr},
     }};
     absl::Mutex mutex_;

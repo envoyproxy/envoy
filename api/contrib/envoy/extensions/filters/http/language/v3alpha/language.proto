@@ -33,4 +33,9 @@ message Language {
     unique: true
     items {string {min_len: 2}}
   }];
+
+  // If the x-language header is altered, clear the route cache for the current request.
+  // This should be set if the route configuration may depend on the x-language header.
+  // Otherwise it should be unset to avoid the performance cost of route recalculation.
+  bool clear_route_cache = 3;
 }
