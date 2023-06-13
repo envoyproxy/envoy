@@ -403,6 +403,35 @@ TEST(LoggerUtilityTest, TestSerializeLogTags) {
                 {{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}));
 }
 
+class ClassForTaggedLog : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
+public:
+  void logMessageWithPreCreatedTags() { ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val"); }
+
+  void logMessageWithInlineTags() {
+    ENVOY_TAGGED_LOG(info, (std::map<std::string, std::string>{{"key_inline", "val"}}),
+                     "fake message {}", "val");
+  }
+
+private:
+  std::map<std::string, std::string> tags_{{"key", "val"}};
+};
+
+TEST(TaggedLogTest, TestTaggedLog) {
+  Envoy::Logger::Registry::setLogFormat("%v");
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"key\":\"val\"] fake message val"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"key_inline\":\"val\"] fake message val"));
+      }));
+
+  ClassForTaggedLog object;
+  object.logMessageWithPreCreatedTags();
+  object.logMessageWithInlineTags();
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy
