@@ -26,6 +26,7 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::Sequence;
 
 namespace Envoy {
 namespace Extensions {
@@ -510,40 +511,40 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
 #ifdef WIN32
-  {
-    InSequence s;
+  Sequence s1;
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .InSequence(s1)
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+  for (size_t i = 0; i < client_hello.size(); i++) {
     EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .InSequence(s1)
+        .WillOnce(Invoke(
+            [&client_hello, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+              // ASSERT(iov->iov_len >= client_hello.size());
+              memcpy(iov->iov_base, client_hello.data() + i, 1);
+              return Api::SysCallSizeResult{ssize_t(1), 0};
+            }))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-    for (size_t i = 0; i < client_hello.size(); i++) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-          .WillOnce(Invoke([&client_hello, i](os_fd_t fd, const iovec* iov,
-                                              int iovcnt) -> Api::SysCallSizeResult {
-            // ASSERT(iov->iov_len >= client_hello.size());
-            memcpy(iov->iov_base, client_hello.data() + i, 1);
-            return Api::SysCallSizeResult{ssize_t(1), 0};
-          }))
-          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-    }
   }
 #else
-  {
-    InSequence s;
+  Sequence s1;
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .InSequence(s1)
+      .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
+        return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+      }));
+  for (size_t i = 1; i <= client_hello.size(); i++) {
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
-          return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+        .InSequence(s1)
+        .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
+          const size_t amount_to_copy = std::min(length, client_hello.size());
+          memcpy(buffer, client_hello.data(), amount_to_copy);
+          return Api::SysCallSizeResult{ssize_t(i), 0};
         }));
-    for (size_t i = 1; i <= client_hello.size(); i++) {
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
-                                              int) -> Api::SysCallSizeResult {
-            const size_t amount_to_copy = std::min(length, client_hello.size());
-            // ASSERT(length >= client_hello.size());
-            memcpy(buffer, client_hello.data(), amount_to_copy);
-            return Api::SysCallSizeResult{ssize_t(i), 0};
-          }));
-    }
   }
 #endif
+
   bool got_continue = false;
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
