@@ -57,7 +57,7 @@ public:
 
 private:
   // We can't call instantiate directly from constructor, otherwise the compiler complains about
-  // bypassing virtual dispatch even tho it's fine.
+  // bypassing virtual dispatch even though it's fine.
   inline StatsStructType& getOrCreate() { return *internal_stats_.get(ctor_); }
   inline StatsStructType& instantiate() override { return getOrCreate(); }
 
