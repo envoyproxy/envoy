@@ -19,15 +19,15 @@ public:
   void createEnvoy() override {
     sotw_or_delta_ = sotwOrDelta();
     const std::string target_uri = Network::Test::getLoopbackAddressUrlString(ipVersion());
-    builder_.setAggregatedDiscoveryService(target_uri,
-                                           fake_upstreams_[1]->localAddress()->ip()->port());
-
+    auto xds_builder = std::make_unique<Platform::XdsBuilder>(
+        target_uri, fake_upstreams_[1]->localAddress()->ip()->port());
     std::string cds_resources_locator;
     if (use_xdstp_) {
       cds_namespace_ = "xdstp://" + target_uri + "/envoy.config.cluster.v3.Cluster";
       cds_resources_locator = cds_namespace_ + "/*";
     }
-    builder_.addCdsLayer(cds_resources_locator, /*timeout_seconds=*/1);
+    xds_builder->addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1);
+    builder_.setXds(std::move(xds_builder));
 
     XdsIntegrationTest::createEnvoy();
   }

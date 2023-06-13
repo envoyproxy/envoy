@@ -20,8 +20,11 @@
 namespace Envoy {
 namespace Platform {
 
-constexpr int DefaultJwtTokenLifetimeSeconds = 31536000; // 1 year
+constexpr int DefaultJwtTokenLifetimeSeconds = 60 * 60 * 24 * 90; // 90 days
 constexpr int DefaultXdsTimeout = 5;
+
+// Forward declaration so it can be referenced by XdsBuilder.
+class EngineBuilder;
 
 // Represents the locality information in the Bootstrap's node, as defined in:
 // https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-locality
@@ -31,13 +34,94 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
+#ifdef ENVOY_GOOGLE_GRPC
+// A class for building the xDS configuration for the Envoy Mobile engine.
+// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
+// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
+//
+// This class is typically used as input to the EngineBuilder's setXds() method.
+class XdsBuilder {
+public:
+  // `xds_server_address`: the host name or IP address of the xDS management server. The xDS server
+  //                       must support the ADS protocol
+  //                       (https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration#aggregated-xds-ads).
+  // `xds_server_port`: the port on which the xDS management server listens for ADS discovery
+  //                    requests.
+  XdsBuilder(std::string xds_server_address, const int xds_server_port);
+
+  virtual ~XdsBuilder() = default;
+
+  // Sets JWT as the authentication method to the xDS management server, using the given token.
+  //
+  // `token`: the JWT token used to authenticate the client to the xDS management server.
+  // `token_lifetime_in_seconds`: <optional> the lifetime of the JWT token, in seconds. If none
+  //                              (or 0) is specified, then DefaultJwtTokenLifetimeSeconds is used.
+  XdsBuilder&
+  setJwtAuthenticationToken(std::string token,
+                            int token_lifetime_in_seconds = DefaultJwtTokenLifetimeSeconds);
+
+  // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
+  // connection. If no root certs are specified, the operating system defaults are used.
+  XdsBuilder& setSslRootCerts(std::string root_certs);
+
+  // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
+  // to retrieve dynamic runtime configuration via the xDS management server.
+  //
+  // `resource_name`: The runtime config resource to subscribe to.
+  // `timeout_in_seconds`: <optional> specifies the `initial_fetch_timeout` field on the
+  //    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
+  //    timeout value of 5s, to prevent mobile app initialization from stalling. The default
+  //    parameter value may change through the course of experimentation and no assumptions should
+  //    be made of its exact value.
+  XdsBuilder& addRuntimeDiscoveryService(std::string resource_name,
+                                         int timeout_in_seconds = DefaultXdsTimeout);
+
+  // Adds the Cluster Discovery Service (CDS) configuration for retrieving dynamic cluster resources
+  // via the xDS management server.
+  //
+  // `cds_resources_locator`: <optional> the xdstp:// URI for subscribing to the cluster resources.
+  //    If not using xdstp, then `cds_resources_locator` should be set to the empty string.
+  // `timeout_in_seconds`: <optional> specifies the `initial_fetch_timeout` field on the
+  //    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
+  //    timeout value of 5s, to prevent mobile app initialization from stalling. The default
+  //    parameter value may change through the course of experimentation and no assumptions should
+  //    be made of its exact value.
+  XdsBuilder& addClusterDiscoveryService(std::string cds_resources_locator = "",
+                                         int timeout_in_seconds = DefaultXdsTimeout);
+
+protected:
+  // Sets the xDS configuration specified on this XdsBuilder instance on the Bootstrap proto
+  // provided as an input parameter.
+  //
+  // This method takes in a modifiable Bootstrap proto pointer because returning a new Bootstrap
+  // proto would rely on proto's MergeFrom behavior, which can lead to unexpected results in the
+  // Bootstrap config.
+  virtual void build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const;
+
+private:
+  // Required so that EngineBuilder can call the XdsBuilder's protected build() method.
+  friend class EngineBuilder;
+
+  const std::string xds_server_address_;
+  const int xds_server_port_;
+  std::string jwt_token_;
+  int jwt_token_lifetime_in_seconds_ = DefaultJwtTokenLifetimeSeconds;
+  std::string ssl_root_certs_;
+  std::string rtds_resource_name_;
+  int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
+  bool enable_cds_ = false;
+  std::string cds_resources_locator_;
+  int cds_timeout_in_seconds_ = DefaultXdsTimeout;
+};
+#endif
+
 // The C++ Engine builder creates a structured bootstrap proto and modifies it through parameters
 // set through the EngineBuilder API calls to produce the Bootstrap config that the Engine is
 // created from.
 class EngineBuilder {
 public:
   EngineBuilder();
-  virtual ~EngineBuilder() {}
+  virtual ~EngineBuilder() = default;
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
@@ -69,24 +153,16 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
-#ifdef ENVOY_GOOGLE_GRPC
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
-  // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
-  // gRPC.
-  EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,
-                                               std::string jwt_token = "",
-                                               int jwt_token_lifetime_seconds = 0,
-                                               std::string ssl_root_certs = "");
-  // Adds an RTDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0);
-  // Adds a CDS layer to default config. Requires that ADS be configured via
-  // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
-  // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
-  // empty string.
-  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
+#ifdef ENVOY_GOOGLE_GRPC
+  // Sets the xDS configuration for the Envoy Mobile engine.
+  //
+  // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
+  //                The EngineBuilder takes ownership over the xds_builder.
+  EngineBuilder& setXds(std::unique_ptr<XdsBuilder>&& xds_builder);
 #endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
@@ -142,18 +218,8 @@ private:
   bool brotli_decompression_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
-  std::string rtds_layer_name_ = "";
-  int rtds_timeout_seconds_;
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
-  std::string ads_address_ = ""; // make absl:optional?
-  int ads_port_;
-  std::string ads_jwt_token_;
-  int ads_jwt_token_lifetime_seconds_;
-  std::string ads_ssl_root_certs_;
-  std::string cds_resources_locator_;
-  int cds_timeout_seconds_;
-  bool enable_cds_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 
@@ -173,6 +239,10 @@ private:
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
+
+#ifdef ENVOY_GOOGLE_GRPC
+  std::unique_ptr<XdsBuilder> xds_builder_ = nullptr;
+#endif
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

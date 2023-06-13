@@ -28,6 +28,106 @@ class Standard : BaseConfiguration()
 class Custom(val yaml: String) : BaseConfiguration()
 
 /**
+  * Builder for generating the xDS configuration for the Envoy Mobile engine.
+  * xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
+  * https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
+  *
+  * This class is typically used as input to the EngineBuilder's setXds() method.
+ */
+open class XdsBuilder (
+  internal val xdsServerAddress: String,
+  internal val xdsServerPort: Int
+) {
+  companion object {
+    private const val DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS: Int = 60 * 60 * 24 * 90 // 90 days
+    private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
+  }
+
+  internal var jwtToken: String? = null
+  internal var jwtTokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+  internal var sslRootCerts: String? = null
+  internal var rtdsResourceName: String? = null
+  internal var rtdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+  internal var enableCds: Boolean = false
+  internal var cdsResourcesLocator: String? = null
+  internal var cdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+
+  /**
+   * Sets JWT as the authentication method to the xDS management server, using the given token.
+   *
+   * @param token The JWT token used to authenticate the client to the xDS management server.
+   * @param tokenLifetimeInSeconds <optional> The lifetime of the JWT token, in seconds. If none
+   *                               (or 0) is specified, then defaultJwtTokenLifetimeSeconds is
+   *                               used.
+   *
+   * @return this builder.
+   */
+  fun setJwtAuthenticationToken(token: String, tokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS): XdsBuilder {
+    this.jwtToken = token
+    this.jwtTokenLifetimeInSeconds = if (tokenLifetimeInSeconds > 0) tokenLifetimeInSeconds else DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+    return this
+  }
+
+  /**
+   * Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
+   * connection. If no root certs are specified, the operating system defaults are used.
+   *
+   * @param rootCerts The PEM-encoded server root certificates.
+   *
+   * @return this builder.
+   */
+  fun setSslRootCerts(rootCerts: String): XdsBuilder {
+    this.sslRootCerts = rootCerts
+    return this
+  }
+
+  /**
+   * Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
+   * to retrieve dynamic runtime configuration via the xDS management server.
+   *
+   * @param resourceName The runtime config resource to subscribe to.
+   * @param timeoutInSeconds <optional> specifies the `initial_fetch_timeout` field on the
+   *     api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
+   *     timeout value of 5s, to prevent mobile app initialization from stalling. The default
+   *     parameter value may change through the course of experimentation and no assumptions should
+   *     be made of its exact value.
+   *
+   * @return this builder.
+   */
+  fun addRuntimeDiscoveryService(resourceName: String, timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS): XdsBuilder {
+    this.rtdsResourceName = resourceName
+    this.rtdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
+    return this
+  }
+
+  /**
+   * Adds the Cluster Discovery Service (CDS) configuration for retrieving dynamic cluster
+   * resources via the xDS management server.
+   *
+   * @param cdsResourcesLocator <optional> the xdstp:// URI for subscribing to the cluster
+   *     resources. If not using xdstp, then `cds_resources_locator` should be set to the empty
+   *     string.
+   * @param timeoutInSeconds <optional> specifies the `initial_fetch_timeout` field on the
+   *     api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
+   *     timeout value of 5s, to prevent mobile app initialization from stalling. The default
+   *     parameter value may change through the course of experimentation and no assumptions should
+   *     be made of its exact value.
+   *
+   * @return this builder.
+   */
+  public fun addClusterDiscoveryService(cdsResourcesLocator: String? = null, timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS): XdsBuilder {
+    this.enableCds = true
+    this.cdsResourcesLocator = cdsResourcesLocator
+    this.cdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
+    return this
+  }
+
+  private fun timeoutOrXdsDefault(timeout: Int): Int {
+    return if (timeout > 0) timeout else DEFAULT_XDS_TIMEOUT_IN_SECONDS
+  }
+}
+
+/**
  * Builder used for creating and running a new `Engine` instance.
  */
 open class EngineBuilder(
@@ -73,20 +173,11 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
-  private var rtdsLayerName: String = ""
-  private var rtdsTimeoutSeconds: Int = 0
-  private var adsAddress: String = ""
-  private var adsPort: Int = 0
-  private var adsJwtToken: String = ""
-  private var adsJwtTokenLifetimeSeconds: Int = 0
-  private var adsSslRootCerts: String = ""
   private var nodeId: String = ""
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
-  private var cdsResourcesLocator: String = ""
-  private var cdsTimeoutSeconds: Int = 0
-  private var enableCds: Boolean = false
+  private var xdsBuilder: XdsBuilder? = null
 
   /**
    * Add a log level to use with Envoy.
@@ -546,72 +637,14 @@ open class EngineBuilder(
   }
 
   /**
-  * Adds an ADS layer.
-  * Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
-  *
-  * @param address the network address of the server.
-  *
-  * @param port the port of the server.
-  *
-  * @param jwtToken the JWT token.
-  *
-  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token. If zero,
-  *                                a default value is set in engine_builder.h.
-  *
-  * @param sslRootCerts the SSL root certificates.
-  *
-  * @return this builder.
-  */
-  fun setAggregatedDiscoveryService(
-    address: String,
-    port: Int,
-    jwtToken: String = "",
-    jwtTokenLifetimeSeconds: Int = 0,
-    sslRootCerts: String = ""
-  ): EngineBuilder {
-    this.adsAddress = address
-    this.adsPort = port
-    this.adsJwtToken = jwtToken
-    this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
-    this.adsSslRootCerts = sslRootCerts
-    return this
-  }
-
-  /**
-  * Adds a CDS layer.
-  *
-  * @param resourcesLocator The xdstp resource URI for fetching clusters.
-  *                         If empty, xdstp is not used and a wildcard is inferred.
-  *
-  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
-  *                       set in engine_builder.h.
-  *
-  * @return this builder.
-  */
-  fun addCdsLayer(
-    resourcesLocator: String = "",
-    timeoutSeconds: Int = 0,
-  ): EngineBuilder {
-    this.cdsResourcesLocator = resourcesLocator
-    this.cdsTimeoutSeconds = timeoutSeconds
-    this.enableCds = true
-    return this
-  }
-
-
-  /**
-  * Adds an RTDS layer to default config. Requires that ADS be configured.
-  *
-  * @param layerName the layer name.
-  *
-  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
-  *                       set in engine_builder.h.
-  *
-  * @return this builder.
-  */
-  fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
-    this.rtdsLayerName = layerName
-    this.rtdsTimeoutSeconds = timeoutSeconds
+   * Sets the xDS configuration for the Envoy Mobile engine.
+   *
+   * @param xdsBuilder The XdsBuilder instance from which to construct the xDS configuration.
+   *
+   * @return this builder.
+   */
+  fun setXds(xdsBuilder: XdsBuilder): EngineBuilder {
+    this.xdsBuilder = xdsBuilder
     return this
   }
 
@@ -668,20 +701,20 @@ open class EngineBuilder(
       statsSinks,
       runtimeGuards,
       enablePlatformCertificatesValidation,
-      rtdsLayerName,
-      rtdsTimeoutSeconds,
-      adsAddress,
-      adsPort,
-      adsJwtToken,
-      adsJwtTokenLifetimeSeconds,
-      adsSslRootCerts,
+      xdsBuilder?.rtdsResourceName,
+      xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
+      xdsBuilder?.xdsServerAddress,
+      xdsBuilder?.xdsServerPort ?: 0,
+      xdsBuilder?.jwtToken,
+      xdsBuilder?.jwtTokenLifetimeInSeconds ?: 0,
+      xdsBuilder?.sslRootCerts,
       nodeId,
       nodeRegion,
       nodeZone,
       nodeSubZone,
-      cdsResourcesLocator,
-      cdsTimeoutSeconds,
-      enableCds,
+      xdsBuilder?.cdsResourcesLocator,
+      xdsBuilder?.cdsTimeoutInSeconds ?: 0,
+      xdsBuilder?.enableCds ?: false,
     )
 
 

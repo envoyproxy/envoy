@@ -107,22 +107,20 @@
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
-                                    rtdsLayerName:(NSString *)rtdsLayerName
+                                           nodeId:(nullable NSString *)nodeId
+                                       nodeRegion:(nullable NSString *)nodeRegion
+                                         nodeZone:(nullable NSString *)nodeZone
+                                      nodeSubZone:(nullable NSString *)nodeSubZone
+                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
+                                    xdsServerPort:(UInt32)xdsServerPort
+                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
+                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
+                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
+                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort
-                                      adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
-                                  adsSslRootCerts:(NSString *)adsSslRootCerts
-                                           nodeId:(NSString *)nodeId
-                                       nodeRegion:(NSString *)nodeRegion
-                                         nodeZone:(NSString *)nodeZone
-                                      nodeSubZone:(NSString *)nodeSubZone
-                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds
-
-{
+                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds {
   self = [super init];
   if (!self) {
     return nil;
@@ -161,17 +159,17 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
-  self.rtdsLayerName = rtdsLayerName;
-  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-  self.adsAddress = adsAddress;
-  self.adsPort = adsPort;
-  self.adsJwtToken = adsJwtToken;
-  self.adsJwtTokenLifetimeSeconds = adsJwtTokenLifetimeSeconds;
-  self.adsSslRootCerts = adsSslRootCerts;
   self.nodeId = nodeId;
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.xdsServerAddress = xdsServerAddress;
+  self.xdsServerPort = xdsServerPort;
+  self.xdsJwtToken = xdsJwtToken;
+  self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
+  self.xdsSslRootCerts = xdsSslRootCerts;
+  self.rtdsResourceName = rtdsResourceName;
+  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
   self.cdsResourcesLocator = cdsResourcesLocator;
   self.cdsTimeoutSeconds = cdsTimeoutSeconds;
   self.enableCds = enableCds;
@@ -251,7 +249,6 @@
   builder.addStatsFlushSeconds(self.statsFlushSeconds);
 #endif
 
-#ifdef ENVOY_GOOGLE_GRPC
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -259,16 +256,26 @@
   if (self.nodeId != nil) {
     builder.setNodeId([self.nodeId toCXXString]);
   }
-  if (self.rtdsLayerName != nil) {
-    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
-  }
-  if (self.adsAddress != nil) {
-    builder.setAggregatedDiscoveryService(
-        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
-  }
-  if (self.enableCds) {
-    builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
+
+#ifdef ENVOY_GOOGLE_GRPC
+  if (self.xdsServerAddress != nil) {
+    Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
+    if (self.xdsJwtToken != nil) {
+      builder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
+                                        self.xdsJwtTokenLifetimeSeconds);
+    }
+    if (self.xdsSslRootCerts != nil) {
+      builder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
+    }
+    if (self.rtdsLayerName != nil) {
+      builder.addRuntimeDiscoveryService([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+    }
+    if (self.enableCds) {
+      builder.addClusterDiscoveryService(
+          self.cdsResourcesLocator != nil ? [self.cdsResourcesLocator toCXXString] : "",
+          self.cdsTimeoutSeconds);
+    }
+    builder.setXds(xdsBuilder);
   }
 #endif
 

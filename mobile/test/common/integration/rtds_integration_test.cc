@@ -18,10 +18,12 @@ public:
     initializeXdsStream();
   }
   void createEnvoy() override {
-    builder_.setAggregatedDiscoveryService(Network::Test::getLoopbackAddressUrlString(ipVersion()),
-                                           fake_upstreams_[1]->localAddress()->ip()->port());
+    auto xds_builder = std::make_unique<Platform::XdsBuilder>(
+        /*xds_server_address=*/Network::Test::getLoopbackAddressUrlString(ipVersion()),
+        /*xds_server_port=*/fake_upstreams_[1]->localAddress()->ip()->port());
     // Add the layered runtime config, which includes the RTDS layer.
-    builder_.addRtdsLayer("some_rtds_layer", 1);
+    xds_builder->addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1);
+    builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }
 
@@ -57,15 +59,15 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   const std::string load_success_counter = "runtime.load_success";
   uint64_t load_success_value = getCounterValue(load_success_counter);
   // Send a RTDS request and get back the RTDS response.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
-                                      {"some_rtds_layer"}, {}, true));
-  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_rtds_layer
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
+                                      {"some_rtds_resource"}, {}, true));
+  auto some_rtds_resource = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_resource
     layer:
       envoy.reloadable_features.test_feature_false: True
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+      Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "1");
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 

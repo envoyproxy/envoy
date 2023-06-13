@@ -35,28 +35,28 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
-@property (nonatomic, strong) NSString *appVersion;
-@property (nonatomic, strong) NSString *appId;
+@property (nonatomic, strong, nullable) NSString *appVersion;
+@property (nonatomic, strong, nullable) NSString *appId;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
-@property (nonatomic, strong, nullable) NSString *rtdsLayerName;
-@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
-@property (nonatomic, strong, nullable) NSString *adsAddress;
-@property (nonatomic, assign) UInt32 adsPort;
-@property (nonatomic, strong, nullable) NSString *adsJwtToken;
-@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
-@property (nonatomic, strong, nullable) NSString *adsSslRootCerts;
 @property (nonatomic, strong, nullable) NSString *nodeId;
 @property (nonatomic, strong, nullable) NSString *nodeRegion;
 @property (nonatomic, strong, nullable) NSString *nodeZone;
 @property (nonatomic, strong, nullable) NSString *nodeSubZone;
-@property (nonatomic, strong) NSString *cdsResourcesLocator;
-@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
+@property (nonatomic, strong, nullable) NSString *xdsServerAddress;
+@property (nonatomic, assign) UInt32 xdsServerPort;
+@property (nonatomic, strong, nullable) NSString *xdsJwtToken;
+@property (nonatomic, assign) UInt32 xdsJwtTokenLifetimeSeconds;
+@property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
+@property (nonatomic, strong, nullable) NSString *rtdsResourceName;
+@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
 @property (nonatomic, assign) BOOL enableCds;
+@property (nonatomic, strong, nullable) NSString *cdsResourcesLocator;
+@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
 @property (nonatomic, assign) intptr_t bootstrapPointer;
 
 /**
@@ -102,20 +102,20 @@ NS_ASSUME_NONNULL_BEGIN
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
-                                    rtdsLayerName:(nullable NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsAddress:(nullable NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort
-                                      adsJwtToken:(nullable NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
-                                  adsSslRootCerts:(nullable NSString *)adsSslRootCerts
                                            nodeId:(nullable NSString *)nodeId
                                        nodeRegion:(nullable NSString *)nodeRegion
                                          nodeZone:(nullable NSString *)nodeZone
                                       nodeSubZone:(nullable NSString *)nodeSubZone
-                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
-                                        enableCds:(BOOL)enableCds;
+                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
+                                    xdsServerPort:(UInt32)xdsServerPort
+                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
+                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
+                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
+                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds
+                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds;
 
 /**
  Generate a string description of the C++ Envoy bootstrap from this configuration.

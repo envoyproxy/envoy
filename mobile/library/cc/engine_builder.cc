@@ -41,6 +41,97 @@
 namespace Envoy {
 namespace Platform {
 
+#ifdef ENVOY_GOOGLE_GRPC
+XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
+    : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
+
+XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
+                                                  const int token_lifetime_in_seconds) {
+  jwt_token_ = std::move(token);
+  jwt_token_lifetime_in_seconds_ =
+      token_lifetime_in_seconds > 0 ? token_lifetime_in_seconds : DefaultJwtTokenLifetimeSeconds;
+  return *this;
+}
+
+XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
+  ssl_root_certs_ = root_certs;
+  return *this;
+}
+
+XdsBuilder& XdsBuilder::addRuntimeDiscoveryService(std::string resource_name,
+                                                   const int timeout_in_seconds) {
+  rtds_resource_name_ = std::move(resource_name);
+  rtds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
+  return *this;
+}
+
+XdsBuilder& XdsBuilder::addClusterDiscoveryService(std::string cds_resources_locator,
+                                                   const int timeout_in_seconds) {
+  enable_cds_ = true;
+  cds_resources_locator_ = std::move(cds_resources_locator);
+  cds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
+  return *this;
+}
+
+void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const {
+  auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+  ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  ads_config->set_set_node_on_first_message_only(true);
+  ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  auto& grpc_service = *ads_config->add_grpc_services();
+  grpc_service.mutable_google_grpc()->set_target_uri(
+      fmt::format(R"({}:{})", xds_server_address_, xds_server_port_));
+  grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
+  if (!ssl_root_certs_.empty()) {
+    grpc_service.mutable_google_grpc()
+        ->mutable_channel_credentials()
+        ->mutable_ssl_credentials()
+        ->mutable_root_certs()
+        ->set_inline_string(ssl_root_certs_);
+  }
+  if (!jwt_token_.empty()) {
+    auto& jwt = *grpc_service.mutable_google_grpc()
+                     ->add_call_credentials()
+                     ->mutable_service_account_jwt_access();
+    jwt.set_json_key(jwt_token_);
+    jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
+  }
+
+  if (!rtds_resource_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name("rtds_layer");
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_resource_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_in_seconds_);
+  }
+
+  if (enable_cds_) {
+    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    if (cds_resources_locator_.empty()) {
+      cds_config->mutable_ads();
+    } else {
+      bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
+      cds_config->mutable_api_config_source()->set_api_type(
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+      cds_config->mutable_api_config_source()->set_transport_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+    }
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_in_seconds_);
+    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    bootstrap->add_node_context_params("cluster");
+    // Stat prefixes that we use in tests.
+    auto* list =
+        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+    list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.cluster_added");
+  }
+}
+#endif
+
 EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
@@ -200,7 +291,7 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
-#ifdef ENVOY_GOOGLE_GRPC
+
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
@@ -212,30 +303,9 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
-                                                            std::string jwt_token,
-                                                            const int jwt_token_lifetime_seconds,
-                                                            std::string ssl_root_certs) {
-  ads_address_ = address;
-  ads_port_ = port;
-  ads_jwt_token_ = std::move(jwt_token);
-  ads_jwt_token_lifetime_seconds_ =
-      jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
-  ads_ssl_root_certs_ = std::move(ssl_root_certs);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
-  rtds_layer_name_ = std::move(layer_name);
-  rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
-                                          const int timeout_seconds) {
-  enable_cds_ = true;
-  cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
+#ifdef ENVOY_GOOGLE_GRPC
+EngineBuilder& EngineBuilder::setXds(std::unique_ptr<XdsBuilder>&& xds_builder) {
+  xds_builder_ = std::move(xds_builder);
   return *this;
 }
 #endif
@@ -787,62 +857,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   bootstrap->mutable_dynamic_resources();
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_address_.empty()) {
-    throw std::runtime_error("ADS must be configured when using xDS");
+#ifdef ENVOY_GOOGLE_GRPC
+  if (xds_builder_ != nullptr) {
+    xds_builder_->build(bootstrap.get());
   }
-  if (!rtds_layer_name_.empty()) {
-    auto* layered_runtime = bootstrap->mutable_layered_runtime();
-    auto* layer = layered_runtime->add_layers();
-    layer->set_name(rtds_layer_name_);
-    auto* rtds_layer = layer->mutable_rtds_layer();
-    rtds_layer->set_name(rtds_layer_name_);
-    auto* rtds_config = rtds_layer->mutable_rtds_config();
-    rtds_config->mutable_ads();
-    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
-  }
-  if (!ads_address_.empty()) {
-    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
-    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
-    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-    ads_config->set_set_node_on_first_message_only(true);
-    ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    auto& grpc_service = *ads_config->add_grpc_services();
-    grpc_service.mutable_google_grpc()->set_target_uri(target_uri);
-    grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
-    if (!ads_ssl_root_certs_.empty()) {
-      grpc_service.mutable_google_grpc()
-          ->mutable_channel_credentials()
-          ->mutable_ssl_credentials()
-          ->mutable_root_certs()
-          ->set_inline_string(ads_ssl_root_certs_);
-    }
-    if (!ads_jwt_token_.empty()) {
-      auto& jwt = *grpc_service.mutable_google_grpc()
-                       ->add_call_credentials()
-                       ->mutable_service_account_jwt_access();
-      jwt.set_json_key(ads_jwt_token_);
-      jwt.set_token_lifetime_seconds(ads_jwt_token_lifetime_seconds_);
-    }
-  }
-  if (enable_cds_) {
-    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
-    if (cds_resources_locator_.empty()) {
-      cds_config->mutable_ads();
-    } else {
-      bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
-      cds_config->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
-      cds_config->mutable_api_config_source()->set_transport_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-    }
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
-    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    bootstrap->add_node_context_params("cluster");
-    // add a stat prefix we use in test
-    list->add_patterns()->set_exact("cluster_manager.active_clusters");
-    list->add_patterns()->set_exact("cluster_manager.cluster_added");
-  }
+#endif
 
   envoy::config::listener::v3::ApiListenerManager api;
   auto* listener_manager = bootstrap->mutable_listener_manager();
