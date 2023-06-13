@@ -11,8 +11,10 @@ behavior_changes:
     Moved xDS code extensions. If you use the xDS and override extensions_build_config.bzl you will
     need to include the new config_subscriptions explicitly.
 - area: build
+  change: |
     Substitution formatter extension factory interface is changed to receive the factory context.
 - area: build
+  change: |
     Access log filter extension factory interface is changed to receive the factory context.
 - area: http
   change: |
