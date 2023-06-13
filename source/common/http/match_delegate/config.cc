@@ -334,12 +334,10 @@ FilterConfigPerRoute::createFilterMatchTree(
       envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name()));
-  Server::Configuration::FactoryContext* context =
-      reinterpret_cast<Server::Configuration::FactoryContext*>(&server_context);
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       fmt::format("http.{}.",
                   server_context.scope().symbolTable().toString(server_context.scope().prefix())),
-      *context};
+      absl::nullopt, server_context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,

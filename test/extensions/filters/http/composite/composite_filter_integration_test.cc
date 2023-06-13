@@ -1,4 +1,3 @@
-
 #include <optional>
 #include <string>
 
@@ -6,9 +5,9 @@
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/network/address.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
-#include "envoy/network/address.h"
 
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
@@ -16,9 +15,8 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
 #include "test/integration/filters/add_body_filter.pb.h"
-#include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
-
+#include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/helloworld.pb.h"
