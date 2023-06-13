@@ -1,7 +1,8 @@
+#include <cstddef>
+
 #include "envoy/common/inline_map_registry.h"
 
 #include "benchmark/benchmark.h"
-#include <cstddef>
 
 namespace Envoy {
 namespace {
