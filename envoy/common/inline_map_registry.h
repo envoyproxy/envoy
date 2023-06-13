@@ -44,14 +44,8 @@ struct InlineMapRegistryDebugInfo {
 class InlineMapRegistryManager {
 public:
   static const std::vector<InlineMapRegistryDebugInfo>& registryInfos() {
-    static bool finalized = false;
-
     // Call finalize() to ensure that all finalizers are called.
-    if (!finalized) {
-      finalize();
-      finalized = true;
-    }
-
+    finalize();
     return mutableRegistryInfos();
   }
 
@@ -66,6 +60,11 @@ public:
 
 private:
   using Finalizer = std::function<InlineMapRegistryDebugInfo()>;
+
+  static uint64_t nextScopeId() {
+    static uint64_t next_scope_id = 0;
+    return next_scope_id++;
+  }
 
   /**
    * Call all finalizers. This should only be called once, after all registrations are
@@ -107,6 +106,7 @@ public:
   };
 
   using RegistrationMap = absl::flat_hash_map<std::string, InlineHandle>;
+  using Hash = absl::container_internal::hash_default_hash<std::string>;
 
   template <class T> class InlineMap : public InlineStorage {
   public:
@@ -118,14 +118,15 @@ public:
     // Get the entry for the given key. If the key is not found, return nullptr.
     RawT lookup(absl::string_view key) const {
       // Compute the hash value for the key and avoid computing it again in the lookup.
-      const size_t hash_value = absl::Hash<absl::string_view>()(key);
+      const size_t hash_value = InlineMapRegistry::Hash()(key);
+
+      // Because the normal string view key is used here, try the normal map entry first.
+      if (auto it = map_.find(key, hash_value); it != map_.end()) {
+        return it->second.get();
+      }
 
       if (auto entry_id = staticLookup(key, hash_value); entry_id.has_value()) {
         return inline_entries_[*entry_id];
-      }
-
-      if (auto it = map_.find(key, hash_value); it != map_.end()) {
-        return it->second.get();
       }
 
       return nullptr;
@@ -385,7 +386,7 @@ template <class Scope> uint64_t InlineMapRegistryManager::generateScopeId() {
   RELEASE_ASSERT(!initialized,
                  "InlineMapRegistryManager::generateScopeId() called twice for same scope");
 
-  const uint64_t scope_id = mutableFinalizers().size();
+  const uint64_t scope_id = nextScopeId();
   mutableFinalizers().push_back([scope_id]() -> InlineMapRegistryDebugInfo {
     using Registry = InlineMapRegistry<Scope>;
     ASSERT(Registry::scopeId() == scope_id);
