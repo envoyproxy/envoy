@@ -368,7 +368,7 @@ void ZooKeeperFilter::onCloseRequest() {
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
                                         const bool readonly,
-                                        const std::chrono::milliseconds& latency) {
+                                        const std::chrono::milliseconds latency) {
   config_->stats_.connect_resp_.inc();
 
   switch (config_->errorBudgetDecision(OpCodes::Connect, latency)) {
@@ -394,7 +394,7 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 }
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
-                                 const int32_t error, const std::chrono::milliseconds& latency) {
+                                 const int32_t error, const std::chrono::milliseconds latency) {
   Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
   std::string opname = "";
   auto iter = config_->op_code_map_.find(opcode);

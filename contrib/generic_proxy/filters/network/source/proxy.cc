@@ -137,6 +137,10 @@ OptRef<UpstreamManager> ActiveStream::ActiveDecoderFilter::boundUpstreamConn() {
   return parent_.parent_.boundUpstreamConn();
 }
 
+const Network::Connection* ActiveStream::ActiveFilterBase::connection() const {
+  return &parent_.parent_.connection();
+}
+
 void ActiveStream::continueEncoding() {
   if (active_stream_reset_ || local_or_upstream_response_stream_ == nullptr) {
     return;
