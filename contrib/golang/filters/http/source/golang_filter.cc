@@ -1106,6 +1106,50 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_str) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    auto go_filter_state =
+        state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key);
+    if (go_filter_state) {
+      req_->strValue = go_filter_state->value();
+      value_str->p = req_->strValue.data();
+      value_str->n = req_->strValue.length();
+    }
+  } else {
+    auto key_str = std::string(key);
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        auto go_filter_state =
+            state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key_str);
+        if (go_filter_state) {
+          req_->strValue = go_filter_state->value();
+          value_str->p = req_->strValue.data();
+          value_str->n = req_->strValue.length();
+        }
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
