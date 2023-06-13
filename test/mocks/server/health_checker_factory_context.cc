@@ -20,6 +20,7 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_context_));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;

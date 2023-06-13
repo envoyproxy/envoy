@@ -55,9 +55,11 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
                                   Event::Dispatcher& dispatcher,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api, AccessLog::AccessLogManager& log_manager)
+                                  Api::Api& api, AccessLog::AccessLogManager& log_manager,
+                                  Server::Configuration::ServerFactoryContext& server_context)
       : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
-        validation_visitor_(validation_visitor), log_manager_(log_manager), api_(api) {}
+        validation_visitor_(validation_visitor), log_manager_(log_manager), api_(api),
+        server_context_(server_context) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -72,6 +74,10 @@ public:
     event_logger_ = std::move(event_logger);
   }
 
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
+    return server_context_;
+  };
+
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
@@ -80,6 +86,7 @@ private:
   AccessLog::AccessLogManager& log_manager_;
   Api::Api& api_;
   HealthCheckEventLoggerPtr event_logger_;
+  Server::Configuration::ServerFactoryContext& server_context_;
 };
 
 /**
@@ -100,13 +107,15 @@ public:
    * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
+   * @param server_context reference to the Server context object
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+         Server::Configuration::ServerFactoryContext& server_context);
 };
 
 /**

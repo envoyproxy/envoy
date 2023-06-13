@@ -96,6 +96,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        ":factory_context_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/upstream:health_checker_interface",

@@ -34,6 +34,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -80,10 +81,11 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::MockApi api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_THROW_WITH_MESSAGE(
       HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, dispatcher,
-                                   log_manager, validation_visitor, api),
+                                   log_manager, validation_visitor, api, server_context),
       EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
@@ -98,12 +100,13 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  EXPECT_NE(nullptr,
-            dynamic_cast<GrpcHealthCheckerImpl*>(
-                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
-                                             dispatcher, log_manager, validation_visitor, api)
-                    .get()));
+  EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
+                         HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
+                                                      runtime, dispatcher, log_manager,
+                                                      validation_visitor, api, server_context)
+                             .get()));
 }
 
 class HealthCheckerTestBase {
@@ -6401,13 +6404,14 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   Event::MockDispatcher dispatcher;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
   HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+                                          log_manager, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
@@ -6474,13 +6478,14 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   Event::MockDispatcher dispatcher;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
 
   HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+                                          log_manager, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
