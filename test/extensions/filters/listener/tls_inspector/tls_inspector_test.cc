@@ -494,6 +494,93 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(*buffer_));
 }
 
+// attempt to duplicate test using readv instead of recv.
+TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
+  LogLevelSetter save_levels{spdlog::level::trace};
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  const uint32_t initial_buffer_size = 64;
+  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
+  const std::string servername("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
+#ifdef WIN32
+  {
+    InSequence s;
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    for (size_t i = 0; i < client_hello.size(); i++) {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Invoke([&client_hello, i](os_fd_t fd, const iovec* iov,
+                                              int iovcnt) -> Api::SysCallSizeResult {
+            // ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data() + i, 1);
+            return Api::SysCallSizeResult{ssize_t(1), 0};
+          }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+  }
+#else
+  {
+    InSequence s;
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
+          return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+        }));
+    for (size_t i = 1; i <= client_hello.size(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
+                                              int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, client_hello.size());
+            // ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
+    }
+  }
+#endif
+  bool got_continue = false;
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  // Create list of maxReadSizes
+  std::vector<size_t> max_read_sizes;
+  max_read_sizes.push_back(filter_->maxReadBytes());
+
+  while (!got_continue) {
+    // trigger the event to copy the client hello message into buffer
+    file_event_callback_(Event::FileReadyType::Read);
+    auto state = filter_->onData(*buffer_);
+    if (filter_->maxReadBytes() != max_read_sizes.back()) {
+      auto new_buffer_size = filter_->maxReadBytes();
+      max_read_sizes.push_back(new_buffer_size);
+      buffer_->resetCapacity(new_buffer_size);
+    }
+    if (state == Network::FilterStatus::Continue) {
+      got_continue = true;
+    }
+  }
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(1, cfg_->stats().sni_found_.value());
+  EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(client_hello.size(), bytes_processed[0]);
+
+  // Check doubling amount max read sizes
+  std::vector<size_t> quotients;
+  quotients.reserve(max_read_sizes.size());
+  std::adjacent_difference(max_read_sizes.begin(), max_read_sizes.end(), quotients.begin(),
+                           std::divides<size_t>());
+  EXPECT_EQ(std::find(quotients.begin() + 1, quotients.end(), 2), quotients.end());
+}
+
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const uint32_t initial_buffer_size = 15;
