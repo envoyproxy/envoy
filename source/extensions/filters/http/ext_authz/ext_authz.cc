@@ -54,9 +54,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (const auto& metadata_it = connection_metadata.find(context_key);
         metadata_it != connection_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
-    if (const auto& metadata_it = request_metadata.find(context_key);
-        metadata_it != request_metadata.end()) {
+    } else if (const auto& metadata_it = request_metadata.find(context_key);
+               metadata_it != request_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
@@ -72,9 +71,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (const auto& metadata_it = connection_typed_metadata.find(context_key);
         metadata_it != connection_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
-    if (const auto& metadata_it = request_typed_metadata.find(context_key);
-        metadata_it != request_typed_metadata.end()) {
+    } else if (const auto& metadata_it = request_typed_metadata.find(context_key);
+               metadata_it != request_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
