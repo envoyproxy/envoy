@@ -56,13 +56,15 @@ public:
   bool flushOnAdmin() const override { return flush_on_admin_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
-  bool enableDeferredCreationStats() const override { return enable_deferred_creation_stats_; }
+  bool enableDeferredCreationStats() const override {
+    return deferred_stat_options_.enable_deferred_creation_stats();
+  }
 
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
-  bool enable_deferred_creation_stats_{false};
+  const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
 };
 
 /**

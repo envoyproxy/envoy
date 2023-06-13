@@ -19,7 +19,7 @@ namespace Stats {
  * This class is thread-safe -- instantiations can occur on multiple concurrent threads.
  * This is used when
  * :ref:`enable_deferred_creation_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is enabled.
+ * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>` is enabled.
  */
 template <typename StatsStructType>
 class DeferredStats : public DeferredCreationCompatibleInterface<StatsStructType> {
@@ -85,7 +85,7 @@ private:
 
 // Non-deferred wrapper over StatsStructType. This is used when
 // :ref:`enable_deferred_creation_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is not
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>` is not
 // enabled.
 template <typename StatsStructType>
 class DirectStats : public DeferredCreationCompatibleInterface<StatsStructType> {
@@ -100,7 +100,7 @@ private:
 
 // Template that lazily initializes a StatsStruct.
 // The bootstrap config :ref:`enable_deferred_creation_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>` decides if
 // stats lazy initialization is enabled or not.
 template <typename StatsStructType>
 DeferredCreationCompatibleStats<StatsStructType>

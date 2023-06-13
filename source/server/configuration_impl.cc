@@ -61,7 +61,7 @@ void FilterChainUtility::buildUdpFilterChain(
 }
 
 StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
-    : enable_deferred_creation_stats_(bootstrap.enable_deferred_creation_stats()) {
+    : deferred_stat_options_(bootstrap.deferred_stat_options()) {
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
