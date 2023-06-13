@@ -232,7 +232,7 @@ Envoy
 template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
   // Helper function to get-or-create and return the StatsStructType object.
-  virtual StatsStructType& instantiate() PURE;
+  virtual StatsStructType& getOrCreate() PURE;
 
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
@@ -247,8 +247,8 @@ public:
   DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) noexcept = default;
   DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) noexcept = default;
 
-  inline StatsStructType* operator->() { return &data_->instantiate(); };
-  inline StatsStructType& operator*() { return data_->instantiate(); };
+  inline StatsStructType* operator->() { return &data_->getOrCreate(); };
+  inline StatsStructType& operator*() { return data_->getOrCreate(); };
 
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;

@@ -46,7 +46,7 @@ public:
           return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {
-      getOrCreate();
+      instantiate();
     }
   }
   ~DeferredStats() {
@@ -56,10 +56,10 @@ public:
   }
 
 private:
-  // We can't call instantiate directly from constructor, otherwise the compiler complains about
+  // We can't call getOrCreate directly from constructor, otherwise the compiler complains about
   // bypassing virtual dispatch even though it's fine.
-  inline StatsStructType& getOrCreate() { return *internal_stats_.get(ctor_); }
-  inline StatsStructType& instantiate() override { return getOrCreate(); }
+  inline StatsStructType& instantiate() { return *internal_stats_.get(ctor_); }
+  inline StatsStructType& getOrCreate() override { return instantiate(); }
 
   // In order to preserve stat value continuity across a config reload, we need to automatically
   // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
@@ -94,7 +94,7 @@ public:
       : stats_(stat_names, scope) {}
 
 private:
-  inline StatsStructType& instantiate() override { return stats_; }
+  inline StatsStructType& getOrCreate() override { return stats_; }
   StatsStructType stats_;
 };
 
