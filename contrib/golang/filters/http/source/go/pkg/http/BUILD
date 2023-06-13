@@ -6,7 +6,6 @@ go_library(
     name = "http",
     srcs = [
         "api.h",
-        "capi.go",
         "capi_impl.go",
         "config.go",
         "filter.go",

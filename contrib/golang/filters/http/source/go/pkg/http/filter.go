@@ -219,5 +219,5 @@ func (f *filterState) SetString(key, value string, stateType api.StateType, life
 }
 
 func (f *filterState) GetString(key string) string {
-	return cAPI.HttpGetStringFilterState(f.request, key)
+	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
 }

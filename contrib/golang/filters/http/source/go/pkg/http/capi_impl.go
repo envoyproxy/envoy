@@ -265,10 +265,10 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI HttpCAPI = &httpCApiImpl{}
+var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api HttpCAPI) {
+func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
 }
 
@@ -277,7 +277,8 @@ func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, va
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
+	r := (*httpRequest)(rr)
 	var value string
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
