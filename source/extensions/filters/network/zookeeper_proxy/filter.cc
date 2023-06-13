@@ -81,6 +81,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
              stats_.setwatches_resp_slow_, "setwatches_resp");
   initOpCode(OpCodes::SetWatches2, stats_.setwatches2_resp_, stats_.setwatches2_resp_fast_,
              stats_.setwatches2_resp_slow_, "setwatches2_resp");
+  initOpCode(OpCodes::AddWatch, stats_.addwatch_resp_, stats_.addwatch_resp_fast_,
+             stats_.addwatch_resp_slow_, "addwatch_resp");
   initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, stats_.checkwatches_resp_fast_,
              stats_.checkwatches_resp_slow_, "checkwatches_resp");
   initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, stats_.removewatches_resp_fast_,
@@ -349,6 +351,11 @@ void ZooKeeperFilter::onSetWatchesRequest() {
 void ZooKeeperFilter::onSetWatches2Request() {
   config_->stats_.setwatches2_rq_.inc();
   setDynamicMetadata("opname", "setwatches2");
+}
+
+void ZooKeeperFilter::onAddWatchRequest(const std::string& path, const int32_t mode) {
+  config_->stats_.addwatch_rq_.inc();
+  setDynamicMetadata({{"opname", "addwatch"}, {"path", path}, {"mode", std::to_string(mode)}});
 }
 
 void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {
