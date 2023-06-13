@@ -51,6 +51,7 @@ type HttpCAPI interface {
 	HttpFinalize(r unsafe.Pointer, reason int)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
+	HttpGetStringFilterState(r unsafe.Pointer, key string) string
 }
 
 type NetworkCAPI interface {

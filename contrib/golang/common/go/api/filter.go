@@ -162,4 +162,5 @@ const (
 
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
+	GetString(key string) string
 }

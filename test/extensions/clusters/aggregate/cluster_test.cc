@@ -12,6 +12,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -123,7 +124,7 @@ public:
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
-    lb_ = lb_factory_->create();
+    lb_ = lb_factory_->create(lb_params_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -145,6 +146,10 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster
