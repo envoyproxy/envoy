@@ -43,7 +43,7 @@ jobs:
         ENVOY_IP_TEST_VERSIONS: v4only
       run: |
         cd mobile
-        ./bazelw run
+        ./bazelw run \
             --config=remote-ci-linux \
             --config=ci \
             --test_output=all \
