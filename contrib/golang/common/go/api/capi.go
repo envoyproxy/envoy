@@ -17,6 +17,19 @@
 
 package api
 
+/*
+// ref https://github.com/golang/go/issues/25832
+
+#cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
+#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "api.h"
+
+*/
+import "C"
 import "unsafe"
 
 type HttpCAPI interface {
@@ -51,6 +64,7 @@ type HttpCAPI interface {
 	HttpFinalize(r unsafe.Pointer, reason int)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
+	HttpGetStringFilterState(r *C.httpRequest, key string) string
 }
 
 type NetworkCAPI interface {

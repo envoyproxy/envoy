@@ -33,6 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -57,9 +58,11 @@ type panicInfo struct {
 	details string
 }
 type httpRequest struct {
-	req        *C.httpRequest
-	httpFilter api.StreamFilter
-	pInfo      panicInfo
+	req            *C.httpRequest
+	httpFilter     api.StreamFilter
+	pInfo          panicInfo
+	sema           sync.WaitGroup
+	waitingOnEnvoy int32
 }
 
 func (r *httpRequest) pluginName() string {
@@ -213,4 +216,8 @@ func (s *streamInfo) FilterState() api.FilterState {
 
 func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
 	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request.req), key, value, stateType, lifeSpan, streamSharing)
+}
+
+func (f *filterState) GetString(key string) string {
+	return cAPI.HttpGetStringFilterState(f.request, key)
 }

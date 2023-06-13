@@ -83,5 +83,9 @@ func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPt
 //export envoyGoFilterOnUpstreamEvent
 func envoyGoFilterOnUpstreamEvent(wrapper unsafe.Pointer, event int) {}
 
+//export envoyGoRequestSemaDec
+func envoyGoRequestSemaDec(r *C.httpRequest) {
+}
+
 func main() {
 }
