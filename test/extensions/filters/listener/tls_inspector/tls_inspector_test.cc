@@ -182,6 +182,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
 
 // Test with the ClientHello spread over multiple socket reads.
 TEST_P(TlsInspectorTest, MultipleReads) {
+  LogLevelSetter save_levels{spdlog::level::trace};
   init();
   const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
@@ -502,6 +503,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
 
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  io_handle_ = Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt);
   init();
   const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
@@ -552,7 +554,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
   std::vector<size_t> max_read_sizes;
   max_read_sizes.push_back(filter_->maxReadBytes());
 
-  while (!got_continue) {
+  for (uint32_t i = 0; i < 3 * client_hello.size(); ++i) {
     // trigger the event to copy the client hello message into buffer
     file_event_callback_(Event::FileReadyType::Read);
     auto state = filter_->onData(*buffer_);
@@ -563,6 +565,9 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
     }
     if (state == Network::FilterStatus::Continue) {
       got_continue = true;
+    }
+    if (got_continue) {
+      break;
     }
   }
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -578,7 +583,9 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoublesIfNeedAdditonalDataReadv) {
   quotients.reserve(max_read_sizes.size());
   std::adjacent_difference(max_read_sizes.begin(), max_read_sizes.end(), quotients.begin(),
                            std::divides<size_t>());
-  EXPECT_EQ(std::find(quotients.begin() + 1, quotients.end(), 2), quotients.end());
+  EXPECT_EQ(std::find_if_not(quotients.begin() + 1, quotients.end(),
+                             [](size_t quotient) { return quotient == 2; }),
+            quotients.end());
 }
 
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
