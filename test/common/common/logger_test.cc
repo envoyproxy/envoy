@@ -384,6 +384,54 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
   ENVOY_LOG_MISC(info, "{\"nested_message\":\"hello\"}");
 }
 
+TEST(LoggerUtilityTest, TestSerializeLogTags) {
+  // No entries
+  EXPECT_EQ("", Envoy::Logger::Utility::serializeLogTags({}));
+
+  // Empty key or value
+  EXPECT_EQ("[Tags: \"\":\"\"] ", Envoy::Logger::Utility::serializeLogTags({{"", ""}}));
+  EXPECT_EQ("[Tags: \"\":\"value\"] ", Envoy::Logger::Utility::serializeLogTags({{"", "value"}}));
+  EXPECT_EQ("[Tags: \"key\":\"\"] ", Envoy::Logger::Utility::serializeLogTags({{"key", ""}}));
+
+  // Single entry
+  EXPECT_EQ("[Tags: \"key\":\"value\"] ",
+            Envoy::Logger::Utility::serializeLogTags({{"key", "value"}}));
+
+  // Multiple entries
+  EXPECT_EQ("[Tags: \"key1\":\"value1\",\"key2\":\"value2\",\"key3\":\"value3\"] ",
+            Envoy::Logger::Utility::serializeLogTags(
+                {{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}));
+}
+
+class ClassForTaggedLog : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
+public:
+  void logMessageWithPreCreatedTags() { ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val"); }
+
+  void logMessageWithInlineTags() {
+    ENVOY_TAGGED_LOG(info, (std::map<std::string, std::string>{{"key_inline", "val"}}),
+                     "fake message {}", "val");
+  }
+
+private:
+  std::map<std::string, std::string> tags_{{"key", "val"}};
+};
+
+TEST(TaggedLogTest, TestTaggedLog) {
+  Envoy::Logger::Registry::setLogFormat("%v");
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"key\":\"val\"] fake message val"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"key_inline\":\"val\"] fake message val"));
+      }));
+
+  ClassForTaggedLog object;
+  object.logMessageWithPreCreatedTags();
+  object.logMessageWithInlineTags();
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy
