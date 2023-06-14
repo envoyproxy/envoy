@@ -96,8 +96,11 @@ private:
  * handle for the key. Then you can use the handle to access the key/value pair in the map without
  * even one time hash searching.
  *
- * This is useful when the key is frequently used and the key is known at compile time or bootstrap
- * time. You can get superior performance by using the inline handle.
+ * This is useful when some keys are frequently used and the keys are known at compile time or
+ * bootstrap time. You can get superior performance by using the inline handle. For example, the
+ * filter state uses always use the filter name as the key and the filter name is known at compile
+ * time. By using the inline handle, the filter state could get the key/value pair without any hash.
+ *
  * This template also provides the interface to access the key/value pair by the normal key and the
  * interface has similar searching performance as the normal hash map. But the insertion and removal
  * by the normal key is slower than the normal hash map.
@@ -382,6 +385,23 @@ public:
     // It is safe to reference the key here because the key is stored in the node hash set.
     mutableRegistrationMap().emplace(absl::string_view(*result.first), entry_id);
     return InlineHandle(entry_id, absl::string_view(*result.first));
+  }
+
+  /**
+   * Fetch the inline handle for the given key. May only be called after finalized(). This should
+   * be used to get the inline handle for the key registered by registerInlineKey(). This function
+   * could used to determine if the key is registered or not at runtime or xDS config loading time
+   * and decide if the key should be used as inline key or normal key.
+   */
+  absl::optional<InlineHandle> getInlineHandle(absl::string_view key) {
+    ASSERT(mutableFinalized(), "Cannot get inline handle before finalized()");
+
+    if (auto it = mutableRegistrationMap().find(key); it != mutableRegistrationMap().end()) {
+      // It is safe to reference the key here because the key is stored in the node hash set.
+      return InlineHandle(it->second, it->first);
+    }
+
+    return absl::nullopt;
   }
 
   /**
