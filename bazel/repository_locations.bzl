@@ -1105,7 +1105,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
         ],
-        release_date = "2023-05-23",
+        release_date = "2023-05-24",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
