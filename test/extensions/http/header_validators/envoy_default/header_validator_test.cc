@@ -83,17 +83,12 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeValid) {
 
   EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_https));
   EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_http));
-}
 
-TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidMixedCase) {
-  HeaderString invalid_https{"HtTps"};
-  HeaderString invalid_http{"hTtp"};
-  auto uhv = createBase(empty_config);
+  HeaderString mixed_https{"HtTps"};
+  HeaderString mixed_http{"hTtp"};
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_https),
-                             UhvResponseCodeDetail::get().InvalidScheme);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_http),
-                             UhvResponseCodeDetail::get().InvalidScheme);
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_https));
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_http));
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidChar) {

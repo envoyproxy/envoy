@@ -1141,6 +1141,24 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
          method == Http::Headers::get().MethodValues.Trace;
 }
 
+bool Utility::schemeIsValid(const absl::string_view scheme) {
+  return schemeIsHttp(scheme) || schemeIsHttps(scheme);
+}
+
+bool Utility::schemeIsHttp(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Http;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
+}
+
+bool Utility::schemeIsHttps(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Https;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
+}
+
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
   return remote_decode_complete &&
                  Runtime::runtimeFeatureEnabled(
