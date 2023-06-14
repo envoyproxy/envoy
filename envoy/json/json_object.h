@@ -28,7 +28,7 @@ public:
   Exception(const std::string& message) : EnvoyException(message) {}
 };
 
-using Value = absl::variant<bool, int64_t, double, std::string>;
+using ValueType = absl::variant<bool, int64_t, double, std::string>;
 
 /**
  * Wraps an individual JSON node.
@@ -49,7 +49,7 @@ public:
    * @param name supplies the key name.
    * @return bool the value.
    */
-  virtual Value getValue(const std::string& name) const PURE;
+  virtual ValueType getValue(const std::string& name) const PURE;
 
   /**
    * Get a boolean value by name.
