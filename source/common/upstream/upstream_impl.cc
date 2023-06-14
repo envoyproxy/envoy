@@ -228,10 +228,9 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   ASSERT(cluster_socket_options_ != nullptr);
 
   if (cluster_config.has_upstream_bind_config()) {
-    parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
-                    base_socket_options_, cluster_socket_options_);
+    parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config());
   } else if (bootstrap_bind_config.has_value()) {
-    parseBindConfig("", *bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
+    parseBindConfig("", *bootstrap_bind_config);
   }
 }
 
@@ -333,9 +332,7 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
 }
 
 void UpstreamLocalAddressSelectorImpl::parseBindConfig(
-    const std::string cluster_name, const envoy::config::core::v3::BindConfig& bind_config,
-    const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options) {
+    const std::string cluster_name, const envoy::config::core::v3::BindConfig& bind_config) {
   if (bind_config.additional_source_addresses_size() > 0 &&
       bind_config.extra_source_addresses_size() > 0) {
     throw EnvoyException(
@@ -374,8 +371,8 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
           : nullptr;
   upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
-  Network::Socket::appendOptions(upstream_local_address.socket_options_, base_socket_options);
-  Network::Socket::appendOptions(upstream_local_address.socket_options_, cluster_socket_options);
+  Network::Socket::appendOptions(upstream_local_address.socket_options_, base_socket_options_);
+  Network::Socket::appendOptions(upstream_local_address.socket_options_, cluster_socket_options_);
 
   upstream_local_addresses_.push_back(upstream_local_address);
 
@@ -397,7 +394,7 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
     extra_upstream_local_address.socket_options_ =
         std::make_shared<Network::ConnectionSocket::Options>();
     Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
-                                   base_socket_options);
+                                   base_socket_options_);
 
     if (bind_config.extra_source_addresses(0).has_socket_options()) {
       Network::Socket::appendOptions(
@@ -406,7 +403,7 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
               bind_config.extra_source_addresses(0).socket_options().socket_options()));
     } else {
       Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
-                                     cluster_socket_options);
+                                     cluster_socket_options_);
     }
 
     upstream_local_addresses_.push_back(extra_upstream_local_address);
@@ -431,9 +428,9 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
         std::make_shared<Network::ConnectionSocket::Options>();
 
     Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
-                                   base_socket_options);
+                                   base_socket_options_);
     Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
-                                   cluster_socket_options);
+                                   cluster_socket_options_);
 
     upstream_local_addresses_.push_back(additional_upstream_local_address);
   }

@@ -87,9 +87,7 @@ public:
 
 private:
   void parseBindConfig(const std::string cluster_name,
-                       const envoy::config::core::v3::BindConfig& bind_config,
-                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
+                       const envoy::config::core::v3::BindConfig& bind_config);
 
   Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
