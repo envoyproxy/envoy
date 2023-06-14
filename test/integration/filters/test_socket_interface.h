@@ -61,6 +61,7 @@ public:
 
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
+  Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
