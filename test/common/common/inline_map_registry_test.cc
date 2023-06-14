@@ -24,7 +24,7 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
     EXPECT_EQ(*map->lookup("key_" + std::to_string(i)), "value_" + std::to_string(i));
   }
 
-  // Looup by untyped inline handle.
+  // Lookup by untyped inline handle.
   for (size_t i = 0; i < 200; ++i) {
     const std::string key = "key_" + std::to_string(i);
     UntypedInlineHandle handle(InlineMapRegistry<InlineMapRegistryTestScope<0>>::scopeId(), i, key);
