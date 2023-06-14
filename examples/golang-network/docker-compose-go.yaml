@@ -6,7 +6,8 @@ services:
       target: golang-base
     command: >
       bash -c "
-      cd examples/golang/simple
+      cd examples/golang-network/simple
+      && go mod tidy
       && go build -o simple.so -buildmode=c-shared .
       && cp ./simple.so /output"
     working_dir: /source
