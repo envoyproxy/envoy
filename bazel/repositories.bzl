@@ -14,6 +14,14 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    # CEL does not build on Windows VS 2019 tools
+    "envoy.access_loggers.extension_filters.cel",
+    "envoy.rate_limit_descriptors.expr",
+    "envoy.formatter.cel",
+    "envoy.matching.inputs.cel_data_input",
+    "envoy.matching.matchers.cel_matcher",
+    "envoy.filters.http.rbac",
+    "envoy.filters.network.rbac",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
