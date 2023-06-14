@@ -29,15 +29,9 @@ namespace Envoy {
 
 namespace {
 
-using envoy::config::route::v3::Route;
-using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
-using envoy::extensions::filters::common::matcher::action::v3::SkipFilter;
 using envoy::extensions::filters::http::composite::v3::ExecuteFilterAction;
-using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 using envoy::type::matcher::v3::HttpRequestHeaderMatchInput;
-using test::integration::filters::AddBodyFilterConfig;
 using test::integration::filters::SetResponseCodeFilterConfig;
 using xds::type::matcher::v3::Matcher_OnMatch;
 
