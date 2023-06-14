@@ -169,6 +169,15 @@ DelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers)
   if (match_state_.skipFilter()) {
     return Envoy::Http::FilterTrailersStatus::Continue;
   }
+
+  if (match_state_.callbackStatus() != Matcher::MatchCallbackStatus::Continue) {
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
+                                       "Stream failed due to match callback error", nullptr,
+                                       absl::nullopt, "");
+
+    return Envoy::Http::FilterTrailersStatus::StopIteration;
+  }
+
   return decoder_filter_->decodeTrailers(trailers);
 }
 
@@ -211,6 +220,15 @@ DelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, b
   if (match_state_.skipFilter()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
+
+  if (match_state_.callbackStatus() != Matcher::MatchCallbackStatus::Continue) {
+    encoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
+                                       "Stream failed due to match callback error", nullptr,
+                                       absl::nullopt, "");
+
+    return Envoy::Http::FilterHeadersStatus::StopIteration;
+  }
+
   return encoder_filter_->encodeHeaders(headers, end_stream);
 }
 
@@ -230,6 +248,15 @@ DelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers
   if (match_state_.skipFilter()) {
     return Envoy::Http::FilterTrailersStatus::Continue;
   }
+
+  if (match_state_.callbackStatus() != Matcher::MatchCallbackStatus::Continue) {
+    encoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
+                                       "Stream failed due to match callback error", nullptr,
+                                       absl::nullopt, "");
+
+    return Envoy::Http::FilterTrailersStatus::StopIteration;
+  }
+
   return encoder_filter_->encodeTrailers(trailers);
 }
 
