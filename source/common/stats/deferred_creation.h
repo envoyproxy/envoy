@@ -108,9 +108,11 @@ createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
                               const typename StatsStructType::StatNameType& stat_names,
                               bool deferred_creation) {
   if (deferred_creation) {
-    return {std::make_unique<DeferredStats<StatsStructType>>(stat_names, scope)};
+    return DeferredCreationCompatibleStats<StatsStructType>(
+        std::make_unique<DeferredStats<StatsStructType>>(stat_names, scope));
   } else {
-    return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
+    return DeferredCreationCompatibleStats<StatsStructType>(
+        std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope));
   }
 }
 
