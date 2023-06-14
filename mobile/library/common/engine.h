@@ -82,7 +82,10 @@ public:
    */
   envoy_status_t makeAdminCall(absl::string_view path, absl::string_view method, envoy_data& out);
 
-  /* Dump Envoy stats into the returned buffer*/
+  /**
+   * Dump Envoy stats into the returned buffer
+   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
+   */
   Buffer::OwnedImpl dumpStats();
 
   /**
