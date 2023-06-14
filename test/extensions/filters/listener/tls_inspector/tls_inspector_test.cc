@@ -66,9 +66,6 @@ public:
           .WillOnce(Invoke([=, &client_hello](os_fd_t, void* buffer, size_t length,
                                               int) -> Api::SysCallSizeResult {
             const size_t amount_to_copy = std::min(length, client_hello.size());
-            // TODO(kbaichoo): remove
-            ENVOY_LOG_MISC(debug, "mock recv length: {} client_hello {} amount_to_copy {}", length,
-                           client_hello.size(), amount_to_copy);
             memcpy(buffer, client_hello.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
@@ -279,7 +276,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
-  mockSysCallForPeek(client_hello);
+  mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -442,8 +439,6 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
 }
 
 TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
-  // TODO(kbaichoo): remove
-  LogLevelSetter save_levels{spdlog::level::trace};
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const uint32_t initial_buffer_size = 15;
   const size_t max_size = 50;
