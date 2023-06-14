@@ -1,14 +1,14 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_set.h"
-
-#include <cstddef>
-#include <cstdint>
 
 namespace Envoy {
 
