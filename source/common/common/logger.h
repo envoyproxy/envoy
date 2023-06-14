@@ -396,6 +396,10 @@ protected:
 
 namespace Utility {
 
+constexpr static absl::string_view TagsPrefix = "[Tags: ";
+constexpr static absl::string_view TagsSuffix = "] ";
+constexpr static absl::string_view TagsSuffixForSearch = "\"] ";
+
 /**
  * Sets the log format for a specific logger.
  */
@@ -403,6 +407,7 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
+ * To support JSON format tags, the key and values will be serialized as escaped JSON string.
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
 
@@ -465,7 +470,7 @@ public:
   }
 
   constexpr static char Placeholder = '*';
-  constexpr static absl::string_view JsonPropertyDeimilter = ",";
+  constexpr static char JsonPropertyDeimilter = ',';
 };
 
 class ExtractedMessage : public spdlog::custom_flag_formatter {

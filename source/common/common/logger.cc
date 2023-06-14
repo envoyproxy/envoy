@@ -332,14 +332,30 @@ std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
   }
 
   std::stringstream tags_stream;
-  tags_stream << "[Tags: ";
+  tags_stream << TagsPrefix;
   for (const auto& tag : tags) {
-    tags_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+    tags_stream << "\"";
+
+    auto required_space = JsonEscaper::extraSpace(tag.first);
+    if (required_space == 0) {
+      tags_stream << tag.first;
+    } else {
+      tags_stream << JsonEscaper::escapeString(tag.first, required_space);
+    }
+    tags_stream << "\":\"";
+
+    required_space = JsonEscaper::extraSpace(tag.second);
+    if (required_space == 0) {
+      tags_stream << tag.second;
+    } else {
+      tags_stream << JsonEscaper::escapeString(tag.second, required_space);
+    }
+    tags_stream << "\",";
   }
 
   std::string serialized = tags_stream.str();
   serialized.pop_back();
-  serialized += "] ";
+  serialized += TagsSuffix;
 
   return serialized;
 }
@@ -376,24 +392,25 @@ void EscapeMessageJsonString::format(const spdlog::details::log_msg& msg, const 
 void ExtractedTags::format(const spdlog::details::log_msg& msg, const std::tm&,
                            spdlog::memory_buf_t& dest) {
   absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
-  if (payload.rfind("[Tags: ", 0) == std::string::npos) {
+  if (payload.rfind(Utility::TagsPrefix, 0) == std::string::npos) {
     return;
   }
 
-  auto tags_end_pos = payload.find("\"] ") + 1;
-  dest.append(JsonPropertyDeimilter.data(), JsonPropertyDeimilter.data() + 1);
-  dest.append(payload.data() + 7, payload.data() + tags_end_pos);
+  auto tags_end_pos = payload.find(Utility::TagsSuffixForSearch) + 1;
+  dest.append(&JsonPropertyDeimilter, &JsonPropertyDeimilter + 1);
+  dest.append(payload.data() + Utility::TagsPrefix.size(), payload.data() + tags_end_pos);
 }
 
 void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm&,
                               spdlog::memory_buf_t& dest) {
   absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
-  if (payload.rfind("[Tags: ", 0) == std::string::npos) {
+  if (payload.rfind(Utility::TagsPrefix, 0) == std::string::npos) {
     Envoy::Logger::Utility::escapeMessageJsonString(payload, dest);
     return;
   }
 
-  auto tags_end_pos = payload.find("\"] ") + 3;
+  auto tags_end_pos =
+      payload.find(Utility::TagsSuffixForSearch) + Utility::TagsSuffixForSearch.size();
   auto original_message =
       absl::string_view(payload.data() + tags_end_pos, payload.size() - tags_end_pos);
   Envoy::Logger::Utility::escapeMessageJsonString(original_message, dest);
