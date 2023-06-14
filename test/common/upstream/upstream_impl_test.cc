@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -19,6 +20,7 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
@@ -3173,6 +3175,106 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
   EXPECT_THROW_WITH_MESSAGE(
       StaticClusterImpl cluster(cluster_config, factory_context), EnvoyException,
       "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
+}
+
+class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+
+public:
+  TestUpstreamLocalAddressSelector(
+      const envoy::config::cluster::v3::Cluster& cluster_config,
+      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
+    if (cluster_config.has_upstream_bind_config()) {
+      parseBindConfig(cluster_config.upstream_bind_config());
+    } else if (bootstrap_bind_config.has_value()) {
+      parseBindConfig(*bootstrap_bind_config);
+    }
+  }
+
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr&) const override {
+    current_idx_ = (++current_idx_) % upstream_local_addresses_.size();
+    return upstream_local_addresses_[current_idx_];
+  }
+
+private:
+  void parseBindConfig(const envoy::config::core::v3::BindConfig& bind_config) {
+    UpstreamLocalAddress upstream_local_address;
+    upstream_local_address.address_ =
+        ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config.source_address());
+    upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+    upstream_local_addresses_.push_back(upstream_local_address);
+
+    for (const auto& extra_source_address : bind_config.extra_source_addresses()) {
+      UpstreamLocalAddress extra_upstream_local_address;
+      extra_upstream_local_address.address_ =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
+      extra_upstream_local_address.socket_options_ =
+          std::make_shared<Network::ConnectionSocket::Options>();
+      upstream_local_addresses_.push_back(extra_upstream_local_address);
+    }
+  }
+
+  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+  mutable size_t current_idx_ = 0;
+};
+
+class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+  UpstreamLocalAddressSelectorPtr
+  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
+                             const absl::optional<envoy::config::core::v3::BindConfig>&
+                                 bootstrap_bind_config) const override {
+    return std::make_shared<TestUpstreamLocalAddressSelector>(cluster_config,
+                                                              bootstrap_bind_config);
+  }
+
+  std::string name() const override { return "test.upstream.local.address.selector"; }
+};
+
+// Test ability to register custom local address selector.
+TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
+
+  TestUpstreamLocalAddressSelectorFactory factory;
+  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+
+  server_context_.cluster_manager_.mutableBindConfig().set_local_address_selector_name(
+      "test.upstream.local.address.selector");
+  server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+      "1.2.3.5");
+  server_context_.cluster_manager_.mutableBindConfig()
+      .add_extra_source_addresses()
+      ->mutable_address()
+      ->set_address("2001::1");
+  server_context_.cluster_manager_.mutableBindConfig()
+      .add_extra_source_addresses()
+      ->mutable_address()
+      ->set_address("1.2.3.6");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+
+  StaticClusterImpl cluster(config, factory_context);
+
+  Network::Address::InstanceConstSharedPtr v6_remote_address =
+      std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+  EXPECT_EQ("[2001::1]:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+  EXPECT_EQ("1.2.3.6:0", cluster.info()
+                             ->getUpstreamLocalAddressSelector()
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             .address_->asString());
+  EXPECT_EQ("1.2.3.5:0", cluster.info()
+                             ->getUpstreamLocalAddressSelector()
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             .address_->asString());
 }
 
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};

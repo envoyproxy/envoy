@@ -530,6 +530,7 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/extensions/clusters/static:static_cluster_lib",
