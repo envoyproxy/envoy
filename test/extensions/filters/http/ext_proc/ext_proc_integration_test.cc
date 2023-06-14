@@ -557,6 +557,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_string", "true"}});
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -631,7 +633,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
             {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
-          ENVOY_LOG_MISC(critical, "{}", header.value());
+          ENVOY_LOG_MISC(critical, "{}", header.value_bytes());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
