@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http
+  change: |
+    Envoy will now lower case scheme values by default. This behaviorial change can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.lowercase_scheme`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -23,6 +27,10 @@ bug_fixes:
     Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
 
     This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
+- area: http
+  change: |
+    Switched Envoy internal scheme checks from case sensitive to case insensitive. This behaviorial change can be temporarily
+    reverted by setting runtime guard ``envoy.reloadable_features.handle_uppercase_scheme`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

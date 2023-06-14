@@ -295,9 +295,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // reason, we also use "http" when constructing our redirect uri to the authorization server.
     auto scheme = Http::Headers::get().SchemeValues.Https;
 
-    const auto* scheme_header = headers.Scheme();
-    if ((scheme_header != nullptr &&
-         scheme_header->value().getStringView() == Http::Headers::get().SchemeValues.Http)) {
+    if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
       scheme = Http::Headers::get().SchemeValues.Http;
     }
 
