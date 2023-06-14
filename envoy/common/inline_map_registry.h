@@ -270,6 +270,16 @@ public:
       memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
     }
 
+    ~InlineMap() {
+      for (uint64_t i = 0; i < InlineMapRegistry::registrationMapSize(); ++i) {
+        auto entry = inline_entries_[i];
+        if (entry != nullptr) {
+          delete entry;
+        }
+      }
+      memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
+    }
+
     RawT lookupImpl(absl::string_view key) const {
       // Compute the hash value for the key and avoid computing it again in the lookup.
       const size_t hash_value = InlineMapRegistry::Hash()(key);
