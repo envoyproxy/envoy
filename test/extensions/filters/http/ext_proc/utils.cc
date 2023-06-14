@@ -13,7 +13,7 @@ const absl::flat_hash_set<std::string> ExtProcTestUtility::ignoredHeaders() {
 }
 
 bool ExtProcTestUtility::headerProtosEqualIgnoreOrder(
-    const Http::HeaderMap& expected, const envoy::config::core::v3::HeaderMapBytes& actual) {
+    const Http::HeaderMap& expected, const envoy::config::core::v3::HeaderMap& actual) {
   // Comparing header maps is hard because they have duplicates in them.
   // So we're going to turn them into a HeaderMap and let Envoy do the work.
   Http::TestRequestHeaderMapImpl actual_headers;

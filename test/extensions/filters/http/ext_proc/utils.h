@@ -15,7 +15,7 @@ class ExtProcTestUtility {
 public:
   // Compare a reference header map to a proto
   static bool headerProtosEqualIgnoreOrder(const Http::HeaderMap& expected,
-                                           const envoy::config::core::v3::HeaderMapBytes& actual);
+                                           const envoy::config::core::v3::HeaderMap& actual);
 
 private:
   // These headers are present in the actual, but cannot be specified in the expected

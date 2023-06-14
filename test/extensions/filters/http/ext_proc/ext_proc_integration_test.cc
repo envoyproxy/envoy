@@ -9,6 +9,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -574,7 +575,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
             {":method", "GET"},
             {"host", "host"},
             {":path", "/"},
-            {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
+            {"x-bad-utf8", "valid_prefix!(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           ENVOY_LOG_MISC(critical, "{}", header.value());
@@ -602,6 +603,50 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
         return true;
       });
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_string", "false"}});
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+    std::string invalid_unicode("valid_prefix");
+    invalid_unicode.append(1, char(0xc3));
+    invalid_unicode.append(1, char(0x28));
+    invalid_unicode.append("valid_suffix");
+
+    headers.addCopy(LowerCaseString("x-bad-utf8"), invalid_unicode);
+  });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"},
+            {":method", "GET"},
+            {"host", "host"},
+            {":path", "/"},
+            {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
+            {"x-forwarded-proto", "http"}};
+        for (const auto& header : headers.headers().headers()) {
+          ENVOY_LOG_MISC(critical, "{}", header.value());
+        }
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("x-bad-utf8");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
 }
 
