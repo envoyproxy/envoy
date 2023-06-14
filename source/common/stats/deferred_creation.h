@@ -46,7 +46,7 @@ public:
           return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {
-      instantiate();
+      getOrCreateHelper();
     }
   }
   ~DeferredStats() {
@@ -54,12 +54,12 @@ public:
       initialized_.dec();
     }
   }
+  inline StatsStructType& getOrCreate() override { return getOrCreateHelper(); }
 
 private:
   // We can't call getOrCreate directly from constructor, otherwise the compiler complains about
   // bypassing virtual dispatch even though it's fine.
-  inline StatsStructType& instantiate() { return *internal_stats_.get(ctor_); }
-  inline StatsStructType& getOrCreate() override { return instantiate(); }
+  inline StatsStructType& getOrCreateHelper() { return *internal_stats_.get(ctor_); }
 
   // In order to preserve stat value continuity across a config reload, we need to automatically
   // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
@@ -92,9 +92,9 @@ class DirectStats : public DeferredCreationCompatibleInterface<StatsStructType> 
 public:
   DirectStats(const typename StatsStructType::StatNameType& stat_names, Stats::Scope& scope)
       : stats_(stat_names, scope) {}
+  inline StatsStructType& getOrCreate() override { return stats_; }
 
 private:
-  inline StatsStructType& getOrCreate() override { return stats_; }
   StatsStructType stats_;
 };
 
