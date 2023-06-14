@@ -331,11 +331,20 @@ new_features:
 - area: http
   change: |
     added support for configuring additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`.
+- area: http
+  change: |
+    Added support for the route/virtual host level
+    :ref:`disabled <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` field.
+    A route/virtual host level per filter config can be marked as disabled, which means that
+    the filter will be disabled in a specific route/virtual host.
 - area: health_check
   change: |
     added host related information :ref:`metadata <envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata>` and
     :ref:`locality <envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality>` to
     the :ref:`health check event <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>` definition.
+- area: zookeeper
+  change: |
+    Added the "addWatch" opcode support to the ZooKeeper proxy filter.
 - area: config
   change: |
     added a statistic :ref:`warming_state <config_cluster_stats>` to indicate the current warming state of a cluster.
