@@ -93,8 +93,13 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   // server initialization.
   ASSERT(state_ != State::AllClustersInitialized);
 
-  const auto initialize_cb = [&cm_cluster, this] { onClusterInit(cm_cluster); };
+  const auto initialize_cb = [&cm_cluster, this] {
+    onClusterInit(cm_cluster);
+    cm_cluster.cluster().info()->configUpdateStats().warming_state_.set(0);
+  };
   Cluster& cluster = cm_cluster.cluster();
+
+  cluster.info()->configUpdateStats().warming_state_.set(1);
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
     primary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
@@ -749,6 +754,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto previous_cluster =
       loadCluster(cluster, new_hash, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
+  cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
     init_helper_.addCluster(*cluster_entry);
@@ -757,6 +763,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     cluster_entry->cluster_->initialize([this, cluster_name] {
       ENVOY_LOG(debug, "warming cluster {} complete", cluster_name);
       auto state_changed_cluster_entry = warming_clusters_.find(cluster_name);
+      state_changed_cluster_entry->second->cluster_->info()->configUpdateStats().warming_state_.set(
+          0);
       onClusterInit(*state_changed_cluster_entry->second);
     });
   }
