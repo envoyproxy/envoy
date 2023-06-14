@@ -15,9 +15,13 @@
  * limitations under the License.
  */
 
-package api
+package http
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+)
 
 type HttpCAPI interface {
 	HttpContinue(r unsafe.Pointer, status uint64)
@@ -33,7 +37,7 @@ type HttpCAPI interface {
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
 	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
-	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
@@ -45,10 +49,11 @@ type HttpCAPI interface {
 	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
-	HttpLog(level LogType, message string)
-	HttpLogLevel() LogType
+	HttpLog(level api.LogType, message string)
+	HttpLogLevel() api.LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
 
-	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
+	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing)
+	HttpGetStringFilterState(r *httpRequest, key string) string
 }

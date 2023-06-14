@@ -581,6 +581,26 @@ public:
   virtual uint64_t bytesReceived() const PURE;
 
   /**
+   * @param bytes_retransmitted denotes number of bytes to add to total retransmitted bytes.
+   */
+  virtual void addBytesRetransmitted(uint64_t bytes_retransmitted) PURE;
+
+  /**
+   * @return the number of bytes retransmitted by the stream.
+   */
+  virtual uint64_t bytesRetransmitted() const PURE;
+
+  /**
+   * @param packets_retransmitted denotes number of packets to add to total retransmitted packets.
+   */
+  virtual void addPacketsRetransmitted(uint64_t packets_retransmitted) PURE;
+
+  /**
+   * @return the number of packets retransmitted by the stream.
+   */
+  virtual uint64_t packetsRetransmitted() const PURE;
+
+  /**
    * @return the protocol of the request.
    */
   virtual absl::optional<Http::Protocol> protocol() const PURE;

@@ -13,5 +13,6 @@ envoy_cc_library(
     hdrs = ["factory_base.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/upstream:load_balancer_factory_base_lib",
     ],
 )

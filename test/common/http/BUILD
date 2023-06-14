@@ -583,6 +583,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "filter_chain_helper_test",
+    srcs = ["filter_chain_helper_test.cc"],
+    deps = [
+        "//source/common/http:filter_chain_helper_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "hcm_router_fuzz_proto",
     srcs = ["hcm_router_fuzz.proto"],

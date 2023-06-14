@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
 
   cc_test:
-    if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
     name: cc_test
     runs-on: ubuntu-20.04
