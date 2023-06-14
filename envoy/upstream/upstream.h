@@ -224,7 +224,7 @@ public:
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
-   * active healchecking.
+   * active health checking.
    */
   virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
@@ -596,7 +596,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  GAUGE(warming_state, NeverImport)
 
 /**
  * All cluster endpoints related stats.
@@ -610,7 +611,7 @@ public:
   GAUGE(membership_total, NeverImport)
 
 /**
- * All cluster loadbalancing related stats.
+ * All cluster load balancing related stats.
  */
 #define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
