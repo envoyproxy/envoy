@@ -4,7 +4,6 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -467,9 +466,6 @@ public:
 
   constexpr static char Placeholder = '*';
   constexpr static absl::string_view JsonPropertyDeimilter = ",";
-
-private:
-  static std::regex extracted_tags_pattern_;
 };
 
 class ExtractedMessage : public spdlog::custom_flag_formatter {
@@ -482,9 +478,6 @@ public:
   }
 
   constexpr static char Placeholder = '+';
-
-private:
-  static std::regex extracted_message_pattern_;
 };
 
 } // namespace CustomFlagFormatter

@@ -376,37 +376,28 @@ void EscapeMessageJsonString::format(const spdlog::details::log_msg& msg, const 
 void ExtractedTags::format(const spdlog::details::log_msg& msg, const std::tm&,
                            spdlog::memory_buf_t& dest) {
   absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
-  std::cmatch matches;
-  std::regex_search(payload.begin(), payload.end(), matches, extracted_tags_pattern_);
-
-  if (matches.empty()) {
+  if (payload.rfind("[Tags: ", 0) == std::string::npos) {
     return;
   }
 
+  auto tags_end_pos = payload.find("\"] ") + 1;
   dest.append(JsonPropertyDeimilter.data(), JsonPropertyDeimilter.data() + 1);
-  dest.append(payload.data() + matches.position(1),
-              payload.data() + matches.position(1) + matches.length(1));
+  dest.append(payload.data() + 7, payload.data() + tags_end_pos);
 }
-
-std::regex ExtractedTags::extracted_tags_pattern_ = std::regex(R"(\[Tags: (.*)\] )");
 
 void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm&,
                               spdlog::memory_buf_t& dest) {
   absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
-  std::cmatch matches;
-  std::regex_search(payload.begin(), payload.end(), matches, extracted_message_pattern_);
-
-  if (matches.empty()) {
+  if (payload.rfind("[Tags: ", 0) == std::string::npos) {
     Envoy::Logger::Utility::escapeMessageJsonString(payload, dest);
     return;
   }
 
+  auto tags_end_pos = payload.find("\"] ") + 3;
   auto original_message =
-      absl::string_view(payload.data() + matches.position(1), matches.length(1));
+      absl::string_view(payload.data() + tags_end_pos, payload.size() - tags_end_pos);
   Envoy::Logger::Utility::escapeMessageJsonString(original_message, dest);
 }
-
-std::regex ExtractedMessage::extracted_message_pattern_ = std::regex(R"(\[Tags: .*\] (.+))");
 
 } // namespace CustomFlagFormatter
 } // namespace Logger
