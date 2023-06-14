@@ -216,6 +216,11 @@ public:
   static void stripTrailingHostDot(RequestHeaderMap& headers);
 
   /**
+   * @return bool true if the provided host has a port, false otherwise.
+   */
+  static bool hostHasPort(absl::string_view host);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
    * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.

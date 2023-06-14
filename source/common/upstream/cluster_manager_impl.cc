@@ -835,24 +835,35 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   auto& lb = new_cluster_pair_or_error->second;
   Cluster& cluster_reference = *new_cluster;
 
+  const auto cluster_info = cluster_reference.info();
+
   if (!added_via_api) {
-    if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
+    if (cluster_map.find(cluster_info->name()) != cluster_map.end()) {
       throw EnvoyException(
-          fmt::format("cluster manager: duplicate cluster '{}'", new_cluster->info()->name()));
+          fmt::format("cluster manager: duplicate cluster '{}'", cluster_info->name()));
     }
   }
 
-  if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided && lb == nullptr) {
-    throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
-                                     "'{}' did not provide one. Check cluster documentation.",
-                                     new_cluster->info()->name()));
+  // Check if the cluster provided load balancing policy is used. We need handle it as special
+  // case.
+  bool cluster_provided_lb = cluster_info->lbType() == LoadBalancerType::ClusterProvided;
+  if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
+    TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
+    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
+    cluster_provided_lb =
+        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
   }
 
-  if (cluster_reference.info()->lbType() != LoadBalancerType::ClusterProvided && lb != nullptr) {
+  if (cluster_provided_lb && lb == nullptr) {
+    throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
+                                     "'{}' did not provide one. Check cluster documentation.",
+                                     cluster_info->name()));
+  }
+  if (!cluster_provided_lb && lb != nullptr) {
     throw EnvoyException(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
-                    new_cluster->info()->name()));
+                    cluster_info->name()));
   }
 
   if (new_cluster->healthChecker() != nullptr) {
@@ -876,7 +887,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     });
   }
   ClusterDataPtr result;
-  auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
+  auto cluster_entry_it = cluster_map.find(cluster_info->name());
   if (cluster_entry_it != cluster_map.end()) {
     result = std::exchange(cluster_entry_it->second,
                            std::make_unique<ClusterData>(cluster, cluster_hash, version_info,
@@ -885,7 +896,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   } else {
     bool inserted = false;
     std::tie(cluster_entry_it, inserted) = cluster_map.emplace(
-        cluster_reference.info()->name(),
+        cluster_info->name(),
         std::make_unique<ClusterData>(cluster, cluster_hash, version_info, added_via_api,
                                       std::move(new_cluster), time_source_));
     ASSERT(inserted);
@@ -893,30 +904,28 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
   // because the thread_aware_lb_ field takes precedence over the subset lb).
-  if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
-    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+  if (cluster_info->lbType() == LoadBalancerType::RingHash) {
+    if (!cluster_info->lbSubsetInfo().isEnabled()) {
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.ring_hash");
-      cluster_entry_it->second->thread_aware_lb_ =
-          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
-                         random_, time_source_);
+      cluster_entry_it->second->thread_aware_lb_ = factory.create(
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
-  } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
-    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+  } else if (cluster_info->lbType() == LoadBalancerType::Maglev) {
+    if (!cluster_info->lbSubsetInfo().isEnabled()) {
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.maglev");
-      cluster_entry_it->second->thread_aware_lb_ =
-          factory.create(*cluster_reference.info(), cluster_reference.prioritySet(), runtime_,
-                         random_, time_source_);
+      cluster_entry_it->second->thread_aware_lb_ = factory.create(
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
-  } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
+  } else if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
-  } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
+  } else if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
+    TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
     cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(*cluster_reference.info(), cluster_reference.prioritySet(),
-                                 runtime_, random_, time_source_);
+        typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
+                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1535,7 +1544,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+    : parent_(parent), cluster_info_(cluster), lb_factory_(lb_factory),
       override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 

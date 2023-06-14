@@ -3,6 +3,7 @@
 #include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -254,6 +255,31 @@ void Registry::setLogFormat(const std::string& log_format) {
   }
 }
 
+absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  json_options.always_print_primitive_fields = true;
+
+  std::string format_as_json;
+  const auto status =
+      Protobuf::util::MessageToJsonString(log_format_struct, &format_as_json, json_options);
+
+  if (!status.ok()) {
+    return absl::InvalidArgumentError("Provided struct cannot be serialized as JSON string");
+  }
+
+  if (format_as_json.find("%v") != std::string::npos) {
+    return absl::InvalidArgumentError("Usage of %v is unavailable for JSON log formats");
+  }
+
+  if (format_as_json.find("%_") != std::string::npos) {
+    return absl::InvalidArgumentError("Usage of %_ is unavailable for JSON log formats");
+  }
+
+  setLogFormat(format_as_json);
+  return absl::OkStatus();
+}
+
 Logger* Registry::logger(const std::string& log_name) {
   Logger* logger_to_return = nullptr;
   for (Logger& logger : loggers()) {
@@ -279,6 +305,24 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
           CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
       .set_pattern(log_format);
   logger.set_formatter(std::move(formatter));
+}
+
+std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
+  if (tags.empty()) {
+    return "";
+  }
+
+  std::stringstream tags_stream;
+  tags_stream << "[Tags: ";
+  for (const auto& tag : tags) {
+    tags_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+  }
+
+  std::string serialized = tags_stream.str();
+  serialized.pop_back();
+  serialized += "] ";
+
+  return serialized;
 }
 
 } // namespace Utility

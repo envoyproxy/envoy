@@ -379,7 +379,8 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   cleanup();
 }
 
-TEST_P(IntegrationTest, MultipleRequests) {
+// https://github.com/envoyproxy/envoy/issues/27842
+TEST_P(IntegrationTest, DISABLED_MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
   codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
@@ -410,8 +411,12 @@ TEST_P(IntegrationTest, MultipleRequests) {
   request_2.protocol_ = "fake_fake_fake";
   request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}};
 
-  // Send the second request with the same stream id and expect the connection to be closed.
+  // Reset request encoder callback.
+  request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
+
+  // Send the second request with the different stream id and expect the connection to be alive.
   sendRequestForTest(request_2);
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";

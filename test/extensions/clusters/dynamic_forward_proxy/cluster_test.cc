@@ -18,6 +18,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
@@ -108,7 +109,7 @@ public:
     host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
   }
 
-  void refreshLb() { lb_ = lb_factory_->create(); }
+  void refreshLb() { lb_ = lb_factory_->create(lb_params_); }
 
   Upstream::MockLoadBalancerContext* setHostAndReturnContext(const std::string& host) {
     downstream_headers_.remove(":authority");
@@ -170,6 +171,10 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Network::MockConnection> connection_;
 
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
+
   const std::string sub_cluster_yaml_config_ = R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -225,11 +230,29 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
+TEST_F(ClusterTest, InvalidSubClusterConfig) {
+  const std::string bad_sub_cluster_yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      lb_policy: CLUSTER_PROVIDED
+)EOF";
+
+  EXPECT_THROW(initialize(bad_sub_cluster_yaml_config, false), EnvoyException);
+}
+
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
-  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")));
 
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
@@ -237,57 +260,63 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
-  updateTestHostAddress("host1", "2.3.4.5");
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("2.3.4.5:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
-  update_callbacks_->onDnsHostRemove("host1");
+  update_callbacks_->onDnsHostRemove("host1:0");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
 }
 
 // Outlier detection
 TEST_F(ClusterTest, OutlierDetection) {
   initialize(default_yaml_config_, false);
-  makeTestHost("host1", "1.2.3.4");
-  makeTestHost("host2", "5.6.7.8");
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "5.6.7.8");
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host2", host_map_["host2"]);
-  EXPECT_CALL(*host_map_["host2"], touch());
-  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+  update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]);
+  EXPECT_CALL(*host_map_["host2:0"], touch());
+  EXPECT_EQ("5.6.7.8:0",
+            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
 
   // Fail outlier check for host1
-  setOutlierFailed("host1");
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
-  // "host2" should not be affected
-  EXPECT_CALL(*host_map_["host2"], touch());
-  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+  setOutlierFailed("host1:0");
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  // "host2:0" should not be affected
+  EXPECT_CALL(*host_map_["host2:0"], touch());
+  EXPECT_EQ("5.6.7.8:0",
+            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
 
   // Clear outlier check failure for host1, it should be available again
-  clearOutlierFailed("host1");
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  clearOutlierFailed("host1:0");
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 }
 
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
@@ -300,19 +329,19 @@ TEST_F(ClusterTest, InvalidLbContext) {
 
 TEST_F(ClusterTest, FilterStateHostOverride) {
   initialize(default_yaml_config_, false);
-  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host1:0", "1.2.3.4");
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_CALL(*host_map_["host1"], touch());
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setFilterStateHostAndReturnContext("host1"))->address()->asString());
+            lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0"))->address()->asString());
 }
 
 // Verify cluster attaches to a populated cache.
 TEST_F(ClusterTest, PopulatedCache) {
-  makeTestHost("host1", "1.2.3.4");
-  makeTestHost("host2", "1.2.3.5");
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "1.2.3.5");
   initialize(default_yaml_config_, false);
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }

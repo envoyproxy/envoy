@@ -76,6 +76,23 @@ public:
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
+
+  Envoy::Http::FilterFactoryCb createFilterServerFactoryFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override {
+    return createFilterServerFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, server_context.messageValidationVisitor()),
+        stats_prefix, server_context);
+  }
+
+  virtual Envoy::Http::FilterFactoryCb
+  createFilterServerFactoryFromProtoTyped(const ConfigProto&, const std::string&,
+                                          Server::Configuration::ServerFactoryContext&) {
+    ExceptionUtil::throwEnvoyException(
+        "Creating filter factory from server factory context is not supported");
+    return nullptr;
+  }
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>

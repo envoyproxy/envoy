@@ -175,6 +175,8 @@ void envoyGoFilterHttpLog(uint32_t level, void* message) {
   getFilterLogger().log(level, mesg);
 }
 
+uint32_t envoyGoFilterHttpLogLevel() { return getFilterLogger().level(); }
+
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
       r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
@@ -198,6 +200,28 @@ CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
     // Since this is only used for logs we don't need to deep copy.
     return filter->sendPanicReply(referGoString(details));
   });
+}
+
+CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
+                                                 int life_span, int stream_sharing) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value, state_type, life_span, stream_sharing](
+                                         std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = referGoString(key);
+                                       auto value_str = referGoString(value);
+                                       return filter->setStringFilterState(key_str, value_str,
+                                                                           state_type, life_span,
+                                                                           stream_sharing);
+                                     });
+}
+
+CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = referGoString(key);
+                                       auto value_str = reinterpret_cast<GoString*>(value);
+                                       return filter->getStringFilterState(key_str, value_str);
+                                     });
 }
 
 #ifdef __cplusplus

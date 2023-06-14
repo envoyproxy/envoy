@@ -275,6 +275,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:health_checker_config_interface",
         "//test/mocks:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

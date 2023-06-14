@@ -104,6 +104,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
+  absl::string_view filterConfigName() const override { return filter_context_.config_name; }
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -905,6 +906,18 @@ private:
   private:
     FilterManager& manager_;
     const Http::FilterContext& context_;
+  };
+
+  class FilterChainOptionsImpl : public FilterChainOptions {
+  public:
+    FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
+
+    bool filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr && route_->filterDisabled(config_name);
+    }
+
+  private:
+    const Router::RouteConstSharedPtr route_;
   };
 
   // Indicates which filter to start the iteration with.

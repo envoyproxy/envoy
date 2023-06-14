@@ -6,6 +6,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
 using testing::Return;
@@ -54,7 +55,7 @@ public:
                           NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
                               NetworkFilters::Common::Redis::Client::ReadPolicy::Primary) {
 
-    Upstream::LoadBalancerPtr lb = lb_->factory()->create();
+    Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
     for (auto& assignment : expected_assignments) {
       TestLoadBalancerContext context(assignment.first, read_command, read_policy);
       auto host = lb->chooseHost(&context);
@@ -77,6 +78,10 @@ public:
   std::unique_ptr<RedisClusterThreadAwareLoadBalancer> lb_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
 };
 
 class RedisLoadBalancerContextImplTest : public testing::Test {
@@ -97,7 +102,7 @@ public:
 // Works correctly without any hosts.
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
 };
 
 // Works correctly with empty context
@@ -119,7 +124,7 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   init();
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
   TestLoadBalancerContext context(absl::nullopt);
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(&context));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context));
 };
 
 TEST_F(RedisClusterLoadBalancerTest, Basic) {
@@ -308,7 +313,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
 
-  Upstream::LoadBalancerPtr lb = lb_->factory()->create();
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   TestLoadBalancerContext context(1100, true,
                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
   auto host = lb->chooseHost(&context);
