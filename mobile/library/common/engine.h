@@ -83,6 +83,12 @@ public:
   envoy_status_t makeAdminCall(absl::string_view path, absl::string_view method, envoy_data& out);
 
   /**
+   * Dump Envoy stats into the returned buffer
+   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
+   */
+  Buffer::OwnedImpl dumpStats();
+
+  /**
    * Flush the stats sinks outside of a flushing interval.
    * Note: stat flushing is done asynchronously, this function will never block.
    * This is a noop if called before the underlying EnvoyEngine has started.
