@@ -101,9 +101,8 @@ private:
     UPSTREAM_GREETING,
     DOWNSTREAM_EHLO,
     UPSTREAM_EHLO_RESP,
-    UPSTREAM_STARTTLS,
     UPSTREAM_STARTTLS_RESP,
-    UPSTREAM_TLS_NEGO,
+    UPSTREAM_EHLO2_RESP,
     DOWNSTREAM_STARTTLS,
     DOWNSTREAM_STARTTLS_RESP,
     DOWNSTREAM_TLS_NEGO,
@@ -116,7 +115,7 @@ private:
   SmtpFilterConfigSharedPtr config_;
   Buffer::OwnedImpl frontend_buffer_;
   Buffer::OwnedImpl backend_buffer_;
-  Buffer::OwnedImpl downstream_esmtp_capabilities_;
+  Buffer::OwnedImpl downstream_ehlo_command_;
   std::unique_ptr<Decoder> decoder_;
 };
 

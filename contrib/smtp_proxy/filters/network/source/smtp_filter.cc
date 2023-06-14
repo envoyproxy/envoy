@@ -106,6 +106,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       return Network::FilterStatus::StopIteration;
     }
+    downstream_ehlo_command_.add(wire_command);
     read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
     if (command.verb == Decoder::Command::HELO) {
       config_->stats_.sessions_non_esmtp_.inc();
@@ -160,6 +161,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   case UPSTREAM_GREETING:
   case UPSTREAM_EHLO_RESP:
   case UPSTREAM_STARTTLS_RESP:
+  case UPSTREAM_EHLO2_RESP:
     break;
   default:
     // upstream spoke out of turn -> hang up
@@ -204,6 +206,9 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     return Network::FilterStatus::StopIteration;
   }
   case UPSTREAM_EHLO_RESP: {
+    // If we're doing upstream starttls, don't send the ehlo resp to
+    // the client yet so we can report an upstream starttls failure or
+    // get the post-tls capabilities: UPSTREAM_STARTTLS_RESP (below).
     if (config_->upstream_ssl_ == ConfigProto::REQUIRE &&
         !decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
       Buffer::OwnedImpl err("400 upstream STARTTLS not offered\r\n");
@@ -211,40 +216,45 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       return Network::FilterStatus::StopIteration;
     }
-
-    {
-      std::string downstream_caps = wire_resp.toString();
-      if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
-        decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
-      } else if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
-        // if we're doing upstream but not downstream, strip the
-        // capability so the client doesn't try to send it to us.
-        decoder_->RemoveEsmtpCapability("STARTTLS", downstream_caps);
-      }
-      downstream_esmtp_capabilities_ = Buffer::OwnedImpl(downstream_caps);
-    }
-
-    if (config_->upstream_ssl_ >= ConfigProto::ENABLE) {
+    if (config_->upstream_ssl_ >= ConfigProto::ENABLE &&
+        decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
       state_ = UPSTREAM_STARTTLS_RESP;
       Buffer::OwnedImpl starttls("STARTTLS\r\n");
       read_callbacks_->injectReadDataToFilterChain(starttls, /*end_stream=*/false);
-    } else {
-      write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities_,
-                                                     /*end_stream=*/false);
-      if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
-        state_ = DOWNSTREAM_STARTTLS;
-      } else {
-        // i.e. we're doing neither upstream nor downstream
-        config_->stats_.sessions_esmtp_unencrypted_.inc();
-        state_ = PASSTHROUGH;
-      }
+      return Network::FilterStatus::StopIteration;
     }
+    if (config_->downstream_ssl_ == ConfigProto::DISABLE) {
+      // and upstream either was disabled or not offered
+      write_callbacks_->injectWriteDataToFilterChain(wire_resp, /*end_stream=*/false);
+      config_->stats_.sessions_esmtp_unencrypted_.inc();
+      state_ = PASSTHROUGH;
+      return Network::FilterStatus::StopIteration;
+    }
+    ABSL_FALLTHROUGH_INTENDED;
+  }
+  case UPSTREAM_EHLO2_RESP: {
+    // If upstream and downstream ssl termination are disabled, there
+    // is nothing to prevent the server from advertising and the
+    // client invoking STARTTLS. If someone wanted to prevent that, we
+    // could add an additional config knob to strip the STARTTLS
+    // capability but that seems like an unlikely configuration?
+    ASSERT(config_->downstream_ssl_ >= ConfigProto::ENABLE);
+    Buffer::OwnedImpl downstream_esmtp_capabilities;
+    {
+      std::string downstream_caps = wire_resp.toString();
+      decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
+      downstream_esmtp_capabilities.add(downstream_caps);
+    }
+    write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities,
+                                                   /*end_stream=*/false);
+    state_ = DOWNSTREAM_STARTTLS;
     return Network::FilterStatus::StopIteration;
   }
+
   case UPSTREAM_STARTTLS_RESP: {
-    // this seems unlikely and is probably indicative of problems with
-    // the upstream, just fail for now
     if ((response.code < 200) || (response.code > 299)) {
+      // This seems unlikely and is probably indicative of problems
+      // with the upstream, just fail for now.
       config_->stats_.sessions_upstream_ssl_command_err_.inc();
       Buffer::OwnedImpl err("400 upstream STARTTLS error\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
@@ -261,19 +271,28 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     } else {
       config_->stats_.sessions_upstream_terminated_ssl_.inc();
 
-      // TODO(jsbucy): this should resend the client's previous EHLO to the
-      // upstream and then -> passthrough?
+      // The downstream smtp client is still waiting for the EHLO
+      // response, resend their original EHLO to the upstream since
+      // the server may return different capabilities now that we've
+      // upgraded to TLS.
 
-      write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities_,
-                                                     /*end_stream=*/false);
+      read_callbacks_->injectReadDataToFilterChain(downstream_ehlo_command_,
+                                                   /*end_stream=*/false);
       if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
-        state_ = DOWNSTREAM_STARTTLS;
+        state_ = UPSTREAM_EHLO2_RESP;
       } else {
+        // If there was a buggy smtp server that continued to
+        // advertise STARTTLS after it had already done it once, that
+        // would probably cause problems here since we'll pass it
+        // through to the client which could try to invoke it. If we
+        // wanted to try to paper over it here, we would do
+        // UPSTREAM_EHLO2_RESP and strip the capability there.
         state_ = PASSTHROUGH;
       }
     }
     return Network::FilterStatus::StopIteration;
   }
+
   default:
     ABSL_UNREACHABLE();
   }
@@ -288,6 +307,8 @@ bool SmtpFilter::onDownstreamSSLRequest() {
   size_t len = buf.length();
   // Add callback to be notified when the reply message has been
   // transmitted.
+  // TODO(jsbucy): does this need to handle bytes < len i.e. didn't
+  // send the whole response in one shot?
   read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
     // Wait until response has been transmitted.
     if (bytes >= len) {
@@ -309,9 +330,6 @@ bool SmtpFilter::onDownstreamSSLRequest() {
         state_ = PASSTHROUGH;
 
         // Switch to TLS has been completed.
-        // Signal to the decoder to stop processing the current message (SSLRequest).
-        // Because Envoy terminates SSL, the message was consumed and should not be
-        // passed to other filters in the chain.
         return false;
       }
     }
