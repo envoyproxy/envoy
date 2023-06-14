@@ -16,7 +16,7 @@ envoy_cc_test(
     ],
     deps = [
         "//contrib/config/source:kv_store_xds_delegate",
-        "//source/common/config:xds_source_id_lib",
+        "//source/extensions/config_subscription/grpc:xds_source_id_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
@@ -43,7 +43,7 @@ envoy_cc_test(
         ":invalid_proto_kv_store_config_proto_cc_proto",
         "//contrib/config/source:kv_store_xds_delegate",
         "//envoy/common:key_value_store_interface",
-        "//source/common/config:xds_source_id_lib",
+        "//source/extensions/config_subscription/grpc:xds_source_id_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",

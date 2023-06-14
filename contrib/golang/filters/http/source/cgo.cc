@@ -175,6 +175,8 @@ void envoyGoFilterHttpLog(uint32_t level, void* message) {
   getFilterLogger().log(level, mesg);
 }
 
+uint32_t envoyGoFilterHttpLogLevel() { return getFilterLogger().level(); }
+
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
       r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
@@ -210,6 +212,15 @@ CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value
                                        return filter->setStringFilterState(key_str, value_str,
                                                                            state_type, life_span,
                                                                            stream_sharing);
+                                     });
+}
+
+CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = referGoString(key);
+                                       auto value_str = reinterpret_cast<GoString*>(value);
+                                       return filter->getStringFilterState(key_str, value_str);
                                      });
 }
 

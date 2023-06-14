@@ -220,11 +220,12 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
                                subscription->lastFactoryName());
       last_config_valid = true;
     }
-    END_TRY catch (const EnvoyException& e) {
+    END_TRY CATCH(const EnvoyException& e, {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
       subscription->incrementConflictCounter();
-    }
+    });
+
     if (last_config_valid) {
       provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
                               nullptr);

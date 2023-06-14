@@ -84,6 +84,18 @@ TEST_F(ConfigTest, AutoHttp3NoCache) {
       "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
 }
 
+TEST_F(ConfigTest, KvStoreConcurrencyFail) {
+  options_.mutable_auto_config();
+  options_.mutable_auto_config()->mutable_http3_protocol_options();
+  options_.mutable_auto_config()
+      ->mutable_alternate_protocols_cache_options()
+      ->mutable_key_value_store_config();
+  server_context_.options_.concurrency_ = 2;
+  EXPECT_THROW_WITH_MESSAGE(
+      ProtocolOptionsConfigImpl config(options_, server_context_), EnvoyException,
+      "options has key value store but Envoy has concurrency = 2 : key_value_store_config {\n}\n");
+}
+
 namespace {
 
 class TestHeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactoryConfig {

@@ -35,6 +35,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
@@ -58,7 +59,7 @@ const (
 type httpCApiImpl struct{}
 
 // Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
-// panic here and it will be recover in the Go entry function (TODO).
+// panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
 	case C.CAPIOK:
@@ -255,18 +256,37 @@ func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.LogType(C.envoyGoFilterHttpLogLevel())
+}
+
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI api.HttpCAPI = &httpCApiImpl{}
+var cAPI HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api api.HttpCAPI) {
+func SetHttpCAPI(api HttpCAPI) {
 	cAPI = api
 }
 
 func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
 	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
 	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+	var value string
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	return strings.Clone(value)
 }

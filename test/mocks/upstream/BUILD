@@ -216,6 +216,7 @@ envoy_cc_mock(
     hdrs = ["typed_load_balancer_factory.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/upstream:load_balancer_factory_base_lib",
     ],
 )
 

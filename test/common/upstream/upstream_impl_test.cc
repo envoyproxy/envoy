@@ -2350,9 +2350,6 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2362,6 +2359,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2388,15 +2387,12 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
-  EXPECT_NE(nullptr, cluster.info()->loadBalancingPolicy());
+  EXPECT_TRUE(cluster.info()->loadBalancerConfig().has_value());
   EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
 }
 
 // lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2428,9 +2424,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
 
 // load_balancing_policy is set and common_lb_config is set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2439,6 +2432,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     common_lb_config:
       update_merge_window: 1s
     load_assignment:
@@ -2466,9 +2461,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
 
 // load_balancing_policy is set and some fields in common_lb_config are set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFields) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2477,6 +2469,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     common_lb_config:
       locality_weighted_lb_config: {}
     load_assignment:
@@ -2508,9 +2502,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
 
 // load_balancing_policy is set and lb_subset_config is set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2519,6 +2510,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
@@ -2592,9 +2585,6 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
 // load_balancing_policy should also be used when lb_policy is set to something else besides
 // LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2604,6 +2594,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2634,9 +2626,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 
 // load_balancing_policy should also be used when lb_policy is omitted.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2645,6 +2634,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:

@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
@@ -208,6 +209,9 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
+	}
 
 	v := api.DestroyReason(reason)
 
@@ -215,10 +219,13 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	f.OnDestroy(v)
 
 	Requests.DeleteReq(r)
+}
 
-	// no one is using req now, we can remove it manually, for better performance.
-	if v == api.Normal {
-		runtime.SetFinalizer(req, nil)
-		req.Finalize(api.GCFinalize)
+//export envoyGoRequestSemaDec
+func envoyGoRequestSemaDec(r *C.httpRequest) {
+	req := getRequest(r)
+	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
 	}
 }

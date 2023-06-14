@@ -1371,6 +1371,14 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
+bool RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+  absl::optional<bool> result = per_filter_configs_.disabled(config_name);
+  if (result.has_value()) {
+    return result.value();
+  }
+  return vhost_->filterDisabled(config_name);
+}
+
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
@@ -1724,6 +1732,14 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 }
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
+
+bool CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+  absl::optional<bool> result = per_filter_configs_.disabled(config_name);
+  if (result.has_value()) {
+    return result.value();
+  }
+  return global_route_config_->filterDisabled(config_name);
+}
 
 const RouteSpecificFilterConfig*
 CommonVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
@@ -2104,11 +2120,9 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 }
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config,
-    const OptionalHttpFilters& optional_http_filters,
+    const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -2148,19 +2162,83 @@ PerFilterConfigs::PerFilterConfigs(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  for (const auto& it : typed_configs) {
-    const auto& name = it.first;
-    auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
-                                                  factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
+
+  const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
+
+  absl::string_view filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+
+  for (const auto& per_filter_config : typed_configs) {
+    const std::string& name = per_filter_config.first;
+    RouteSpecificFilterConfigConstSharedPtr config;
+
+    // There are two ways to mark a route/virtual host per filter configuration as optional:
+    // 1. Mark it as optional in the HTTP filter of HCM. This way is deprecated but still works
+    //    when the runtime flag
+    //    `envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config`
+    //    is explicitly set to false.
+    // 2. Mark it as optional in the route/virtual host per filter configuration. This way is
+    //    recommended.
+    //
+    // We check the first way first to ensure if this filter configuration is marked as optional
+    // or not. This will be true if the runtime flag is explicitly reverted to false and the
+    // config name is in the optional http filter list.
+    bool is_optional_by_hcm = !ignore_optional_option_from_hcm_for_route_config &&
+                              (optional_http_filters.find(name) != optional_http_filters.end());
+
+    if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
+        filter_config_type) {
+      envoy::config::route::v3::FilterConfig filter_config;
+      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
+                                                    filter_config);
+
+      // The filter is marked as disabled explicitly and the config is ignored directly.
+      if (filter_config.disabled()) {
+        configs_.emplace(name, FilterConfig{nullptr, true});
+        continue;
+      }
+
+      // If the field `config` is not configured, we treat it as configuration error.
+      if (!filter_config.has_config()) {
+        throw EnvoyException(
+            fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
+      }
+
+      // If the field `config` is configured but is empty, we treat the filter as disabled
+      // explicitly.
+      if (filter_config.config().type_url().empty()) {
+        configs_.emplace(name, FilterConfig{nullptr, false});
+        continue;
+      }
+
+      config = createRouteSpecificFilterConfig(name, filter_config.config(),
+                                               is_optional_by_hcm || filter_config.is_optional(),
+                                               factory_context, validator);
+    } else {
+      config = createRouteSpecificFilterConfig(name, per_filter_config.second, is_optional_by_hcm,
+                                               factory_context, validator);
     }
+
+    // If a filter is explicitly configured we treat it as enabled.
+    // The config may be nullptr because the filter could be optional.
+    configs_.emplace(name, FilterConfig{std::move(config), false});
   }
 }
 
 const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
   auto it = configs_.find(name);
-  return it == configs_.end() ? nullptr : it->second.get();
+  return it == configs_.end() ? nullptr : it->second.config_.get();
+}
+
+absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
+  // Quick exit if there are no configs.
+  if (configs_.empty()) {
+    return absl::nullopt;
+  }
+
+  const auto it = configs_.find(name);
+  return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
