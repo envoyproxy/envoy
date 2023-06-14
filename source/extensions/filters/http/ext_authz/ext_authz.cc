@@ -51,11 +51,11 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto& metadata_it = connection_metadata.find(context_key);
-        metadata_it != connection_metadata.end()) {
+    if (const auto metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto& metadata_it = request_metadata.find(context_key);
-               metadata_it != request_metadata.end()) {
+    } else if (const auto metadata_it = connection_metadata.find(context_key);
+               metadata_it != connection_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
@@ -68,11 +68,11 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const auto& request_typed_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto& metadata_it = connection_typed_metadata.find(context_key);
-        metadata_it != connection_typed_metadata.end()) {
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto& metadata_it = request_typed_metadata.find(context_key);
-               metadata_it != request_typed_metadata.end()) {
+    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
+               metadata_it != connection_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
