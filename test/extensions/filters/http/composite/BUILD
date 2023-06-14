@@ -14,6 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    args = [
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.enhanced_match_callback",
+    ],
     extension_names = ["envoy.filters.http.composite"],
     deps = [
         "//source/common/http:header_map_lib",

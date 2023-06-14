@@ -85,6 +85,10 @@ void Filter::encodeComplete() {
 Matcher::MatchCallbackStatus Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
+  // With enhanced match callback a local reply is issued whenever a problem occurs
+  bool enhanced_match_callback =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enhanced_match_callback");
+
   FactoryCallbacksWrapper wrapper(*this, dispatcher_);
   composite_action.createFilters(wrapper);
 
@@ -94,7 +98,9 @@ Matcher::MatchCallbackStatus Filter::onMatchCallback(const Matcher::Action& acti
               accumulateToString<absl::Status>(
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
 
-    return Matcher::MatchCallbackStatus::StopAndFailStream;
+    if (enhanced_match_callback) {
+      return Matcher::MatchCallbackStatus::StopAndFailStream;
+    }
   }
 
   if (wrapper.filter_to_inject_.has_value()) {
@@ -120,7 +126,11 @@ Matcher::MatchCallbackStatus Filter::onMatchCallback(const Matcher::Action& acti
     return Matcher::MatchCallbackStatus::Continue;
   }
 
-  return Matcher::MatchCallbackStatus::StopAndFailStream;
+  if (enhanced_match_callback) {
+    return Matcher::MatchCallbackStatus::StopAndFailStream;
+  } else {
+    return Matcher::MatchCallbackStatus::Continue;
+  }
 }
 
 Http::FilterHeadersStatus
