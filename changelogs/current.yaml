@@ -83,6 +83,9 @@ minor_behavior_changes:
   change: |
     Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
     to the name of the ext_proc filter.
+-area: upstream
+  change: |
+    Added the ability to specify a custom local address selector using :ref:`local_address_selector_name:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector_name>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
