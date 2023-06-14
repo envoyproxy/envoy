@@ -5,6 +5,10 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_set.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace Envoy {
 
@@ -86,6 +90,39 @@ private:
   }
 };
 
+/**
+ * This template could be used as an alternative of normal hash map to store the key/value pairs.
+ * But by this template, you can register some frequently used keys as inline keys and get the
+ * handle for the key. Then you can use the handle to access the key/value pair in the map without
+ * even one time hash searching.
+ *
+ * This is useful when the key is frequently used and the key is known at compile time or bootstrap
+ * time. You can get superior performance by using the inline handle.
+ * This template also provides the interface to access the key/value pair by the normal key and the
+ * interface has similar searching performance as the normal hash map. But the insertion and removal
+ * by the normal key is slower than the normal hash map.
+ *
+ * The Scope template parameter is used to distinguish different inline map registry. Different
+ * Scope will have different inline key registrations and different scope id.
+ *
+ * These is usage example:
+ *
+ *   // Define a scope type.
+ *   class ExampleScope {
+ *   public:
+ *     static absl::string_view name() { return "ExampleScope"; }
+ *   };
+ *
+ *   // Register the inline key. We should never do this after bootstrapping.
+ *   static auto inline_handle = InlineMapRegistry<ExampleScope>::registerInlineKey("inline_key");
+ *
+ *   // Create the inline map.
+ *   auto inline_map = InlineMapRegistry<ExampleScope>::InlineMap<std::string>::createInlineMap();
+ *
+ *   // Get value by inline handle.
+ *   inline_map->insert(inline_handle, std::make_unique<std::string>("value"));
+ *   EXPECT_EQ(*inline_map->lookup(inline_handle), "value");
+ */
 template <class Scope> class InlineMapRegistry {
 public:
   class InlineHandle {
@@ -105,57 +142,33 @@ public:
     absl::string_view inline_entry_key_;
   };
 
-  using RegistrationMap = absl::flat_hash_map<std::string, InlineHandle>;
+  // This is the Hash used for registration map/set and underlay hash map.
   using Hash = absl::container_internal::hash_default_hash<std::string>;
+
+  using RegistrationMap = absl::flat_hash_map<absl::string_view, uint64_t, Hash>;
+
+  // Node hash set is used to store the registration keys because it's entries have stable address
+  // and it is safe to reference the key in the InlineHandle or RegistrationMap.
+  using RegistrationSet = absl::node_hash_set<std::string, Hash>;
 
   template <class T> class InlineMap : public InlineStorage {
   public:
     using TPtr = std::unique_ptr<T>;
     using RawT = T*;
     using ConstRawT = const T*;
-    using HashMap = absl::flat_hash_map<std::string, TPtr>;
+    using UnderlayHashMap = absl::flat_hash_map<std::string, TPtr, Hash>;
 
     // Get the entry for the given key. If the key is not found, return nullptr.
-    RawT lookup(absl::string_view key) const {
-      // Compute the hash value for the key and avoid computing it again in the lookup.
-      const size_t hash_value = InlineMapRegistry::Hash()(key);
-
-      // Because the normal string view key is used here, try the normal map entry first.
-      if (auto it = map_.find(key, hash_value); it != map_.end()) {
-        return it->second.get();
-      }
-
-      if (auto entry_id = staticLookup(key, hash_value); entry_id.has_value()) {
-        return inline_entries_[*entry_id];
-      }
-
-      return nullptr;
-    }
+    ConstRawT lookup(absl::string_view key) const { return lookupImpl(key); }
+    RawT lookup(absl::string_view key) { return lookupImpl(key); }
 
     // Get the entry for the given handle. If the handle is not valid, return nullptr.
-    RawT lookup(InlineHandle handle) const {
-      ASSERT(handle.inlineEntryId() < InlineMapRegistry::registrationMapSize());
-      return inline_entries_[handle.inlineEntryId()];
-    }
+    ConstRawT lookup(InlineHandle handle) const { return lookupImpl(handle); }
+    RawT lookup(InlineHandle handle) { return lookupImpl(handle); }
 
     // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
-    RawT lookup(UntypedInlineHandle handle) const {
-      // If the scope id does not match, the handle is not valid.
-      if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
-        return nullptr;
-      }
-
-      // If the entry id is valid, it is an inline entry.
-      if (handle.inlineEntryId() < InlineMapRegistry::registrationMapSize()) {
-        return inline_entries_[handle.inlineEntryId()];
-      }
-
-      // Otherwise, try normal map entry.
-      if (auto it = map_.find(handle.inlineEntryKey()); it != map_.end()) {
-        return it->second.get();
-      }
-      return nullptr;
-    }
+    ConstRawT lookup(UntypedInlineHandle handle) const { return lookupImpl(handle); }
+    RawT lookup(UntypedInlineHandle handle) { return lookupImpl(handle); }
 
     // Set the entry for the given key. If the key is already present, overwrite it.
     void insert(absl::string_view key, TPtr value) {
@@ -165,7 +178,7 @@ public:
       if (auto entry_id = staticLookup(key, hash_value); entry_id.has_value()) {
         resetInlineMapEntry(*entry_id, std::move(value));
       } else {
-        map_[key] = std::move(value);
+        normal_entries_[key] = std::move(value);
       }
     }
 
@@ -189,7 +202,7 @@ public:
       }
 
       // Otherwise, try normal map entry.
-      map_[handle.inlineEntryKey()] = std::move(value);
+      normal_entries_[handle.inlineEntryKey()] = std::move(value);
     }
 
     // Remove the entry for the given key. If the key is not found, do nothing.
@@ -200,7 +213,7 @@ public:
       if (auto entry_id = staticLookup(key, hash_value); entry_id.has_value()) {
         resetInlineMapEntry(*entry_id);
       } else {
-        map_.erase(key);
+        normal_entries_.erase(key);
       }
     }
 
@@ -221,29 +234,31 @@ public:
       }
 
       // Otherwise, try normal map entry.
-      map_.erase(handle.inlineEntryKey());
+      normal_entries_.erase(handle.inlineEntryKey());
     }
 
     void iterate(std::function<bool(absl::string_view, RawT)> callback) const {
-      for (const auto& entry : map_) {
+      for (const auto& entry : normal_entries_) {
         if (!callback(entry.first, entry.second.get())) {
           return;
         }
       }
 
       for (const auto& id : InlineMapRegistry::registrationMap()) {
-        ASSERT(id.second.inlineEntryId() < InlineMapRegistry::registrationMapSize());
+        ASSERT(id.second < InlineMapRegistry::registrationMapSize());
 
-        auto entry = inline_entries_[id.second.inlineEntryId()];
+        auto entry = inline_entries_[id.second];
         if (entry == nullptr) {
           continue;
         }
 
-        if (!callback(id.second.inlineEntryKey(), entry.get())) {
+        if (!callback(id.first, entry.get())) {
           return;
         }
       }
     }
+
+    uint64_t size() const { return normal_entries_.size() + inline_entries_size_; }
 
     static std::unique_ptr<InlineMap> createInlineMap() {
       return std::unique_ptr<InlineMap>(
@@ -255,24 +270,76 @@ public:
       memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
     }
 
+    RawT lookupImpl(absl::string_view key) const {
+      // Compute the hash value for the key and avoid computing it again in the lookup.
+      const size_t hash_value = InlineMapRegistry::Hash()(key);
+
+      // Because the normal string view key is used here, try the normal map entry first.
+      if (auto it = normal_entries_.find(key, hash_value); it != normal_entries_.end()) {
+        return it->second.get();
+      }
+
+      if (auto entry_id = staticLookup(key, hash_value); entry_id.has_value()) {
+        return inline_entries_[*entry_id];
+      }
+
+      return nullptr;
+    }
+
+    RawT lookupImpl(InlineHandle handle) const {
+      ASSERT(handle.inlineEntryId() < InlineMapRegistry::registrationMapSize());
+      return inline_entries_[handle.inlineEntryId()];
+    }
+
+    // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
+    RawT lookupImpl(UntypedInlineHandle handle) const {
+      // If the scope id does not match, the handle is not valid.
+      if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
+        return nullptr;
+      }
+
+      // If the entry id is valid, it is an inline entry.
+      if (handle.inlineEntryId() < InlineMapRegistry::registrationMapSize()) {
+        return inline_entries_[handle.inlineEntryId()];
+      }
+
+      // Otherwise, try normal map entry.
+      if (auto it = normal_entries_.find(handle.inlineEntryKey()); it != normal_entries_.end()) {
+        return it->second.get();
+      }
+      return nullptr;
+    }
+
     void resetInlineMapEntry(uint64_t inline_entry_id, TPtr new_entry = nullptr) {
       ASSERT(inline_entry_id < InlineMapRegistry::registrationMapSize());
-
       if (auto entry = inline_entries_[inline_entry_id]; entry != nullptr) {
+        // Remove and delete the old valid entry.
+        ASSERT(inline_entries_size_ > 0);
+        --inline_entries_size_;
         delete entry;
       }
+
+      if (new_entry != nullptr) {
+        // Append the new valid entry.
+        ++inline_entries_size_;
+      }
+
       inline_entries_[inline_entry_id] = new_entry.release();
     }
 
     absl::optional<uint64_t> staticLookup(absl::string_view key, size_t hash_value) const {
       if (auto iter = InlineMapRegistry::registrationMap().find(key, hash_value);
           iter != InlineMapRegistry::registrationMap().end()) {
-        return iter->second.inlineEntryId();
+        return iter->second;
       }
       return absl::nullopt;
     }
 
-    HashMap map_;
+    // This is the underlay hash map for the normal entries.
+    UnderlayHashMap normal_entries_;
+
+    uint64_t inline_entries_size_{};
+    // This should be the last member of the class and no member should be added after this.
     RawT inline_entries_[];
   };
 
@@ -289,12 +356,22 @@ public:
 
     // If the key is already registered, return the existing handle.
     if (auto it = mutableRegistrationMap().find(key); it != mutableRegistrationMap().end()) {
-      return it->second;
+      // It is safe to reference the key here because the key is stored in the node hash set.
+      return InlineHandle(it->second, it->first);
     }
 
-    InlineHandle handle{mutableRegistrationMap().size(), key};
-    mutableRegistrationMap().emplace(key, handle);
-    return handle;
+    // If the key is not registered, create a new handle for it.
+
+    const uint64_t entry_id = mutableRegistrationMap().size();
+
+    // Insert the key to the node hash set and keep the reference of the key in the
+    // inline handle and registration map.
+    auto result = mutableRegistrationSet().emplace(key);
+    RELEASE_ASSERT(result.second, "The key is already registered and this should never happen");
+
+    // It is safe to reference the key here because the key is stored in the node hash set.
+    mutableRegistrationMap().emplace(absl::string_view(*result.first), entry_id);
+    return InlineHandle(entry_id, absl::string_view(*result.first));
   }
 
   /**
@@ -365,6 +442,10 @@ private:
 
   static RegistrationMap& mutableRegistrationMap() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(RegistrationMap);
+  }
+
+  static RegistrationSet& mutableRegistrationSet() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(RegistrationSet);
   }
 
   static InlineMapRegistryDebugInfo debugInfo() {

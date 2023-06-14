@@ -4,6 +4,7 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_boringssl",
 )
@@ -493,11 +494,25 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "inline_map_registry_test_scope_lib",
+    hdrs = ["inline_map_registry_test_scope.h"],
+    deps = [
+        "//envoy/common:inline_map_registry",
+    ],
+)
+
+envoy_cc_test(
+    name = "inline_map_registry_test",
+    srcs = ["inline_map_registry_test.cc"],
+    deps = [":inline_map_registry_test_scope_lib"],
+)
+
 envoy_cc_benchmark_binary(
     name = "inline_map_registry_speed_test",
     srcs = ["inline_map_registry_speed_test.cc"],
     external_deps = ["benchmark"],
-    deps = ["//envoy/common:inline_map_registry"],
+    deps = [":inline_map_registry_test_scope_lib"],
 )
 
 envoy_benchmark_test(
