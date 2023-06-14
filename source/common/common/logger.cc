@@ -3,6 +3,7 @@
 #include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -304,6 +305,24 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
           CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
       .set_pattern(log_format);
   logger.set_formatter(std::move(formatter));
+}
+
+std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
+  if (tags.empty()) {
+    return "";
+  }
+
+  std::stringstream tags_stream;
+  tags_stream << "[Tags: ";
+  for (const auto& tag : tags) {
+    tags_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+  }
+
+  std::string serialized = tags_stream.str();
+  serialized.pop_back();
+  serialized += "] ";
+
+  return serialized;
 }
 
 } // namespace Utility
