@@ -432,6 +432,25 @@ TEST(TaggedLogTest, TestTaggedLog) {
   object.logMessageWithInlineTags();
 }
 
+TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Level"].set_string_value("%l");
+  (*log_struct.mutable_fields())["Message"].set_string_value("%j");
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+    EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
+    EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
+  }));
+
+  ClassForTaggedLog object;
+  object.logMessageWithPreCreatedTags();
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy

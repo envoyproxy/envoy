@@ -276,6 +276,14 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
     return absl::InvalidArgumentError("Usage of %_ is unavailable for JSON log formats");
   }
 
+  format_as_json.replace(format_as_json.rfind("}"), 1, "%*}");
+
+  size_t flag_index = format_as_json.find("%j");
+  while (flag_index != std::string::npos) {
+    format_as_json.replace(flag_index, 2, "%+");
+    flag_index = format_as_json.find("%j");
+  }
+
   setLogFormat(format_as_json);
   return absl::OkStatus();
 }
@@ -304,6 +312,17 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
       ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
           CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
       .set_pattern(log_format);
+
+  formatter
+      ->add_flag<CustomFlagFormatter::ExtractedTags>(
+          CustomFlagFormatter::ExtractedTags::Placeholder)
+      .set_pattern(log_format);
+
+  formatter
+      ->add_flag<CustomFlagFormatter::ExtractedMessage>(
+          CustomFlagFormatter::ExtractedMessage::Placeholder)
+      .set_pattern(log_format);
+
   logger.set_formatter(std::move(formatter));
 }
 
@@ -325,6 +344,17 @@ std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
   return serialized;
 }
 
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest) {
+  const uint64_t required_space = JsonEscaper::extraSpace(payload);
+  if (required_space == 0) {
+    dest.append(payload.data(), payload.data() + payload.size());
+    return;
+  }
+
+  const std::string escaped = JsonEscaper::escapeString(payload, required_space);
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
 } // namespace Utility
 
 namespace CustomFlagFormatter {
@@ -340,14 +370,43 @@ void EscapeMessageJsonString::format(const spdlog::details::log_msg& msg, const 
                                      spdlog::memory_buf_t& dest) {
 
   absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
-  const uint64_t required_space = JsonEscaper::extraSpace(payload);
-  if (required_space == 0) {
-    dest.append(payload.data(), payload.data() + payload.size());
+  Envoy::Logger::Utility::escapeMessageJsonString(payload, dest);
+}
+
+void ExtractedTags::format(const spdlog::details::log_msg& msg, const std::tm&,
+                           spdlog::memory_buf_t& dest) {
+  absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
+  std::cmatch matches;
+  std::regex_search(payload.begin(), payload.end(), matches, extracted_tags_pattern_);
+
+  if (matches.empty()) {
     return;
   }
-  const std::string escaped = JsonEscaper::escapeString(payload, required_space);
-  dest.append(escaped.data(), escaped.data() + escaped.size());
+
+  dest.append(JsonPropertyDeimilter.data(), JsonPropertyDeimilter.data() + 1);
+  dest.append(payload.data() + matches.position(1),
+              payload.data() + matches.position(1) + matches.length(1));
 }
+
+std::regex ExtractedTags::extracted_tags_pattern_ = std::regex(R"(\[Tags: (.*)\] )");
+
+void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm&,
+                              spdlog::memory_buf_t& dest) {
+  absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
+  std::cmatch matches;
+  std::regex_search(payload.begin(), payload.end(), matches, extracted_message_pattern_);
+
+  if (matches.empty()) {
+    Envoy::Logger::Utility::escapeMessageJsonString(payload, dest);
+    return;
+  }
+
+  auto original_message =
+      absl::string_view(payload.data() + matches.position(1), matches.length(1));
+  Envoy::Logger::Utility::escapeMessageJsonString(original_message, dest);
+}
+
+std::regex ExtractedMessage::extracted_message_pattern_ = std::regex(R"(\[Tags: .*\] (.+))");
 
 } // namespace CustomFlagFormatter
 } // namespace Logger

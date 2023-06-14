@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -406,6 +407,11 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
 
+/**
+ * Escapes the payload to a JSON string and writes the output to the destination buffer.
+ */
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest);
+
 } // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
@@ -448,6 +454,37 @@ public:
   }
 
   constexpr static char Placeholder = 'j';
+};
+
+class ExtractedTags : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedTags>();
+  }
+
+  constexpr static char Placeholder = '*';
+  constexpr static absl::string_view JsonPropertyDeimilter = ",";
+
+private:
+  static std::regex extracted_tags_pattern_;
+};
+
+class ExtractedMessage : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedMessage>();
+  }
+
+  constexpr static char Placeholder = '+';
+
+private:
+  static std::regex extracted_message_pattern_;
 };
 
 } // namespace CustomFlagFormatter
