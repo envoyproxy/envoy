@@ -199,7 +199,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
   Matcher::MatchCallbackStatus onMatchCallback(const Matcher::Action& action) override {
-    return handle_->onMatchCallback(std::move(action));
+    return handle_->onMatchCallback(action);
   }
 
   // Http::StreamDecoderFilterCallbacks
