@@ -1017,10 +1017,8 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
-                     request_port == ":443";
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
-                     request_port == ":80";
+      remove_port |= Http::Utility::schemeIsHttps(request_protocol) && request_port == ":443";
+      remove_port |= Http::Utility::schemeIsHttp(request_protocol) && request_port == ":80";
     }
 
     if (remove_port) {
