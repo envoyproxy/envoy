@@ -239,7 +239,7 @@ public:
 // A helper class for a lazy compatible stats struct type.
 template <typename StatsStructType> class DeferredCreationCompatibleStats {
 public:
-  DeferredCreationCompatibleStats(
+  explicit DeferredCreationCompatibleStats(
       std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
       : data_(std::move(d)) {}
   // Allows move construct and assign.
