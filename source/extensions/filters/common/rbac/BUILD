@@ -26,6 +26,12 @@ envoy_cc_library(
         "matcher_extension.h",
         "matchers.h",
     ],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "-DUSE_CEL",
+        ],
+    }),
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:header_map_interface",

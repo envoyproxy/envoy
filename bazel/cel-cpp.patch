@@ -1,3 +1,71 @@
+diff --git a/eval/public/message_wrapper.h b/eval/public/message_wrapper.h
+index ffa8648..bd83b17 100644
+--- a/eval/public/message_wrapper.h
++++ b/eval/public/message_wrapper.h
+@@ -45,12 +45,12 @@ class MessageWrapper {
+    public:
+     explicit Builder(google::protobuf::MessageLite* message)
+         : message_ptr_(reinterpret_cast<uintptr_t>(message)) {
+-      ABSL_ASSERT(absl::countr_zero(reinterpret_cast<uintptr_t>(message)) >=
++      ABSL_ASSERT(static_cast<uintptr_t>(absl::countr_zero(reinterpret_cast<uintptr_t>(message))) >=
+                   kTagSize);
+     }
+     explicit Builder(google::protobuf::Message* message)
+         : message_ptr_(reinterpret_cast<uintptr_t>(message) | kMessageTag) {
+-      ABSL_ASSERT(absl::countr_zero(reinterpret_cast<uintptr_t>(message)) >=
++      ABSL_ASSERT(static_cast<uintptr_t>(absl::countr_zero(reinterpret_cast<uintptr_t>(message))) >=
+                   kTagSize);
+     }
+ 
+@@ -82,7 +82,7 @@ class MessageWrapper {
+                  const LegacyTypeInfoApis* legacy_type_info)
+       : message_ptr_(reinterpret_cast<uintptr_t>(message)),
+         legacy_type_info_(legacy_type_info) {
+-    ABSL_ASSERT(absl::countr_zero(reinterpret_cast<uintptr_t>(message)) >=
++    ABSL_ASSERT(static_cast<uintptr_t>(absl::countr_zero(reinterpret_cast<uintptr_t>(message))) >=
+                 kTagSize);
+   }
+ 
+@@ -90,7 +90,7 @@ class MessageWrapper {
+                  const LegacyTypeInfoApis* legacy_type_info)
+       : message_ptr_(reinterpret_cast<uintptr_t>(message) | kMessageTag),
+         legacy_type_info_(legacy_type_info) {
+-    ABSL_ASSERT(absl::countr_zero(reinterpret_cast<uintptr_t>(message)) >=
++    ABSL_ASSERT(static_cast<uintptr_t>(absl::countr_zero(reinterpret_cast<uintptr_t>(message))) >=
+                 kTagSize);
+   }
+ 
+diff --git a/eval/public/structs/cel_proto_lite_wrap_util.cc b/eval/public/structs/cel_proto_lite_wrap_util.cc
+index 4cb21e5..b25921b 100644
+--- a/eval/public/structs/cel_proto_lite_wrap_util.cc
++++ b/eval/public/structs/cel_proto_lite_wrap_util.cc
+@@ -698,7 +698,7 @@ absl::StatusOr<BytesValue*> CreateMessageFromValue(
+   if (wrapper == nullptr) {
+     wrapper = google::protobuf::Arena::CreateMessage<BytesValue>(arena);
+   }
+-  wrapper->set_value(view_val.value());
++  wrapper->set_value(view_val.value().value(), view_val.value().size());
+   return wrapper;
+ }
+ 
+@@ -782,7 +782,7 @@ absl::StatusOr<StringValue*> CreateMessageFromValue(
+   if (wrapper == nullptr) {
+     wrapper = google::protobuf::Arena::CreateMessage<StringValue>(arena);
+   }
+-  wrapper->set_value(view_val.value());
++  wrapper->set_value(view_val.value().value(), view_val.value().size());
+   return wrapper;
+ }
+ 
+@@ -950,7 +950,7 @@ absl::StatusOr<Value*> CreateMessageFromValue(
+     case CelValue::Type::kString: {
+       CelValue::StringHolder val;
+       if (cel_value.GetValue(&val)) {
+-        wrapper->set_string_value(val.value());
++        wrapper->set_string_value(val.value().value(), val.value().size());
+       }
+     } break;
+     case CelValue::Type::kTimestamp: {
 diff --git a/eval/public/structs/cel_proto_wrap_util.cc b/eval/public/structs/cel_proto_wrap_util.cc
 index 9df9c00..1f077a9 100644
 --- a/eval/public/structs/cel_proto_wrap_util.cc
@@ -30,7 +98,7 @@ index 9df9c00..1f077a9 100644
        }
      } break;
 diff --git a/eval/public/structs/proto_message_type_adapter.cc b/eval/public/structs/proto_message_type_adapter.cc
-index 42c7f10..2e4dd20 100644
+index 74b32f6..4fef472 100644
 --- a/eval/public/structs/proto_message_type_adapter.cc
 +++ b/eval/public/structs/proto_message_type_adapter.cc
 @@ -86,10 +86,10 @@ absl::StatusOr<bool> HasFieldImpl(const google::protobuf::Message* message,
@@ -55,7 +123,7 @@ index 42c7f10..2e4dd20 100644
    if (field_desc == nullptr && reflection != nullptr) {
      std::string ext_name(field_name);
      field_desc = reflection->FindKnownExtensionByName(ext_name);
-@@ -332,7 +332,7 @@ ProtoMessageTypeAdapter::NewInstance(cel::MemoryManager& memory_manager) const {
+@@ -360,7 +360,7 @@ ProtoMessageTypeAdapter::NewInstance(cel::MemoryManager& memory_manager) const {
  }
  
  bool ProtoMessageTypeAdapter::DefinesField(absl::string_view field_name) const {
@@ -64,7 +132,7 @@ index 42c7f10..2e4dd20 100644
  }
  
  absl::StatusOr<bool> ProtoMessageTypeAdapter::HasField(
-@@ -365,7 +365,7 @@ absl::Status ProtoMessageTypeAdapter::SetField(
+@@ -393,7 +393,7 @@ absl::Status ProtoMessageTypeAdapter::SetField(
                         UnwrapMessage(instance, "SetField"));
  
    const google::protobuf::FieldDescriptor* field_descriptor =
@@ -74,12 +142,12 @@ index 42c7f10..2e4dd20 100644
        ValidateSetFieldOp(field_descriptor != nullptr, field_name, "not found"));
  
 diff --git a/eval/public/structs/protobuf_descriptor_type_provider.cc b/eval/public/structs/protobuf_descriptor_type_provider.cc
-index 03313d7..a2928ae 100644
+index 5c18ce3..77839ea 100644
 --- a/eval/public/structs/protobuf_descriptor_type_provider.cc
 +++ b/eval/public/structs/protobuf_descriptor_type_provider.cc
-@@ -53,7 +53,7 @@ ProtobufDescriptorProvider::ProvideLegacyTypeInfo(
- std::unique_ptr<ProtoMessageTypeAdapter> ProtobufDescriptorProvider::GetType(
-     absl::string_view name) const {
+@@ -42,7 +42,7 @@ ProtobufDescriptorProvider::ProvideLegacyTypeInfo(
+ std::unique_ptr<ProtoMessageTypeAdapter>
+ ProtobufDescriptorProvider::CreateTypeAdapter(absl::string_view name) const {
    const google::protobuf::Descriptor* descriptor =
 -      descriptor_pool_->FindMessageTypeByName(name);
 +      descriptor_pool_->FindMessageTypeByName(std::string(name));

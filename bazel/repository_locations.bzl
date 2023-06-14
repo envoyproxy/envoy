@@ -1085,10 +1085,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "c2d4b175d5c315e0b69b4d9d73f52a0a6ce26638",
-        sha256 = "456a5b70661a506a17e5d0de8c34bf5e31992f34d1680c201710d4e0701da4c3",
+        version = "0.9.0",
+        sha256 = "fb2c047baced1eb5a3f61c47f77e0dfb85b811db5c387e5ed4fbeb2facee87dd",
         strip_prefix = "cel-cpp-{version}",
-        urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/cel-cpp/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.extension_filters.cel",
@@ -1105,7 +1105,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
         ],
-        release_date = "2023-05-19",
+        release_date = "2023-05-23",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
