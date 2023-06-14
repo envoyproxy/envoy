@@ -222,6 +222,53 @@ Network::ConnectivityManager& Engine::networkConnectivityManager() {
   return *connectivity_manager_;
 }
 
+void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                 const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                 Buffer::Instance& response) {
+  for (const auto& stat : all_stats) {
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
+  }
+  std::map<std::string, std::string> all_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
+    if (histogram->used()) {
+      all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+    }
+  }
+  for (const auto& histogram : all_histograms) {
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
+  }
+}
+
+void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
+  std::map<std::string, uint64_t> all_stats;
+  for (const Stats::CounterSharedPtr& counter : stats.counters()) {
+    if (counter->used()) {
+      all_stats.emplace(counter->name(), counter->value());
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
+    if (gauge->used()) {
+      all_stats.emplace(gauge->name(), gauge->value());
+    }
+  }
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
+  statsAsText(all_stats, histograms, response);
+}
+
+Envoy::Buffer::OwnedImpl Engine::dumpStats() {
+  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
+
+  Envoy::Buffer::OwnedImpl instance;
+  handlerStats(server_->stats(), instance);
+  return instance;
+}
+
 void Engine::flushStats() {
   ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
 
