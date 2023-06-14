@@ -97,19 +97,16 @@ public:
 
 private:
   enum State {
-    PASSTHROUGH,
-    UPSTREAM_GREETING,
-    DOWNSTREAM_EHLO,
-    UPSTREAM_EHLO_RESP,
-    UPSTREAM_STARTTLS_RESP,
-    UPSTREAM_EHLO2_RESP,
-    DOWNSTREAM_STARTTLS,
-    DOWNSTREAM_STARTTLS_RESP,
-    DOWNSTREAM_TLS_NEGO,
+    Passthrough,
+    UpstreamGreeting,
+    DownstreamEhlo,
+    UpstreamEhloResp,
+    UpstreamStarttlsResp,
+    UpstreamEhlo2Resp,
+    DownstreamStarttls,
+    DownstreamStarttlsResp
   };
-
   State state_;
-
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   SmtpFilterConfigSharedPtr config_;

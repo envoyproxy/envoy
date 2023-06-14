@@ -27,8 +27,8 @@ public:
   };
 
   struct Command {
-    enum Verb { UNKNOWN, HELO, EHLO, STARTTLS };
-    Verb verb = UNKNOWN;
+    enum Verb { Unknown, Helo, Ehlo, Starttls };
+    Verb verb = Unknown;
     std::string raw_verb;
     std::string rest;
     size_t wire_len;
@@ -45,9 +45,9 @@ public:
   // is returned. Otherwise:
   // NeedMoreData: buffer contains an incomplete command
   // Bad: buffer contains data that is not a prefix of a valid command
-  virtual Result DecodeCommand(Buffer::Instance& data, Command& result) = 0;
+  virtual Result decodeCommand(Buffer::Instance& data, Command& result) = 0;
   // Attempts to decode an SMTP response from data.
-  virtual Result DecodeResponse(Buffer::Instance& data, Response& result) = 0;
+  virtual Result decodeResponse(Buffer::Instance& data, Response& result) = 0;
 
   // The following routines operate on the full wire bytes of a
   // response to EHLO that has previously been validated by
@@ -57,11 +57,11 @@ public:
   // 220 STARTTLS\r\n
 
   // Adds the ESMTP capability cap to caps if not present.
-  virtual void AddEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  virtual void addEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
   // Adds the ESMTP capability cap to caps if present.
-  virtual void RemoveEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
+  virtual void removeEsmtpCapability(absl::string_view cap, std::string& caps) = 0;
   // Returns true if the ESMTP capability cap is present in caps.
-  virtual bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) = 0;
+  virtual bool hasEsmtpCapability(absl::string_view cap, absl::string_view caps) = 0;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -72,13 +72,13 @@ public:
 
   // if data starts with a valid smtp command, decodes into result and returns ReadyForNext
   // else returns NeedMoreData
-  Result DecodeCommand(Buffer::Instance& data, Command& result) override;
+  Result decodeCommand(Buffer::Instance& data, Command& result) override;
 
-  Result DecodeResponse(Buffer::Instance& data, Response& result) override;
+  Result decodeResponse(Buffer::Instance& data, Response& result) override;
 
-  void AddEsmtpCapability(absl::string_view, std::string&) override;
-  void RemoveEsmtpCapability(absl::string_view, std::string&) override;
-  bool HasEsmtpCapability(absl::string_view cap, absl::string_view caps) override;
+  void addEsmtpCapability(absl::string_view, std::string&) override;
+  void removeEsmtpCapability(absl::string_view, std::string&) override;
+  bool hasEsmtpCapability(absl::string_view cap, absl::string_view caps) override;
 };
 
 } // namespace SmtpProxy

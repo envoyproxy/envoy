@@ -18,13 +18,12 @@ namespace SmtpProxy {
 
 using ::testing::ReturnRef;
 using ::testing::Truly;
-using ::testing::WithArgs;
 
 // Fixture class.
 class SmtpFilterTest : public ::testing::Test {
 public:
   SmtpFilterTest() {
-    Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+    configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
                                                         /*downstream_ssl=*/ConfigProto::ENABLE,
                                                         /*upstream_ssl=*/ConfigProto::DISABLE});
   }
@@ -33,7 +32,7 @@ public:
     EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
   }
 
-  void Configure(const SmtpFilterConfig::SmtpFilterConfigOptions& config_options) {
+  void configure(const SmtpFilterConfig::SmtpFilterConfigOptions& config_options) {
     config_ = std::make_shared<SmtpFilterConfig>(config_options, scope_);
     filter_ = std::make_unique<SmtpFilter>(config_);
 
@@ -46,37 +45,37 @@ public:
     EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   }
 
-  void ExpectInjectReadData(absl::string_view s, bool end_stream) {
+  void expectInjectReadData(absl::string_view s, bool end_stream) {
     EXPECT_CALL(read_callbacks_,
                 injectReadDataToFilterChain(
                     Truly([s](Buffer::Instance& b) { return b.toString() == s; }), end_stream));
   }
 
-  void ExpectInjectWriteData(absl::string_view s, bool end_stream) {
+  void expectInjectWriteData(absl::string_view s, bool end_stream) {
     EXPECT_CALL(write_callbacks_,
                 injectWriteDataToFilterChain(
                     Truly([s](Buffer::Instance& b) { return b.toString() == s; }), end_stream));
   }
 
-  void ReadExpectConsumed(absl::string_view s) {
+  void readExpectConsumed(absl::string_view s) {
     Buffer::OwnedImpl buf(s);
     EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(buf, false));
     EXPECT_EQ(0, buf.length());
   }
 
-  void ReadExpectContinue(absl::string_view s) {
+  void readExpectContinue(absl::string_view s) {
     Buffer::OwnedImpl buf(s);
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(buf, false));
     EXPECT_EQ(s.size(), buf.length());
   }
 
-  void WriteExpectConsumed(absl::string_view s) {
+  void writeExpectConsumed(absl::string_view s) {
     Buffer::OwnedImpl buf(s);
     EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(buf, false));
     EXPECT_EQ(0, buf.length());
   }
 
-  void WriteExpectContinue(absl::string_view s) {
+  void writeExpectContinue(absl::string_view s) {
     Buffer::OwnedImpl buf(s);
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(buf, false));
     EXPECT_EQ(s.size(), buf.length());
@@ -100,13 +99,13 @@ public:
 TEST_F(SmtpFilterTest, BadPipeline) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
-  ExpectInjectWriteData("503 bad pipeline\r\n", true);
+  expectInjectWriteData("503 bad pipeline\r\n", true);
   EXPECT_CALL(connection_, close(_));
 
-  ReadExpectConsumed("ehlo example.com\r\nstuff");
+  readExpectConsumed("ehlo example.com\r\nstuff");
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_bad_pipeline_.value(), 1);
 }
@@ -115,86 +114,86 @@ TEST_F(SmtpFilterTest, BadPipeline) {
 TEST_F(SmtpFilterTest, NoHelo) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
-  ExpectInjectWriteData("503 bad sequence of commands\r\n", true);
+  expectInjectWriteData("503 bad sequence of commands\r\n", true);
   EXPECT_CALL(connection_, close(_));
 
-  ReadExpectConsumed("starttls\r\n");
+  readExpectConsumed("starttls\r\n");
   ASSERT_THAT(filter_->getStats().sessions_bad_ehlo_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, NoEsmtp) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view helo = "helo example.com\r\n";
-  ExpectInjectReadData(helo, false);
-  ReadExpectConsumed(helo);
+  expectInjectReadData(helo, false);
+  readExpectConsumed(helo);
 
   absl::string_view ehlo_resp = "220 upstream smtp server at your service\r\n";
-  WriteExpectContinue(ehlo_resp);
+  writeExpectContinue(ehlo_resp);
 
-  ReadExpectContinue("mail from:<alice>\r\n");
-  WriteExpectContinue("200 ok\r\n");
+  readExpectContinue("mail from:<alice>\r\n");
+  writeExpectContinue("200 ok\r\n");
   ASSERT_THAT(filter_->getStats().sessions_non_esmtp_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, NoStarttls) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200 PIPELINING\r\n";
   absl::string_view updated_ehlo_response = "200-upstream smtp server at your service\r\n"
                                             "200-PIPELINING\r\n"
                                             "200 STARTTLS\r\n";
-  ExpectInjectWriteData(updated_ehlo_response, false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectWriteData(updated_ehlo_response, false);
+  writeExpectConsumed(ehlo_response);
 
   absl::string_view kMail = "mail from:<someone>\r\n";
-  ExpectInjectReadData(kMail, false);
-  ReadExpectConsumed(kMail);
+  expectInjectReadData(kMail, false);
+  readExpectConsumed(kMail);
 
   ASSERT_THAT(filter_->getStats().sessions_esmtp_unencrypted_.value(), 1);
 }
 
 // upstream and downstream starttls disabled: filter should pass through caps and client invocation
 TEST_F(SmtpFilterTest, DisabledUpstreamDownstreamTls) {
-  Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+  configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
                                                       /*downstream_ssl=*/ConfigProto::DISABLE,
                                                       /*upstream_ssl=*/ConfigProto::DISABLE});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200-PIPELINING\r\n"
                                     "200 STARTTLS\r\n";
-  ExpectInjectWriteData(ehlo_response, false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectWriteData(ehlo_response, false);
+  writeExpectConsumed(ehlo_response);
 
-  ReadExpectContinue("starttls\r\n");
-  WriteExpectContinue("220 upstream ready for tls\r\n");
+  readExpectContinue("starttls\r\n");
+  writeExpectContinue("220 upstream ready for tls\r\n");
 
   // Filter now in passthrough state, TLS exchange is opaque/binary data.
-  ReadExpectContinue("\x01\x02\x03\x04");
-  WriteExpectContinue("\x05\x06\x07\x08");
+  readExpectContinue("\x01\x02\x03\x04");
+  writeExpectContinue("\x05\x06\x07\x08");
 
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_non_esmtp_.value(), 0);
@@ -205,28 +204,28 @@ TEST_F(SmtpFilterTest, DisabledUpstreamDownstreamTls) {
 TEST_F(SmtpFilterTest, DownstreamStarttls) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200 PIPELINING\r\n";
   absl::string_view updated_ehlo_response = "200-upstream smtp server at your service\r\n"
                                             "200-PIPELINING\r\n"
                                             "200 STARTTLS\r\n";
-  ExpectInjectWriteData(updated_ehlo_response, false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectWriteData(updated_ehlo_response, false);
+  writeExpectConsumed(ehlo_response);
 
   Network::Connection::BytesSentCb cb;
   EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
 
   absl::string_view kStarttlsResp = "220 envoy ready for tls\r\n";
-  ExpectInjectWriteData(kStarttlsResp, false); // starttls response
+  expectInjectWriteData(kStarttlsResp, false); // starttls response
 
-  ReadExpectConsumed("starttls\r\n");
+  readExpectConsumed("starttls\r\n");
 
   EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
   cb(kStarttlsResp.size());
@@ -234,13 +233,13 @@ TEST_F(SmtpFilterTest, DownstreamStarttls) {
   // PASSTHROUGH after downstream STARTTLS
 
   const absl::string_view kEhlo2 = "ehlo example.com\r\n";
-  ReadExpectContinue(kEhlo2);
+  readExpectContinue(kEhlo2);
 
-  WriteExpectContinue("200-upstream smtp ok\r\n"
+  writeExpectContinue("200-upstream smtp ok\r\n"
                       "200-PIPELINING\r\n"
                       "200 8BITMIME\r\n");
 
-  ReadExpectContinue("mail from:<someone>\r\n");
+  readExpectContinue("mail from:<someone>\r\n");
 
   ASSERT_THAT(filter_->getStats().sessions_downstream_terminated_ssl_.value(), 1);
 }
@@ -250,95 +249,95 @@ TEST_F(SmtpFilterTest, DownstreamStarttls) {
 // downstream REQUIRE + not invoked
 
 TEST_F(SmtpFilterTest, UpstreamStarttls) {
-  Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+  configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
                                                       /*downstream_ssl=*/ConfigProto::DISABLE,
                                                       /*upstream_ssl=*/ConfigProto::ENABLE});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200-PIPELINING\r\n"
                                     "200 STARTTLS\r\n";
-  ExpectInjectReadData("STARTTLS\r\n", false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectReadData("STARTTLS\r\n", false);
+  writeExpectConsumed(ehlo_response);
 
   EXPECT_CALL(read_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
-  ExpectInjectReadData(ehlo_command, false);
-  WriteExpectConsumed("200 upstream ready for tls\r\n");
+  expectInjectReadData(ehlo_command, false);
+  writeExpectConsumed("200 upstream ready for tls\r\n");
 
-  WriteExpectContinue("200-upstream smtp ok\r\n"
+  writeExpectContinue("200-upstream smtp ok\r\n"
                       "200-PIPELINING\r\n"
                       "200 8BITMIME\r\n");
 
-  ReadExpectContinue("mail from:<someone>\r\n");
+  readExpectContinue("mail from:<someone>\r\n");
 
   ASSERT_THAT(filter_->getStats().sessions_upstream_terminated_ssl_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, UpstreamStarttlsErr) {
-  Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+  configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
                                                       /*downstream_ssl=*/ConfigProto::DISABLE,
                                                       /*upstream_ssl=*/ConfigProto::ENABLE});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200-PIPELINING\r\n"
                                     "200 STARTTLS\r\n";
-  ExpectInjectReadData("STARTTLS\r\n", false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectReadData("STARTTLS\r\n", false);
+  writeExpectConsumed(ehlo_response);
 
-  ExpectInjectWriteData("400 upstream STARTTLS error\r\n", true);
+  expectInjectWriteData("400 upstream STARTTLS error\r\n", true);
   EXPECT_CALL(connection_, close(_));
-  WriteExpectConsumed("400 ENOMEM\r\n");
+  writeExpectConsumed("400 ENOMEM\r\n");
 
   ASSERT_THAT(filter_->getStats().sessions_upstream_ssl_command_err_.value(), 1);
 }
 
 TEST_F(SmtpFilterTest, DownstreamUpstreamStarttls) {
-  Configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
+  configure(SmtpFilterConfig::SmtpFilterConfigOptions{stat_prefix_,
                                                       /*downstream_ssl=*/ConfigProto::ENABLE,
                                                       /*upstream_ssl=*/ConfigProto::ENABLE});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  ExpectInjectWriteData("220 upstream ESMTP\r\n", false);
-  WriteExpectConsumed("220 upstream ESMTP\r\n");
+  expectInjectWriteData("220 upstream ESMTP\r\n", false);
+  writeExpectConsumed("220 upstream ESMTP\r\n");
 
   absl::string_view ehlo_command = "ehlo example.com\r\n";
-  ExpectInjectReadData(ehlo_command, false);
-  ReadExpectConsumed(ehlo_command);
+  expectInjectReadData(ehlo_command, false);
+  readExpectConsumed(ehlo_command);
 
   absl::string_view ehlo_response = "200-upstream smtp server at your service\r\n"
                                     "200-PIPELINING\r\n"
                                     "200 STARTTLS\r\n";
-  ExpectInjectReadData("STARTTLS\r\n", false);
-  WriteExpectConsumed(ehlo_response);
+  expectInjectReadData("STARTTLS\r\n", false);
+  writeExpectConsumed(ehlo_response);
 
   EXPECT_CALL(read_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
-  ExpectInjectReadData(ehlo_command, false);
-  WriteExpectConsumed("200 upstream ready for tls\r\n");
+  expectInjectReadData(ehlo_command, false);
+  writeExpectConsumed("200 upstream ready for tls\r\n");
 
   absl::string_view updated_ehlo_response = "200-upstream smtp ok\r\n"
                                             "200-PIPELINING\r\n"
                                             "200-8BITMIME\r\n"
                                             "200 STARTTLS\r\n";
-  ExpectInjectWriteData(updated_ehlo_response, false);
-  WriteExpectConsumed("200-upstream smtp ok\r\n"
+  expectInjectWriteData(updated_ehlo_response, false);
+  writeExpectConsumed("200-upstream smtp ok\r\n"
                       "200-PIPELINING\r\n"
                       "200 8BITMIME\r\n");
 
@@ -346,14 +345,14 @@ TEST_F(SmtpFilterTest, DownstreamUpstreamStarttls) {
   EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
 
   absl::string_view kStarttlsResp = "220 envoy ready for tls\r\n";
-  ExpectInjectWriteData(kStarttlsResp, false); // starttls response
-  ReadExpectConsumed("STARTTLS\r\n");
+  expectInjectWriteData(kStarttlsResp, false); // starttls response
+  readExpectConsumed("STARTTLS\r\n");
 
   EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
   cb(kStarttlsResp.size());
 
   // PASSTHROUGH after downstream STARTTLS
-  ReadExpectContinue("mail from:<alice@example.com>\r\n");
+  readExpectContinue("mail from:<alice@example.com>\r\n");
 
   ASSERT_THAT(filter_->getStats().sessions_downstream_terminated_ssl_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_upstream_terminated_ssl_.value(), 1);

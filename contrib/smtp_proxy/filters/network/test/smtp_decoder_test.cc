@@ -23,18 +23,18 @@ protected:
 
 class SmtpProxyDecoderTest : public SmtpProxyDecoderTestBase, public ::testing::Test {};
 
-TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
+TEST_F(SmtpProxyDecoderTest, decodeCommand) {
   Decoder::Command command;
-  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeCommand(data_, command));
 
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
 
   data_.add(std::string(1022, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
-  EXPECT_EQ(Decoder::Command::UNKNOWN, command.verb);
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Command::Unknown, command.verb);
   EXPECT_EQ(std::string(1022, 'q'), command.raw_verb);
   EXPECT_TRUE(command.rest.empty());
   EXPECT_EQ(1024, command.wire_len);
@@ -42,36 +42,36 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
 
   data_.add(std::string(1023, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
 
   data_.add("fOo bar\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
   EXPECT_EQ(9, command.wire_len);
-  EXPECT_EQ(Decoder::Command::UNKNOWN, command.verb);
+  EXPECT_EQ(Decoder::Command::Unknown, command.verb);
   EXPECT_EQ("fOo", command.raw_verb);
   EXPECT_EQ("bar", command.rest);
 
   data_.add("eHlO example.com\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
   EXPECT_EQ(18, command.wire_len);
-  EXPECT_EQ(Decoder::Command::EHLO, command.verb);
+  EXPECT_EQ(Decoder::Command::Ehlo, command.verb);
   EXPECT_EQ("eHlO", command.raw_verb);
   EXPECT_EQ("example.com", command.rest);
 }
 
-TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
+TEST_F(SmtpProxyDecoderTest, decodeResponse) {
   Decoder::Response response;
-  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeResponse(data_, response));
 
   data_.add("200");
-  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("200\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
   EXPECT_EQ(200, response.code);
   EXPECT_EQ("", response.msg);
@@ -80,7 +80,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   data_.add("200 ");
   data_.add(std::string(1018, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
   EXPECT_EQ(200, response.code);
   EXPECT_EQ(std::string(1018, 'q') + "\r\n", response.msg);
@@ -89,7 +89,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   data_.add("200 ");
   data_.add(std::string(1019, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   // exactly 64KiB response is accepted
@@ -101,7 +101,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
     }
     max_line[3] = ' ';
     data_.add(max_line);
-    EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+    EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
     data_.drain(data_.length());
     EXPECT_EQ(200, response.code);
     EXPECT_EQ(65536, response.wire_len);
@@ -116,31 +116,31 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
     }
     max_line[3] = ' ';
     data_.add(max_line);
-    EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+    EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
     data_.drain(data_.length());
   }
 
   data_.add("200 ok\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
   EXPECT_EQ(200, response.code);
   EXPECT_EQ("ok\r\n", response.msg);
   EXPECT_EQ(8, response.wire_len);
 
   data_.add("qqq \r\n"); // isdigit
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("123q\r\n"); // space or dash
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("123-q\r\n321 q\r\n"); // codes must match
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("200 ok\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   EXPECT_EQ(200, response.code);
@@ -150,14 +150,14 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   data_.add("400-bad\r\n");
   data_.add("400 more bad\r\n");
   data_.add("200 pipelined response\r\n");
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
 
   EXPECT_EQ(400, response.code);
   EXPECT_EQ("bad\r\nmore bad\r\n", response.msg);
   EXPECT_EQ(23, response.wire_len);
   data_.drain(response.wire_len);
 
-  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->DecodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_->decodeResponse(data_, response));
   EXPECT_EQ(200, response.code);
   EXPECT_EQ("pipelined response\r\n", response.msg);
   EXPECT_EQ(24, response.wire_len);
@@ -169,33 +169,33 @@ TEST_F(SmtpProxyDecoderTest, HasCap) {
                      "200-SMTPUTF8\r\n"
                      "200-PIPELINING\r\n"
                      "200 STARTTLS\r\n";
-  EXPECT_TRUE(decoder_->HasEsmtpCapability("smtputf8", caps));
-  EXPECT_TRUE(decoder_->HasEsmtpCapability("PIPELINING", caps));
-  EXPECT_TRUE(decoder_->HasEsmtpCapability("StArTtLs", caps));
-  EXPECT_FALSE(decoder_->HasEsmtpCapability("SIZE", caps));
+  EXPECT_TRUE(decoder_->hasEsmtpCapability("smtputf8", caps));
+  EXPECT_TRUE(decoder_->hasEsmtpCapability("PIPELINING", caps));
+  EXPECT_TRUE(decoder_->hasEsmtpCapability("StArTtLs", caps));
+  EXPECT_FALSE(decoder_->hasEsmtpCapability("SIZE", caps));
 
   caps = "200-STARTTLS is the server greeting, not a capability\r\n"
          "200 PIPELINING\r\n";
-  EXPECT_FALSE(decoder_->HasEsmtpCapability("STARTTLS", caps));
+  EXPECT_FALSE(decoder_->hasEsmtpCapability("STARTTLS", caps));
 
   caps = "200-example.com smtp server at your service\r\n"
          "200 STARTTLSXYZ\r\n";
-  EXPECT_FALSE(decoder_->HasEsmtpCapability("STARTTLS", caps));
+  EXPECT_FALSE(decoder_->hasEsmtpCapability("STARTTLS", caps));
 
   caps = "200-example.com smtp server at your service\r\n"
          "200 SIZE 1048576\r\n";
-  EXPECT_TRUE(decoder_->HasEsmtpCapability("SIZE", caps));
+  EXPECT_TRUE(decoder_->hasEsmtpCapability("SIZE", caps));
 }
 
 TEST_F(SmtpProxyDecoderTest, RemoveCap) {
   std::string caps = "200 example.com at your service\r\n";
-  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  decoder_->removeEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200 example.com at your service\r\n", caps);
 
   caps = "200-example.com at your service\r\n"
          "200-SMTPUTF8\r\n"
          "200 PIPELINING\r\n";
-  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  decoder_->removeEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200 PIPELINING\r\n",
@@ -205,7 +205,7 @@ TEST_F(SmtpProxyDecoderTest, RemoveCap) {
          "200-SMTPUTF8\r\n"
          "200-STARTTLS\r\n"
          "200 PIPELINING\r\n";
-  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  decoder_->removeEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200 PIPELINING\r\n",
@@ -215,7 +215,7 @@ TEST_F(SmtpProxyDecoderTest, RemoveCap) {
          "200-SMTPUTF8\r\n"
          "200-PIPELINING\r\n"
          "200 STARTTLS\r\n";
-  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  decoder_->removeEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200 PIPELINING\r\n",
@@ -223,7 +223,7 @@ TEST_F(SmtpProxyDecoderTest, RemoveCap) {
 
   caps = "200-STARTTLS is the server greeting, not a capability\r\n"
          "200 PIPELINING\r\n";
-  decoder_->RemoveEsmtpCapability("STARTTLS", caps);
+  decoder_->removeEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-STARTTLS is the server greeting, not a capability\r\n"
             "200 PIPELINING\r\n",
             caps);
@@ -231,7 +231,7 @@ TEST_F(SmtpProxyDecoderTest, RemoveCap) {
 
 TEST_F(SmtpProxyDecoderTest, AddCap) {
   std::string caps = "200 example.com at your service\r\n";
-  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  decoder_->addEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200 STARTTLS\r\n",
             caps);
@@ -239,7 +239,7 @@ TEST_F(SmtpProxyDecoderTest, AddCap) {
   caps = "200-example.com at your service\r\n"
          "200-SMTPUTF8\r\n"
          "200 PIPELINING\r\n";
-  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  decoder_->addEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200-PIPELINING\r\n"
@@ -250,7 +250,7 @@ TEST_F(SmtpProxyDecoderTest, AddCap) {
          "200-SMTPUTF8\r\n"
          "200-STARTTLS\r\n"
          "200 PIPELINING\r\n";
-  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  decoder_->addEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200-STARTTLS\r\n"
@@ -261,7 +261,7 @@ TEST_F(SmtpProxyDecoderTest, AddCap) {
          "200-SMTPUTF8\r\n"
          "200-PIPELINING\r\n"
          "200 STARTTLS\r\n";
-  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  decoder_->addEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-example.com at your service\r\n"
             "200-SMTPUTF8\r\n"
             "200-PIPELINING\r\n"
@@ -270,7 +270,7 @@ TEST_F(SmtpProxyDecoderTest, AddCap) {
 
   caps = "200-STARTTLS is the server greeting, not a capability\r\n"
          "200 PIPELINING\r\n";
-  decoder_->AddEsmtpCapability("STARTTLS", caps);
+  decoder_->addEsmtpCapability("STARTTLS", caps);
   EXPECT_EQ("200-STARTTLS is the server greeting, not a capability\r\n"
             "200-PIPELINING\r\n"
             "200 STARTTLS\r\n",

@@ -39,7 +39,7 @@ const size_t kMaxReplyBytes = 65536;
 using RawLinePtr = std::unique_ptr<char[]>;
 } // anonymous namespace
 
-Decoder::Result GetLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
+Decoder::Result getLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
                         absl::string_view& line, size_t max_line) {
   ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
@@ -64,10 +64,10 @@ Decoder::Result GetLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_li
   return Decoder::Result::ReadyForNext;
 }
 
-Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& result) {
+Decoder::Result DecoderImpl::decodeCommand(Buffer::Instance& data, Command& result) {
   RawLinePtr raw_line;
   absl::string_view line;
-  Result res = GetLine(data, 0, raw_line, line, kMaxCommandLine);
+  Result res = getLine(data, 0, raw_line, line, kMaxCommandLine);
   if (res != Result::ReadyForNext) {
     return res;
   }
@@ -91,9 +91,9 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
     Command::Verb verb;
     absl::string_view raw_verb;
   } kCommands[] = {
-      {Decoder::Command::HELO, "HELO"},
-      {Decoder::Command::EHLO, "EHLO"},
-      {Decoder::Command::STARTTLS, "STARTTLS"},
+      {Decoder::Command::Helo, "HELO"},
+      {Decoder::Command::Ehlo, "EHLO"},
+      {Decoder::Command::Starttls, "STARTTLS"},
   };
 
   for (const auto& c : kCommands) {
@@ -110,7 +110,7 @@ Decoder::Result DecoderImpl::DecodeCommand(Buffer::Instance& data, Command& resu
   return Result::ReadyForNext;
 }
 
-Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& result) {
+Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& result) {
   RawLinePtr raw_line;
 
   absl::optional<int> code;
@@ -118,7 +118,7 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
   std::string msg;
   for (;;) {
     absl::string_view line;
-    Result res = GetLine(data, line_off, raw_line, line, kMaxReplyLine);
+    Result res = getLine(data, line_off, raw_line, line, kMaxReplyLine);
     if (res != Result::ReadyForNext) {
       return res;
     }
@@ -176,7 +176,7 @@ Decoder::Result DecoderImpl::DecodeResponse(Buffer::Instance& data, Response& re
 
 // line is
 // 234-SIZE 1048576\r\n
-bool MatchCapability(absl::string_view line, absl::string_view cap) {
+bool matchCapability(absl::string_view line, absl::string_view cap) {
   line = line.substr(4); // 234-
   line = line.substr(0, line.size() - CRLF.size());
   if (!absl::StartsWithIgnoreCase(line, cap)) {
@@ -189,18 +189,19 @@ bool MatchCapability(absl::string_view line, absl::string_view cap) {
   return false;
 }
 
-void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+void DecoderImpl::addEsmtpCapability(absl::string_view cap, std::string& caps_in) {
   std::string caps_out;
   absl::string_view caps = caps_in;
   bool first = true;
 
   while (!caps.empty()) {
     size_t crlf = caps.find(CRLF);
-    if (crlf == absl::string_view::npos)
+    if (crlf == absl::string_view::npos) {
       break; // invalid input
+    }
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
-    if (!first && MatchCapability(line, cap)) {
+    if (!first && matchCapability(line, cap)) {
       return;
     }
     first = false;
@@ -217,7 +218,7 @@ void DecoderImpl::AddEsmtpCapability(absl::string_view cap, std::string& caps_in
   caps_in = std::move(caps_out);
 }
 
-void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+void DecoderImpl::removeEsmtpCapability(absl::string_view cap, std::string& caps_in) {
   std::string caps_out;
   absl::string_view caps = caps_in;
   bool first = true;
@@ -229,7 +230,7 @@ void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps
     }
     absl::string_view line = caps.substr(0, crlf + CRLF.size());
     caps = caps.substr(crlf + CRLF.size());
-    if (!first && MatchCapability(line, cap)) {
+    if (!first && matchCapability(line, cap)) {
       continue;
     }
     first = false;
@@ -240,7 +241,7 @@ void DecoderImpl::RemoveEsmtpCapability(absl::string_view cap, std::string& caps
   caps_in = std::move(caps_out);
 }
 
-bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view caps) {
+bool DecoderImpl::hasEsmtpCapability(absl::string_view cap, absl::string_view caps) {
   bool first = true;
   while (!caps.empty()) {
     size_t crlf = caps.find("\r\n");
@@ -254,7 +255,7 @@ bool DecoderImpl::HasEsmtpCapability(absl::string_view cap, absl::string_view ca
       continue;
     }
 
-    if (MatchCapability(line, cap)) {
+    if (matchCapability(line, cap)) {
       return true;
     }
   }

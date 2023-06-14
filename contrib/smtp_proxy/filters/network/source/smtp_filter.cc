@@ -31,7 +31,7 @@ Network::FilterStatus SmtpFilter::onNewConnection() {
 
   config_->stats_.sessions_.inc();
 
-  state_ = UPSTREAM_GREETING;
+  state_ = UpstreamGreeting;
 
   return Network::FilterStatus::Continue;
 }
@@ -42,10 +42,10 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
                  data.length(), state_);
 
   switch (state_) {
-  case PASSTHROUGH:
+  case Passthrough:
     return Network::FilterStatus::Continue;
-  case DOWNSTREAM_EHLO:
-  case DOWNSTREAM_STARTTLS:
+  case DownstreamEhlo:
+  case DownstreamStarttls:
     break;
   default:
     // client spoke out of turn -> hang up
@@ -59,7 +59,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
 
   Decoder::Command command;
 
-  Decoder::Result res = decoder_->DecodeCommand(frontend_buffer_, command);
+  Decoder::Result res = decoder_->decodeCommand(frontend_buffer_, command);
 
   switch (res) {
   case Decoder::Result::Bad: {
@@ -98,8 +98,8 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
   wire_command.move(frontend_buffer_, command.wire_len);
 
   switch (state_) {
-  case DOWNSTREAM_EHLO: {
-    if (command.verb != Decoder::Command::HELO && command.verb != Decoder::Command::EHLO) {
+  case DownstreamEhlo: {
+    if (command.verb != Decoder::Command::Helo && command.verb != Decoder::Command::Ehlo) {
       config_->stats_.sessions_bad_ehlo_.inc();
       Buffer::OwnedImpl err("503 bad sequence of commands\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
@@ -108,16 +108,16 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
     }
     downstream_ehlo_command_.add(wire_command);
     read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
-    if (command.verb == Decoder::Command::HELO) {
+    if (command.verb == Decoder::Command::Helo) {
       config_->stats_.sessions_non_esmtp_.inc();
-      state_ = PASSTHROUGH;
+      state_ = Passthrough;
       return Network::FilterStatus::StopIteration;
     }
-    state_ = UPSTREAM_EHLO_RESP;
+    state_ = UpstreamEhloResp;
     return Network::FilterStatus::StopIteration;
   }
-  case DOWNSTREAM_STARTTLS: {
-    if (command.verb != Decoder::Command::STARTTLS) {
+  case DownstreamStarttls: {
+    if (command.verb != Decoder::Command::Starttls) {
       if (config_->downstream_ssl_ == ConfigProto::REQUIRE) {
         Buffer::OwnedImpl err("530 TLS required\r\n"); // rfc3207
         write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
@@ -129,7 +129,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
       // the client is not TLS, we would start that here.
       read_callbacks_->injectReadDataToFilterChain(wire_command, /*end_stream=*/false);
       config_->stats_.sessions_esmtp_unencrypted_.inc();
-      state_ = PASSTHROUGH;
+      state_ = Passthrough;
       return Network::FilterStatus::StopIteration;
     }
     onDownstreamSSLRequest();
@@ -156,12 +156,12 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
                  data.length(), state_);
 
   switch (state_) {
-  case PASSTHROUGH:
+  case Passthrough:
     return Network::FilterStatus::Continue;
-  case UPSTREAM_GREETING:
-  case UPSTREAM_EHLO_RESP:
-  case UPSTREAM_STARTTLS_RESP:
-  case UPSTREAM_EHLO2_RESP:
+  case UpstreamGreeting:
+  case UpstreamEhloResp:
+  case UpstreamStarttlsResp:
+  case UpstreamEhlo2Resp:
     break;
   default:
     // upstream spoke out of turn -> hang up
@@ -175,7 +175,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
 
   // We need to decode the response to know that we consumed it all
   Decoder::Response response;
-  Decoder::Result res = decoder_->DecodeResponse(backend_buffer_, response);
+  Decoder::Result res = decoder_->decodeResponse(backend_buffer_, response);
   switch (res) {
   case Decoder::Result::Bad: {
     Buffer::OwnedImpl err("451 upstream syntax error\r\n");
@@ -200,25 +200,25 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   wire_resp.move(backend_buffer_, response.wire_len);
 
   switch (state_) {
-  case UPSTREAM_GREETING: {
+  case UpstreamGreeting: {
     write_callbacks_->injectWriteDataToFilterChain(wire_resp, /*end_stream=*/false);
-    state_ = DOWNSTREAM_EHLO;
+    state_ = DownstreamEhlo;
     return Network::FilterStatus::StopIteration;
   }
-  case UPSTREAM_EHLO_RESP: {
+  case UpstreamEhloResp: {
     // If we're doing upstream starttls, don't send the ehlo resp to
     // the client yet so we can report an upstream starttls failure or
-    // get the post-tls capabilities: UPSTREAM_STARTTLS_RESP (below).
+    // get the post-tls capabilities: UpstreamStarttlsResp (below).
     if (config_->upstream_ssl_ == ConfigProto::REQUIRE &&
-        !decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
+        !decoder_->hasEsmtpCapability("STARTTLS", wire_resp.toString())) {
       Buffer::OwnedImpl err("400 upstream STARTTLS not offered\r\n");
       write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       return Network::FilterStatus::StopIteration;
     }
     if (config_->upstream_ssl_ >= ConfigProto::ENABLE &&
-        decoder_->HasEsmtpCapability("STARTTLS", wire_resp.toString())) {
-      state_ = UPSTREAM_STARTTLS_RESP;
+        decoder_->hasEsmtpCapability("STARTTLS", wire_resp.toString())) {
+      state_ = UpstreamStarttlsResp;
       Buffer::OwnedImpl starttls("STARTTLS\r\n");
       read_callbacks_->injectReadDataToFilterChain(starttls, /*end_stream=*/false);
       return Network::FilterStatus::StopIteration;
@@ -227,12 +227,12 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       // and upstream either was disabled or not offered
       write_callbacks_->injectWriteDataToFilterChain(wire_resp, /*end_stream=*/false);
       config_->stats_.sessions_esmtp_unencrypted_.inc();
-      state_ = PASSTHROUGH;
+      state_ = Passthrough;
       return Network::FilterStatus::StopIteration;
     }
     ABSL_FALLTHROUGH_INTENDED;
   }
-  case UPSTREAM_EHLO2_RESP: {
+  case UpstreamEhlo2Resp: {
     // If upstream and downstream ssl termination are disabled, there
     // is nothing to prevent the server from advertising and the
     // client invoking STARTTLS. If someone wanted to prevent that, we
@@ -242,16 +242,16 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
     Buffer::OwnedImpl downstream_esmtp_capabilities;
     {
       std::string downstream_caps = wire_resp.toString();
-      decoder_->AddEsmtpCapability("STARTTLS", downstream_caps);
+      decoder_->addEsmtpCapability("STARTTLS", downstream_caps);
       downstream_esmtp_capabilities.add(downstream_caps);
     }
     write_callbacks_->injectWriteDataToFilterChain(downstream_esmtp_capabilities,
                                                    /*end_stream=*/false);
-    state_ = DOWNSTREAM_STARTTLS;
+    state_ = DownstreamStarttls;
     return Network::FilterStatus::StopIteration;
   }
 
-  case UPSTREAM_STARTTLS_RESP: {
+  case UpstreamStarttlsResp: {
     if ((response.code < 200) || (response.code > 299)) {
       // This seems unlikely and is probably indicative of problems
       // with the upstream, just fail for now.
@@ -279,15 +279,15 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
       read_callbacks_->injectReadDataToFilterChain(downstream_ehlo_command_,
                                                    /*end_stream=*/false);
       if (config_->downstream_ssl_ >= ConfigProto::ENABLE) {
-        state_ = UPSTREAM_EHLO2_RESP;
+        state_ = UpstreamEhlo2Resp;
       } else {
         // If there was a buggy smtp server that continued to
         // advertise STARTTLS after it had already done it once, that
         // would probably cause problems here since we'll pass it
         // through to the client which could try to invoke it. If we
         // wanted to try to paper over it here, we would do
-        // UPSTREAM_EHLO2_RESP and strip the capability there.
-        state_ = PASSTHROUGH;
+        // UpstreamEhlo2Resp and strip the capability there.
+        state_ = Passthrough;
       }
     }
     return Network::FilterStatus::StopIteration;
@@ -327,7 +327,7 @@ bool SmtpFilter::onDownstreamSSLRequest() {
 
         // if we wanted to send XCLIENT to the upstream with the TLS
         // info, we would start that here.
-        state_ = PASSTHROUGH;
+        state_ = Passthrough;
 
         // Switch to TLS has been completed.
         return false;
