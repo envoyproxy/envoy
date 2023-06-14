@@ -170,6 +170,10 @@ message ProcessingResponse {
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
+  // This field is ignored by Envoy when the ext_proc filter config
+  // :ref:`allow_mode_override
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+  // is set to false.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // When ext_proc server receives a request message, in case it needs more
@@ -275,8 +279,11 @@ message CommonResponse {
 
   // Replace the body of the last message sent to the remote server on this
   // stream. If responding to an HttpBody request, simply replace or clear
-  // the body chunk that was sent with that request. Body mutations only take
-  // effect in response to ``body`` messages and are ignored otherwise.
+  // the body chunk that was sent with that request. Body mutations may take
+  // effect in response either to ``header`` or ``body`` messages. When it is
+  // in response to ``header`` messages, it only take effect if the
+  // :ref:`status <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.status>`
+  // is set to CONTINUE_AND_REPLACE.
   BodyMutation body_mutation = 3;
 
   // [#not-implemented-hide:]
@@ -285,9 +292,9 @@ message CommonResponse {
   // along with the CONTINUE_AND_REPLACE status.
   config.core.v3.HeaderMap trailers = 4;
 
-  // Clear the route cache for the current request.
-  // This is necessary if the remote server
-  // modified headers that are used to calculate the route.
+  // Clear the route cache for the current client request. This is necessary
+  // if the remote server modified headers that are used to calculate the route.
+  // This field is ignored in the response direction.
   bool clear_route_cache = 5;
 }
 
