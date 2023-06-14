@@ -131,6 +131,14 @@ public:
         ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
             CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
         .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::ExtractedTags>(
+            CustomFlagFormatter::ExtractedTags::Placeholder)
+        .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::ExtractedMessage>(
+            CustomFlagFormatter::ExtractedMessage::Placeholder)
+        .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
     logger_->set_level(spdlog::level::info);
 
@@ -177,6 +185,22 @@ TEST_P(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
       "StreamAggregatedResources gRPC config stream closed: 14, connection error: desc = "
       "\\\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\\\"");
 }
+
+TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractMessage) {
+  expectLogMessage("%+", "[Tags: \"key\":\"val\"] message1", "message1");
+  expectLogMessage("%+", "[Tags: \"key1\":\"val1\",\"key2\":\"val2\"] message2", "message2");
+  expectLogMessage("%+", "[Tags: \"key\":\"val\"] mes] sge3", "mes] sge3");
+  expectLogMessage("%+", "[Tags: \"key\":\"val\"] mes\"] sge4", "mes\\\"] sge4");
+}
+
+TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
+  expectLogMessage("%*", "[Tags: \"key\":\"val\"] message1", ",\"key\":\"val\"");
+  expectLogMessage("%*", "[Tags: \"key1\":\"val1\",\"key2\":\"val2\"] message2",
+                   ",\"key1\":\"val1\",\"key2\":\"val2\"");
+  expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes] sge3", ",\"key\":\"val\"");
+  expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes\"] sge4", ",\"key\":\"val\"");
+}
+
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
@@ -401,6 +425,15 @@ TEST(LoggerUtilityTest, TestSerializeLogTags) {
   EXPECT_EQ("[Tags: \"key1\":\"value1\",\"key2\":\"value2\",\"key3\":\"value3\"] ",
             Envoy::Logger::Utility::serializeLogTags(
                 {{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}));
+
+  // Entries that require JSON escaping
+  EXPECT_EQ("[Tags: "
+            "\"ke\\\"y2\":\"value2\",\"ke\\\"y4\":\"va\\\"lue4\",\"key1\":\"value1\",\"key3\":"
+            "\"va\\\"lue3\"] ",
+            Envoy::Logger::Utility::serializeLogTags({{"key1", "value1"},
+                                                      {"ke\"y2", "value2"},
+                                                      {"key3", "va\"lue3"},
+                                                      {"ke\"y4", "va\"lue4"}}));
 }
 
 class ClassForTaggedLog : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
@@ -412,8 +445,13 @@ public:
                      "fake message {}", "val");
   }
 
+  void logMessageWithEscaping() {
+    ENVOY_TAGGED_LOG(info, tags_with_escaping_, "fake me\"ssage {}", "val");
+  }
+
 private:
   std::map<std::string, std::string> tags_{{"key", "val"}};
+  std::map<std::string, std::string> tags_with_escaping_{{"key", "val"}, {"ke\"y", "v\"al"}};
 };
 
 TEST(TaggedLogTest, TestTaggedLog) {
@@ -425,11 +463,16 @@ TEST(TaggedLogTest, TestTaggedLog) {
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"key_inline\":\"val\"] fake message val"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(
+            msg, HasSubstr("[Tags: \"ke\\\"y\":\"v\\\"al\",\"key\":\"val\"] fake me\"ssage val"));
       }));
 
   ClassForTaggedLog object;
   object.logMessageWithPreCreatedTags();
   object.logMessageWithInlineTags();
+  object.logMessageWithEscaping();
 }
 
 TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
@@ -440,15 +483,24 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
   EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
-    EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
-    EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
-    EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
-  }));
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
+        EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake me\\\"ssage val\""));
+        EXPECT_THAT(msg, HasSubstr("\"ke\\\"y\":\"v\\\"al\""));
+        EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
+      }));
 
   ClassForTaggedLog object;
   object.logMessageWithPreCreatedTags();
+  object.logMessageWithEscaping();
 }
 
 } // namespace
