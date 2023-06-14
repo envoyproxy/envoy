@@ -80,8 +80,16 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     if (!sh.has_header()) {
       continue;
     }
+
+    absl::string_view header_value;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_string")) {
+      header_value = sh.header().value();
+    } else {
+      header_value = sh.header().value_bytes();
+    }
+
     if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
-        !Http::HeaderUtility::headerValueIsValid(sh.header().value())) {
+        !Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,
                 "set_headers contain invalid character in key or value, may not be appended.");
       rejected_mutations.inc();
@@ -91,7 +99,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                         : CheckOperation::SET;
-    auto check_result = checker.check(check_op, header_name, sh.header().value());
+    auto check_result = checker.check(check_op, header_name, header_value);
     if (replacing_message && header_name == Http::Headers::get().Method) {
       // Special handling to allow changing ":method" when the
       // CONTINUE_AND_REPLACE option is selected, to stay compatible.
@@ -101,9 +109,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     case CheckResult::OK:
       ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
       if (append) {
-        headers.addCopy(header_name, sh.header().value());
+        headers.addCopy(header_name, header_value);
       } else {
-        headers.setCopy(header_name, sh.header().value());
+        headers.setCopy(header_name, header_value);
       }
       break;
     case CheckResult::IGNORE:
