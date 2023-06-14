@@ -23,7 +23,7 @@ protected:
 
 class SmtpProxyDecoderTest : public SmtpProxyDecoderTestBase, public ::testing::Test {};
 
-TEST_F(SmtpProxyDecoderTest, decodeCommand) {
+TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   Decoder::Command command;
   EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeCommand(data_, command));
 
@@ -62,7 +62,7 @@ TEST_F(SmtpProxyDecoderTest, decodeCommand) {
   EXPECT_EQ("example.com", command.rest);
 }
 
-TEST_F(SmtpProxyDecoderTest, decodeResponse) {
+TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   Decoder::Response response;
   EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeResponse(data_, response));
 
