@@ -13,10 +13,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
-
-#if defined(USE_CEL)
 #include "source/extensions/filters/common/expr/evaluator.h"
-#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -216,11 +213,9 @@ public:
                 ProtobufMessage::ValidationVisitor& validation_visitor)
       : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
         condition_(policy.condition()) {
-#if defined(USE_CEL)
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
-#endif
   }
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,

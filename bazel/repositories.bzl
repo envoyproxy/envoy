@@ -19,6 +19,8 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.formatter.cel",
     "envoy.matching.inputs.cel_data_input",
     "envoy.matching.matchers.cel_matcher",
+    "envoy.filters.http.rbac",
+    "envoy.filters.network.rbac",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
