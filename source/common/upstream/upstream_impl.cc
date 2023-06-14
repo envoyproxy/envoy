@@ -178,40 +178,27 @@ Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelec
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
   const std::string empty;
-  UpstreamLocalAddressSelectorFactory* local_address_selector = nullptr;
   const std::string& local_address_selector_name =
       cluster_config.has_upstream_bind_config() &&
               !cluster_config.upstream_bind_config().local_address_selector_name().empty()
           ? cluster_config.upstream_bind_config().local_address_selector_name()
       : bootstrap_bind_config.has_value() ? bootstrap_bind_config->local_address_selector_name()
                                           : empty;
-  if (!local_address_selector_name.empty()) {
-    local_address_selector =
-        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
-            local_address_selector_name);
-  }
-  if (local_address_selector == nullptr) {
-    local_address_selector =
-        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
-            "envoy.default_local_address_selector");
-  }
-  return local_address_selector->createLocalAddressSelector(cluster_config, bootstrap_bind_config);
-}
-
-} // namespace
-
-class UpstreamLocalAddressSelectorImplFactory : public UpstreamLocalAddressSelectorFactory {
-public:
-  std::string name() const override { return "envoy.default_local_address_selector"; }
-
-  UpstreamLocalAddressSelectorPtr
-  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
-                             const absl::optional<envoy::config::core::v3::BindConfig>&
-                                 bootstrap_bind_config) const override {
+  UpstreamLocalAddressSelectorFactory* local_address_selector =
+      !local_address_selector_name.empty()
+          ? Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
+                local_address_selector_name)
+          : nullptr;
+  if (local_address_selector != nullptr) {
+    return local_address_selector->createLocalAddressSelector(cluster_config,
+                                                              bootstrap_bind_config);
+  } else {
     return std::make_shared<UpstreamLocalAddressSelectorImpl>(cluster_config,
                                                               bootstrap_bind_config);
   }
-};
+}
+
+} // namespace
 
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
@@ -2284,10 +2271,6 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   }
   return health_check_address;
 }
-/**
- * Static registration for the default local address selector. @see RegisterFactory.
- */
-REGISTER_FACTORY(UpstreamLocalAddressSelectorImplFactory, UpstreamLocalAddressSelectorFactory);
 
 } // namespace Upstream
 } // namespace Envoy
