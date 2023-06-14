@@ -327,8 +327,9 @@ message HeaderValue {
   oneof data {
     // Header value is encoded as string. This does not work for non-utf8 characters.
     string value = 2 [
-        (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
-                      ];
+      (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    ];
+
     // Header value is encoded as bytes which can support non-utf8 characters.
     bytes value_bytes = 3 [(validate.rules).bytes = {min_len: 0 max_len: 16384}];
   }

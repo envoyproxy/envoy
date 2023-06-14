@@ -654,7 +654,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
+  EXPECT_THAT(upstream_request_->headers(),
+              SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
 }
