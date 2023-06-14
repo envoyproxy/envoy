@@ -98,8 +98,8 @@ private:
  *
  * This is useful when some keys are frequently used and the keys are known at compile time or
  * bootstrap time. You can get superior performance by using the inline handle. For example, the
- * filter state uses always use the filter name as the key and the filter name is known at compile
- * time. By using the inline handle, the filter state could get the key/value pair without any hash.
+ * filter state always uses the filter name as the key and the filter name is known at compile time.
+ * By using the inline handle, the filter state could get the key/value pair without any hash.
  *
  * This template also provides the interface to access the key/value pair by the normal key and the
  * interface has similar searching performance as the normal hash map. But the insertion and removal
