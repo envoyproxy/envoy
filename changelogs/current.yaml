@@ -132,6 +132,10 @@ minor_behavior_changes:
   change: |
     Round trip time will not be refreshed for every request by default. And if this is necessary, it can be
     enabled by setting runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` to true.
+- area: http
+  change: |
+    Envoy will now lower case scheme values by default. This behaviorial change can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.lowercase_scheme`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -145,6 +149,10 @@ bug_fixes:
 - area: tls
   change: |
     Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
+- area: http
+  change: |
+    Switched Envoy internal scheme checks from case sensitive to case insensitive. This behaviorial change can be temporarily
+    reverted by setting runtime guard ``envoy.reloadable_features.handle_uppercase_scheme`` to ``false``.
 - area: ext_authz
   change: |
     Fix a bug where the ext_authz filter will ignore the request body when the
