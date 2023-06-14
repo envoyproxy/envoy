@@ -268,11 +268,6 @@ public:
           new ((InlineMapRegistry::registrationMapSize() * sizeof(TPtr))) InlineMap());
     }
 
-  private:
-    InlineMap() {
-      memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
-    }
-
     ~InlineMap() {
       for (uint64_t i = 0; i < InlineMapRegistry::registrationMapSize(); ++i) {
         auto entry = inline_entries_[i];
@@ -280,6 +275,11 @@ public:
           delete entry;
         }
       }
+      memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
+    }
+
+  private:
+    InlineMap() {
       memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
     }
 
