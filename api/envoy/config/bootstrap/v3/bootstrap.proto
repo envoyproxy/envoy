@@ -123,7 +123,7 @@ message Bootstrap {
     // option is not allowed, and will cause a bootstrap error.
     LogFormat log_format = 1;
   }
-  
+
   message DeferredStatOptions {
     // To save memory and CPU consumption on blocks of stats that are never referenced throughout
     // the process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then
