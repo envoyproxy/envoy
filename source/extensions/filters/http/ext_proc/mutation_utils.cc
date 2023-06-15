@@ -38,6 +38,7 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
+      // Setting up value or value_bytes field based on the runtime flag.
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
         new_header->set_value_bytes(std::string(e.value().getStringView()));
       } else {
@@ -79,6 +80,16 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   for (const auto& sh : mutation.set_headers()) {
     if (!sh.has_header()) {
       continue;
+    }
+
+    // Only one of value or value_bytes in the HeaderValue message should be set.
+    if (!sh.header().value().empty() &&
+        (sh.header().value_type_case() == envoy::config::core::v3::HeaderValue::kValueBytes)) {
+      ENVOY_LOG(debug, "Only one of value or value_bytes in the HeaderValue message should be set, "
+                       "may not be append.");
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(
+          "Only one of value or value_bytes in the HeaderValue message should be set.");
     }
 
     absl::string_view header_value;

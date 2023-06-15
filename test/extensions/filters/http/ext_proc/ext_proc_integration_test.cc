@@ -560,7 +560,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -582,6 +582,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
             {"x-bad-utf8", "valid_prefix!(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
+          EXPECT_TRUE(!header.value().empty());
+          EXPECT_TRUE(header.value_type_case() !=
+                      envoy::config::core::v3::HeaderValue::kValueBytes);
           ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -612,6 +615,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // Set up runtime flag to have header value encoded in value_bytes.
   header_value_bytes_ = "true";
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -637,6 +641,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
             {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
+          EXPECT_TRUE(header.value().empty());
+          EXPECT_TRUE(header.value_type_case() ==
+                      envoy::config::core::v3::HeaderValue::kValueBytes);
           ENVOY_LOG_MISC(critical, "{}", header.value_bytes());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -662,6 +669,26 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
               SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // Set up runtime flag to have header value encoded in value_bytes.
+  header_value_bytes_ = "true";
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_value("foo");
+        mut1->mutable_header()->set_value_bytes("bar");
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter with body buffering turned on, but sending a GET
