@@ -72,7 +72,8 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
-  Http::FilterFactoryCb cb = factory.createFilterServerFactoryFromProto(*proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterServerFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
