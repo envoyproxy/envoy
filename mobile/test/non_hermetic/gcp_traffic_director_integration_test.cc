@@ -147,7 +147,7 @@ TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
   //      5. base_clear
   ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 5));
 
-  // TODO(abeyad): Once we have a Envoy Mobile stats/admin API, we can use it to check the
+  // TODO(abeyad): Once we have a Envoy Mobile stats API, we can use it to check the
   // actual cluster names.
 }
 

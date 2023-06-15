@@ -98,13 +98,13 @@ public:
                                         const std::string& config_hostname,
                                         const ClusterInfoConstSharedPtr& cluster);
   /**
-   * Create a health checker.
+   * Create a health checker or return an error.
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param server_context reference to the Server context object
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr
+  static absl::StatusOr<HealthCheckerSharedPtr>
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context);
 };
@@ -159,7 +159,7 @@ class PayloadMatcher {
 public:
   using MatchSegments = std::list<std::vector<uint8_t>>;
 
-  static MatchSegments loadProtoBytes(
+  static absl::StatusOr<MatchSegments> loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };

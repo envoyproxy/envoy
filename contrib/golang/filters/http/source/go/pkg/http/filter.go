@@ -63,6 +63,7 @@ type httpRequest struct {
 	pInfo          panicInfo
 	sema           sync.WaitGroup
 	waitingOnEnvoy int32
+	mutex          sync.Mutex
 }
 
 func (r *httpRequest) pluginName() string {
@@ -137,12 +138,12 @@ type streamInfo struct {
 }
 
 func (s *streamInfo) GetRouteName() string {
-	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueRouteName)
+	name, _ := cAPI.HttpGetStringValue(s.request, ValueRouteName)
 	return name
 }
 
 func (s *streamInfo) FilterChainName() string {
-	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueFilterChainName)
+	name, _ := cAPI.HttpGetStringValue(s.request, ValueFilterChainName)
 	return name
 }
 
@@ -164,7 +165,7 @@ func (s *streamInfo) ResponseCode() (uint32, bool) {
 }
 
 func (s *streamInfo) ResponseCodeDetails() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueResponseCodeDetails)
+	return cAPI.HttpGetStringValue(s.request, ValueResponseCodeDetails)
 }
 
 func (s *streamInfo) AttemptCount() uint32 {
@@ -187,21 +188,21 @@ func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) 
 }
 
 func (s *streamInfo) DownstreamLocalAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
+	address, _ := cAPI.HttpGetStringValue(s.request, ValueDownstreamLocalAddress)
 	return address
 }
 
 func (s *streamInfo) DownstreamRemoteAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
+	address, _ := cAPI.HttpGetStringValue(s.request, ValueDownstreamRemoteAddress)
 	return address
 }
 
 func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamHostAddress)
+	return cAPI.HttpGetStringValue(s.request, ValueUpstreamHostAddress)
 }
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
+	return cAPI.HttpGetStringValue(s.request, ValueUpstreamClusterName)
 }
 
 type filterState struct {

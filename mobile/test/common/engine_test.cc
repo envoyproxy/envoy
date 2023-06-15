@@ -18,7 +18,7 @@ struct TestEngineHandle {
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
-    run_engine(handle_, yaml.c_str(), level.c_str(), "");
+    run_engine(handle_, yaml.c_str(), level.c_str());
   }
 
   envoy_status_t terminate() { return terminate_engine(handle_, /* release */ false); }

@@ -110,10 +110,12 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         Upstream::HealthCheckerFactory::create(
-                             Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, server_context)
-                             .get()));
+  EXPECT_NE(nullptr,
+            dynamic_cast<CustomRedisHealthChecker*>(
+                Upstream::HealthCheckerFactory::create(
+                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, server_context)
+                    .value()
+                    .get()));
 }
 } // namespace
 } // namespace RedisHealthChecker
