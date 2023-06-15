@@ -283,7 +283,7 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
   // in case ENVOY_TAGGED_LOG is used. If there are no tags, '%*' will be replaced by
   // an empty string, falling back to the original log format. If there are log tags,
   // '%*' will be replaced by the serialized tags as JSON properties.
-  format_as_json.replace(format_as_json.rfind("}"), 1, "%*}");
+  format_as_json.replace(format_as_json.rfind('}'), 1, "%*}");
 
   // To avoid performance impact for '%j' flag in case JSON logs are not enabled,
   // all occurrences of '%j' will be replaced with '%+' which removes the tags from
