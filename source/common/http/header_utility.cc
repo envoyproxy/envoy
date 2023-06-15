@@ -267,10 +267,14 @@ bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
   }
 
   // Extract target host and port from path using default template.
+  if (!absl::StartsWith(path, "/.well-known/masque/udp/")) {
+    ENVOY_LOG_MISC(error, "CONNECT-UDP request path is not a well-known URI: {}", path);
+    return false;
+  }
+
   std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
-  if (path_split.size() != 7 || !path_split[0].empty() || path_split[1] != ".well-known" ||
-      path_split[2] != "masque" || path_split[3] != "udp" || path_split[4].empty() ||
-      path_split[5].empty() || !path_split[6].empty()) {
+  if (path_split.size() != 7 || path_split[4].empty() || path_split[5].empty() ||
+      !path_split[6].empty()) {
     ENVOY_LOG_MISC(error, "CONNECT-UDP request with a malformed URI template in the path {}", path);
     return false;
   }

@@ -68,12 +68,9 @@ public:
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
       return quic::HttpDatagramSupport::kRfc;
-    } else {
-      return quic::HttpDatagramSupport::kNone;
     }
-#else
-    return quic::HttpDatagramSupport::kNone;
 #endif
+    return quic::HttpDatagramSupport::kNone;
   }
 
   // quic::QuicSpdyClientSessionBase

@@ -773,17 +773,13 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    if (method == Http::Headers::get().MethodValues.Connect) {
-      upstream_protocol = UpstreamProtocol::TCP;
-    }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        downstream_headers_->getUpgradeValue() == Http::Headers::get().UpgradeValues.ConnectUdp) {
+        Http::HeaderUtility::isConnectUdp(downstream_headers_)) {
       upstream_protocol = UpstreamProtocol::UDP;
-    }
-    // Allow POST for proxying raw TCP if it is configured.
-    if (upstream_protocol == UpstreamProtocol::HTTP &&
-        route_entry_->connectConfig()->allow_post() &&
-        method == Http::Headers::get().MethodValues.Post) {
+    } else if (method == Http::Headers::get().MethodValues.Connect ||
+               (route_entry_->connectConfig()->allow_post() &&
+                method == Http::Headers::get().MethodValues.Post)) {
+      // Allow POST for proxying raw TCP if it is configured.
       upstream_protocol = UpstreamProtocol::TCP;
     }
   }
