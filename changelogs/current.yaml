@@ -15,6 +15,12 @@ behavior_changes:
     When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
     value in the list. This resolves issues where a retry caused the same value to be appended multiple times. This
     behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
+- area: ext_proc
+  change: |
+    To support transmiting header value with non-utf8 characters, a new proto field is added in HeaderMap message:
+    :ref:`value_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_bytes>`.
+    The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending messages to and receiving messages from the ext_proc server.
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
