@@ -124,7 +124,7 @@ func (h *requestOrResponseHeaderMapImpl) Del(key string) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Range(f func(key, value string) bool) {
-    // To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
+	// To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initHeaders()
@@ -259,7 +259,7 @@ func (h *requestOrResponseTrailerMapImpl) Del(key string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {
-    // To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
+	// To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initTrailers()
