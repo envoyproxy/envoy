@@ -49,19 +49,6 @@ createPrefixRoutes() {
   return prefix_routes;
 }
 
-TEST(PrefixRoutesTest, MissingCatchAll) {
-  Upstreams upstreams;
-  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
-  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
-
-  Runtime::MockLoader runtime_;
-
-  PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
-
-  std::string key("c:bar");
-  EXPECT_EQ(nullptr, router.upstreamPool(key));
-}
-
 TEST(PrefixRoutesTest, RoutedToCatchAll) {
   auto upstream_c = std::make_shared<ConnPool::MockInstance>();
 

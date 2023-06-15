@@ -91,13 +91,12 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     // prefix route not found, default to catch all route.
     value = catch_all_route_;
   }
-  if (value != nullptr) {
-    if (value->removePrefix()) {
-      key.erase(0, value->prefix().length());
-    }
-    if (!value->keyFormatter().empty()) {
-      formatKey(key, value->keyFormatter());
-    }
+
+  if (value->removePrefix()) {
+    key.erase(0, value->prefix().length());
+  }
+  if (!value->keyFormatter().empty()) {
+    formatKey(key, value->keyFormatter());
   }
   return value;
 }
