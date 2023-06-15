@@ -68,7 +68,6 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
-    adminInterfaceEnabled: Boolean = false,
     grpcStatsDomain: String = "stats.example.com",
     connectTimeoutSeconds: Int = 123,
     dnsRefreshSeconds: Int = 234,
@@ -116,7 +115,6 @@ class EnvoyConfigurationTest {
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
-      adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,
       dnsRefreshSeconds,
@@ -173,8 +171,6 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
-
-    assertThat(resolvedTemplate).doesNotContain("admin: *admin_interface")
 
     // DNS
     assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
@@ -243,7 +239,6 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      adminInterfaceEnabled = false,
       grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,

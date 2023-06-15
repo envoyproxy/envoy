@@ -691,8 +691,9 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool) const {
-  Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool,
+                                                    const Http::FilterChainOptions& options) const {
+  Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
   return true;
 }
 
@@ -724,7 +725,8 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(
+      callbacks, Http::EmptyFilterChainOptions{}, *filters_to_use);
   return true;
 }
 

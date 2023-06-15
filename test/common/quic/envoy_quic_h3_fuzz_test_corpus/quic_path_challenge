@@ -1,0 +1,8 @@
+frames {
+  qframe {
+    path_challenge {
+      control_frame_id: 0,
+      data: "\000",
+    }
+  }
+}

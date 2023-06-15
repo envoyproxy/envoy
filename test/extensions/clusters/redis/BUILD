@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
         "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/redis/v3:pkg_cc_proto",

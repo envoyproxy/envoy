@@ -19,7 +19,6 @@ open class EngineBuilder: NSObject {
     case custom(String)
   }
 
-  private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
@@ -620,22 +619,6 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-#if ENVOY_ADMIN_FUNCTIONALITY
-  /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-  /// used for development/debugging purposes only. Enabling it in production may open
-  /// your app to security vulnerabilities.
-  ///
-  /// Note this will not work with the default production build, as it builds with admin
-  /// functionality disabled via --define=admin_functionality=disabled
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableAdminInterface() -> Self {
-    self.adminInterfaceEnabled = true
-    return self
-  }
-#endif
-
 #if canImport(EnvoyCxxSwiftInterop)
   /// Use Swift's experimental C++ interop support to generate the bootstrap object
   /// instead of going through the Objective-C layer.
@@ -694,7 +677,6 @@ open class EngineBuilder: NSObject {
 
   func makeConfig() -> EnvoyConfiguration {
     EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,
@@ -762,9 +744,6 @@ private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
     var cxxBuilder = Envoy.Platform.EngineBuilder()
     cxxBuilder.addLogLevel(self.logLevel.toCXX())
-#if ENVOY_ADMIN_FUNCTIONALITY
-    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
-#endif
     if let grpcStatsDomain = self.grpcStatsDomain {
       cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
     }

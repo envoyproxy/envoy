@@ -22,4 +22,8 @@ public:
     throw_action EnvoyException(std::string(variable.status().message()));                         \
   }
 
+#define RETURN_IF_STATUS_NOT_OK(variable)                                                          \
+  if (!variable.status().ok()) {                                                                   \
+    return variable.status();                                                                      \
+  }
 } // namespace Envoy
