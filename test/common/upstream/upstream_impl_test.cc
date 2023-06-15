@@ -3184,7 +3184,7 @@ public:
   UpstreamLocalAddress
   getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr&) const override {
-    current_idx_ = (++current_idx_) % upstream_local_addresses_.size();
+    current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
     return upstream_local_addresses_[current_idx_];
   }
 
