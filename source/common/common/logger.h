@@ -360,6 +360,11 @@ public:
   static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
 
   /**
+   * @return true if JSON log format was set using setJsonLogFormat.
+   */
+  static bool jsonLogFormatSet() { return json_log_format_set_; }
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -376,6 +381,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static bool json_log_format_set_;
 };
 
 /**
@@ -407,7 +414,7 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
- * To support JSON format tags, the key and values will be serialized as escaped JSON string.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escapings.
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
 

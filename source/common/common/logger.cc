@@ -253,6 +253,8 @@ void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
     Utility::setLogFormatForLogger(logger.getLogger(), log_format);
   }
+
+  json_log_format_set_ = false;
 }
 
 absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
@@ -276,8 +278,16 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
     return absl::InvalidArgumentError("Usage of %_ is unavailable for JSON log formats");
   }
 
+  // Since the format is now a JSON struct, it is guaranteed that it ends with '}'.
+  // Here we replace '}' with '%*}' to enable the option to add more JSON properties,
+  // in case ENVOY_TAGGED_LOG is used. If there are no tags, '%*' will be replaced by
+  // an empty string, falling back to the original log format. If there are log tags,
+  // '%*' will be replaced by the serialized tags as JSON properties.
   format_as_json.replace(format_as_json.rfind("}"), 1, "%*}");
 
+  // To avoid performance impact for '%j' flag in case JSON logs are not enabled,
+  // all occurrences of '%j' will be replaced with '%+' which removes the tags from
+  // the message string before writing it to the output as escaped JSON string.
   size_t flag_index = format_as_json.find("%j");
   while (flag_index != std::string::npos) {
     format_as_json.replace(flag_index, 2, "%+");
@@ -285,8 +295,11 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
   }
 
   setLogFormat(format_as_json);
+  json_log_format_set_ = true;
   return absl::OkStatus();
 }
+
+bool Registry::json_log_format_set_ = false;
 
 Logger* Registry::logger(const std::string& log_name) {
   Logger* logger_to_return = nullptr;
@@ -333,24 +346,30 @@ std::string serializeLogTags(const std::map<std::string, std::string>& tags) {
 
   std::stringstream tags_stream;
   tags_stream << TagsPrefix;
-  for (const auto& tag : tags) {
-    tags_stream << "\"";
+  if (Registry::jsonLogFormatSet()) {
+    for (const auto& tag : tags) {
+      tags_stream << "\"";
 
-    auto required_space = JsonEscaper::extraSpace(tag.first);
-    if (required_space == 0) {
-      tags_stream << tag.first;
-    } else {
-      tags_stream << JsonEscaper::escapeString(tag.first, required_space);
-    }
-    tags_stream << "\":\"";
+      auto required_space = JsonEscaper::extraSpace(tag.first);
+      if (required_space == 0) {
+        tags_stream << tag.first;
+      } else {
+        tags_stream << JsonEscaper::escapeString(tag.first, required_space);
+      }
+      tags_stream << "\":\"";
 
-    required_space = JsonEscaper::extraSpace(tag.second);
-    if (required_space == 0) {
-      tags_stream << tag.second;
-    } else {
-      tags_stream << JsonEscaper::escapeString(tag.second, required_space);
+      required_space = JsonEscaper::extraSpace(tag.second);
+      if (required_space == 0) {
+        tags_stream << tag.second;
+      } else {
+        tags_stream << JsonEscaper::escapeString(tag.second, required_space);
+      }
+      tags_stream << "\",";
     }
-    tags_stream << "\",";
+  } else {
+    for (const auto& tag : tags) {
+      tags_stream << "\"" << tag.first << "\":\"" << tag.second << "\",";
+    }
   }
 
   std::string serialized = tags_stream.str();
