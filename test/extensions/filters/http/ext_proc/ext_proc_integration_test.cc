@@ -68,6 +68,8 @@ protected:
   }
 
   void initializeConfig() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.send_header_value_in_bytes", header_value_bytes_}});
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
@@ -382,6 +384,8 @@ protected:
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
+  TestScopedRuntime scoped_runtime_;
+  std::string header_value_bytes_{"false"};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -557,8 +561,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_string", "true"}});
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -609,9 +611,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_string", "false"}});
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  header_value_bytes_ = "true";
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -623,6 +624,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
     headers.addCopy(LowerCaseString("x-bad-utf8"), invalid_unicode);
   });
 
+  // Verify the encoded non-utf8 character is received by the server as it is. Then send back a
+  // response with non-utf8 character in the header value, and verify it is received by Envoy as it
+  // is.
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{

@@ -38,10 +38,10 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_string")) {
-        new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
-      } else {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
         new_header->set_value_bytes(std::string(e.value().getStringView()));
+      } else {
+        new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
       }
     }
     return Http::HeaderMap::Iterate::Continue;
@@ -82,12 +82,11 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
 
     absl::string_view header_value;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_string")) {
-      header_value = sh.header().value();
-    } else {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
       header_value = sh.header().value_bytes();
+    } else {
+      header_value = sh.header().value();
     }
-
     if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
         !Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,
