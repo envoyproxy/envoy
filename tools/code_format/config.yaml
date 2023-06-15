@@ -97,7 +97,6 @@ paths:
     - source/common/upstream/cds_api_helper.cc
     - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/load_balancer_impl.cc
-    - source/common/upstream/health_checker_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
@@ -247,9 +246,7 @@ paths:
   # Files that are allowed to use try without main thread assertion.
   raw_try:
     include:
-    - source/common/common/regex.cc
     - source/common/common/thread.h
-    - source/common/network/utility.cc
 
   # Files matching these exact names can reference real-world time. These include the class
   # definitions for real-world time, the construction of them in main(), and perf annotation.

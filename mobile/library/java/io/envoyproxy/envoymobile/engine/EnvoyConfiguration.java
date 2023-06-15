@@ -28,7 +28,6 @@ public class EnvoyConfiguration {
     ACCEPT_UNTRUSTED;
   }
 
-  public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer connectTimeoutSeconds;
   public final Integer dnsRefreshSeconds;
@@ -81,8 +80,6 @@ public class EnvoyConfiguration {
   /**
    * Create a new instance of the configuration.
    *
-   * @param adminInterfaceEnabled                         whether admin interface should be enabled
-   *     or not.
    * @param grpcStatsDomain                               the domain to flush stats to.
    * @param connectTimeoutSeconds                         timeout for new network connections to
    *     hosts in
@@ -152,11 +149,11 @@ public class EnvoyConfiguration {
    *     could be empty.
    */
   public EnvoyConfiguration(
-      boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
-      int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-      int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
-      boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      String grpcStatsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
+      int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
+      int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
+      int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
@@ -172,7 +169,6 @@ public class EnvoyConfiguration {
       String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
       Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
-    this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -249,11 +245,11 @@ public class EnvoyConfiguration {
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
 
     return JniLibrary.createBootstrap(
-        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
-        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
+        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
+        enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
+        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
+        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
         streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
         enforceTrustChainVerification, filter_chain, stats_sinks,

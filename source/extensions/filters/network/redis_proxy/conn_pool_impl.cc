@@ -348,11 +348,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
-    try {
+    TRY_NEEDS_AUDIT {
       address_ptr = std::make_shared<Network::Address::Ipv6Instance>(ip_address, ip_port_number);
-    } catch (const EnvoyException&) {
-      return nullptr;
     }
+    END_TRY catch (const EnvoyException&) { return nullptr; }
     host_address_map_key = address_ptr->asString();
   }
 
@@ -371,11 +370,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }
-      try {
+      TRY_NEEDS_AUDIT {
         address_ptr = std::make_shared<Network::Address::Ipv4Instance>(ip_address, ip_port_number);
-      } catch (const EnvoyException&) {
-        return nullptr;
       }
+      END_TRY catch (const EnvoyException&) { return nullptr; }
     }
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),

@@ -46,6 +46,7 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
@@ -53,6 +54,7 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 }
 
 // Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
@@ -71,6 +73,8 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster_0, cluster_1},
                                                              {cluster_0, cluster_1}, {}, "1");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {cluster_0.name(), cluster_1.name()},
                                       {cluster_0.name(), cluster_1.name()}, {}));
   auto cla_0 = buildClusterLoadAssignment(cluster_0.name());
@@ -80,6 +84,8 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
   // Send an update for one of the ClusterLoadAssignments only.
   cla_0.mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_load_balancing_weight()->set_value(
@@ -244,6 +250,8 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context"},
                                       {"validation_context"}, {}));
   test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -719,6 +727,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.warming_cluster_1.warming_state", 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -729,8 +738,9 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")},
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")}, {}, "3");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
-  // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
+  test_server_->waitForGaugeEq("cluster.warming_cluster_2.warming_state", 1);
 
+  // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
@@ -746,6 +756,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
 
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeEq("cluster.warming_cluster_1.warming_state", 0);
+  test_server_->waitForGaugeEq("cluster.warming_cluster_2.warming_state", 0);
 
   // CDS is resumed and EDS response was acknowledged.
   // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.

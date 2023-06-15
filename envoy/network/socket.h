@@ -40,7 +40,7 @@ private:
 // ENVOY_MAKE_SOCKET_OPTION_NAME is a helper macro to generate a
 // SocketOptionName with a descriptive string name.
 #define ENVOY_MAKE_SOCKET_OPTION_NAME(level, option)                                               \
-  Network::SocketOptionName(level, option, #level "/" #option)
+  ::Envoy::Network::SocketOptionName(level, option, #level "/" #option)
 
 // Moved from source/common/network/socket_option_impl.h to avoid dependency loops.
 #ifdef IP_TRANSPARENT

@@ -214,7 +214,6 @@ jobs:
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --fat_apk_cpu=x86_64 \
-            --define=admin_functionality=enabled \
             --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
