@@ -1,7 +1,7 @@
-.. _install_sandboxes_golang:
+.. _install_sandboxes_golang_http:
 
-Golang filter
-=============
+Golang HTTP filter
+==================
 
 .. sidebar:: Requirements
 
