@@ -31,11 +31,9 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     upstream_buffer_.move(data);
 
     bool underflow = false;
-    try {
-      underflow = onData();
-    } catch (const AppException&) {
-      return ThriftFilters::ResponseStatus::Reset;
-    } catch (const EnvoyException&) {
+    TRY_NEEDS_AUDIT { underflow = onData(); }
+    END_TRY catch (const AppException&) { return ThriftFilters::ResponseStatus::Reset; }
+    catch (const EnvoyException&) {
       return ThriftFilters::ResponseStatus::Reset;
     }
 

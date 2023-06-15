@@ -246,9 +246,8 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     return;
   }
   Json::ObjectSharedPtr document_json;
-  try {
-    document_json = Json::Factory::loadFromString(credential_document_value);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(error, "Could not parse AWS credentials document: {}", e.what());
     return;
   }
@@ -298,9 +297,8 @@ void TaskRoleCredentialsProvider::extractCredentials(const std::string& credenti
     return;
   }
   Json::ObjectSharedPtr document_json;
-  try {
-    document_json = Json::Factory::loadFromString(credential_document_value);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from the task role: {}", e.what());
     return;
   }
