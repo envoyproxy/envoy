@@ -19,7 +19,7 @@ behavior_changes:
   change: |
     Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
     where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
-    runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status`` to false.
+    runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
