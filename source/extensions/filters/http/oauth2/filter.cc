@@ -299,6 +299,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, state}})};
       decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
     // Continue on with the filter stack.

@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "connect"
+            }
+            headers {
+              key: "content-type"
+              value: "application/x-www-form-urlencoded"
+            }
+            headers {
+              key: "proxy-status"
+              value: "empty"
+            }
+            headers {
+              key: "-upstream-hostname"
+              value: "empty"
+            }
+            headers {
+              key: "-retry-on"
+              value: "refused-stream"
+            }
+            headers {
+              key: "keep-alive"
+              value: "empty"
+            }
+            headers {
+              key: "-ip-tags"
+              value: "empty"
+            }
+            headers {
+              key: "x-forwarded-host"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

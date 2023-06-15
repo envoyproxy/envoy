@@ -70,6 +70,9 @@ public:
     }
 
     configure(config);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<std::vector<AccessLog::InstanceSharedPtr>&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
@@ -160,6 +163,7 @@ public:
   // Saved api handle pointer. The pointer is assigned in setup() in most of the on demand cases.
   // In these cases, the mocked allocateOdCdsApi() takes the ownership.
   Upstream::MockOdCdsApiHandle* mock_odcds_api_handle_{};
+  std::shared_ptr<NiceMock<AccessLog::MockInstance>> mock_access_logger_;
 };
 
 TEST_F(TcpProxyTest, ExplicitCluster) {
@@ -970,10 +974,33 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
 
   // The timer will be enabled cyclically.
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
+                    testing::IsNull());
+      }));
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
   EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
+
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                      ->bytesAtLastDownstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  10);
+      }));
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  flush_timer->invokeCallback();
+
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpConnectionEnd));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
