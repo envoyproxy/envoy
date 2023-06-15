@@ -475,8 +475,8 @@ TEST(TaggedLogTest, TestTaggedLog) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"key_inline\":\"val\"] fake message val"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_THAT(
-            msg, HasSubstr("[Tags: \"ke\"y\":\"v\"al\",\"key\":\"val\"] fake me\"ssage val"));
+        EXPECT_THAT(msg,
+                    HasSubstr("[Tags: \"ke\"y\":\"v\"al\",\"key\":\"val\"] fake me\"ssage val"));
       }));
 
   ClassForTaggedLog object;
