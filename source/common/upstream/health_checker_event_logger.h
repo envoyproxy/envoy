@@ -36,7 +36,6 @@ public:
       file_ = log_manager.createAccessLog(Filesystem::FilePathAndType{
           Filesystem::DestinationType::File, health_check_config.event_log_path()});
     }
-
     for (const auto& config : health_check_config.event_logger()) {
       auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
       event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));
