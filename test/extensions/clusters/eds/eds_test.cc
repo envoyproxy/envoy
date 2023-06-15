@@ -1527,6 +1527,166 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
   }
 }
 
+// Verifies that if an endpoint's locality is updated, the active hc flags are preserved,
+// unless the health checker is updated.
+TEST_F(EdsTest, ActiveHealthCheckFlagsEndpointMovedToNewLocality) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  // Start with an endpoint in locality zone1, it should be marked FAILED_ACTIVE_HC.
+  endpoints->mutable_locality()->set_zone("zone1");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone1");
+
+    // When active-HC is used, the state is initialized to FAILED_ACTIVE_HC.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Verify that the host is added (to a new locality) and removed (from its
+  // current locality) as part of an update.
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(1, added.size());
+        EXPECT_EQ(1, removed.size());
+      });
+
+  // Validate that moving an healthy endpoint to another locality keeps
+  // it as healthy.
+  {
+    // Set the endpoint in healthy status, and update its zone.
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // Mark the host as healthy.
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone2");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone2");
+
+    // The endpoint was healthy in the previous locality, so moving it
+    // to another locality should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving an unhealthy endpoint to another locality keeps
+  // it as unhealthy.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone3");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone3");
+
+    // The endpoint was in failed status in the previous priority, so moving it
+    // to another locality should preserve that.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving a degraded endpoint to another locality keeps
+  // it as degraded.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone4");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone4");
+
+    // The endpoint was in degraded status in the original locality, so moving it
+    // to another locality should preserve that.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  }
+
+  // Validate that moving a endpoint marked as timeout active health check to
+  // another locality keeps that flag.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // The code requires that ACTIVE_HC_TIMEOUT is set only if FAILED_ACTIVE_HC
+    // is also set.
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+  endpoints->mutable_locality()->set_zone("zone5");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone5");
+
+    // The endpoint was in timeout status in the original locality, so moving it
+    // to another locality keeps the flag..
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving a endpoint marked as pending active health check to
+  // another locality keeps that flag.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // The code requires that PENDING_ACTIVE_HC is set only if FAILED_ACTIVE_HC
+    // is also set.
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+  endpoints->mutable_locality()->set_zone("zone6");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone6");
+
+    // The endpoint was in timeout status in the original priority, but its
+    // health checker host changes, so now it is initialized to unhealthy.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that updating the locality and the health checker of a healthy
+  // endpoint, marks it as failing active HC.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone7");
+  endpoint->mutable_health_check_config()->set_port_value(90);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone7");
+
+    // The endpoint was in healthy status in the original priority, but its
+    // health checker host changes, so now it is initialized to unhealthy.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+}
+
 // Validates that we correctly update the host list when a new overprovisioning factor is set.
 TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
