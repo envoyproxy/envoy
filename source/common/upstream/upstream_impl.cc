@@ -1471,10 +1471,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
   auto excluded_list = std::make_shared<ExcludedHostVector>();
 
   for (const auto& host : hosts) {
-    if (host->coarseHealth() == Host::Health::Healthy) {
+    const Host::Health health_status = host->coarseHealth();
+    if (health_status == Host::Health::Healthy) {
       healthy_list->get().emplace_back(host);
-    }
-    if (host->coarseHealth() == Host::Health::Degraded) {
+    } else if (health_status == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
     if (excludeBasedOnHealthFlag(*host)) {
