@@ -322,9 +322,7 @@ class FormatChecker:
         ]
 
     def allow_listed_for_raw_try(self, file_path):
-        # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
-        return file_path in self.config.paths["raw_try"]["include"] or file_path.startswith(
-            "./source/extensions")
+        return file_path in self.config.paths["raw_try"]["include"]
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
@@ -624,7 +622,7 @@ class FormatChecker:
         if " try {" in line and file_path.startswith(
                 "./source") and not self.allow_listed_for_raw_try(file_path):
             report_error(
-                "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
+                "Don't use raw try, use TRY_ASSERT_MAIN_THREAD and CATCH if on the main thread otherwise don't use exceptions."
             )
         if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that

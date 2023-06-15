@@ -118,7 +118,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
   bool sampled{extractor.extractSampled(tracing_decision)};
-  try {
+  TRY_NEEDS_AUDIT {
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
@@ -129,9 +129,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
       new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
                                          stream_info.startTime(), ret_span_context.first);
     }
-  } catch (const ExtractorException& e) {
-    return std::make_unique<Tracing::NullSpan>();
   }
+  END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
   // Return the active Zipkin span.
   return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer);

@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/json/json_loader.h"
 
 namespace Envoy {
@@ -101,12 +102,11 @@ std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
 }
 
 std::string QueryMessageInfo::parseCallingFunctionJson(const std::string& json_string) {
-  try {
+  TRY_NEEDS_AUDIT {
     Json::ObjectSharedPtr json = Json::Factory::loadFromString(json_string);
     return json->getString("callingFunction");
-  } catch (Json::Exception&) {
-    return "";
   }
+  END_TRY catch (Json::Exception&) { return ""; }
 }
 
 QueryMessageInfo::QueryType QueryMessageInfo::parseType(const QueryMessage& query) {

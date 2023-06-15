@@ -539,7 +539,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   bool has_full_packets = false;
 
   while (offset < data_len) {
-    try {
+    TRY_NEEDS_AUDIT {
       // Peek packet length.
       len = helper_.peekInt32(data, offset);
       ensureMinLength(len, dtype == DecodeType::READ ? XID_LENGTH + INT_LENGTH
@@ -549,7 +549,8 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
       if (offset <= data_len) {
         has_full_packets = true;
       }
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY catch (const EnvoyException& e) {
       ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
       callbacks_.onDecodeError();
       return;
@@ -587,7 +588,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len) {
   uint64_t offset = 0;
 
-  try {
+  TRY_NEEDS_AUDIT {
     while (offset < full_packets_len) {
       // Reset the helper's cursor, to ensure the current message stays within the
       // allowed max length, even when it's different than the declared length
@@ -610,7 +611,8 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
         break;
       }
     }
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
     callbacks_.onDecodeError();
   }

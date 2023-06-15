@@ -161,9 +161,8 @@ void ClientImpl::onConnectOrOpTimeout() {
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
-  try {
-    decoder_->decode(data);
-  } catch (ProtocolError&) {
+  TRY_NEEDS_AUDIT { decoder_->decode(data); }
+  END_TRY catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
     host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
