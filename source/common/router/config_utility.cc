@@ -124,7 +124,9 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
                                        filename, size, max_body_size_bytes));
     }
-    return api.fileSystem().fileReadToEnd(filename);
+    auto file_or_error = api.fileSystem().fileReadToEnd(filename);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    return file_or_error.value();
   }
   const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
                                                             : body.inline_bytes());

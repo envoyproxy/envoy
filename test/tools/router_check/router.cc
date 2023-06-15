@@ -226,7 +226,7 @@ RouterCheckTool::RouterCheckTool(
 }
 
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
-  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  std::string contents = api.fileSystem().fileReadToEnd(file_path).value();
   if (absl::EndsWith(file_path, ".yaml")) {
     contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
@@ -238,7 +238,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
   TestUtility::validate(validation_config);
 
