@@ -914,6 +914,7 @@ EngineSharedPtr EngineBuilder::build() {
     if (bootstrap) {
       options->setConfigProto(std::move(bootstrap));
     }
+    log_level_ = LogLevel::debug;
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
     cast_engine->run(std::move(options));

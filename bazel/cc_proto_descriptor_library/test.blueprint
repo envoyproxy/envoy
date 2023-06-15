@@ -1,0 +1,29 @@
+include "devtools/blueprint/ncl/blueprint_file.ncl";
+include "devtools/blueprint/ncl/sanitizer.ncl";
+
+blueprint_file = ::blueprint::BlueprintFile(
+  project_name = "cc_proto_descriptor_library",
+  teams_product_id = 8953708915,
+  tech_lead = ["kmensah"],
+  dev_mailing_list = "portable-proto-library-deprecation@google.com",
+  buganizer_component_ids = [550153],
+  buildable_units = [
+    ::blueprint::BuildableUnit(
+      name = "cc_proto_descriptor_library",
+      test_patterns = ["//net/proto2/contrib/cc_proto_descriptor_library/testdata:text_format_transcoder_test",
+                       "//net/proto2/contrib/cc_proto_descriptor_library/testdata:global_fallback_test",
+                       "//net/proto2/contrib/cc_proto_descriptor_library/testdata:create_dynamic_message_test"],
+      continuous_build_email = ::blueprint::ContinuousBuildEmailInfo(
+        build_cop_email_addrs = ["kmensah@google.com", "portable-proto-library-deprecation+tap@google.com"],
+        summary_email_addrs = ["portable-proto-library-deprecation+tap@google.com"],
+      ),
+      enable_continuous_build = true,
+      enable_coverage = true,
+      enable_release = false,
+    ),
+  ],
+  owned_code_depotpaths = [
+    "//depot/google3/net/proto2/contrib/cc_proto_descriptor_library/...",
+  ],
+  mdb_groups = ["lpt-c-toolchain-mobile"],
+);

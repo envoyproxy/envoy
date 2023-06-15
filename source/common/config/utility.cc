@@ -264,12 +264,11 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
   static const std::string struct_type =
-      ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+      ProtobufWkt::Struct::default_instance().GetTypeName();
   static const std::string typed_struct_type =
-      xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+      xds::type::v3::TypedStruct::default_instance().GetTypeName();
   static const std::string legacy_typed_struct_type =
-      udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-
+      udpa::type::v1::TypedStruct::default_instance().GetTypeName();
   if (!typed_config.value().empty()) {
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -279,8 +278,8 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       xds::type::v3::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
-      if (out_proto.GetDescriptor()->full_name() == struct_type) {
-        out_proto.CopyFrom(typed_struct.value());
+      if (out_proto.GetTypeName() == struct_type) {
+        out_proto.CheckTypeAndMergeFrom(typed_struct.value());
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
@@ -294,8 +293,8 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
-      if (out_proto.GetDescriptor()->full_name() == struct_type) {
-        out_proto.CopyFrom(typed_struct.value());
+      if (out_proto.GetTypeName() == struct_type) {
+        out_proto.CheckTypeAndMergeFrom(typed_struct.value());
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
@@ -307,7 +306,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 #endif
       }
     } // out_proto is expecting Struct, unpack directly
-    else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+    else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
       MessageUtil::unpackTo(typed_config, out_proto);
     } else {
 #ifdef ENVOY_ENABLE_YAML
