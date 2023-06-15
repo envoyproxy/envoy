@@ -1898,10 +1898,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   // Check for a route that matches the request.
   return getRouteFromRoutes(cb, headers, stream_info, random_value, routes_);
 }
-
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     absl::string_view host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
-    RouteMatcher::SubstringFunction substring_function) const {
+    RouteMatcher::SubstringFunction substring_function, VirtualHostPort port) const {
   // We do a longest wildcard match against the host that's passed in
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
@@ -1913,9 +1912,24 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     if (wildcard_length >= host.size()) {
       continue;
     }
-    const auto match = wildcard_map.find(substring_function(host, wildcard_length));
-    if (match != wildcard_map.end()) {
-      return match->second.get();
+    const auto host_match = wildcard_map.find(substring_function(host, wildcard_length));
+    if (host_match != wildcard_map.end()) {
+      if (ignorePortInHostMatching()) {
+        // return the first entry of virtual host
+        return host_match->second.begin()->second.get();
+      } else {
+        // first try to match one to one with the specified port
+        auto port_iter = host_match->second.find(port);
+        if (port_iter != host_match->second.end()) {
+          return port_iter->second.get();
+        }
+        // if the specified port is not available
+        // search for port "0", entrym which matches with all ports
+        port_iter = host_match->second.find(VHOST_PORTS_MATCH_ALL);
+        if (port_iter != host_match->second.end()) {
+          return port_iter->second.get();
+        }
+      }
     }
   }
   return nullptr;
@@ -1937,8 +1951,19 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, optional_http_filters, global_route_config, factory_context,
         *vhost_scope_, validator, validation_clusters);
-    for (const std::string& domain_name : virtual_host_config.domains()) {
-      const Http::LowerCaseString lower_case_domain_name(domain_name);
+    for (std::string_view domain_name : virtual_host_config.domains()) {
+      absl::string_view::size_type port_start = Http::HeaderUtility::getPortStart(domain_name);
+      const Http::LowerCaseString lower_case_domain_name(domain_name.substr(0, port_start));
+      VirtualHostPort port = VHOST_PORTS_MATCH_ALL;
+      if (port_start != absl::string_view::npos) {
+        std::string_view port_string = domain_name.substr(port_start + 1, domain_name.size());
+        if (port_string != "*" && !absl::SimpleAtoi(port_string, &port)) {
+          throw EnvoyException(fmt::format("Port number {} in"
+                                           "entry of domain {} in route {} is invalid",
+                                           port_string, lower_case_domain_name,
+                                           route_config.name()));
+        }
+      }
       absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
@@ -1948,15 +1973,19 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         }
         default_virtual_host_ = virtual_host;
       } else if (!domain.empty() && '*' == domain[0]) {
-        duplicate_found = !wildcard_virtual_host_suffixes_[domain.size() - 1]
-                               .emplace(domain.substr(1), virtual_host)
-                               .second;
+        auto domain_without_wildcard = domain.substr(1);
+        duplicate_found =
+            !wildcard_virtual_host_suffixes_[domain.size() - 1][domain_without_wildcard]
+                 .emplace(port, virtual_host)
+                 .second;
       } else if (!domain.empty() && '*' == domain[domain.size() - 1]) {
-        duplicate_found = !wildcard_virtual_host_prefixes_[domain.size() - 1]
-                               .emplace(domain.substr(0, domain.size() - 1), virtual_host)
-                               .second;
+        auto domain_without_wildcard = domain.substr(0, domain.size() - 1);
+        duplicate_found =
+            !wildcard_virtual_host_suffixes_[domain.size() - 1][domain_without_wildcard]
+                 .emplace(port, virtual_host)
+                 .second;
       } else {
-        duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
+        duplicate_found = !virtual_hosts_[domain].emplace(port, virtual_host).second;
       }
       if (duplicate_found) {
         throw EnvoyException(fmt::format("Only unique values for domains are permitted. Duplicate "
@@ -1981,25 +2010,43 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
 
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   absl::string_view host_header_value = headers.getHostValue();
-  if (ignorePortInHostMatching()) {
-    if (const absl::string_view::size_type port_start =
-            Http::HeaderUtility::getPortStart(host_header_value);
-        port_start != absl::string_view::npos) {
-      host_header_value = host_header_value.substr(0, port_start);
+  const absl::string_view::size_type port_start =
+      Http::HeaderUtility::getPortStart(host_header_value);
+  VirtualHostPort port = VHOST_PORTS_MATCH_ALL;
+  if (port_start != absl::string_view::npos) {
+    if (!absl::SimpleAtoi(host_header_value.substr(port_start + 1), &port)) {
+      // invalid port on the header
+      return default_virtual_host_.get();
     }
   }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(host_header_value);
-  const auto iter = virtual_hosts_.find(host);
-  if (iter != virtual_hosts_.end()) {
-    return iter->second.get();
+  const std::string host = absl::AsciiStrToLower(host_header_value.substr(0, port_start));
+  // find a matching host
+  const auto vhost_iter = virtual_hosts_.find(host);
+  if (vhost_iter != virtual_hosts_.end()) {
+    if (ignorePortInHostMatching()) {
+      // if we ignore port in host matching, return the first virtual host entry
+      return vhost_iter->second.begin()->second.get();
+    } else {
+      // find a matching port and return the corresponding virtual host
+      auto port_iter = vhost_iter->second.find(port);
+      if (port_iter != vhost_iter->second.end()) {
+        return port_iter->second.get();
+      }
+      // try to find one that matches all ports
+      port_iter = vhost_iter->second.find(VHOST_PORTS_MATCH_ALL);
+      if (port_iter != vhost_iter->second.end()) {
+        return port_iter->second.get();
+      }
+    }
   }
   if (!wildcard_virtual_host_suffixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_suffixes_,
-        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); },
+        port);
     if (vhost != nullptr) {
       return vhost;
     }
@@ -2007,7 +2054,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   if (!wildcard_virtual_host_prefixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_prefixes_,
-        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); }, port);
     if (vhost != nullptr) {
       return vhost;
     }

@@ -1491,6 +1491,8 @@ public:
 
 DECLARE_FACTORY(RouteListMatchActionFactory);
 
+inline const uint16_t VHOST_PORTS_MATCH_ALL = 0;
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
@@ -1509,16 +1511,19 @@ public:
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
 private:
+  using VirtualHostPort = uint32_t;
+  using VirtualHostInfo = absl::flat_hash_map<VirtualHostPort, VirtualHostSharedPtr>;
   using WildcardVirtualHosts =
-      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostInfo>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
-                                                 SubstringFunction substring_function) const;
+                                                 SubstringFunction substring_function,
+                                                 VirtualHostPort port) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   Stats::ScopeSharedPtr vhost_scope_;
-  absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  absl::node_hash_map<std::string, VirtualHostInfo> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
   // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
