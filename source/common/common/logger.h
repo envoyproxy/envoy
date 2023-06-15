@@ -414,7 +414,7 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
- * In case JSON logging is enabled, the keys and values will be serialized with JSON escapings.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escaping.
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
 
