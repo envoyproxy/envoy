@@ -105,8 +105,8 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     if (cluster.health_checks().size() != 1) {
       return absl::InvalidArgumentError("Multiple health checks not supported");
     } else {
-      auto checker_or_error = HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster_pair.first, server_context);
+      auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
+                                                           *new_cluster_pair.first, server_context);
       RETURN_IF_STATUS_NOT_OK(checker_or_error);
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
     }

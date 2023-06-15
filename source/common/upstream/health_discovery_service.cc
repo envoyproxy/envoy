@@ -436,8 +436,8 @@ absl::Status HdsCluster::updateHealthchecks(
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
-      auto checker_or_error = Upstream::HealthCheckerFactory::create(
-          health_check, *this, server_context_);
+      auto checker_or_error =
+          Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
       RETURN_IF_STATUS_NOT_OK(checker_or_error);
       auto new_health_checker = checker_or_error.value();
       health_checkers_map.insert({health_check, new_health_checker});
@@ -549,8 +549,8 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
 void HdsCluster::initHealthchecks() {
   for (auto& health_check : cluster_.health_checks()) {
-    auto health_checker_or_error = Upstream::HealthCheckerFactory::create(
-        health_check, *this, server_context_);
+    auto health_checker_or_error =
+        Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
     THROW_IF_STATUS_NOT_OK(health_checker_or_error, throw);
 
     auto health_checker = health_checker_or_error.value();
