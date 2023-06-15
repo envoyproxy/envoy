@@ -101,7 +101,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    absl::StatusOr<bool> update_or_error =
+        server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    if (!update_or_error.status().ok()) {
+      throw EnvoyException(std::string(update_or_error.status().message()));
+    }
   }
 
   initializeWatchdogs(bootstrap, server);

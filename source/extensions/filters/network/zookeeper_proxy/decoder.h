@@ -51,10 +51,13 @@ enum class OpCodes {
   SetWatches = 101,
   GetEphemerals = 103,
   GetAllChildrenNumber = 104,
-  SetWatches2 = 105
+  SetWatches2 = 105,
+  AddWatch = 106,
 };
 
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
+
+enum class AddWatchMode { Persistent, PersistentRecursive };
 
 enum class CreateFlags {
   Persistent,
@@ -96,6 +99,7 @@ public:
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
   virtual void onSetWatches2Request() PURE;
+  virtual void onAddWatchRequest(const std::string& path, const int32_t mode) PURE;
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
@@ -167,6 +171,7 @@ private:
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseAddWatchRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipString(Buffer::Instance& data, uint64_t& offset);
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
