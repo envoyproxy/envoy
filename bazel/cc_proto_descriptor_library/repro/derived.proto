@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package repro.dynamic_descriptors;
+
+import "bazel/cc_proto_descriptor_library/repro/base_with_any.proto";
+
+message Derived {
+  repeated repro.dynamic_descriptors.BaseWithAny foo = 1;
+}

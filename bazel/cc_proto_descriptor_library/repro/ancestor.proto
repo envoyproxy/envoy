@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package repro.dynamic_descriptors;
+
+import "bazel/cc_proto_descriptor_library/repro/derived.proto";
+
+message Ancestor {
+  repeated repro.dynamic_descriptors.Derived foo = 1;
+}
