@@ -1214,6 +1214,11 @@ envoy.upstreams.http.tcp:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.http.udp:
+  categories:
+  - envoy.upstreams
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.upstreams.tcp.generic:
   categories:
   - envoy.upstreams

@@ -293,6 +293,7 @@ EXTENSIONS = {
 
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
+    "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 
     #
     # Watchdog actions
