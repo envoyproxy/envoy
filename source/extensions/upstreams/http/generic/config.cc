@@ -20,8 +20,7 @@ Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
   switch (upstream_protocol) {
   case UpstreamProtocol::HTTP: {
     auto http_conn_pool = std::make_unique<Upstreams::Http::Http::HttpConnPool>(
-        thread_local_cluster, upstream_protocol != UpstreamProtocol::HTTP, route_entry,
-        downstream_protocol, ctx);
+        thread_local_cluster, route_entry, downstream_protocol, ctx);
     return (http_conn_pool->valid() ? std::move(http_conn_pool) : nullptr);
   }
   case UpstreamProtocol::TCP: {
