@@ -1267,11 +1267,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Mutating system header :scheme is not allowed.
-    hdr->mutable_header()->set_key(":scheme");
-    hdr->mutable_header()->set_value("HTTP");
+    hdr->mutable_header()->set_key(":foo");
+    hdr->mutable_header()->set_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), HasNoHeader(":scheme"));
+  EXPECT_THAT(response->headers(), HasNoHeader(":foo"));
 }
 
 // Test the filter using an ext_proc server that responds to the request_header message
