@@ -49,3 +49,12 @@ envoy_cc_mock(
         "//test/test_common:test_time_lib",
     ],
 )
+
+envoy_cc_mock(
+    name = "upstream_request",
+    srcs = ["upstream_request.cc"],
+    hdrs = ["upstream_request.h"],
+    deps = [
+        "//source/common/router:router_lib",
+    ],
+)

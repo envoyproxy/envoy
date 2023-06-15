@@ -518,6 +518,11 @@ public:
    * Returns a handle to the downstream callbacks, if available.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
+  /**
+   * Returns if close from the upstream is to be handled with half-close semantics and
+   * will not reset the stream. This will allow the downstream to still send data.
+   */
+  virtual bool allowDownstreamOpenOnUpstreamClosed() PURE;
 };
 
 /**
