@@ -388,6 +388,18 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
         upstreamLog(AccessLog::AccessLogType::UpstreamPeriodic);
         resetUpstreamLogFlushTimer();
       }
+      // Both downstream and upstream bytes meters may not be initialized when
+      // the timer goes off, e.g. if it takes longer than the interval for a
+      // connection to be initialized; check for nullptr.
+      auto& downstream_bytes_meter = stream_info_.getDownstreamBytesMeter();
+      auto& upstream_bytes_meter = stream_info_.getUpstreamBytesMeter();
+      const SystemTime now = parent_.callbacks()->dispatcher().timeSource().systemTime();
+      if (downstream_bytes_meter) {
+        downstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
+      }
+      if (upstream_bytes_meter) {
+        upstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
+      }
     });
 
     resetUpstreamLogFlushTimer();
@@ -649,6 +661,12 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   if (parent_.config().flush_upstream_log_on_upstream_stream_) {
     upstreamLog(AccessLog::AccessLogType::UpstreamPoolReady);
+  }
+
+  if (address_provider.connectionID() && stream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              address_provider.connectionID().value(),
+              stream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   for (auto* callback : upstream_callbacks_) {

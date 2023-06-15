@@ -93,8 +93,13 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   // server initialization.
   ASSERT(state_ != State::AllClustersInitialized);
 
-  const auto initialize_cb = [&cm_cluster, this] { onClusterInit(cm_cluster); };
+  const auto initialize_cb = [&cm_cluster, this] {
+    onClusterInit(cm_cluster);
+    cm_cluster.cluster().info()->configUpdateStats().warming_state_.set(0);
+  };
   Cluster& cluster = cm_cluster.cluster();
+
+  cluster.info()->configUpdateStats().warming_state_.set(1);
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
     primary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
@@ -749,6 +754,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto previous_cluster =
       loadCluster(cluster, new_hash, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
+  cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
     init_helper_.addCluster(*cluster_entry);
@@ -757,6 +763,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     cluster_entry->cluster_->initialize([this, cluster_name] {
       ENVOY_LOG(debug, "warming cluster {} complete", cluster_name);
       auto state_changed_cluster_entry = warming_clusters_.find(cluster_name);
+      state_changed_cluster_entry->second->cluster_->info()->configUpdateStats().warming_state_.set(
+          0);
       onClusterInit(*state_changed_cluster_entry->second);
     });
   }
@@ -909,22 +917,23 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.ring_hash");
       cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
   } else if (cluster_info->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_info->lbSubsetInfo().isEnabled()) {
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.maglev");
       cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
   } else if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
-    cluster_entry_it->second->thread_aware_lb_ = typed_lb_factory->create(
-        *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+    cluster_entry_it->second->thread_aware_lb_ =
+        typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
+                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1543,7 +1552,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+    : parent_(parent), cluster_info_(cluster), lb_factory_(lb_factory),
       override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 

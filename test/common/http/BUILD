@@ -625,3 +625,15 @@ envoy_cc_fuzz_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "filter_chain_helper_test",
+    srcs = ["filter_chain_helper_test.cc"],
+    deps = [
+        "//source/common/http:filter_chain_helper_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

@@ -224,7 +224,7 @@ public:
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
-   * active healchecking.
+   * active health checking.
    */
   virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
@@ -596,7 +596,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  GAUGE(warming_state, NeverImport)
 
 /**
  * All cluster endpoints related stats.
@@ -610,7 +611,7 @@ public:
   GAUGE(membership_total, NeverImport)
 
 /**
- * All cluster loadbalancing related stats.
+ * All cluster load balancing related stats.
  */
 #define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
@@ -823,6 +824,7 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class LoadBalancerConfig;
 class TypedLoadBalancerFactory;
 
 /**
@@ -939,10 +941,10 @@ public:
   }
 
   /**
-   * @return const ProtobufWkt::Message& the validated load balancing policy configuration to use
-   * for this cluster.
+   * @return OptRef<const LoadBalancerConfig> the validated load balancing policy configuration to
+   * use for this cluster.
    */
-  virtual const ProtobufTypes::MessagePtr& loadBalancingPolicy() const PURE;
+  virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
 
   /**
    * @return the load balancer factory for this cluster if the load balancing type is

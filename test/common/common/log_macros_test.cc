@@ -32,11 +32,15 @@ public:
     ENVOY_STREAM_LOG(info, "fake message", stream_);
     ENVOY_CONN_LOG(error, "fake error", connection_);
     ENVOY_STREAM_LOG(error, "fake error", stream_);
+    ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val");
+    ENVOY_TAGGED_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), "fake message {}",
+                     "val");
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
 
 private:
+  std::map<std::string, std::string> tags_{{"key", "val"}};
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
 };
