@@ -94,6 +94,10 @@ minor_behavior_changes:
   change: |
     Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
     query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
+- area: upstream
+  change: |
+    Changed behavior of the unpausing connect with 2xx status codes. This change can be reverted temporarily by
+    setting the runtime guard ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
