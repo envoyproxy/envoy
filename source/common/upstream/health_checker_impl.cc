@@ -49,10 +49,7 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
 
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
-                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager,
-                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                             Upstream::Cluster& cluster,
                              Server::Configuration::ServerFactoryContext& server_context) {
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
@@ -83,14 +80,12 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
   }
 
   std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager, server_context));
+      new HealthCheckerFactoryContextImpl(cluster, server_context));
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {
     HealthCheckEventLoggerPtr event_logger;
-    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
-        log_manager, dispatcher.timeSource(), health_check_config, *context);
+    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(health_check_config, *context);
     context->setEventLogger(std::move(event_logger));
   }
   return factory->createCustomHealthChecker(health_check_config, *context);

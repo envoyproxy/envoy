@@ -420,10 +420,8 @@ void HdsCluster::updateHealthchecks(
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
-      auto new_health_checker = Upstream::HealthCheckerFactory::create(
-          health_check, *this, server_context_.runtime(), server_context_.mainThreadDispatcher(),
-          server_context_.accessLogManager(), server_context_.messageValidationVisitor(),
-          server_context_.api(), server_context_);
+      auto new_health_checker =
+          Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
       health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);
 

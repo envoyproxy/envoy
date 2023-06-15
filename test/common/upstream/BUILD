@@ -189,7 +189,6 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

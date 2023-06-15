@@ -52,13 +52,12 @@ struct HealthCheckerEqualTo {
  */
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
-  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
-                                  Event::Dispatcher& dispatcher,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api, AccessLog::AccessLogManager& log_manager,
+  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
                                   Server::Configuration::ServerFactoryContext& server_context)
-      : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
-        validation_visitor_(validation_visitor), log_manager_(log_manager), api_(api),
+      : cluster_(cluster), runtime_(server_context.runtime()),
+        dispatcher_(server_context.mainThreadDispatcher()),
+        validation_visitor_(server_context.messageValidationVisitor()),
+        log_manager_(server_context.accessLogManager()), api_(server_context.api()),
         server_context_(server_context) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
@@ -102,20 +101,12 @@ public:
    * Create a health checker.
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
-   * @param runtime supplies the runtime loader.
-   * @param dispatcher supplies the dispatcher.
-   * @param log_manager supplies the log_manager.
-   * @param validation_visitor message validation visitor instance.
-   * @param api reference to the Api object
    * @param server_context reference to the Server context object
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         Server::Configuration::ServerFactoryContext& server_context);
+         Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context);
 };
 
 /**

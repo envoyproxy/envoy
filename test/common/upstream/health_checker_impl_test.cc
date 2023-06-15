@@ -28,7 +28,6 @@
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -77,15 +76,10 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
 
   Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  Api::MockApi api;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, dispatcher,
-                                   log_manager, validation_visitor, api, server_context),
+      HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, server_context),
       EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
@@ -95,18 +89,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   EXPECT_CALL(*cluster.info_, features())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
-                         HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
-                                                      runtime, dispatcher, log_manager,
-                                                      validation_visitor, api, server_context)
-                             .get()));
+  EXPECT_NE(nullptr,
+            dynamic_cast<GrpcHealthCheckerImpl*>(
+                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, server_context)
+                    .get()));
 }
 
 class HealthCheckerTestBase {
@@ -6390,21 +6378,16 @@ TEST(Printer, HealthTransitionPrinter) {
 }
 
 TEST(HealthCheckEventLoggerImplTest, All) {
-  AccessLog::MockAccessLogManager log_manager;
-  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
-  EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
-                               Filesystem::DestinationType::File, "foo"}))
-      .WillOnce(Return(file));
-
   envoy::config::core::v3::HealthCheck health_check_config;
   health_check_config.set_event_log_path("foo");
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
+  EXPECT_CALL(server_context.access_log_manager_, createAccessLog(Filesystem::FilePathAndType{
+                                                      Filesystem::DestinationType::File, "foo"}))
+      .WillOnce(Return(file));
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
@@ -6412,14 +6395,13 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager, server_context);
+  HealthCheckerFactoryContextImpl context(cluster, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
+  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6481,16 +6463,12 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   config.set_event_log_path("foo");
   event_log->mutable_typed_config()->PackFrom(config);
 
-  NiceMock<AccessLog::MockAccessLogManager> log_manager;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StringViewSaver file_log_data;
-  ON_CALL(*log_manager.file_, write(_)).WillByDefault(SaveArg<0>(&file_log_data));
+  ON_CALL(*server_context.access_log_manager_.file_, write(_))
+      .WillByDefault(SaveArg<0>(&file_log_data));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
@@ -6498,14 +6476,13 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager, server_context);
+  HealthCheckerFactoryContextImpl context(cluster, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
+  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
 
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
   EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
