@@ -41,8 +41,7 @@ public:
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
-                                               Envoy::Http::Protocol::Http11, nullptr);
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, route_entry, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
