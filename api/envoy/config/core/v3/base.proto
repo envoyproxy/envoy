@@ -327,8 +327,9 @@ message HeaderValue {
   // Header value is encoded as string. This does not work for non-utf8 characters.
   // Only one of ``value`` or ``value_bytes`` can be set.
   string value = 2 [
-      (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
-      (udpa.annotations.field_migrate).oneof_promotion = "value_type"];
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
+  ];
 
   oneof value_type {
     // Header value is encoded as bytes which can support non-utf8 characters.
