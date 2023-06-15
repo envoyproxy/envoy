@@ -348,7 +348,11 @@ protected:
       )EOF";
       TestUtility::loadFromYaml(filter_chain_matcher, *listener.mutable_filter_chain_matcher());
     }
-    return manager_->addOrUpdateListener(listener, version_info, added_via_api);
+    auto status_or_error = manager_->addOrUpdateListener(listener, version_info, added_via_api);
+    if (status_or_error.status().ok()) {
+      return status_or_error.value();
+    }
+    throw EnvoyException(std::string(status_or_error.status().message()));
   }
 
   void testListenerUpdateWithSocketOptionsChange(const std::string& origin,

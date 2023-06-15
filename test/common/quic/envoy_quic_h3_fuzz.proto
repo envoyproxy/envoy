@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+package test.common.quic;
+import "test/fuzz/common.proto";
+
+message H3DataFrame {
+  bytes data = 1;
+}
+
+message H3HeaderFrame {
+  // Need to be converted to an encoded field section
+  test.fuzz.Headers headers = 1;
+}
+
+message H3CancelPushFrame {
+  uint64 push_id = 1;
+}
+
+message H3Setting {
+  // Uses only lower 2 bytes
+  uint64 identifier = 1;
+  uint64 value = 2;
+}
+
+message H3SettingsFrame {
+  repeated H3Setting settings = 1;
+}
+
+message H3PushPromiseFrame {
+  uint64 push_id = 1;
+  // Need to be converted to an encoded field section
+  test.fuzz.Headers headers = 2;
+}
+
+message H3GoAwayFrame {
+  uint64 push_id = 1;
+}
+
+message H3MaxPushIdFrame {
+  uint64 push_id = 1;
+}
+
+message H3Frame {
+  oneof frame {
+    H3DataFrame data = 1;
+    H3HeaderFrame headers = 2;
+    H3CancelPushFrame cancel_push = 3;
+    H3SettingsFrame settings = 4;
+    H3PushPromiseFrame push_promise = 5;
+    H3GoAwayFrame go_away = 6;
+    H3MaxPushIdFrame max_push_id = 7;
+  }
+}
+
+message QuicPaddingFrame {
+  int32 num_padding_bytes = 1;
+}
+
+message QuicStreamFrame {
+  bool unidirectional = 1;
+  uint32 type = 2;
+  uint32 id = 3;
+  bool fin = 4;
+  uint64 offset = 5;
+  oneof data {
+    H3Frame h3frame = 6;
+    bytes junk = 7;
+  }
+}
+
+message QuicHandshakeDoneFrame {
+  uint32 control_frame_id = 1;
+}
+
+message QuicCryptoFrame {
+  uint64 offset = 1;
+  bytes data = 2;
+}
+
+message QuicEcnCounters {
+  uint64 ect0 = 1;
+  uint64 ect1 = 2;
+  uint64 ce = 3;
+}
+
+message QuicAckFrame {
+  uint64 largest_acked = 1;
+  QuicEcnCounters ecn_counters = 4;
+}
+
+message QuicMtuDiscoveryFrame {
+}
+
+message QuicStopWaitingFrame {
+  uint64 least_unacked = 1;
+}
+
+message QuicPingFrame {
+  uint32 control_frame_id = 1;
+}
+
+message QuicRstStreamFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_id = 2;
+  uint32 error_code = 3;
+  uint64 bytes_written = 4;
+}
+
+message QuicConnectionCloseFrame {
+  // TODO transport_version = 1;
+  uint32 error_code = 2;
+  uint64 ietf_error = 3;
+  string error_phrase = 4;
+  uint64 transport_close_frame_type = 5;
+}
+
+message QuicGoAwayFrame {
+  uint32 control_frame_id = 1;
+  uint32 error_code = 2;
+  uint32 last_good_stream_id = 3;
+  string reason = 4;
+}
+
+message QuicWindowUpdateFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_id = 2;
+  uint64 max_data = 3;
+}
+
+message QuicBlockedFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_id = 2;
+  uint64 offset = 3;
+}
+
+message QuicNewConnectionIdFrame {
+  uint32 control_frame_id = 1;
+  bytes connection_id = 2;
+  uint64 sequence_number = 3;
+  bytes stateless_reset_token = 4;
+  uint64 retire_prior_to = 5;
+}
+
+message QuicRetireConnectionIdFrame {
+  uint32 control_frame_id = 1;
+  uint64 sequence_number = 2;
+}
+
+message QuicMaxStreamsFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_count = 2;
+  bool unidirectional = 3;
+}
+
+message QuicStreamsBlockedFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_count = 2;
+  bool unidirectional = 3;
+}
+
+message QuicPathResponseFrame {
+  uint32 control_frame_id = 1;
+  bytes data = 2;
+}
+
+message QuicPathChallengeFrame {
+  uint32 control_frame_id = 1;
+  bytes data = 2;
+}
+
+message QuicStopSendingFrame {
+  uint32 control_frame_id = 1;
+  uint32 stream_id = 2;
+  uint32 error_code = 3;
+}
+
+message QuicMessageFrame {
+  uint32 message_id = 1;
+  bytes data = 2;
+}
+
+message QuicNewTokenFrame {
+  uint32 control_frame_id = 1;
+  string token = 2;
+}
+
+message QuickAckFrequencyFrame {
+  uint32 control_frame_id = 1;
+  uint64 sequence_number = 2;
+  uint64 packet_tolerance = 3;
+  uint32 milliseconds = 4;
+}
+
+message QuicFrame {
+  oneof frame {
+    QuicPaddingFrame padding = 1;
+    QuicStreamFrame stream = 2;
+    QuicHandshakeDoneFrame handshake_done = 3;
+    QuicCryptoFrame crypto = 4;
+    QuicAckFrame ack = 5;
+    QuicMtuDiscoveryFrame mtu_discovery = 6;
+    QuicStopWaitingFrame stop_waiting = 7;
+    QuicPingFrame ping = 8;
+    QuicRstStreamFrame rst_stream = 9;
+    QuicConnectionCloseFrame connection_close = 10;
+    QuicGoAwayFrame go_away = 11;
+    QuicWindowUpdateFrame window_update = 12;
+    QuicBlockedFrame blocked = 13;
+    QuicNewConnectionIdFrame new_connection_id = 14;
+    QuicRetireConnectionIdFrame retire_connection_id = 15;
+    QuicMaxStreamsFrame max_streams = 16;
+    QuicStreamsBlockedFrame streams_blocked = 17;
+    QuicPathResponseFrame path_response = 18;
+    QuicPathChallengeFrame path_challenge = 19;
+    QuicStopSendingFrame stop_sending = 20;
+    QuicMessageFrame message_frame = 21;
+    QuicNewTokenFrame new_token = 22;
+    QuickAckFrequencyFrame ack_frequency = 23;
+  }
+}
+
+message QuicFrameOrJunk {
+  oneof frame {
+    QuicFrame qframe = 1;
+    bytes junk = 2;
+  }
+}
+
+message QuicH3FuzzCase {
+  // QUIC frames to be processed
+  repeated QuicFrameOrJunk frames = 1;
+}
