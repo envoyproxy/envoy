@@ -282,14 +282,14 @@ ssize_t InstanceImplPosix::fileSize(const std::string& path) {
   return info.st_size;
 }
 
-std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplPosix::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   std::ifstream file(path);
   if (file.fail()) {
-    throw EnvoyException(absl::StrCat("unable to read file: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;

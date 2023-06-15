@@ -20,7 +20,9 @@ std::string read(const envoy::config::core::v3::DataSource& source, bool allow_e
   std::string data;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    data = api.fileSystem().fileReadToEnd(source.filename());
+    auto file_or_error = api.fileSystem().fileReadToEnd(path);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    data = file_or_error.value();
     break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes:
     data = source.inline_bytes();

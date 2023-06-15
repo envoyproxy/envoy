@@ -167,7 +167,9 @@ SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
 SdsApi::FileContentMap SdsApi::loadFiles() {
   FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
-    files[filename] = api_.fileSystem().fileReadToEnd(filename);
+    auto file_or_error = api.fileSystem().fileReadToEnd(path);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    files[filename] = file_or_error.value();
   }
   return files;
 }

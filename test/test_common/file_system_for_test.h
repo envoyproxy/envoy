@@ -30,7 +30,7 @@ public:
 
   ssize_t fileSize(const std::string& path) override;
 
-  std::string fileReadToEnd(const std::string& path) override;
+  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override;
 
   PathSplitResult splitPathFromFilename(absl::string_view path) override {
     return file_system_->splitPathFromFilename(path);

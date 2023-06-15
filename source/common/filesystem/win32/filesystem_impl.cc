@@ -276,9 +276,9 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   return result;
 }
 
-std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
   }
 
   // In integration tests (and potentially in production) we rename config files and this creates
@@ -290,9 +290,9 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (fd == INVALID_HANDLE) {
     auto last_error = ::GetLastError();
     if (last_error == ERROR_FILE_NOT_FOUND) {
-      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+      return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
     }
-    throw EnvoyException(absl::StrCat("unable to read file: ", path));
+    return absl::InvalidArgumentException(absl::StrCat("unable to read file: ", path));
   }
   DWORD buffer_size = 100;
   DWORD bytes_read = 0;
@@ -303,10 +303,10 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
       auto last_error = ::GetLastError();
       if (last_error == ERROR_FILE_NOT_FOUND) {
         CloseHandle(fd);
-        throw EnvoyException(absl::StrCat("Invalid path: ", path));
+        return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
       }
       CloseHandle(fd);
-      throw EnvoyException(absl::StrCat("unable to read file: ", path));
+      return absl::InvalidArgumentException(absl::StrCat("unable to read file: ", path));
     }
     complete_buffer.insert(complete_buffer.end(), buffer.begin(), buffer.begin() + bytes_read);
   } while (bytes_read == buffer_size);
