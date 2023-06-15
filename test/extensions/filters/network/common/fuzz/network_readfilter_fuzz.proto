@@ -27,8 +27,12 @@ message Action {
   }
 }
 
+message Actions {
+  repeated Action actions = 1;
+}
+
 message FilterFuzzTestCase {
   // This is actually a protobuf type for the config of network filters.
   envoy.config.listener.v3.Filter config = 1;
-  repeated Action actions = 2;
+  Actions actions = 2;
 }
