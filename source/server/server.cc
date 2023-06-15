@@ -780,7 +780,7 @@ void InstanceImpl::onRuntimeReady() {
   // Initializing can throw exceptions, so catch these.
   TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
   END_TRY
-  CATCH (const EnvoyException& e, {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
   });
@@ -799,7 +799,7 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_, *ssl_context_manager_, info_factory_);
     }
     END_TRY
-    CATCH (const EnvoyException& e, {
+    CATCH(const EnvoyException& e, {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
     });
