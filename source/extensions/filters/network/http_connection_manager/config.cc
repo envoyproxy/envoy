@@ -413,7 +413,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     final_rid_config.mutable_typed_config()->PackFrom(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
-  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  THROW_IF_STATUS_NOT_OK(extension_or_error, throw);
+  request_id_extension_ = extension_or_error.value();
 
   // Check if IP detection extensions were configured, otherwise fall back to XFF.
   auto ip_detection_extensions = config.original_ip_detection_extensions();

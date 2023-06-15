@@ -11,4 +11,15 @@ class EnvoyException : public std::runtime_error {
 public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
+
+// Simple macro to handle bridging functions which return absl::StatusOr, and
+// functions which throw errors.
+//
+// The completely unnecessary throw action argument is just so 'throw' appears
+// at the call site, so format checks about use of exceptions are triggered.
+#define THROW_IF_STATUS_NOT_OK(variable, throw_action)                                             \
+  if (!variable.status().ok()) {                                                                   \
+    throw_action EnvoyException(std::string(variable.status().message()));                         \
+  }
+
 } // namespace Envoy
