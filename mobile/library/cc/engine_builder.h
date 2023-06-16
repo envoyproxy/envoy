@@ -49,7 +49,7 @@ public:
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
 
-  virtual ~XdsBuilder() = default;
+  ~XdsBuilder() = default;
 
   // Sets JWT as the authentication method to the xDS management server, using the given token.
   //
@@ -96,7 +96,7 @@ protected:
   // This method takes in a modifiable Bootstrap proto pointer because returning a new Bootstrap
   // proto would rely on proto's MergeFrom behavior, which can lead to unexpected results in the
   // Bootstrap config.
-  virtual void build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const;
+  void build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const;
 
 private:
   // Required so that EngineBuilder can call the XdsBuilder's protected build() method.

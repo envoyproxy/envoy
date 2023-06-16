@@ -892,35 +892,35 @@ private extension EngineBuilder {
       cxxBuilder.setNodeId(nodeID.toCXX())
     }
 
-    // generateXds(&cxxBuilder)
+    generateXds(&cxxBuilder)
 
     return cxxBuilder.generateBootstrap()
   }
 
-//   private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
-// #if ENVOY_GOOGLE_GRPC
-//     if let xdsBuilder = self.xdsBuilder {
-//       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
-//                                                     Int32(xdsBuilder.xdsServerPort))
-//       if let xdsJwtToken = xdsBuilder.jwtToken {
-//         cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
-//                                                 Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
-//       }
-//       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
-//         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
-//       }
-//       if let rtdsResourceName = xdsBuilder.rtdsResourceName {
-//         cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
-//                                                  Int32(xdsBuilder.rtdsTimeoutInSeconds))
-//       }
-//       if xdsBuilder.enableCds {
-//         cxxXdsBuilder.addClusterDiscoveryService(
-//           xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
-//           Int32(xdsBuilder.cdsTimeoutInSeconds))
-//       }
-//       cxxBuilder.setXds(cxxXdsBuilder)
-//     }
-// #endif
-//   }
+  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
+#if ENVOY_GOOGLE_GRPC
+    if let xdsBuilder = self.xdsBuilder {
+      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
+                                                    Int32(xdsBuilder.xdsServerPort))
+      if let xdsJwtToken = xdsBuilder.jwtToken {
+        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
+                                                Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
+      }
+      if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
+        cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
+      }
+      if let rtdsResourceName = xdsBuilder.rtdsResourceName {
+        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
+                                                 Int32(xdsBuilder.rtdsTimeoutInSeconds))
+      }
+      if xdsBuilder.enableCds {
+        cxxXdsBuilder.addClusterDiscoveryService(
+          xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
+          Int32(xdsBuilder.cdsTimeoutInSeconds))
+      }
+      cxxBuilder.setXds(cxxXdsBuilder)
+    }
+#endif
+  }
 }
 #endif
