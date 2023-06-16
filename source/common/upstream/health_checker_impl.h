@@ -92,7 +92,7 @@ public:
                                         const std::string& config_hostname,
                                         const ClusterInfoConstSharedPtr& cluster);
   /**
-   * Create a health checker.
+   * Create a health checker or return an error.
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
@@ -100,9 +100,9 @@ public:
    * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
-   * @return a health checker.
+   * @return a health checker or creation error.
    */
-  static HealthCheckerSharedPtr
+  static absl::StatusOr<HealthCheckerSharedPtr>
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager,
@@ -159,7 +159,7 @@ class PayloadMatcher {
 public:
   using MatchSegments = std::list<std::vector<uint8_t>>;
 
-  static MatchSegments loadProtoBytes(
+  static absl::StatusOr<MatchSegments> loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };

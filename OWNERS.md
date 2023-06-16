@@ -21,8 +21,6 @@ routing PRs, questions, etc. to the right place.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
-* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
-  * Upstream, host/priority sets, load balancing, and retry plugins.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -111,6 +109,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
 * JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
+* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
 
 # Friends of Envoy
 
