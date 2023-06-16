@@ -67,8 +67,7 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
+- (instancetype)initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
@@ -129,7 +128,6 @@
     return nil;
   }
 
-  self.adminInterfaceEnabled = adminInterfaceEnabled;
   self.grpcStatsDomain = grpcStatsDomain;
   self.connectTimeoutSeconds = connectTimeoutSeconds;
   self.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -272,9 +270,6 @@
   if (self.enableCds) {
     builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
   }
-#endif
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-  builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
 
   return builder;

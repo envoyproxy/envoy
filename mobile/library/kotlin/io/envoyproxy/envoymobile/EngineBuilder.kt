@@ -42,7 +42,6 @@ open class EngineBuilder(
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  internal var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
@@ -637,7 +636,6 @@ open class EngineBuilder(
   @Suppress("LongMethod")
   fun build(): Engine {
     val engineConfiguration = EnvoyConfiguration(
-      adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,
       dnsRefreshSeconds,
