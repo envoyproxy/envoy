@@ -84,6 +84,12 @@ class Connection : public Event::DeferredDeletable,
 public:
   enum class State { Open, Closing, Closed };
 
+  enum class ReadDisableStatus {
+    TransitionedToReadEnabled,
+    TransitionedToReadDisabled,
+    NoTransition
+  };
+
   /**
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
@@ -186,7 +192,7 @@ public:
    * readDisable(false);  // Notes the connection is blocked by one source
    * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
-  virtual void readDisable(bool disable) PURE;
+  virtual ReadDisableStatus readDisable(bool disable) PURE;
 
   /**
    * Set if Envoy should detect TCP connection close when readDisable(true) is called.
