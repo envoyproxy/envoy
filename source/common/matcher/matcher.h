@@ -167,7 +167,6 @@ public:
       return createAnyMatcher(config);
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
-    return nullptr;
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>
