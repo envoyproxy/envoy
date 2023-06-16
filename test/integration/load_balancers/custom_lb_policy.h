@@ -46,8 +46,9 @@ private:
   public:
     LbFactory(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(host_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LbImpl>(host_);
+    }
 
     const Upstream::HostSharedPtr host_;
   };

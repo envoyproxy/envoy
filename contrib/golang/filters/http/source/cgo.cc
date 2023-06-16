@@ -215,6 +215,15 @@ CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value) {
+  return envoyGoFilterHandlerWrapper(r,
+                                     [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+                                       auto key_str = referGoString(key);
+                                       auto value_str = reinterpret_cast<GoString*>(value);
+                                       return filter->getStringFilterState(key_str, value_str);
+                                     });
+}
+
 #ifdef __cplusplus
 }
 #endif

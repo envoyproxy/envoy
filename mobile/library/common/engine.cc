@@ -21,8 +21,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level,
-                           const std::string admin_address_path) {
+envoy_status_t Engine::run(const std::string config, const std::string log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -33,9 +32,6 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
     options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
   }
   options->setConcurrency(1);
-  if (!admin_address_path.empty()) {
-    options->setAdminAddressPath(admin_address_path);
-  }
   return run(std::move(options));
 }
 
@@ -186,28 +182,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
-                                     envoy_data& out) {
-  ENVOY_LOG(trace, "admin call {} {}", method, path);
-  if (!server_->admin()) {
-    ENVOY_LOG(warn, "admin support compiled out.");
-    return ENVOY_FAILURE;
-  }
-
-  ASSERT(dispatcher_->isThreadSafe(), "admin calls must be run from the dispatcher's context");
-  auto response_headers = Http::ResponseHeaderMapImpl::create();
-  std::string body;
-  const auto code = server_->admin()->request(path, method, *response_headers, body);
-  if (code != Http::Code::OK) {
-    ENVOY_LOG(warn, "admin call failed with status {} body {}", static_cast<uint64_t>(code), body);
-    return ENVOY_FAILURE;
-  }
-
-  out = Data::Utility::copyToBridgeData(body);
-
-  return ENVOY_SUCCESS;
-}
-
 Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
 
 Http::Client& Engine::httpClient() {
@@ -220,6 +194,53 @@ Network::ConnectivityManager& Engine::networkConnectivityManager() {
   RELEASE_ASSERT(dispatcher_->isThreadSafe(),
                  "networkConnectivityManager must be accessed from dispatcher's context");
   return *connectivity_manager_;
+}
+
+void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                 const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                 Buffer::Instance& response) {
+  for (const auto& stat : all_stats) {
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
+  }
+  std::map<std::string, std::string> all_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
+    if (histogram->used()) {
+      all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+    }
+  }
+  for (const auto& histogram : all_histograms) {
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
+  }
+}
+
+void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
+  std::map<std::string, uint64_t> all_stats;
+  for (const Stats::CounterSharedPtr& counter : stats.counters()) {
+    if (counter->used()) {
+      all_stats.emplace(counter->name(), counter->value());
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
+    if (gauge->used()) {
+      all_stats.emplace(gauge->name(), gauge->value());
+    }
+  }
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
+  statsAsText(all_stats, histograms, response);
+}
+
+Envoy::Buffer::OwnedImpl Engine::dumpStats() {
+  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
+
+  Envoy::Buffer::OwnedImpl instance;
+  handlerStats(server_->stats(), instance);
+  return instance;
 }
 
 void Engine::flushStats() {
