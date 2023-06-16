@@ -261,21 +261,21 @@ bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
   for (char c : path) {
     unsigned char ascii_code = static_cast<unsigned char>(c);
     if (ascii_code < 0x21 || ascii_code > 0x7e) {
-      ENVOY_LOG_MISC(error, "CONNECT-UDP request with a bad character in the path {}", path);
+      ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a bad character in the path {}", path);
       return false;
     }
   }
 
   // Extract target host and port from path using default template.
   if (!absl::StartsWith(path, "/.well-known/masque/udp/")) {
-    ENVOY_LOG_MISC(error, "CONNECT-UDP request path is not a well-known URI: {}", path);
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request path is not a well-known URI: {}", path);
     return false;
   }
 
   std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
   if (path_split.size() != 7 || path_split[4].empty() || path_split[5].empty() ||
       !path_split[6].empty()) {
-    ENVOY_LOG_MISC(error, "CONNECT-UDP request with a malformed URI template in the path {}", path);
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a malformed URI template in the path {}", path);
     return false;
   }
 
@@ -284,7 +284,7 @@ bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
   std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
   // Per RFC 9298, IPv6 Zone ID is not supported.
   if (target_host.find('%') != std::string::npos) {
-    ENVOY_LOG_MISC(error, "CONNECT-UDP request with a non-escpaed char (%) in the path {}", path);
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a non-escpaed char (%) in the path {}", path);
     return false;
   }
   std::string target_port = Utility::PercentEncoding::decode(path_split[5]);

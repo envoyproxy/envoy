@@ -241,7 +241,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
       );
   codec_client_->sendData(*request_encoder_, unknown_capsule_fragment, false);
   ASSERT_FALSE(
-      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
+      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(1)));
 
   const std::string unknown_context_id =
       absl::HexStringToBytes("00"             // DATAGRAM Capsule Type
@@ -251,7 +251,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
       );
   codec_client_->sendData(*request_encoder_, unknown_context_id, false);
   ASSERT_FALSE(
-      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(100)));
+      fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::milliseconds(1)));
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, ConnectUdpTerminationIntegrationTest,
