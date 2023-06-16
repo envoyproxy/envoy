@@ -1198,6 +1198,12 @@ FilterConfig::FilterConfig(
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 };
 
+FilterConfig::~FilterConfig() {
+  if (config_id_ > 0) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+  }
+}
+
 uint64_t FilterConfig::getConfigId() { return config_id_; }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
@@ -1251,10 +1257,17 @@ RoutePluginConfig::RoutePluginConfig(
             config_id_);
 };
 
-uint64_t RoutePluginConfig::getConfigId() {
+RoutePluginConfig::~RoutePluginConfig() {
+  absl::WriterMutexLock lock(&mutex_);
   if (config_id_ > 0) {
-    return config_id_;
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+  if (merged_config_id_ > 0) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+  }
+}
+
+uint64_t RoutePluginConfig::getConfigId() {
   if (dso_lib_ == nullptr) {
     dso_lib_ = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name_);
     ASSERT(dso_lib_ != nullptr, "load at the request time, so it should not be null");
@@ -1270,12 +1283,26 @@ uint64_t RoutePluginConfig::getConfigId() {
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
+  {
+    // this is the fast path for most cases.
+    absl::ReaderMutexLock lock(&mutex_);
+    if (merged_config_id_ > 0 && cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+  }
+  absl::WriterMutexLock lock(&mutex_);
   if (merged_config_id_ > 0) {
-    return merged_config_id_;
+    if (cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+    // upper level config changed, merged_config_id_ is outdated.
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
   }
 
-  config_id_ = getConfigId();
-  RELEASE_ASSERT(config_id_, "TODO: terminate request or passthrough");
+  if (config_id_ == 0) {
+    config_id_ = getConfigId();
+    RELEASE_ASSERT(config_id_, "TODO: terminate request or passthrough");
+  }
 
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
   merged_config_id_ = dso_lib_->envoyGoFilterMergeHttpPluginConfig(name_ptr, plugin_name_.length(),
@@ -1283,6 +1310,8 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   ASSERT(merged_config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter merge '{}' plugin config, from {} + {} to {}", plugin_name_,
             parent_id, config_id_, merged_config_id_);
+
+  cached_parent_id_ = parent_id;
   return merged_config_id_;
 };
 
