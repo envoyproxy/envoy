@@ -47,7 +47,7 @@ public:
     // is present.
     try {
       if (context.server_factory_context_.has_value()) {
-        callback = factory.createFilterServerFactoryFromProto(
+        callback = factory.createFilterFactoryFromProtoWithServerContext(
             *message, context.stat_prefix_, context.server_factory_context_.value());
       }
     } catch (EnvoyException& e) {
