@@ -31,7 +31,7 @@ open class XdsBuilder: NSObject {
   /// Initialize a new builder for xDS configuration.
   ///
   /// - parameter xdsServerAddress: The host name or IP address of the xDS management server.
-  /// - parameter xdsServerPort: The port on which the xDS server listens for incoming xDS requests.
+  /// - parameter xdsServerPort:    The port on which the server listens for client connections.
   public init(xdsServerAddress: String, xdsServerPort: UInt32) {
     self.xdsServerAddress = xdsServerAddress
     self.xdsServerPort = xdsServerPort
@@ -39,11 +39,17 @@ open class XdsBuilder: NSObject {
 
   /// Sets JWT as the authentication method to the xDS management server, using the given token.
   ///
-  /// -parameter token: the JWT token used to authenticate the client to the xDS management server.
-  /// -parameter tokenLifetimeInSeconds: <optional> the lifetime of the JWT token, in seconds. If none
-  //                              (or 0) is specified, then defaultJwtTokenLifetimeSeconds is used.
+  /// - parameter token:                  The JWT token used to authenticate the client to the xDS
+  ///                                     management server.
+  /// - parameter tokenLifetimeInSeconds: <optional> the lifetime of the JWT token, in seconds. If
+  ///                                     none (or 0) is specified, then
+  ///                                     defaultJwtTokenLifetimeSeconds is used.
+  ///
+  /// - returns: This builder.
   @discardableResult
-  public func setJwtAuthenticationToken(token: String, tokenLifetimeInSeconds: UInt32 = defaultJwtTokenLifetimeInSeconds) -> Self {
+  public func setJwtAuthenticationToken(
+    token: String,
+    tokenLifetimeInSeconds: UInt32 = defaultJwtTokenLifetimeInSeconds) -> Self {
     self.jwtToken = token
     self.jwtTokenLifetimeInSeconds = tokenLifetimeInSeconds > 0 ? tokenLifetimeInSeconds : defaultJwtTokenLifetimeInSeconds
     return self
@@ -52,7 +58,9 @@ open class XdsBuilder: NSObject {
   /// Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   /// connection. If no root certs are specified, the operating system defaults are used.
   ///
-  /// -parameter rootCerts: the PEM-encoded server root certificates.
+  /// - parameter rootCerts: The PEM-encoded server root certificates.
+  ///
+  /// - returns: This builder.
   @discardableResult
   public func setSslRootCerts(rootCerts: String) -> Self {
     self.sslRootCerts = rootCerts
@@ -62,14 +70,19 @@ open class XdsBuilder: NSObject {
   /// Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   /// to retrieve dynamic runtime configuration via the xDS management server.
   ///
-  /// -parameter resourceName: The runtime config resource to subscribe to.
-  /// -parameter timeoutInSeconds: <optional> specifies the `initial_fetch_timeout` field on the
-  ///    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
-  ///    timeout value of 5s, to prevent mobile app initialization from stalling. The default
-  ///    parameter value may change through the course of experimentation and no assumptions should
-  ///    be made of its exact value.
+  /// - parameter resourceName:     The runtime config resource to subscribe to.
+  /// - parameter timeoutInSeconds: <optional> specifies the `initial_fetch_timeout` field on the
+  ///                               api.v3.core.ConfigSource. Unlike the ConfigSource default of
+  ///                               15s, we set a default fetch timeout value of 5s, to prevent
+  ///                               mobile app initialization from stalling. The default parameter
+  ///                               value may change through the course of experimentation and no
+  ///                               assumptions should be made of its exact value.
+  ///
+  /// - returns: This builder.
   @discardableResult
-  public func addRuntimeDiscoveryService(resourceName: String, timeoutInSeconds: UInt32 = defaultXdsTimeoutInSeconds) -> Self {
+  public func addRuntimeDiscoveryService(
+    resourceName: String,
+    timeoutInSeconds: UInt32 = defaultXdsTimeoutInSeconds) -> Self {
     self.rtdsResourceName = resourceName
     self.rtdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
     return self
@@ -78,16 +91,22 @@ open class XdsBuilder: NSObject {
   /// Adds the Cluster Discovery Service (CDS) configuration for retrieving dynamic cluster
   /// resources via the xDS management server.
   ///
-  /// -parameter cdsResourcesLocator: <optional> the xdstp:// URI for subscribing to the cluster
-  ///   resources. If not using xdstp, then `cds_resources_locator` should be set to the empty
-  ///   string.
-  /// -parameter timeoutInSeconds: <optional> specifies the `initial_fetch_timeout` field on the
-  ///    api.v3.core.ConfigSource. Unlike the ConfigSource default of 15s, we set a default fetch
-  ///    timeout value of 5s, to prevent mobile app initialization from stalling. The default
-  ///    parameter value may change through the course of experimentation and no assumptions should
-  ///    be made of its exact value.
+  /// - parameter cdsResourcesLocator: <optional> the xdstp:// URI for subscribing to the cluster
+  ///                                  resources. If not using xdstp, then `cds_resources_locator`
+  ///                                  should be set to the empty string.
+  /// - parameter timeoutInSeconds:    <optional> specifies the `initial_fetch_timeout` field on the
+  ///                                  api.v3.core.ConfigSource. Unlike the ConfigSource default of
+  ///                                  15s, we set a default fetch timeout value of 5s, to prevent
+  ///                                  mobile app initialization from stalling. The default
+  ///                                  parameter value may change through the course of
+  ///                                  experimentation and no assumptions should be made of its
+  ///                                  exact value.
+  ///
+  /// - returns: This builder.
   @discardableResult
-  public func addClusterDiscoveryService(cdsResourcesLocator: String? = nil, timeoutInSeconds: UInt32 = defaultXdsTimeoutInSeconds) -> Self {
+  public func addClusterDiscoveryService(
+    cdsResourcesLocator: String? = nil,
+    timeoutInSeconds: UInt32 = defaultXdsTimeoutInSeconds) -> Self {
     self.enableCds = true
     self.cdsResourcesLocator = cdsResourcesLocator
     self.cdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
@@ -157,7 +176,9 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
-  private var xdsBuilder: XdsBuilder? = xdsBuilder
+#if ENVOY_GOOGLE_GRPC
+  private var xdsBuilder: XdsBuilder? = nil
+#endif
   private var enableSwiftBootstrap = false
 
   // MARK: - Public
@@ -648,8 +669,8 @@ open class EngineBuilder: NSObject {
 #if ENVOY_GOOGLE_GRPC
   /// Sets the xDS configuration for the Envoy Mobile engine.
   ///
-  /// - parameter xds_builder: The XdsBuilder instance which specifies the xDS config options.
-  ///                          The EngineBuilder takes ownership over the xds_builder.
+  /// - parameter xdsBuilder: The XdsBuilder instance which specifies the xDS config options.
+  ///                         The EngineBuilder takes ownership over the xds_builder.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -716,6 +737,30 @@ open class EngineBuilder: NSObject {
   }
 
   func makeConfig() -> EnvoyConfiguration {
+    var xdsServerAddress: String? = nil
+    var xdsServerPort: Int = 0
+    var xdsJwtToken: String? = nil
+    var xdsJwtTokenLifetimeSeconds: Int = 0
+    var xdsSslRootCerts: String? = nil
+    var rtdsResourceName: String? = nil
+    var rtdsTimeoutSeconds: Int = 0
+    var enableCds: Bool = false
+    var cdsResourcesLocator: String? = nil
+    var cdsTimeoutSeconds: Int = 0
+
+#if ENVOY_GOOGLE_GRPC
+    xdsServerAddress = self.xdsBuilder?.xdsServerAddress
+    xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
+    xdsJwtToken = self.xdsBuilder?.jwtToken
+    xdsJwtTokenLifetimeSeconds = self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0
+    xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
+    rtdsResourceName = self.xdsBuilder?.rtdsResourceName
+    rtdsTimeoutSeconds = self.xdsBuilder?.rtdsTimeoutInSeconds ?? 0
+    enableCds = self.xdsBuilder?.enableCds ?? false
+    cdsResourcesLocator = self.xdsBuilder?.cdsResourcesLocator
+    cdsTimeoutSeconds = self.xdsBuilder?.cdsTimeoutInSeconds ?? 0
+#endif
+
     EnvoyConfiguration(
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
@@ -754,16 +799,16 @@ open class EngineBuilder: NSObject {
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
-      xdsServerAddress: self.xdsBuilder?.xdsServerAddress,
-      xdsServerPort: self.xdsBuilder?.xdsServerPort ?? 0,
-      xdsJwtToken: self.xdsBuilder?.jwtToken,
-      xdsJwtTokenLifetimeSeconds: self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0,
-      xdsSslRootCerts: self.xdsBuilder?.sslRootCerts,
-      rtdsResourceName: self.xdsBuilder?.rtdsResourceName,
-      rtdsTimeoutSeconds: self.xdsBuilder?.rtdsTimeoutInSeconds ?? 0,
-      enableCds: self.xdsBuilder?.enableCds ?? false,
-      cdsResourcesLocator: self.xdsBuilder?.cdsResourcesLocator,
-      cdsTimeoutSeconds: self.xdsBuilder?.cdsTimeoutInSeconds ?? 0,
+      xdsServerAddress: xdsServerAddress,
+      xdsServerPort: xdsServerPort,
+      xdsJwtToken: xdsJwtToken,
+      xdsJwtTokenLifetimeSeconds: xdsJwtTokenLifetimeSeconds,
+      xdsSslRootCerts: xdsSslRootCerts,
+      rtdsResourceName: rtdsResourceName,
+      rtdsTimeoutSeconds: rtdsTimeoutSeconds,
+      enableCds: enableCds,
+      cdsResourcesLocator: cdsResourcesLocator,
+      cdsTimeoutSeconds: cdsTimeoutSeconds
     )
   }
 
@@ -848,20 +893,24 @@ private extension EngineBuilder {
 
 #if ENVOY_GOOGLE_GRPC
     if let xdsBuilder = self.xdsBuilder {
-      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(), Int32(xdsBuilder.xdsServerPort))
+      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
+                                                    Int32(xdsBuilder.xdsServerPort))
       if let xdsJwtToken = xdsBuilder.jwtToken {
-        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(), Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
+        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
+                                                Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
       }
       if let rtdsResourceName = xdsBuilder.rtdsResourceName {
-        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(), Int32(xdsBuilder.rtdsTimeoutInSeconds))
+        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
+                                                 Int32(xdsBuilder.rtdsTimeoutInSeconds))
       }
       if xdsBuilder.enableCds {
-        cxxXdsBuilder.addClusterDiscoveryService(xdsBuilder.cdsResourcesLocator?.toCXX() ?? "", Int32(xdsBuilder.cdsTimeoutInSeconds))
+        cxxXdsBuilder.addClusterDiscoveryService(xdsBuilder.cdsResourcesLocator?.toCXX() ?? "",
+                                                 Int32(xdsBuilder.cdsTimeoutInSeconds))
       }
-      cxxBuilder.setXds(cxxXdsBuilder);
+      cxxBuilder.setXds(cxxXdsBuilder)
     }
 #endif
     return cxxBuilder.generateBootstrap()

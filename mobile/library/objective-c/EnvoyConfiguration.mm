@@ -261,17 +261,18 @@
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
     if (self.xdsJwtToken != nil) {
-      builder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
-                                        self.xdsJwtTokenLifetimeSeconds);
+      xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
+                                           self.xdsJwtTokenLifetimeSeconds);
     }
     if (self.xdsSslRootCerts != nil) {
-      builder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
+      xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
     }
-    if (self.rtdsLayerName != nil) {
-      builder.addRuntimeDiscoveryService([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+    if (self.rtdsResourceName != nil) {
+      xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],
+                                            self.rtdsTimeoutSeconds);
     }
     if (self.enableCds) {
-      builder.addClusterDiscoveryService(
+      xdsBuilder.addClusterDiscoveryService(
           self.cdsResourcesLocator != nil ? [self.cdsResourcesLocator toCXXString] : "",
           self.cdsTimeoutSeconds);
     }

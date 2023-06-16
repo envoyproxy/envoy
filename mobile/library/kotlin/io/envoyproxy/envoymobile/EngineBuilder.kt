@@ -62,9 +62,14 @@ open class XdsBuilder (
    *
    * @return this builder.
    */
-  fun setJwtAuthenticationToken(token: String, tokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS): XdsBuilder {
+  fun setJwtAuthenticationToken(
+    token: String,
+    tokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+  ): XdsBuilder {
     this.jwtToken = token
-    this.jwtTokenLifetimeInSeconds = if (tokenLifetimeInSeconds > 0) tokenLifetimeInSeconds else DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+    this.jwtTokenLifetimeInSeconds = if (tokenLifetimeInSeconds > 0)
+        tokenLifetimeInSeconds else
+        DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
     return this
   }
 
@@ -94,7 +99,10 @@ open class XdsBuilder (
    *
    * @return this builder.
    */
-  fun addRuntimeDiscoveryService(resourceName: String, timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS): XdsBuilder {
+  fun addRuntimeDiscoveryService(
+    resourceName: String,
+    timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+  ): XdsBuilder {
     this.rtdsResourceName = resourceName
     this.rtdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
     return this
@@ -115,7 +123,10 @@ open class XdsBuilder (
    *
    * @return this builder.
    */
-  public fun addClusterDiscoveryService(cdsResourcesLocator: String? = null, timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS): XdsBuilder {
+  public fun addClusterDiscoveryService(
+    cdsResourcesLocator: String? = null,
+    timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+  ): XdsBuilder {
     this.enableCds = true
     this.cdsResourcesLocator = cdsResourcesLocator
     this.cdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
