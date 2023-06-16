@@ -839,10 +839,10 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
   ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
                    end_stream, filter_manager_callbacks_.allowDownstreamOpenOnUpstreamClosed());
   if (filter == nullptr) {
-    // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
-    // should not set the local_complete_ flag to true when end_stream is true.
-    // setting local_complete_ to true will cause any data sent in the upstream direction to be
-    // dropped.
+    // allowDownstreamOpenOnUpstreamClosed is enabled in case tcp proxying is done with http1
+    // encoder. In this case, we should not set the local_complete_ flag to true when end_stream is
+    // true. setting local_complete_ to true will cause any data sent in the upstream direction to
+    // be dropped/ignored by filter manager.
     if (end_stream && !filter_manager_callbacks_.allowDownstreamOpenOnUpstreamClosed()) {
       ASSERT(!state_.local_complete_);
       state_.local_complete_ = true;
