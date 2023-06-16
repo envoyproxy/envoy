@@ -762,7 +762,7 @@ open class EngineBuilder: NSObject {
     cdsTimeoutSeconds = self.xdsBuilder?.cdsTimeoutInSeconds ?? 0
 #endif
 
-    EnvoyConfiguration(
+    return EnvoyConfiguration(
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,
@@ -892,6 +892,12 @@ private extension EngineBuilder {
       cxxBuilder.setNodeId(nodeID.toCXX())
     }
 
+    generateXds(cxxBuilder)
+
+    return cxxBuilder.generateBootstrap()
+  }
+
+  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
 #if ENVOY_GOOGLE_GRPC
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
@@ -908,14 +914,14 @@ private extension EngineBuilder {
                                                  Int32(xdsBuilder.rtdsTimeoutInSeconds))
       }
       if xdsBuilder.enableCds {
-        cxxXdsBuilder.addClusterDiscoveryService(xdsBuilder.cdsResourcesLocator?.toCXX() ?? "",
-                                                 Int32(xdsBuilder.cdsTimeoutInSeconds))
+        val emptyCxxString = "".toCXX()
+        cxxXdsBuilder.addClusterDiscoveryService(
+          xdsBuilder.cdsResourcesLocator?.toCXX() ?? emptyCxxString,
+          Int32(xdsBuilder.cdsTimeoutInSeconds))
       }
       cxxBuilder.setXds(cxxXdsBuilder)
     }
 #endif
-    return cxxBuilder.generateBootstrap()
   }
-  // swiftlint:enable cyclomatic_complexity
 }
 #endif
