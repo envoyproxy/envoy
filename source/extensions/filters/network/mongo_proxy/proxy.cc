@@ -335,9 +335,8 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     decoder_ = createDecoder(*this);
   }
 
-  try {
-    decoder_->onData(buffer);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { decoder_->onData(buffer); }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;

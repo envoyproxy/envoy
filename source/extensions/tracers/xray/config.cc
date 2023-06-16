@@ -22,10 +22,11 @@ Tracing::DriverSharedPtr
 XRayTracerFactory::createTracerDriverTyped(const envoy::config::trace::v3::XRayConfig& proto_config,
                                            Server::Configuration::TracerFactoryContext& context) {
   std::string sampling_rules_json;
-  try {
+  TRY_NEEDS_AUDIT {
     sampling_rules_json = Config::DataSource::read(proto_config.sampling_rule_manifest(), true,
                                                    context.serverFactoryContext().api());
-  } catch (EnvoyException& e) {
+  }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 

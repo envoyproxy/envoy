@@ -45,18 +45,19 @@ public:
 
     // TODO(tyxia) Update the logic later to create the filter from the `factoryContext` first if it
     // is present.
-    try {
+    TRY_NEEDS_AUDIT {
       if (context.server_factory_context_.has_value()) {
         callback = factory.createFilterServerFactoryFromProto(
             *message, context.stat_prefix_, context.server_factory_context_.value());
       }
-    } catch (EnvoyException& e) {
+    }
+    END_TRY CATCH(EnvoyException & e, {
       // First, we try to create the delegated filter creation callback from server factory context.
       // If it failed (i.e., the corresponding filter doesn't support this method), we log this
       // message and fallback to creating the filter from factory context.
       ENVOY_LOG(trace,
                 absl::StrCat(e.what(), ", fallback to creating the filter from factory context."));
-    }
+    });
 
     if (callback == nullptr) {
       RELEASE_ASSERT(context.factory_context_.has_value(),
