@@ -116,8 +116,9 @@ private:
  *     static absl::string_view name() { return "ExampleScope"; }
  *   };
  *
- *   // Register the inline key. We should never do this after bootstrapping.
- *   static auto inline_handle = InlineMapRegistry<ExampleScope>::registerInlineKey("inline_key");
+ *   // Register the inline key. We should never do this after bootstrapping. Typically, we can
+ *   // do this by define a global variable.
+ *   auto inline_handle = InlineMapRegistry<ExampleScope>::registerInlineKey("inline_key");
  *
  *   // Create the inline map.
  *   auto inline_map = InlineMapRegistry<ExampleScope>::InlineMap<std::string>::createInlineMap();
@@ -157,21 +158,19 @@ public:
   template <class T> class InlineMap : public InlineStorage {
   public:
     using TPtr = std::unique_ptr<T>;
-    using RawT = T*;
-    using ConstRawT = const T*;
     using UnderlayHashMap = absl::flat_hash_map<std::string, TPtr, Hash>;
 
     // Get the entry for the given key. If the key is not found, return nullptr.
-    ConstRawT lookup(absl::string_view key) const { return lookupImpl(key); }
-    RawT lookup(absl::string_view key) { return lookupImpl(key); }
+    const T* lookup(absl::string_view key) const { return lookupImpl(key); }
+    T* lookup(absl::string_view key) { return lookupImpl(key); }
 
     // Get the entry for the given handle. If the handle is not valid, return nullptr.
-    ConstRawT lookup(InlineHandle handle) const { return lookupImpl(handle); }
-    RawT lookup(InlineHandle handle) { return lookupImpl(handle); }
+    const T* lookup(InlineHandle handle) const { return lookupImpl(handle); }
+    T* lookup(InlineHandle handle) { return lookupImpl(handle); }
 
     // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
-    ConstRawT lookup(UntypedInlineHandle handle) const { return lookupImpl(handle); }
-    RawT lookup(UntypedInlineHandle handle) { return lookupImpl(handle); }
+    const T* lookup(UntypedInlineHandle handle) const { return lookupImpl(handle); }
+    T* lookup(UntypedInlineHandle handle) { return lookupImpl(handle); }
 
     // Set the entry for the given key. If the key is already present, overwrite it.
     void insert(absl::string_view key, TPtr value) {
@@ -240,7 +239,7 @@ public:
       normal_entries_.erase(handle.inlineEntryKey());
     }
 
-    void iterate(std::function<bool(absl::string_view, RawT)> callback) const {
+    void iterate(std::function<bool(absl::string_view, T*)> callback) const {
       for (const auto& entry : normal_entries_) {
         if (!callback(entry.first, entry.second.get())) {
           return;
@@ -283,7 +282,7 @@ public:
       memset(inline_entries_, 0, InlineMapRegistry::registrationMapSize() * sizeof(TPtr));
     }
 
-    RawT lookupImpl(absl::string_view key) const {
+    T* lookupImpl(absl::string_view key) const {
       // Compute the hash value for the key and avoid computing it again in the lookup.
       const size_t hash_value = InlineMapRegistry::Hash()(key);
 
@@ -299,13 +298,13 @@ public:
       return nullptr;
     }
 
-    RawT lookupImpl(InlineHandle handle) const {
+    T* lookupImpl(InlineHandle handle) const {
       ASSERT(handle.inlineEntryId() < InlineMapRegistry::registrationMapSize());
       return inline_entries_[handle.inlineEntryId()];
     }
 
     // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
-    RawT lookupImpl(UntypedInlineHandle handle) const {
+    T* lookupImpl(UntypedInlineHandle handle) const {
       // If the scope id does not match, the handle is not valid.
       if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
         return nullptr;
@@ -353,7 +352,7 @@ public:
 
     uint64_t inline_entries_size_{};
     // This should be the last member of the class and no member should be added after this.
-    RawT inline_entries_[];
+    T* inline_entries_[];
   };
 
   /**

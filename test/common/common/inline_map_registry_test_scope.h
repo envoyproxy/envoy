@@ -7,8 +7,7 @@ namespace Envoy {
 template <size_t N> class InlineMapRegistryTestScope {
 public:
   static absl::string_view name() {
-    static const std::string name = "BenchmarkTestScope_KeySize_" + std::to_string(N);
-    return name;
+    CONSTRUCT_ON_FIRST_USE(std::string, "BenchmarkTestScope_KeySize_" + std::to_string(N));
   }
 
   static std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle>
@@ -29,11 +28,11 @@ public:
     return handles;
   }
 
-  static std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle>
+  static const std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle>&
   inlineHandles() {
-    static const std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle>
-        inline_handles = initializeRegistry();
-    return inline_handles;
+    CONSTRUCT_ON_FIRST_USE(
+        std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle>,
+        initializeRegistry());
   }
 };
 

@@ -9,15 +9,14 @@
 namespace Envoy {
 namespace {
 
-template <size_t N> static std::vector<std::string> getNormalKeys() {
-  static const std::vector<std::string> normal_keys = []() {
+template <size_t N> static const std::vector<std::string>& getNormalKeys() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, []() {
     std::vector<std::string> keys;
     for (size_t i = 0; i < N; ++i) {
       keys.push_back("key_" + std::to_string(i));
     }
     return keys;
-  }();
-  return normal_keys;
+  }());
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
