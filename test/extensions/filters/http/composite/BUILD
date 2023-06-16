@@ -42,11 +42,13 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration/filters:server_factory_context_filter_config_proto_cc_proto",
         "//test/integration/filters:server_factory_context_filter_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

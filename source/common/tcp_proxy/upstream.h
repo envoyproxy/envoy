@@ -30,7 +30,8 @@ class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callback
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::LoadBalancerContext* context,
-              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
+              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+              StreamInfo::StreamInfo& downstream_info);
   ~TcpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value(); }
@@ -50,6 +51,7 @@ private:
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  StreamInfo::StreamInfo& downstream_info_;
 };
 
 class HttpUpstream;

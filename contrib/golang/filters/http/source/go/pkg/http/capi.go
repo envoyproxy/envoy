@@ -43,7 +43,7 @@ type HttpCAPI interface {
 	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
 	HttpRemoveTrailer(r unsafe.Pointer, key *string)
 
-	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
+	HttpGetStringValue(r *httpRequest, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
 	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}

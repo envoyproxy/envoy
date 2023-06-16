@@ -218,8 +218,9 @@ Http::RequestHeaderMap* HttpUpstream::downstreamHeaders() { return downstream_he
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
-                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : upstream_callbacks_(upstream_callbacks) {
+                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                         StreamInfo::StreamInfo& downstream_info)
+    : upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
   conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
@@ -251,6 +252,12 @@ void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
+  if (downstream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              conn_data->connection().id(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
   Network::Connection& connection = conn_data->connection();
@@ -343,6 +350,15 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+  if (info.downstreamAddressProvider().connectionID() &&
+      downstream_info_.downstreamAddressProvider().connectionID()) {
+    // info.downstreamAddressProvider() is being called to get the upstream connection ID,
+    // because the StreamInfo object here is of the upstream connection.
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              info.downstreamAddressProvider().connectionID().value(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
