@@ -319,7 +319,7 @@ public:
     virtual void onSuccess(Http::RequestEncoder* request_encoder) {
       ASSERT(conn_pool_ != nullptr);
       if (request_encoder != nullptr) {
-        conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionInfoProvider(),
+        conn_pool_->onGenericPoolReady(host_, request_encoder->getStream().connectionInfoProvider(),
                                        ssl_info_);
       }
     }
