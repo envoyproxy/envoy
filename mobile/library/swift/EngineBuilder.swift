@@ -918,7 +918,7 @@ private extension EngineBuilder {
           xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
           Int32(xdsBuilder.cdsTimeoutInSeconds))
       }
-      cxxBuilder.setXds(cxxXdsBuilder)
+      // cxxBuilder.setXds(cxxXdsBuilder)
     }
 #endif
   }
