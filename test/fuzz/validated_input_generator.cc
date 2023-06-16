@@ -427,13 +427,12 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
                                !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index)))) {
       // No required member in one of set, so create one.
       for (int index = 0; index < oneof_desc->field_count(); ++index) {
-        const std::string parents_class_name = parents.back()->GetDescriptor()->full_name();
+        const std::string class_name = descriptor->full_name();
         // Treat matchers special, because in their oneof they reference themselves, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.
-        if ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
-             parents_class_name ==
-                 "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
+        if ((class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
+             class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
             (random_() % 200) > 0) {
           onField(msg, *oneof_desc->field(0), parents, true, max_depth_exceeded);
         } else {

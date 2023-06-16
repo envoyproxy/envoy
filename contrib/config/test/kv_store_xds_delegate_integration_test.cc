@@ -6,7 +6,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"

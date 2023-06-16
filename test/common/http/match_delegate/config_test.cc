@@ -100,6 +100,38 @@ xds_matcher:
   cb(factory_callbacks);
 }
 
+TEST(MatchWrapper, PerRouteConfig) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  const auto yaml = (R"EOF(
+xds_matcher:
+  matcher_tree:
+    input:
+      name: request-headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+        header_name: default-matcher-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory.createRouteSpecificFilterConfig(config, server_factory_context,
+                                              ProtobufMessage::getNullValidationVisitor());
+  EXPECT_TRUE(route_config.get());
+}
+
 TEST(MatchWrapper, DEPRECATED_FEATURE_TEST(WithDeprecatedMatcher)) {
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
@@ -184,27 +216,6 @@ xds_matcher:
   MatchDelegateConfig match_delegate_config;
   auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
   EXPECT_TRUE(cb);
-}
-
-TEST(MatchWrapper, WithNoMatcher) {
-  TestFactory test_factory;
-  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
-      inject_factory(test_factory);
-
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-
-  const auto config =
-      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
-extension_config:
-  name: test
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.StringValue
-)EOF");
-
-  MatchDelegateConfig match_delegate_config;
-  EXPECT_THROW_WITH_REGEX(
-      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context),
-      EnvoyException, "one of `matcher` and `matcher_tree` must be set.");
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {
@@ -328,6 +339,34 @@ createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) 
   tree->addChild(
       value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; }, nullptr});
   return tree;
+}
+
+// Test that the DelegatingStreamFilter skips when no matcher is defined.
+TEST(DelegatingFilterTest, WithNoMatcher) {
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestQueryParamsDataInput, SkipAction>(
+          "match_query", "match");
+  auto delegating_filter =
+      std::make_shared<DelegatingStreamFilter>(nullptr, decoder_filter, nullptr);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{new Envoy::Http::TestRequestHeaderMapImpl{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}, {"match-header", "not_match"}}};
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  delegating_filter->decodeComplete();
 }
 
 TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {

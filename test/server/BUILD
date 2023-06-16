@@ -397,5 +397,6 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["utils_test.cc"]),
     deps = [
         "//source/server:utils_lib",
+        "//test/mocks/server:options_mocks",
     ],
 )

@@ -247,6 +247,10 @@ typed_config:
     codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
+
+    EXPECT_EQ("go_state_test_value",
+              getHeader(upstream_request_->headers(), "go-state-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 
@@ -385,6 +389,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());

@@ -419,7 +419,11 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
       f_stat(*gauge);
     }
   } else {
-    forEachGauge(f_size, f_stat);
+    forEachGauge(f_size, [&f_stat](Gauge& gauge) {
+      if (!gauge.hidden()) {
+        f_stat(gauge);
+      }
+    });
   }
 }
 

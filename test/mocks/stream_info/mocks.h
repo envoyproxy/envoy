@@ -85,6 +85,10 @@ public:
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addBytesRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, bytesRetransmitted, (), (const));
+  MOCK_METHOD(void, addPacketsRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
@@ -146,6 +150,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;

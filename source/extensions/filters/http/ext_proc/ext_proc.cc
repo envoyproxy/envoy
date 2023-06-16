@@ -118,7 +118,13 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 Filter::StreamOpenState Filter::openStream() {
-  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
+  // External processing is completed. This means there is no need to send any further
+  // message to the server for processing. Just return IgnoreError so the filter
+  // will return FilterHeadersStatus::Continue.
+  if (processing_complete_) {
+    ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
+    return StreamOpenState::IgnoreError;
+  }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());

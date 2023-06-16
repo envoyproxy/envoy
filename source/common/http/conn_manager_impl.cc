@@ -833,6 +833,16 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
         refreshAccessLogFlushTimer();
       }
+      const SystemTime now = connection_manager_.timeSource().systemTime();
+      // Downstream bytes meter is guaranteed to be non-null because ActiveStream and the timer
+      // event are created on the same thread that sets the meter in
+      // ConnectionManagerImpl::newStream.
+      filter_manager_.streamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(
+          now);
+      if (auto& upstream_bytes_meter = filter_manager_.streamInfo().getUpstreamBytesMeter();
+          upstream_bytes_meter != nullptr) {
+        upstream_bytes_meter->takeDownstreamPeriodicLoggingSnapshot(now);
+      }
     });
     refreshAccessLogFlushTimer();
   }

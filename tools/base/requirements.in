@@ -4,6 +4,7 @@ aiohttp>=3.8.1
 cffi>=1.15.0
 colorama
 coloredlogs
+cryptography>=41.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.4.11
 envoy.code.check>=0.5.4

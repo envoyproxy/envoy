@@ -86,23 +86,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_stream_lib",
-    hdrs = ["grpc_stream.h"],
-    deps = [
-        ":utility_lib",
-        "//envoy/config:grpc_mux_interface",
-        "//envoy/config:subscription_interface",
-        "//envoy/grpc:async_client_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
-        "//source/common/grpc:async_client_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "null_grpc_mux_lib",
     hdrs = ["null_grpc_mux_impl.h"],
     deps = [
@@ -134,16 +117,6 @@ envoy_cc_library(
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "pausable_ack_queue_lib",
-    srcs = ["pausable_ack_queue.cc"],
-    hdrs = ["pausable_ack_queue.h"],
-    deps = [
-        ":update_ack_lib",
-        "//source/common/common:assert_lib",
     ],
 )
 
@@ -225,18 +198,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "xds_context_params_lib",
-    srcs = ["xds_context_params.cc"],
-    hdrs = ["xds_context_params.h"],
-    deps = [
-        "//source/common/common:macros",
-        "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "xds_resource_lib",
     srcs = ["xds_resource.cc"],
     hdrs = ["xds_resource.h"],
@@ -244,21 +205,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_library(
-    name = "xds_source_id_lib",
-    srcs = ["xds_source_id.cc"],
-    hdrs = ["xds_source_id.h"],
-    deps = [
-        "//envoy/config:xds_resources_delegate_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "update_ack_lib",
-    hdrs = ["update_ack.h"],
-    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
 )
 
 envoy_cc_library(
@@ -297,26 +243,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "watch_map_lib",
-    srcs = ["watch_map.cc"],
-    hdrs = ["watch_map.h"],
-    deps = [
-        ":decoded_resource_lib",
-        ":utility_lib",
-        ":xds_resource_lib",
-        "//envoy/config:custom_config_validators_interface",
-        "//envoy/config:subscription_interface",
-        "//envoy/config:xds_config_tracker_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:cleanup_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "subscription_base_interface",
     hdrs = ["subscription_base.h"],
     deps = [
@@ -347,6 +273,18 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:watcher_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_context_params_lib",
+    srcs = ["xds_context_params.cc"],
+    hdrs = ["xds_context_params.h"],
+    deps = [
+        "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

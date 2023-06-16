@@ -1,5 +1,4 @@
 .. _arch_overview_load_balancer_subsets:
-.. _extension_envoy.load_balancing_policies.subset:
 
 Load Balancer Subsets
 ---------------------
