@@ -92,8 +92,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
   }
 
-  ENVOY_LOG_MISC(trace, "TcpListener {} accepted {} new connections.",
-                 socket_->ioHandle().localAddress()->asStringView(),
+  ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",
                  connections_accepted_from_kernel_count);
 }
 
