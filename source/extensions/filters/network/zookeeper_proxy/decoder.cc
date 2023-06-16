@@ -190,8 +190,11 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   switch (xid_code) {
   case XidCodes::ConnectXid:
+    ABSL_FALLTHROUGH_INTENDED;
   case XidCodes::PingXid:
+    ABSL_FALLTHROUGH_INTENDED;
   case XidCodes::AuthXid:
+    ABSL_FALLTHROUGH_INTENDED;
   case XidCodes::SetWatchesXid:
     latency = fetchControlRequestData(xid, opcode);
     break;
@@ -658,6 +661,10 @@ std::chrono::milliseconds DecoderImpl::fetchControlRequestData(const int32_t xid
   }
 
   std::queue<RequestBegin> rq_queue = it->second;
+  if (rq_queue.empty()) {
+    throw EnvoyException(fmt::format("control request queue for {} is empty", xid));
+  }
+
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - rq_queue.front().start_time);
   opcode = rq_queue.front().opcode;
