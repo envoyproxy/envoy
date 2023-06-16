@@ -225,7 +225,9 @@ new_features:
     that sets the maximum number of new connections to be accepted per socket
     event on a listener. If there are more connections to be accepted beyond
     the maximum, the remaining connections would be processed in later
-    dispatcher loop iterations.
+    dispatcher loop iterations. Added listener histogram
+    ``connections_accepted_per_socket_event`` to allow users to empperically
+    determine an appropriate configuration for their deployment.
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams

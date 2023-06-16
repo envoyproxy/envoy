@@ -94,6 +94,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",
                  connections_accepted_from_kernel_count);
+  cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
 }
 
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
