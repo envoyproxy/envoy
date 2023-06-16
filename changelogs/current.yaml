@@ -15,6 +15,12 @@ behavior_changes:
     When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
     value in the list. This resolves issues where a retry caused the same value to be appended multiple times. This
     behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
+- area: ext_proc
+  change: |
+    ext_proc filter uses hard-coded header mutation rule to handle header mutations in the ImmediateResponse message from the
+    ext_proc server. This is problematic. Changing to use the header mutation rule in the filter config to handle it, same as
+    any other header or body response messages from the ext_proc server. This behavior change can be temporarily reverted by
+    setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

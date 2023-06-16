@@ -781,15 +781,16 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      const Checker& checker;
+      absl::Status mut_status;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
-        checker = config().mutationChecker();
+        mut_status = MutationUtils::applyHeaderMutations(
+            response.headers(), headers, false, config().mutationChecker(),
+            stats_.rejected_header_mutations_);
       } else {
-        checker = immediateResponseChecker().checker();
-      }
-      const auto mut_status = MutationUtils::applyHeaderMutations(
-          response.headers(), headers, false, checker,
+        mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, immediateResponseChecker().checker(),
           stats_.rejected_header_mutations_);
+      }
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
