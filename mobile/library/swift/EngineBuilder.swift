@@ -675,7 +675,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setXds(xdsBuilder: XdsBuilder) -> Self {
+  public func setXds(_ xdsBuilder: XdsBuilder) -> Self {
     self.xdsBuilder = xdsBuilder
     return self
   }
