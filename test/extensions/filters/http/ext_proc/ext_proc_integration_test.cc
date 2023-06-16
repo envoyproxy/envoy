@@ -1272,7 +1272,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
   processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
-    // Mutating system header :scheme is not allowed.
+    // Adding system header starting with : is not allowed.
     hdr->mutable_header()->set_key(":foo");
     hdr->mutable_header()->set_value("bar");
   });
