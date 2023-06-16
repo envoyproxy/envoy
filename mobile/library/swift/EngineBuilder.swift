@@ -825,7 +825,6 @@ open class EngineBuilder: NSObject {
   }
 }
 
-// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
@@ -893,6 +892,12 @@ private extension EngineBuilder {
       cxxBuilder.setNodeId(nodeID.toCXX())
     }
 
+    generateXds(&cxxBuilder)
+
+    return cxxBuilder.generateBootstrap()
+  }
+
+  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
 #if ENVOY_GOOGLE_GRPC
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
@@ -916,9 +921,6 @@ private extension EngineBuilder {
       cxxBuilder.setXds(cxxXdsBuilder)
     }
 #endif
-
-    return cxxBuilder.generateBootstrap()
   }
-  // swiftlint:enable cyclomatic_complexity
 }
 #endif
