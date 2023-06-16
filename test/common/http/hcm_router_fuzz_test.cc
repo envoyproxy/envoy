@@ -585,6 +585,18 @@ private:
   std::vector<FuzzDownstreamPtr> streams_;
 };
 
+// Macro to disable use of allocations that persist across fuzz runs.
+// Enabling it leads to significant slowdown, however, disabling it
+// may incur false positives.
+#ifdef _DISABLE_STATIC_HARNESS
+
+DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  auto harness = std::make_unique<Harness>();
+  harness->fuzz(input);
+}
+
+#else
+
 static std::unique_ptr<Harness> harness = nullptr;
 static void cleanup() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
@@ -594,6 +606,8 @@ DEFINE_PROTO_FUZZER(FuzzCase& input) {
   }
   harness->fuzz(input);
 }
+
+#endif
 
 } // namespace Http
 } // namespace Envoy
