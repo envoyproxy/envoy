@@ -83,8 +83,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
 
     // Only one of value or value_bytes in the HeaderValue message should be set.
-    if (!sh.header().value().empty() &&
-        (sh.header().value_type_case() == envoy::config::core::v3::HeaderValue::kValueBytes)) {
+    if (!sh.header().value().empty() && !sh.header().value_bytes().empty()) {
       ENVOY_LOG(debug, "Only one of value or value_bytes in the HeaderValue message should be set, "
                        "may not be append.");
       rejected_mutations.inc();

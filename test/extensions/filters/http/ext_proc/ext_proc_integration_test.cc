@@ -583,8 +583,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(!header.value().empty());
-          EXPECT_TRUE(header.value_type_case() !=
-                      envoy::config::core::v3::HeaderValue::kValueBytes);
+          EXPECT_TRUE(header.value_bytes().empty());
           ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -642,8 +641,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(header.value().empty());
-          EXPECT_TRUE(header.value_type_case() ==
-                      envoy::config::core::v3::HeaderValue::kValueBytes);
+          EXPECT_TRUE(!header.value_bytes().empty());
           ENVOY_LOG_MISC(critical, "{}", header.value_bytes());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
