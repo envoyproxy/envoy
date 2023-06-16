@@ -529,9 +529,9 @@ xds_builder
   builder.setXds(xdsBuilder)
 
   // C++
-  auto xds_builder = std::make_unique<XdsBuilder>(/*address=*/"my_xds_server.com", /*port=*/443);
-  xds_builder->addRuntimeDiscoveryService("my_rtds_resource")
-      ->addClusterDiscoveryService();
+  XdsBuilder xds_builder(/*address=*/"my_xds_server.com", /*port=*/443);
+  xds_builder.addRuntimeDiscoveryService("my_rtds_resource")
+      .addClusterDiscoveryService();
   builder.setXds(std::move(xds_builder));
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

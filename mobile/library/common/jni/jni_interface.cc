@@ -1307,24 +1307,23 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 #ifdef ENVOY_GOOGLE_GRPC
   std::string native_xds_address = getCppString(env, xds_address);
   if (!native_xds_address.empty()) {
-    auto xds_builder =
-        std::make_unique<Envoy::Platform::XdsBuilder>(std::move(native_xds_address), xds_port);
+    Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
     std::string native_jwt_token = getCppString(env, xds_jwt_token);
     if (!native_jwt_token.empty()) {
-      xds_builder->setJwtAuthenticationToken(std::move(native_jwt_token), xds_jwt_token_lifetime);
+      xds_builder.setJwtAuthenticationToken(std::move(native_jwt_token), xds_jwt_token_lifetime);
     }
     std::string native_root_certs = getCppString(env, xds_root_certs);
     if (!native_root_certs.empty()) {
-      xds_builder->setSslRootCerts(std::move(native_root_certs));
+      xds_builder.setSslRootCerts(std::move(native_root_certs));
     }
     std::string native_rtds_resource_name = getCppString(env, rtds_resource_name);
     if (!native_rtds_resource_name.empty()) {
-      xds_builder->addRuntimeDiscoveryService(std::move(native_rtds_resource_name),
-                                              rtds_timeout_seconds);
+      xds_builder.addRuntimeDiscoveryService(std::move(native_rtds_resource_name),
+                                             rtds_timeout_seconds);
     }
     if (enable_cds == JNI_TRUE) {
-      xds_builder->addClusterDiscoveryService(getCppString(env, cds_resources_locator),
-                                              cds_timeout_seconds);
+      xds_builder.addClusterDiscoveryService(getCppString(env, cds_resources_locator),
+                                             cds_timeout_seconds);
     }
     builder.setXds(std::move(xds_builder));
   }

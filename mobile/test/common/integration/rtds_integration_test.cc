@@ -18,11 +18,11 @@ public:
     initializeXdsStream();
   }
   void createEnvoy() override {
-    auto xds_builder = std::make_unique<Platform::XdsBuilder>(
+    Platform::XdsBuilder xds_builder(
         /*xds_server_address=*/Network::Test::getLoopbackAddressUrlString(ipVersion()),
         /*xds_server_port=*/fake_upstreams_[1]->localAddress()->ip()->port());
     // Add the layered runtime config, which includes the RTDS layer.
-    xds_builder->addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1);
+    xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1);
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }

@@ -262,10 +262,10 @@ TEST(TestConfig, DisableHttp3) {
 }
 
 #ifdef ENVOY_GOOGLE_GRPC
-TEST(TestConfig, AdsConfig) {
+TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
-  auto xds_builder = std::make_unique<XdsBuilder>(/*xds_server_address=*/"fake-td.googleapis.com",
-                                                  /*xds_server_port=*/12345);
+  XdsBuilder xds_builder(/*xds_server_address=*/"fake-td.googleapis.com",
+                         /*xds_server_port=*/12345);
   engine_builder.setXds(std::move(xds_builder));
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   auto& ads_config = bootstrap->dynamic_resources().ads_config();
@@ -282,11 +282,11 @@ TEST(TestConfig, AdsConfig) {
   EXPECT_THAT(ads_config.grpc_services(0).google_grpc().call_credentials(), SizeIs(0));
 
   // With security credentials.
-  xds_builder = std::make_unique<XdsBuilder>(/*xds_server_address=*/"fake-td.googleapis.com",
-                                             /*xds_server_port=*/12345);
-  xds_builder->setJwtAuthenticationToken(/*token=*/"my_jwt_token",
-                                         /*token_lifetime_in_seconds=*/500);
-  xds_builder->setSslRootCerts(/*root_certs=*/"my_root_cert");
+  xds_builder =
+      XdsBuilder(/*xds_server_address=*/"fake-td.googleapis.com", /*xds_server_port=*/12345);
+  xds_builder.setJwtAuthenticationToken(/*token=*/"my_jwt_token",
+                                        /*token_lifetime_in_seconds=*/500);
+  xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
@@ -429,9 +429,8 @@ TEST(TestConfig, SetNodeLocality) {
 
 #ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, AddCdsLayer) {
-  auto xds_builder = std::make_unique<XdsBuilder>(/*xds_server_address=*/"fake-xds-server",
-                                                  /*xds_server_port=*/12345);
-  xds_builder->addClusterDiscoveryService();
+  XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
+  xds_builder.addClusterDiscoveryService();
   EngineBuilder engine_builder;
   engine_builder.setXds(std::move(xds_builder));
 
@@ -440,12 +439,11 @@ TEST(TestConfig, AddCdsLayer) {
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
             /*default_timeout=*/5);
 
-  xds_builder = std::make_unique<XdsBuilder>(/*xds_server_address=*/"fake-xds-server",
-                                             /*xds_server_port=*/12345);
+  xds_builder = XdsBuilder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
   const std::string cds_resources_locator =
       "xdstp://traffic-director-global.xds.googleapis.com/envoy.config.cluster.v3.Cluster";
   const int timeout_seconds = 300;
-  xds_builder->addClusterDiscoveryService(cds_resources_locator, timeout_seconds);
+  xds_builder.addClusterDiscoveryService(cds_resources_locator, timeout_seconds);
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), cds_resources_locator);

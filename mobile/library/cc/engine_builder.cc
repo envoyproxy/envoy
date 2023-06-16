@@ -304,7 +304,7 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
 }
 
 #ifdef ENVOY_GOOGLE_GRPC
-EngineBuilder& EngineBuilder::setXds(std::unique_ptr<XdsBuilder>&& xds_builder) {
+EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
   return *this;
 }
@@ -858,7 +858,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_dynamic_resources();
 #ifdef ENVOY_GOOGLE_GRPC
-  if (xds_builder_ != nullptr) {
+  if (xds_builder_) {
     xds_builder_->build(bootstrap.get());
   }
 #endif

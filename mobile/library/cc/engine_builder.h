@@ -102,8 +102,8 @@ private:
   // Required so that EngineBuilder can call the XdsBuilder's protected build() method.
   friend class EngineBuilder;
 
-  const std::string xds_server_address_;
-  const int xds_server_port_;
+  std::string xds_server_address_;
+  int xds_server_port_;
   std::string jwt_token_;
   int jwt_token_lifetime_in_seconds_ = DefaultJwtTokenLifetimeSeconds;
   std::string ssl_root_certs_;
@@ -161,8 +161,7 @@ public:
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
   // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
-  //                The EngineBuilder takes ownership over the xds_builder.
-  EngineBuilder& setXds(std::unique_ptr<XdsBuilder>&& xds_builder);
+  EngineBuilder& setXds(XdsBuilder xds_builder);
 #endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
@@ -241,7 +240,7 @@ private:
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
 #ifdef ENVOY_GOOGLE_GRPC
-  std::unique_ptr<XdsBuilder> xds_builder_ = nullptr;
+  absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };
 
