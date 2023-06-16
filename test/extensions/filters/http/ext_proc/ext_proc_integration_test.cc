@@ -1265,6 +1265,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
   filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  // Disallow system header in the mutation rule config.
   proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1272,11 +1273,12 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
   processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
-    // Adding system header starting with : is not allowed.
+    // Adding system header in the ext_proc response.
     hdr->mutable_header()->set_key(":foo");
     hdr->mutable_header()->set_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
+  // The added system header is not sent to the client.
   EXPECT_THAT(response->headers(), HasNoHeader(":foo"));
 }
 
