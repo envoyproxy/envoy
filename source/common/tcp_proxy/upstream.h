@@ -316,10 +316,12 @@ public:
               Ssl::ConnectionInfoConstSharedPtr ssl_info)
         : conn_pool_(&conn_pool), host_(host), ssl_info_(ssl_info) {}
     virtual ~Callbacks() = default;
-    virtual void onSuccess(Http::RequestEncoder& request_encoder) {
+    virtual void onSuccess(Http::RequestEncoder* request_encoder) {
       ASSERT(conn_pool_ != nullptr);
-      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionInfoProvider(),
-                                     ssl_info_);
+      if (request_encoder != nullptr) {
+        conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionInfoProvider(),
+                                       ssl_info_);
+      }
     }
     virtual void onFailure() {
       ASSERT(conn_pool_ != nullptr);
@@ -488,7 +490,7 @@ private:
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
-        parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
+        parent_.conn_pool_callbacks_->onSuccess(parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();
       }
     }
