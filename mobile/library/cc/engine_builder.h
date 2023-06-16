@@ -40,7 +40,7 @@ struct NodeLocality {
 // https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
 //
 // This class is typically used as input to the EngineBuilder's setXds() method.
-class final XdsBuilder {
+class XdsBuilder final {
 public:
   // `xds_server_address`: the host name or IP address of the xDS management server. The xDS server
   //                       must support the ADS protocol
