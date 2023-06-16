@@ -262,8 +262,8 @@ public:
    * @return Http::FilterFactoryCb the factory creation function.
    */
   virtual Http::FilterFactoryCb
-  createFilterServerFactoryFromProto(const Protobuf::Message&, const std::string&,
-                                     Server::Configuration::ServerFactoryContext&) {
+  createFilterFactoryFromProtoWithServerContext(const Protobuf::Message&, const std::string&,
+                                                Server::Configuration::ServerFactoryContext&) {
     ExceptionUtil::throwEnvoyException(
         "Creating filter factory from server factory context is not supported");
     return nullptr;
