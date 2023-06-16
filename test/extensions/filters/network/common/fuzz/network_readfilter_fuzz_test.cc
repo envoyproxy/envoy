@@ -41,16 +41,13 @@ void ensuredValidFilter(unsigned int seed, envoy::config::listener::v3::Filter* 
       "type.googleapis.com/", factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
 }
 
-static void TestOneProtoInput(const test::extensions::filters::network::FilterFuzzTestCase& input);
-
+static void TestOneProtoInput(const test::extensions::filters::network::FilterFuzzTestCase&);
 using FuzzerProtoType = test::extensions::filters::network::FilterFuzzTestCase;
-// protobuf_mutator::libfuzzer::macro_internal::GetFirstParam<decltype(&TestOneProtoInput)>::type;
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max_size,
                                           unsigned int seed) {
-  static unsigned config_mutation_cnt = 0;
-  // mutate the config part of the fuzzer only so often.
-  static const unsigned config_mutation_limit = 1000;
+  // mutate the config part of the fuzzer only with a probability of
+  static const unsigned config_mutation_probability = 1 /* / 100 */;
   static protobuf_mutator::Mutator mutator = [seed] {
     protobuf_mutator::Mutator mutator;
     mutator.Seed(seed);
@@ -58,17 +55,24 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
   }();
   static ProtobufMessage::ValidatedInputGenerator generator(
       seed, ProtobufMessage::composeFiltersAnyMap(), 20);
+  static Random::PsuedoRandomGenerator64 random;
+  static bool _random_inited = [seed] {
+    random.initializeSeed(seed);
+    return true;
+  }();
+  _random_inited = !_random_inited;
+
   FuzzerProtoType input;
   input.ParseFromString({reinterpret_cast<const char*>(data), size});
-  mutator.Mutate(input.mutable_actions(), max_size);
-
-  if (config_mutation_cnt > config_mutation_limit) {
+  if (random.random() % 100 < config_mutation_probability) {
+    test::extensions::filters::network::FuzzHelperForActions actions;
+    *actions.mutable_actions() = *input.mutable_actions();
+    mutator.Mutate(&actions, max_size);
+  } else {
     mutator.Mutate(input.mutable_config(), max_size);
     ensuredValidFilter(seed, input.mutable_config());
-    config_mutation_cnt = 0;
   }
   ProtobufMessage::traverseMessage(generator, input, true);
-  ++config_mutation_cnt;
 
   return protobuf_mutator::SaveMessageAsText(input, data, max_size);
 }
@@ -102,7 +106,7 @@ static void TestOneProtoInput(const test::extensions::filters::network::FilterFu
       return;
     }
     static UberFilterFuzzer fuzzer;
-    fuzzer.fuzz(input.config(), input.actions().actions());
+    fuzzer.fuzz(input.config(), input.actions());
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
   }
