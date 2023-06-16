@@ -285,6 +285,7 @@ public:
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
+    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
 protected:
@@ -311,6 +312,7 @@ private:
   const std::string hostname_;
   const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
+  // The first entry in the address_list_ should match the value in address_.
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
