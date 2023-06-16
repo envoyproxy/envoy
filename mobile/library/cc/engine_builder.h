@@ -92,9 +92,6 @@ public:
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-  EngineBuilder& enableAdminInterface(bool admin_interface_on);
-#endif
 
 #ifdef ENVOY_MOBILE_STATS_REPORTING
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
@@ -162,7 +159,6 @@ private:
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
-  bool admin_interface_enabled_ = false;
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
