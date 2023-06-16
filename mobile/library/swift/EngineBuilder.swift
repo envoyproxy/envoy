@@ -892,7 +892,7 @@ private extension EngineBuilder {
       cxxBuilder.setNodeId(nodeID.toCXX())
     }
 
-    generateXds(cxxBuilder)
+    generateXds(&cxxBuilder)
 
     return cxxBuilder.generateBootstrap()
   }
@@ -914,9 +914,8 @@ private extension EngineBuilder {
                                                  Int32(xdsBuilder.rtdsTimeoutInSeconds))
       }
       if xdsBuilder.enableCds {
-        val emptyCxxString = "".toCXX()
         cxxXdsBuilder.addClusterDiscoveryService(
-          xdsBuilder.cdsResourcesLocator?.toCXX() ?? emptyCxxString,
+          xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
           Int32(xdsBuilder.cdsTimeoutInSeconds))
       }
       cxxBuilder.setXds(cxxXdsBuilder)
