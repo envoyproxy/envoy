@@ -47,7 +47,7 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
   return cluster->name();
 }
 
-HealthCheckerSharedPtr HealthCheckerFactory::create(
+absl::StatusOr<HealthCheckerSharedPtr> HealthCheckerFactory::create(
     const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
     Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
@@ -56,7 +56,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
 
   switch (health_check_config.health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
-    throw EnvoyException("invalid cluster config");
+    return absl::InvalidArgumentError("invalid cluster config");
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     factory = &Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::CustomHealthCheckerFactory>("envoy.health_checkers.http");
@@ -67,8 +67,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     break;
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
-      throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
-                                       cluster.info()->name()));
+      return absl::InvalidArgumentError(fmt::format(
+          "{} cluster must support HTTP/2 for gRPC healthchecking", cluster.info()->name()));
     }
     factory = &Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::CustomHealthCheckerFactory>("envoy.health_checkers.grpc");
@@ -94,7 +94,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   return factory->createCustomHealthChecker(health_check_config, *context);
 }
 
-PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
+absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array) {
   MatchSegments result;
 
@@ -103,7 +103,7 @@ PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
     if (entry.has_text()) {
       decoded = Hex::decode(entry.text());
       if (decoded.empty()) {
-        throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
+        return absl::InvalidArgumentError(fmt::format("invalid hex string '{}'", entry.text()));
       }
     } else {
       decoded.assign(entry.binary().begin(), entry.binary().end());

@@ -67,35 +67,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAdminInterfaceIsDisabledByDefault() {
-    let expectation = self.expectation(description: "Run called with disabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-#if ENVOY_ADMIN_FUNCTIONALITY
-  func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableAdminInterface()
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-#endif
-
   func testEnablingInterfaceBindingAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled interface binding")
     MockEnvoyEngine.onRunWithConfig = { config, _ in

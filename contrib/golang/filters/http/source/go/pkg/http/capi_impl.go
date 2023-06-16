@@ -216,11 +216,13 @@ func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
+func (c *httpCApiImpl) HttpGetStringValue(r *httpRequest, id int) (string, bool) {
 	var value string
-	// TODO: add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
 	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	res := C.envoyGoFilterHttpGetStringValue(r, C.int(id), unsafe.Pointer(&value))
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	res := C.envoyGoFilterHttpGetStringValue(unsafe.Pointer(r.req), C.int(id), unsafe.Pointer(&value))
 	if res == C.CAPIValueNotFound {
 		return "", false
 	}

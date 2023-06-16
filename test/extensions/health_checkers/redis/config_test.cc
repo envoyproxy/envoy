@@ -122,6 +122,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
                 Upstream::HealthCheckerFactory::create(
                     Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
                     log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    .value()
                     .get()));
 }
 } // namespace
