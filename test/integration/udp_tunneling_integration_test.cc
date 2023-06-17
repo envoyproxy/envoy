@@ -20,7 +20,7 @@ public:
 
   ~ConnectUdpTerminationIntegrationTest() {
     // Since the upstream is a UDP server, there is nothing to check on the upstream side. Simply
-    // make sure that the connection is closed to avoid TSAN/MSAN error.
+    // make sure that the connection is closed to avoid TSAN error.
     codec_client_->close();
   }
 
