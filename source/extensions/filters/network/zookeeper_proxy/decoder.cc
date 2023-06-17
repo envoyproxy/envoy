@@ -660,7 +660,7 @@ std::chrono::milliseconds DecoderImpl::fetchControlRequestData(const int32_t xid
     throw EnvoyException(fmt::format("control request xid {} not found", xid));
   }
 
-  std::queue<RequestBegin> rq_queue = it->second;
+  std::queue<RequestBegin>& rq_queue = it->second;
   if (rq_queue.empty()) {
     throw EnvoyException(fmt::format("control request queue for {} is empty", xid));
   }
