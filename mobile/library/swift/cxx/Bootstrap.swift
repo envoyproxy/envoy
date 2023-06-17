@@ -21,7 +21,7 @@ final class Bootstrap {
 
 extension Envoy.Platform.EngineBuilder {
   /// - returns: A generated bootstrap object.
-  func generateBootstrap() -> Bootstrap {
+  mutating func generateBootstrap() -> Bootstrap {
     Bootstrap(pointer: Envoy.CxxSwift.generateBootstrapPtr(self))
   }
 }
