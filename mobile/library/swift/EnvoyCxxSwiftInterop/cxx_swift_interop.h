@@ -37,8 +37,8 @@ inline void raw_header_map_set(Platform::RawHeaderMap& map, std::string key,
 
 // Smart pointers aren't currently supported by Swift / C++ interop, so we "erase"
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
-inline BootstrapPtr generateBootstrapPtr(const Platform::EngineBuilder& /*builder*/) {
-  return 0; // return reinterpret_cast<BootstrapPtr>(builder.generateBootstrap().release());
+inline BootstrapPtr generateBootstrapPtr(const Platform::EngineBuilder& builder) {
+  return reinterpret_cast<BootstrapPtr>(builder.generateBootstrap().release());
 }
 
 inline std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
