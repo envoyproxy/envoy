@@ -43,28 +43,20 @@ public:
 
     Envoy::Http::FilterFactoryCb callback = nullptr;
 
-    // TODO(tyxia) Update the logic later to create the filter from the `factoryContext` first if it
-    // is present.
-    TRY_NEEDS_AUDIT {
-      if (context.server_factory_context_.has_value()) {
-        callback = factory.createFilterFactoryFromProtoWithServerContext(
-            *message, context.stat_prefix_, context.server_factory_context_.value());
-      }
-    }
-    END_TRY CATCH(EnvoyException & e, {
-      // First, we try to create the delegated filter creation callback from server factory context.
-      // If it failed (i.e., the corresponding filter doesn't support this method), we log this
-      // message and fallback to creating the filter from factory context.
-      ENVOY_LOG(trace,
-                absl::StrCat(e.what(), ", fallback to creating the filter from factory context."));
-    });
-
-    if (callback == nullptr) {
-      RELEASE_ASSERT(context.factory_context_.has_value(),
-                     "The factory context must exist here to create the delegated filter");
+    // First, try to create the filter from factory context (if exists).
+    if (context.factory_context_.has_value()) {
       callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
                                                       context.factory_context_.value());
     }
+
+    // If creation above failed, try to create the filter from server factory context (if
+    // exists)
+    if (callback == nullptr && context.server_factory_context_.has_value()) {
+      callback = factory.createFilterFactoryFromProtoWithServerContext(
+          *message, context.stat_prefix_, context.server_factory_context_.value());
+    }
+
+    RELEASE_ASSERT(callback != nullptr, "Failed to get filter factory creation function");
 
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterAction>(cb);
