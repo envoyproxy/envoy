@@ -43,20 +43,20 @@ public:
 
     Envoy::Http::FilterFactoryCb callback = nullptr;
 
-    // First, try to create the filter from factory context (if exists).
+    // First, try to create the filter factory creation function from factory context (if exists).
     if (context.factory_context_.has_value()) {
       callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
                                                       context.factory_context_.value());
     }
 
-    // If creation above failed, try to create the filter from server factory context (if
-    // exists)
+    // If creation above failed, try to create the filter factory creation function the filter from
+    // server factory context (if exists).
     if (callback == nullptr && context.server_factory_context_.has_value()) {
       callback = factory.createFilterFactoryFromProtoWithServerContext(
           *message, context.stat_prefix_, context.server_factory_context_.value());
     }
 
-    RELEASE_ASSERT(callback != nullptr, "Failed to get filter factory creation function");
+    RELEASE_ASSERT(callback != nullptr, "Failed to get filter factory creation function.");
 
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterAction>(cb);
