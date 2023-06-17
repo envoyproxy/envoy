@@ -19,6 +19,7 @@ final class Bootstrap {
   }
 }
 
+/// An extension that provides a generateBootstrap() function.
 extension Envoy.Platform.EngineBuilder {
   /// - returns: A generated bootstrap object.
   func generateBootstrap() -> Bootstrap {
