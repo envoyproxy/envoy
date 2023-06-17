@@ -10,9 +10,8 @@ BaseRequest::BaseRequest(uint32_t type, IoUringSocket& socket) : type_(type), so
 AcceptRequest::AcceptRequest(IoUringSocket& socket) : BaseRequest(RequestType::Accept, socket) {}
 
 ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
-    : BaseRequest(RequestType::Read, socket), iov_(std::make_unique<struct iovec>()) {
-  buf_.mem_ = std::make_unique<new uint8_t[]>(size);
-  buf_.len_ = size;
+    : BaseRequest(RequestType::Read, socket), buf_{std::make_unique<uint8_t[]>(size), size},
+      iov_(std::make_unique<struct iovec>()) {
   iov_->iov_base = buf_.mem_.get();
   iov_->iov_len = size;
 }
