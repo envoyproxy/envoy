@@ -48,8 +48,6 @@ public:
   // `xds_server_port`: the port on which the xDS management server listens for ADS discovery
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
-  XdsBuilder(const XdsBuilder&) = default;
-  XdsBuilder& operator=(const XdsBuilder&) = default;
 
   // Sets JWT as the authentication method to the xDS management server, using the given token.
   //
@@ -121,7 +119,6 @@ private:
 class EngineBuilder {
 public:
   EngineBuilder();
-  EngineBuilder(const EngineBuilder&) = default;
   virtual ~EngineBuilder() {}
 
   EngineBuilder& addLogLevel(LogLevel log_level);
