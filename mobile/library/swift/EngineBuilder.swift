@@ -894,7 +894,7 @@ private extension EngineBuilder {
 
     generateXds(&cxxBuilder)
 
-    return cxxBuilder.generateBootstrap()
+    return Bootstrap(pointer: 0) //cxxBuilder.generateBootstrap()
   }
 
   private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
