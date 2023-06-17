@@ -238,7 +238,7 @@ private:
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
 #ifdef ENVOY_GOOGLE_GRPC
-  absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
+  // absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };
 
