@@ -10,6 +10,10 @@ flake8==4.0.1 \
     # via
     #   -r requirements.in
     #   pep8-naming
+importlib-metadata==6.6.0 \
+    --hash=sha256:43dd286a2cd8995d5eaef7fee2066340423b818ed3fd70adf0bad5f1fac53fed \
+    --hash=sha256:92501cdf9cc66ebd3e612f1b4f0c0765dfa42f0fa38ffb319b6bd84dd675d705
+    # via yapf
 mccabe==0.6.1 \
     --hash=sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42 \
     --hash=sha256:dd8d182285a0fe56bace7f45b5e7d1a6ebcbf524e8f3bd87eb0f125271b8831f
@@ -18,6 +22,10 @@ pep8-naming==0.13.2 \
     --hash=sha256:59e29e55c478db69cffbe14ab24b5bd2cd615c0413edf790d47d3fb7ba9a4e23 \
     --hash=sha256:93eef62f525fd12a6f8c98f4dcc17fa70baae2f37fa1f73bec00e3e44392fa48
     # via -r requirements.in
+platformdirs==3.5.3 \
+    --hash=sha256:0ade98a4895e87dc51d47151f7d2ec290365a585151d97b4d8d6312ed6132fed \
+    --hash=sha256:e48fabd87db8f3a7df7150a4a5ea22c546ee8bc39bc2473244730d4b56d2cc4e
+    # via yapf
 pycodestyle==2.8.0 \
     --hash=sha256:720f8b39dde8b293825e7ff02c475f3077124006db4f440dcbc9a20b76548a20 \
     --hash=sha256:eddd5847ef438ea1c7870ca7eb78a9d47ce0cdb4851a5523949f2601d0cbbe7f
@@ -32,7 +40,11 @@ tomli==2.0.1 \
     --hash=sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc \
     --hash=sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f
     # via yapf
-yapf==0.33.0 \
-    --hash=sha256:4c2b59bd5ffe46f3a7da48df87596877189148226ce267c16e8b44240e51578d \
-    --hash=sha256:da62bdfea3df3673553351e6246abed26d9fe6780e548a5af9e70f6d2b4f5b9a
+yapf==0.40.0 \
+    --hash=sha256:63386557876c2686cb29d8c422b2d1e484f29f7a278821f91515b5c5adf569a7 \
+    --hash=sha256:7eeb8c404e386f16e24cbd785103dbc573f51cbb68e65a35f4392e0233f3d7bc
     # via -r requirements.in
+zipp==3.15.0 \
+    --hash=sha256:112929ad649da941c23de50f356a2b5570c954b65150642bccdd66bf194d224b \
+    --hash=sha256:48904fc76a60e542af151aded95726c1a5c34ed43ab4134b597665c86d7ad556
+    # via importlib-metadata
