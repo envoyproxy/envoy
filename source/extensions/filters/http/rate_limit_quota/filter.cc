@@ -83,6 +83,8 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 }
 
+void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus) {}
+
 } // namespace RateLimitQuota
 } // namespace HttpFilters
 } // namespace Extensions

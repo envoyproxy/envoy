@@ -72,6 +72,7 @@ public:
     return *data_ptr_;
   }
 
+  void onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus);
   ~RateLimitQuotaFilter() override = default;
 
 private:
