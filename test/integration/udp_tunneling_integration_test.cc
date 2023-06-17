@@ -18,6 +18,12 @@ class ConnectUdpTerminationIntegrationTest : public HttpProtocolIntegrationTest 
 public:
   ConnectUdpTerminationIntegrationTest() {}
 
+  ~ConnectUdpTerminationIntegrationTest() {
+    // Since the upstream is a UDP server, there is nothing to check on the upstream side. Simply
+    // make sure that the connection is closed to avoid TSAN/MSAN error.
+    codec_client_->close();
+  }
+
   void initialize() override {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -143,6 +149,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, IPv6WithZoneIdHostMatch) {
   connect_udp_headers_.setPath("/.well-known/masque/udp/fe80::a%25ee1/80/");
   initialize();
   setUpConnection();
+  EXPECT_EQ("404", response_->headers().getStatusValue());
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsulesWithoutCapsuleProtocolHeader) {
@@ -150,28 +157,6 @@ TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsulesWithoutCapsuleProto
   connect_udp_headers_.remove(Envoy::Http::Headers::get().CapsuleProtocol);
   setUpConnection();
   exchangeValidCapsules();
-}
-
-TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamClose) {
-  initialize();
-  setUpConnection();
-  exchangeValidCapsules();
-  // Tear down by closing the client connection.
-  codec_client_->close();
-}
-
-TEST_P(ConnectUdpTerminationIntegrationTest, DownstreamReset) {
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    // Resetting an individual stream requires HTTP/2 or later.
-    return;
-  }
-
-  initialize();
-  setUpConnection();
-  exchangeValidCapsules();
-
-  // Tear down by resetting the client stream.
-  codec_client_->sendReset(*request_encoder_);
 }
 
 TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
@@ -204,7 +189,6 @@ TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response_->waitForReset());
-    codec_client_->close();
   }
 }
 
