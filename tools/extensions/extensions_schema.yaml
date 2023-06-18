@@ -11,6 +11,7 @@ builtin:
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
 - envoy.matching.inputs.query_params
+- envoy.matching.inputs.cel_data_input
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
 - envoy.matching.inputs.source_ip
@@ -76,6 +77,7 @@ categories:
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.health_check.event_sinks
 - envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters

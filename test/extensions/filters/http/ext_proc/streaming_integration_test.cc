@@ -44,7 +44,7 @@ protected:
   void initializeConfig() {
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
-
+    proto_config_.set_allow_mode_override(true);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Create a cluster for our gRPC server pointing to the address that is running the gRPC
       // server.

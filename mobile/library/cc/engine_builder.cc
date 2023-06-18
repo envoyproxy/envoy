@@ -174,13 +174,6 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
-  admin_interface_enabled_ = admin_interface_on;
-  return *this;
-}
-#endif
-
 #ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
@@ -283,11 +276,6 @@ EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
 
 EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.push_back({guard, value});
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setOverrideConfigForTests(std::string config) {
-  config_override_for_tests_ = std::move(config);
   return *this;
 }
 
@@ -856,23 +844,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
   }
 
-  // Admin
-  if (admin_interface_enabled_) {
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-    auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
-    admin_address->set_address("::1");
-    admin_address->set_port_value(9901);
-#else
-    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
-#endif
-  } else {
-    // Default Envoy mobile to the lightweight API listener. This is not
-    // supported if the admin interface is enabled.
-    envoy::config::listener::v3::ApiListenerManager api;
-    auto* listener_manager = bootstrap->mutable_listener_manager();
-    listener_manager->mutable_typed_config()->PackFrom(api);
-    listener_manager->set_name("envoy.listener_manager_impl.api");
-  }
+  envoy::config::listener::v3::ApiListenerManager api;
+  auto* listener_manager = bootstrap->mutable_listener_manager();
+  listener_manager->mutable_typed_config()->PackFrom(api);
+  listener_manager->set_name("envoy.listener_manager_impl.api");
 
   return bootstrap;
 }
@@ -884,11 +859,6 @@ EngineSharedPtr EngineBuilder::build() {
   null_logger.context = nullptr;
 
   envoy_event_tracker null_tracker{};
-
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
-  if (config_override_for_tests_.empty()) {
-    bootstrap = generateBootstrap();
-  }
 
   envoy_engine_t envoy_engine =
       init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
@@ -911,10 +881,9 @@ EngineSharedPtr EngineBuilder::build() {
 
   if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
     auto options = std::make_unique<Envoy::OptionsImpl>();
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
     if (bootstrap) {
       options->setConfigProto(std::move(bootstrap));
-    } else {
-      options->setConfigYaml(config_override_for_tests_);
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);

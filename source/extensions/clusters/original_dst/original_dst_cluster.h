@@ -104,8 +104,9 @@ private:
     LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LoadBalancer>(cluster_);
+    }
 
     const std::shared_ptr<OriginalDstCluster> cluster_;
   };

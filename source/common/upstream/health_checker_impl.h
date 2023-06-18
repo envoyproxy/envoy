@@ -9,9 +9,11 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/network/socket.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/health_checker_config.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
+#include "envoy/upstream/health_checker.h"
 
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/logger.h"
@@ -46,6 +48,47 @@ struct HealthCheckerEqualTo {
 };
 
 /**
+ * Health checker factory context.
+ */
+class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
+public:
+  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
+                                  Server::Configuration::ServerFactoryContext& server_context)
+      : cluster_(cluster), runtime_(server_context.runtime()),
+        dispatcher_(server_context.mainThreadDispatcher()),
+        validation_visitor_(server_context.messageValidationVisitor()),
+        log_manager_(server_context.accessLogManager()), api_(server_context.api()),
+        server_context_(server_context) {}
+  Upstream::Cluster& cluster() override { return cluster_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
+  HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
+  Api::Api& api() override { return api_; }
+
+  AccessLog::AccessLogManager& accessLogManager() override { return log_manager_; }
+  void setEventLogger(HealthCheckEventLoggerPtr event_logger) override {
+    event_logger_ = std::move(event_logger);
+  }
+
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
+    return server_context_;
+  };
+
+private:
+  Upstream::Cluster& cluster_;
+  Envoy::Runtime::Loader& runtime_;
+  Event::Dispatcher& dispatcher_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  AccessLog::AccessLogManager& log_manager_;
+  Api::Api& api_;
+  HealthCheckEventLoggerPtr event_logger_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+};
+
+/**
  * Factory for creating health checker implementations.
  */
 class HealthCheckerFactory : public Logger::Loggable<Logger::Id::health_checker> {
@@ -55,21 +98,15 @@ public:
                                         const std::string& config_hostname,
                                         const ClusterInfoConstSharedPtr& cluster);
   /**
-   * Create a health checker.
+   * Create a health checker or return an error.
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
-   * @param runtime supplies the runtime loader.
-   * @param dispatcher supplies the dispatcher.
-   * @param log_manager supplies the log_manager.
-   * @param validation_visitor message validation visitor instance.
-   * @param api reference to the Api object
+   * @param server_context reference to the Server context object
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr
+  static absl::StatusOr<HealthCheckerSharedPtr>
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context);
 };
 
 /**
@@ -122,7 +159,7 @@ class PayloadMatcher {
 public:
   using MatchSegments = std::list<std::vector<uint8_t>>;
 
-  static MatchSegments loadProtoBytes(
+  static absl::StatusOr<MatchSegments> loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };

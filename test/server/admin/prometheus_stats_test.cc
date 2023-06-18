@@ -53,12 +53,12 @@ protected:
                                            tag_extracted_name_storage.statName(), cluster_tags));
   }
 
-  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
+                Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
-                                       tag_extracted_name_storage.statName(), cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+    gauges_.push_back(alloc_.makeGauge(
+        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
@@ -81,6 +81,7 @@ protected:
     histogram->setTagExtractedName(name);
     histogram->setTags(cluster_tags);
     histogram->used_ = true;
+    histogram->hidden_ = false;
     return histogram;
   }
 
@@ -777,6 +778,56 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::HiddenAccumulate);
+
+  StatsParams params;
+
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Exclude;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::ShowOnly;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Include;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
 }
 
 TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {

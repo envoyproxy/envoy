@@ -25,7 +25,7 @@ namespace Ssl {
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
-  std::string rundir = TestEnvironment::runfilesDirectory();
+  const std::string rundir = TestEnvironment::runfilesDirectory();
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()

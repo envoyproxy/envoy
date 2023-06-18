@@ -1397,17 +1397,7 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  // We coalesce 1xx headers here, to prevent encoder filters and HCM from having to worry
-  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
-  // potentially coalesce across retries and multiple upstream requests in the future, even though
-  // we currently don't support retry after 1xx.
-  // It's plausible that this functionality might need to move to HCM in the future for internal
-  // redirects, but we would need to maintain the "only call encode1xxHeaders() once"
-  // invariant.
-  if (!downstream_1xx_headers_encoded_) {
-    downstream_1xx_headers_encoded_ = true;
-    callbacks_->encode1xxHeaders(std::move(headers));
-  }
+  callbacks_->encode1xxHeaders(std::move(headers));
 }
 
 void Filter::resetAll() {

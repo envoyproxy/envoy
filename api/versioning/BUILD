@@ -173,6 +173,7 @@ proto_library(
         "//envoy/extensions/formatter/cel/v3:pkg",
         "//envoy/extensions/formatter/metadata/v3:pkg",
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
+        "//envoy/extensions/health_check/event_sinks/file/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",

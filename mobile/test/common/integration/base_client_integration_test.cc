@@ -79,15 +79,16 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 // Use the Envoy mobile default config as much as possible in this test.
 // There are some config modifiers below which do result in deltas.
 // Note: This function is only used to build the Engine if `override_builder_config_` is true.
-std::string defaultConfig() {
+envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   Platform::EngineBuilder builder;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = builder.generateBootstrap();
-  return MessageUtil::getYamlStringFromMessage(*bootstrap);
+  envoy::config::bootstrap::v3::Bootstrap to_return = *bootstrap;
+  return to_return;
 }
 
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
-                                                     const std::string& bootstrap_config)
-    : BaseIntegrationTest(ip_version, bootstrap_config) {
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
+    : BaseIntegrationTest(BaseIntegrationTest::defaultAddressFunction(ip_version), ip_version,
+                          defaultConfig()) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
@@ -204,7 +205,8 @@ void BaseClientIntegrationTest::createEnvoy() {
     finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    builder_.setOverrideConfig(
+        std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }

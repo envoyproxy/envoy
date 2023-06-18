@@ -7,7 +7,7 @@ Before adding the new filter into the fuzzers, please make sure the filter is de
 
 # Add a new ReadFilter into Generic Readfilter Fuzzer
 Only one step is needed to add a new filter to the fuzzer:
-* In the file [BUILD](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/BUILD) the name of the filter has to be added to the `READFILTER_FUZZ_FILTERS` list. The fuzz test will figure the available filters from the factories.
+* In the file [config.bzl](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/config.bzl) the name of the filter has to be added to the `READFILTER_FUZZ_FILTERS` list. The fuzz test will figure the available filters from the factories.
 ```
 READFILTER_FUZZ_FILTERS = [
     "envoy.filters.network.client_ssl_auth",

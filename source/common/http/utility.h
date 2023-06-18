@@ -364,7 +364,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  */
 std::string makeSetCookieValue(const std::string& key, const std::string& value,
                                const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly);
+                               bool httponly, const Http::CookieAttributeRefVector attributes);
 
 /**
  * Get the response status from the response headers.

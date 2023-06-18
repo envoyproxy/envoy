@@ -382,10 +382,6 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   // Config client to use an async cert validator which defer the actual validation by 5ms.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
@@ -416,10 +412,6 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -469,10 +461,6 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-    return;
-  }
-
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(

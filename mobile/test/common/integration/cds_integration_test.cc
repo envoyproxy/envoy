@@ -41,7 +41,7 @@ protected:
         use_xdstp_ ? cds_namespace_ + "/my_cluster?xds.node.cluster=envoy-mobile" : "my_cluster";
     envoy::config::cluster::v3::Cluster cluster1 = ConfigHelper::buildStaticCluster(
         cluster_name, fake_upstreams_[0]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+        Network::Test::getLoopbackAddressString(ipVersion()));
     initializeXdsStream();
     int cluster_count = getGaugeValue("cluster_manager.active_clusters");
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.

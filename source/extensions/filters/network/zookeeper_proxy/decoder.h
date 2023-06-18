@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -51,10 +52,13 @@ enum class OpCodes {
   SetWatches = 101,
   GetEphemerals = 103,
   GetAllChildrenNumber = 104,
-  SetWatches2 = 105
+  SetWatches2 = 105,
+  AddWatch = 106,
 };
 
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
+
+enum class AddWatchMode { Persistent, PersistentRecursive };
 
 enum class CreateFlags {
   Persistent,
@@ -96,14 +100,15 @@ public:
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
   virtual void onSetWatches2Request() PURE;
+  virtual void onAddWatchRequest(const std::string& path, const int32_t mode) PURE;
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
   virtual void onResponseBytes(uint64_t bytes) PURE;
   virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
-                                 const std::chrono::milliseconds& latency) PURE;
+                                 const std::chrono::milliseconds latency) PURE;
   virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
-                          const std::chrono::milliseconds& latency) PURE;
+                          const std::chrono::milliseconds latency) PURE;
   virtual void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path,
                             int64_t zxid, int32_t error) PURE;
 };
@@ -167,6 +172,7 @@ private:
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseAddWatchRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipString(Buffer::Instance& data, uint64_t& offset);
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
@@ -174,16 +180,23 @@ private:
   void ensureMaxLength(int32_t len) const;
   std::string pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
-                            const std::chrono::milliseconds& latency);
+                            const std::chrono::milliseconds latency);
   void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
                        int32_t error);
   bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);
+  std::chrono::milliseconds fetchControlRequestData(const int32_t xid, OpCodes& opcode);
+  std::chrono::milliseconds fetchDataRequestData(const int32_t xid, OpCodes& opcode);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;
   BufferHelper helper_;
   TimeSource& time_source_;
-  absl::node_hash_map<int32_t, RequestBegin> requests_by_xid_;
+  absl::flat_hash_map<int32_t, RequestBegin> requests_by_xid_;
+  // Different from transaction ids of data requests, the transaction ids (XidCodes) of same kind of
+  // control requests are always the same. Therefore, we use a queue for each kind of control
+  // request, so we can differentiate different control requests with the same xid and calculate
+  // their response latency.
+  absl::flat_hash_map<int32_t, std::queue<RequestBegin>> control_requests_by_xid_;
   Buffer::OwnedImpl zk_filter_read_buffer_;
   Buffer::OwnedImpl zk_filter_write_buffer_;
 };

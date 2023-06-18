@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/health_checker.h"
 
 namespace Envoy {
@@ -46,6 +47,23 @@ public:
    * @return Api::Api& the API used by the server.
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /*
+   * @return Server context.
+   */
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * Set the event logger to the context, nullptr is accepted since
+   * the default in the context is nullptr.
+   * @param event_logger the health check event logger.
+   */
+  virtual void setEventLogger(Upstream::HealthCheckEventLoggerPtr event_logger) PURE;
 };
 
 /**
