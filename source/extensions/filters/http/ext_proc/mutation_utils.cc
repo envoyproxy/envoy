@@ -63,6 +63,13 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const uint32_t max_request_h
   }
 
   const auto& set_headers = mutation.set_headers();
+
+  ENVOY_LOG(debug, " yanjun 0 set_headers.size() {}, set_headers.SpaceUsedExcludingSelf {} ",
+            set_headers.size(), set_headers.SpaceUsedExcludingSelf());
+
+  ENVOY_LOG(debug, " yanjun 1 max_request_headers_kb {}, max_request_headers_count {} ",
+            max_request_headers_kb, max_request_headers_count);
+
   if (set_headers.size() > static_cast<int>(max_request_headers_count) ||
       set_headers.SpaceUsedExcludingSelf() > static_cast<int>(max_request_headers_kb * 1024)) {
     ENVOY_LOG(debug,
@@ -82,6 +89,8 @@ absl::Status MutationUtils::headerMutationResultCheck(const uint32_t max_request
                                                       const uint32_t max_request_headers_count,
                                                       const Http::HeaderMap& headers,
                                                       Counter& rejected_mutations) {
+  ENVOY_LOG(debug, " yanjun 2 result header headers.size() {}, headers.byteSize() {} ",
+            headers.size(), headers.byteSize());
   if (headers.byteSize() > max_request_headers_kb * 1024 ||
       headers.size() > max_request_headers_count) {
     ENVOY_LOG(debug,

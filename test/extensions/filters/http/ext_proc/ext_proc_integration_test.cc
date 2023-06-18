@@ -2103,6 +2103,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Test ext_proc server set header count exceeds HCM limit by responding request header.
 TEST_P(ExtProcIntegrationTest, ResponseSetHeaderCountTest) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -2118,13 +2119,15 @@ TEST_P(ExtProcIntegrationTest, ResponseSetHeaderCountTest) {
   verifyDownstreamResponse(*response, 500);
 }
 
+// Test ext_proc server remove header count exceeds HCM limit by responding response header.
 TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderCountTest) {
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
+  handleUpstreamRequest();
+  processResponseHeadersMessage(
       *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
         // The remove header count 101 > default HCM limit 100.
         addMutationRemoveHeaders(101, *headers_resp.mutable_response()->mutable_header_mutation());
@@ -2133,8 +2136,10 @@ TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderCountTest) {
   verifyDownstreamResponse(*response, 500);
 }
 
+// Test ext_proc server set header size exceeds HCM limit by responding request body.
 TEST_P(ExtProcIntegrationTest, ResponseSetHeaderSizeTest) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2145,18 +2150,21 @@ TEST_P(ExtProcIntegrationTest, ResponseSetHeaderSizeTest) {
       });
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+  auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse& body_resp) {
         // Set header count 150 is within limit 200, but the size is over limit 1kb.
-        addMutationSetHeaders(150, *headers_resp.mutable_response()->mutable_header_mutation());
+        addMutationSetHeaders(150, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
   verifyDownstreamResponse(*response, 500);
 }
 
+// Test ext_proc server remove header size exceeds HCM limit by responding response body.
 TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderSizeTest) {
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2167,17 +2175,22 @@ TEST_P(ExtProcIntegrationTest, ResponseRemoveHeaderSizeTest) {
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse& body_resp) {
         // Remove header count 150 is within limit 200, but size is over limit 1kb.
-        addMutationRemoveHeaders(150, *headers_resp.mutable_response()->mutable_header_mutation());
+        addMutationRemoveHeaders(150, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
   verifyDownstreamResponse(*response, 500);
 }
 
+// Test ext_proc server header mutation exceeds HCM limit by responding request trailer.
 TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultCountTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   initializeConfig();
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2187,19 +2200,35 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultCountTest) {
       });
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
-        // The set header counter 8 is smaller than HCM limit 10, add size is smaller than 10kb.
-        // It passed the mutation check, but failed the end result header count check.
-        addMutationSetHeaders(8, *headers_resp.mutable_response()->mutable_header_mutation());
-        return true;
-      });
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo-1", "foo-1"},
+                                                   {"x-trailer-foo-2", "foo-2"},
+                                                   {"x-trailer-foo-3", "foo-3"},
+                                                   {"x-trailer-foo-4", "foo-4"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestTrailersMessage(*grpc_upstreams_[0], true,
+                                [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+                                  // The set header counter 8 is smaller than HCM limit 10, add
+                                  // size is smaller than 10kb. It passed the mutation check,
+                                  // but failed the end result header count check.
+                                  addMutationSetHeaders(8, *trailer_resp.mutable_header_mutation());
+                                  return true;
+                                });
   verifyDownstreamResponse(*response, 500);
 }
 
+// Test ext_proc server header mutation exceeds HCM limit by responding response trailer.
 TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   initializeConfig();
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2209,19 +2238,27 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
       });
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
-    std::string header_key(1900, 'a');
-    headers.addCopy(LowerCaseString(header_key), "yes");
-  });
+  auto response = sendDownstreamRequest(absl::nullopt);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, false);
 
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
-        // The set header counter 5 is smaller than HCM limit 100, add size is smaller than 1kb.
+  // Needs to encode a large  trailer to exceed the HCM byte size limit after header mutation.
+  upstream_request_->encodeTrailers(
+      Http::TestResponseTrailerMapImpl{{"x-test-trailers", std::string(1950, 'a')}});
+  processResponseBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+        // The set header counter 8 is smaller than HCM limit 100, add size is smaller than 2kb.
         // It passed the mutation check, but failed the end result header size check.
-        addMutationSetHeaders(8, *headers_resp.mutable_response()->mutable_header_mutation());
+        addMutationSetHeaders(8, *trailer_resp.mutable_header_mutation());
         return true;
       });
-  verifyDownstreamResponse(*response, 500);
+  // The response header is already sent. So just wait for disconnect.
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace Envoy
