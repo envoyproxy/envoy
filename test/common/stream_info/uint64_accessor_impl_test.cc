@@ -16,7 +16,7 @@ TEST(UInt64AccessorImplTest, IncrementValue) {
   uint64_t init_value = 0xdeadbeefdeadbeef;
   UInt64AccessorImpl accessor(init_value);
   accessor.increment();
-            
+
   EXPECT_EQ(0xdeadbeefdeadbef0, accessor.value());
 }
 
