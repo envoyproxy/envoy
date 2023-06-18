@@ -222,13 +222,6 @@ new_features:
     added :ref:`sub_clusters_config
     <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` to enable
     independent sub cluster for each host:port, with STRICT_DNS cluster type.
-- area: http
-  change: |
-    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-- area: tls
-  change: |
-    added support to configure the new config option :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`. This can be used to override its configuration in BoringSSL.
-    It is currently default to false but expected to be changed to true by default in a future release. A warning will be output for certificate configurations that would fail if this option were set to true.
 - area: router
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
@@ -401,7 +394,11 @@ new_features:
 - area: lds
   change: |
     pause SRDS when LDS is updated.
-
+- area: tls
+  change: |
+    added support to configure the new config option :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`.
+    This can be used to override its configuration in BoringSSL. It is currently default to false but expected to be changed to true by default in a future release.
+    ssl.was_key_usage_invalid is added to :ref:`listener metrics <config_listener_stats>` and it will be true for certificate configurations that would fail if this option were set to true.
 deprecated:
 - area: access_log
   change: |

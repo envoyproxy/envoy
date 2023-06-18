@@ -18,3 +18,4 @@
    curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
    sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
    versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
+   was_key_usage_invalid, Gauge, A boolean (1 for was_invalid) to indicate whether TLS connection has invalid RSA key usage

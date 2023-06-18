@@ -563,7 +563,7 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   // triggered an error but is allowed because the enforcement that rsa key usage and tls usage need
   // to be matched has been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
-    stats_.was_key_usage_invalid_.inc();
+    stats_.was_key_usage_invalid_.set(1);
   }
 }
 
