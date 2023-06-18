@@ -99,6 +99,10 @@ minor_behavior_changes:
   change: |
     Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
     query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
+- area: eds
+  change: |
+    Added the ability to specify mulitple addresses for a host in an EDS cluster. Connections to the host with more than one
+    address will be established using the Happy Eyeballs algorithm.
 - area: upstream
   change: |
     Changed behavior of the unpausing connect with 2xx status codes. This change can be reverted temporarily by
