@@ -49,8 +49,8 @@ public:
                                                       context.factory_context_.value());
     }
 
-    // If creation above failed, try to create the filter factory creation function the filter from
-    // server factory context (if exists).
+    // If above failed, try to create the filter factory creation function from server factory
+    // context (if exists).
     if (callback == nullptr && context.server_factory_context_.has_value()) {
       callback = factory.createFilterFactoryFromProtoWithServerContext(
           *message, context.stat_prefix_, context.server_factory_context_.value());
