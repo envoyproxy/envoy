@@ -21,7 +21,7 @@ std::string genSoPath(std::string name) {
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
   HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 100), 100);
 }
 
 TEST(DsoManagerTest, Pub) {
@@ -40,7 +40,7 @@ TEST(DsoManagerTest, Pub) {
   // get after load http filter dso
   dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
   EXPECT_NE(dso, nullptr);
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 200), 200);
 
   // second time load http filter dso
   dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
@@ -58,6 +58,24 @@ TEST(DsoInstanceTest, BadSo) {
   auto path = genSoPath("bad.so");
   ClusterSpecifierDsoPtr dso(new ClusterSpecifierDsoImpl(path));
   EXPECT_EQ(dso->loaded(), false);
+}
+
+// remove plugin config
+TEST(DsoInstanceTest, RemovePluginConfig) {
+  auto path = genSoPath("simple.so");
+  HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+  // new again, return 0, since it's already existing
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 0);
+
+  // remove it
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  // new again, after removed.
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+
+  // remove twice should be ok
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
 }
 
 } // namespace

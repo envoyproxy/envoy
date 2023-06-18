@@ -59,7 +59,7 @@ private:
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
-  Http::FilterFactoryCb createFilterServerFactoryFromProtoTyped(
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(

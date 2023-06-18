@@ -122,7 +122,6 @@ paths:
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
     - source/common/http/filter_chain_helper.cc
-    - source/common/http/request_id_extension_impl.cc
     - source/common/http/utility.cc
     - source/common/http/hash_policy.cc
     - source/common/http/utility.h
