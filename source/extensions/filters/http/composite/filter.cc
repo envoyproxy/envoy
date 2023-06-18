@@ -22,8 +22,8 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 }
 
 // Own version of lambda overloading since std::overloaded is not available to use yet.
-template <class... Ts> struct Overloaded : Ts... {
-  using Ts::operator()...;
+template <class... Ts> struct Overloaded : Ts... { 
+  using Ts::operator()...; 
 };
 
 template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
@@ -102,6 +102,8 @@ Matcher::MatchCallbackStatus Filter::onMatchCallback(const Matcher::Action& acti
 
     if (enhanced_match_callback) {
       return Matcher::MatchCallbackStatus::StopAndFailStream;
+    } else {
+      return Matcher::MatchCallbackStatus::Continue;
     }
   }
 
