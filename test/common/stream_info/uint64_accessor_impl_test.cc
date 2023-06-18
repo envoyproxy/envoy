@@ -20,6 +20,12 @@ TEST(UInt64AccessorImplTest, IncrementValue) {
   EXPECT_EQ(0xdeadbeefdeadbef0, accessor.value());
 }
 
+TEST(UInt64AccessorImplTest, TestProto) {
+  UInt64AccessorImpl accessor(0xdeadbeefdeadbeef);
+  auto message = accessor.serializeAsProto();
+  EXPECT_NE(nullptr, message);
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
