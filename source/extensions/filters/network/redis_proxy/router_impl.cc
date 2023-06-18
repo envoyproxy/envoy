@@ -87,17 +87,18 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     value = prefix_lookup_table_.findLongestPrefix(key.c_str());
   }
 
-  if (value != nullptr) {
-    if (value->removePrefix()) {
-      key.erase(0, value->prefix().length());
-    }
-    if (!value->keyFormatter().empty()) {
-      formatKey(key, value->keyFormatter());
-    }
-    return value;
+  if (value == nullptr) {
+    // prefix route not found, default to catch all route.
+    value = catch_all_route_;
   }
 
-  return catch_all_route_;
+  if (value->removePrefix()) {
+    key.erase(0, value->prefix().length());
+  }
+  if (!value->keyFormatter().empty()) {
+    formatKey(key, value->keyFormatter());
+  }
+  return value;
 }
 
 void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) {

@@ -42,7 +42,7 @@ public:
                                const Protobuf::Reflection* reflection,
                                const validate::FieldRules& rules,
                                const absl::Span<const Protobuf::Message* const>& parents,
-                               const bool force_create);
+                               bool force_create, bool cut_off);
 
   // Handle all validation rules for intrinsic types like int, uint and string.
   // Messages are more complicated to handle and can not be handled here.
@@ -52,19 +52,20 @@ public:
                 T, typename std::result_of<decltype(RULEGETTER)(validate::FieldRules)>::type>>
   void handleIntrinsicTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                                  const Protobuf::Reflection* reflection,
-                                 const validate::FieldRules& rules, const bool force);
+                                 const validate::FieldRules& rules, bool force);
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                const absl::Span<const Protobuf::Message* const> parents) override;
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-               const absl::Span<const Protobuf::Message* const> parents, const bool force_create);
+               const absl::Span<const Protobuf::Message* const> parents, bool force_create,
+               bool cut_off);
 
   void onEnterMessage(Protobuf::Message& msg, absl::Span<const Protobuf::Message* const> parents,
-                      bool, absl::string_view const& field_name) override;
+                      bool, absl::string_view field_name) override;
 
   void onLeaveMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>, bool,
-                      absl::string_view const&) override;
+                      absl::string_view) override;
 
 private:
   Mutator mutator_;

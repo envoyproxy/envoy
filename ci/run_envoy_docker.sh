@@ -124,15 +124,22 @@ docker run --rm \
        -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
+       -e ENVOY_BRANCH \
        -e ENVOY_RBE \
        -e ENVOY_BUILD_IMAGE \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
        -e ENVOY_BUILD_DEBUG_INFORMATION \
        -e ENVOY_BUILD_FILTER_EXAMPLE \
+       -e ENVOY_COMMIT \
+       -e ENVOY_HEAD_REF \
+       -e ENVOY_PUBLISH_DRY_RUN \
+       -e ENVOY_REPO \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_TOKEN \
+       -e GITHUB_APP_ID \
+       -e GITHUB_INSTALL_ID \
        -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \

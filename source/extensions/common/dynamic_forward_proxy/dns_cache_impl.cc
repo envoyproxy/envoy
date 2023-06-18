@@ -83,8 +83,10 @@ DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
-DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port, bool is_proxy_lookup,
-                                LoadDnsCacheEntryCallbacks& callbacks) {
+DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_port,
+                                bool is_proxy_lookup, LoadDnsCacheEntryCallbacks& callbacks) {
+  std::string host = DnsHostInfo::normalizeHostForDfp(raw_host, default_port);
+
   ENVOY_LOG(debug, "thread local lookup for host '{}' {}", host,
             is_proxy_lookup ? "proxy mode " : "");
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;

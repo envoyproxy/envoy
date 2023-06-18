@@ -156,7 +156,9 @@ public:
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
-  void move(Buffer::Instance& rhs, uint64_t length) override {
+  void move(Buffer::Instance& rhs, uint64_t length) override { move(rhs, length, false); }
+
+  void move(Buffer::Instance& rhs, uint64_t length, bool) override {
     StringBuffer& src = dynamic_cast<StringBuffer&>(rhs);
     add(src.start(), length);
     src.start_ += length;

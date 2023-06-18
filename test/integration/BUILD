@@ -1053,7 +1053,6 @@ envoy_cc_test_library(
         "//source/common/config:api_version_lib",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
-        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/load_balancing_policies/maglev:config",
@@ -1081,7 +1080,9 @@ envoy_cc_test_library(
     ] + select({
         "//bazel:apple": ["//source/extensions/network/dns_resolver/apple:config"],
         "//conditions:default": [],
-    }),
+    }) + envoy_select_enable_yaml([
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+    ]),
 )
 
 envoy_cc_test_library(
@@ -1101,12 +1102,14 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = [
         "server.cc",
+        "ssl_utility.cc",
         "utility.cc",
-    ] + envoy_select_enable_yaml(["ssl_utility.cc"]),
+    ],
     hdrs = [
         "server.h",
+        "ssl_utility.h",
         "utility.h",
-    ] + envoy_select_enable_yaml(["ssl_utility.h"]),
+    ],
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
@@ -1140,6 +1143,8 @@ envoy_cc_test_library(
         "//source/server:options_lib",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/config:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -1157,10 +1162,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ] + envoy_select_enable_yaml([
-        "//test/common/upstream:utility_lib",
-        "//test/config:utility_lib",
-    ]),
+    ],
 )
 
 envoy_cc_test_library(
@@ -2273,6 +2275,7 @@ envoy_cc_test(
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
+        ":socket_interface_swap_lib",
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",

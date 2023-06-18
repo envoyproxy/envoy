@@ -969,6 +969,22 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return stream_info.bytesReceived();
                                   });
                             }}},
+                          {"BYTES_RETRANSMITTED",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoUInt64FieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.bytesRetransmitted();
+                                  });
+                            }}},
+                          {"PACKETS_RETRANSMITTED",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoUInt64FieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.packetsRetransmitted();
+                                  });
+                            }}},
                           {"UPSTREAM_WIRE_BYTES_RECEIVED",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {

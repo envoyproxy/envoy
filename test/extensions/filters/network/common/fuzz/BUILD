@@ -7,7 +7,11 @@ load(
 )
 load(
     "//source/extensions:all_extensions.bzl",
-    "envoy_all_network_filters",
+    "envoy_filters_from_selected",
+)
+load(
+    ":config.bzl",
+    "READFILTER_FUZZ_FILTERS",
 )
 
 licenses(["notice"])  # Apache 2
@@ -85,16 +89,25 @@ envoy_cc_fuzz_test(
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
     dictionaries = ["network_readfilter_fuzz_test.dict"],
-    # All Envoy network filters must be linked to the test in order for the fuzzer to pick
-    # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-    ] + envoy_all_network_filters(),
+    ] + envoy_filters_from_selected(READFILTER_FUZZ_FILTERS),
 )
+
+# The filters to be fuzzed by the network_writefilter_fuzz_test. Prefer to add only stable filters,
+# that do not have a dedicated fuzzer to them.
+WRITEFILTER_FUZZ_FILTERS = [
+    "envoy.filters.network.zookeeper_proxy",
+    "envoy.filters.network.kafka_broker",
+    "envoy.filters.network.mongo_proxy",
+    "envoy.filters.network.mysql_proxy",
+    # TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it
+    # supports untrusted data.
+]
 
 envoy_cc_test_library(
     name = "uber_writefilter_lib",
@@ -123,8 +136,6 @@ envoy_cc_fuzz_test(
         ":uber_writefilter_lib",
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/mongo_proxy:config",
-        "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/config:utility_lib",
-    ],
+    ] + envoy_filters_from_selected(WRITEFILTER_FUZZ_FILTERS),
 )

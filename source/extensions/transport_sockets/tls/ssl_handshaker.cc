@@ -48,7 +48,6 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
   cert_validation_result_ =
       succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   if (cert_validate_result_callback_.has_value()) {
-    ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
     // This is an async cert validation.
     cert_validate_result_callback_.reset();
     // Resume handshake.

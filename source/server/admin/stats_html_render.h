@@ -35,16 +35,23 @@ public:
     StatsTextRender::generate(response, name, value);
   }
 
-  // generate() call directly calls parent method, which is needed to allow gcc
-  // to compile, otherwise it warns about hidden overrides.
-  void generate(Buffer::Instance& response, const std::string& name,
+  // We override the generate method for HTML to trigger some JS that will
+  // render the histogram graphically. We will render that from JavaScript
+  // and convey the histogram data to the JS via JSON, so we can delegate
+  // to an instantiated JSON `sub-renderer` that will write into json_data_.
+  void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
-    StatsTextRender::generate(response, name, histogram);
+    histogram_json_render_->generate(json_data_, name, histogram);
   }
+
   void finalize(Buffer::Instance&) override;
 
 private:
   const bool active_{false};
+  Buffer::OwnedImpl json_data_;
+  std::unique_ptr<StatsJsonRender> histogram_json_render_;
+  Http::ResponseHeaderMapPtr json_response_headers_; // ignored.
+  std::unique_ptr<Http::ResponseHeaderMap> json_headers_;
 };
 
 } // namespace Server

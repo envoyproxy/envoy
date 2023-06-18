@@ -375,6 +375,13 @@ config_setting(
     values = {"define": "envoy_yaml=disabled"},
 )
 
+# The goal here is to allow Envoy to build with this option but it is not yet
+# complete.  See https://github.com/envoyproxy/envoy/issues/27412
+config_setting(
+    name = "disable_exceptions",
+    values = {"define": "envoy_exceptions=disabled"},
+)
+
 config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
@@ -464,7 +471,6 @@ config_setting(
     name = "boringssl_fips",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )

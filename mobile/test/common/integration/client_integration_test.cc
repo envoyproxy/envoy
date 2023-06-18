@@ -97,7 +97,7 @@ void ClientIntegrationTest::trickleTest() {
 
   stream_prototype_->setOnData([this](envoy_data c_data, bool) {
     if (explicit_flow_control_) {
-      // Allow reading up to 100 bytes
+      // Allow reading up to 100 bytes.
       stream_->readData(100);
     }
     cc_.on_data_calls++;
@@ -508,12 +508,12 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-TEST_P(ClientIntegrationTest, TestAdmin) {
-  builder_.enableAdminInterface(true);
+TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
+
+  std::string stats = engine_->dumpStats();
+  EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
 }
-#endif
 
 } // namespace
 } // namespace Envoy

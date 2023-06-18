@@ -11,7 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Typed configuration that may be used for starting Envoy.
 @interface EnvoyConfiguration : NSObject
 
-@property (nonatomic, assign) BOOL adminInterfaceEnabled;
 @property (nonatomic, strong, nullable) NSString *grpcStatsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
@@ -39,7 +38,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
-@property (nonatomic, strong) NSArray<EMODirectResponse *> *typedDirectResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -64,8 +62,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Create a new instance of the configuration.
  */
-- (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
+- (instancetype)initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
@@ -94,8 +91,6 @@ NS_ASSUME_NONNULL_BEGIN
                                             appId:(NSString *)appId
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
-                             typedDirectResponses:
-                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:

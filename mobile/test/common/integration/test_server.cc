@@ -4,6 +4,7 @@
 
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 
 namespace Envoy {
 
@@ -58,29 +59,35 @@ TestServer::TestServer()
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
 }
 
-void TestServer::startTestServer(bool use_quic) {
+void TestServer::startTestServer(TestServerType test_server_type) {
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock, false, false);
   // end pre-setup
+  Network::DownstreamTransportSocketFactoryPtr factory;
 
-  if (use_quic) {
+  switch (test_server_type) {
+  case TestServerType::HTTP3:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
-  } else {
+    factory = createQuicUpstreamTlsContext(factory_context_);
+    break;
+  case TestServerType::HTTP2_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+    factory = createUpstreamTlsContext(factory_context_);
+    break;
+  case TestServerType::HTTP1_WITHOUT_TLS:
+    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
+    factory = Network::Test::createRawBufferDownstreamSocketFactory();
+    break;
   }
-
-  Network::DownstreamTransportSocketFactoryPtr factory =
-      use_quic ? createQuicUpstreamTlsContext(factory_context_)
-               : createUpstreamTlsContext(factory_context_);
 
   upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
                                                    upstream_config_, true);
 
   // Legacy behavior for cronet tests.
-  if (use_quic) {
+  if (test_server_type == TestServerType::HTTP3) {
     upstream_->setResponseHeaders(
         std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
             {{":status", "200"},
@@ -101,5 +108,13 @@ void TestServer::shutdownTestServer() {
 int TestServer::getServerPort() {
   ASSERT(upstream_);
   return upstream_->localAddress()->ip()->port();
+}
+
+void TestServer::setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
+                                   absl::string_view response_body) {
+  upstream_->setResponseHeaders(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+          {{std::string(header_key), std::string(header_value)}, {":status", "200"}})));
+  upstream_->setResponseBody(std::string(response_body));
 }
 } // namespace Envoy

@@ -15,6 +15,7 @@ load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
+load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.18"
@@ -145,6 +146,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
     )
+
+    protoc_gen_jsonschema_go_dependencies()
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(

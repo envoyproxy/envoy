@@ -30,8 +30,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
                Server::Configuration::FactoryContext& context);
-  // TODO: delete config in Go
-  virtual ~FilterConfig() = default;
+  ~FilterConfig();
 
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
@@ -56,20 +55,22 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
 public:
   RoutePluginConfig(const std::string plugin_name,
-                    const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
-      : plugin_name_(plugin_name), plugin_config_(config.config()) {
-    ENVOY_LOG(debug, "initilizing golang filter route plugin config, type_url: {}",
-              config.config().type_url());
-  };
-  // TODO: delete plugin config in Go
-  ~RoutePluginConfig() = default;
-  uint64_t getMergedConfigId(uint64_t parent_id, std::string so_id);
+                    const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
+  ~RoutePluginConfig();
+  uint64_t getConfigId();
+  uint64_t getMergedConfigId(uint64_t parent_id);
 
 private:
   const std::string plugin_name_;
   const ProtobufWkt::Any plugin_config_;
+
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  uint64_t merged_config_id_{0};
+  // since these two fields are updated in worker threads, we need to protect them with a mutex.
+  uint64_t merged_config_id_ ABSL_GUARDED_BY(mutex_){0};
+  uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
+
+  absl::Mutex mutex_;
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
@@ -82,7 +83,7 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute&,
                        Server::Configuration::ServerFactoryContext&);
-  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name, std::string so_id) const;
+  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name) const;
 
   ~FilterConfigPerRoute() override { plugins_config_.clear(); }
 
@@ -181,6 +182,9 @@ public:
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
+  CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing);
+  CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
 
 private:
   bool hasDestroyed() {
@@ -257,6 +261,16 @@ public:
   FilterLogger() = default;
 
   void log(uint32_t level, absl::string_view message) const;
+  uint32_t level() const;
+};
+
+class GoStringFilterState : public StreamInfo::FilterState::Object {
+public:
+  GoStringFilterState(absl::string_view value) : value_(value) {}
+  const std::string& value() const { return value_; }
+
+private:
+  const std::string value_;
 };
 
 } // namespace Golang

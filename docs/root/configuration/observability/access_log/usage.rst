@@ -187,6 +187,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
 %PROTOCOL%
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.

@@ -37,8 +37,8 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 824 || sizeof(stream_info) == 840 ||
-                sizeof(stream_info) == 872)
+    ASSERT_TRUE(sizeof(stream_info) == 840 || sizeof(stream_info) == 856 ||
+                sizeof(stream_info) == 888)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -245,6 +245,8 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
+  s1.addBytesRetransmitted(1);
+  s1.addPacketsRetransmitted(1);
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -264,6 +266,8 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
   EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
+  EXPECT_EQ(s1.bytesRetransmitted(), s2.bytesRetransmitted());
+  EXPECT_EQ(s1.packetsRetransmitted(), s2.packetsRetransmitted());
 }
 
 TEST_F(StreamInfoImplTest, SetFrom) {
@@ -272,6 +276,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   // setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
+  s1.addBytesRetransmitted(1);
+  s1.addPacketsRetransmitted(1);
 
   // setFrom
   s1.setRouteName("foo");
@@ -322,6 +328,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
   EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
+  EXPECT_EQ(s1.bytesRetransmitted(), s2.bytesRetransmitted());
+  EXPECT_EQ(s1.packetsRetransmitted(), s2.packetsRetransmitted());
 
   // Copied by setFrom
   EXPECT_EQ(s1.getRouteName(), s2.getRouteName());

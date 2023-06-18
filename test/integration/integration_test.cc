@@ -924,16 +924,7 @@ TEST_P(IntegrationTest, TestInvalidTransferEncoding) {
   const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                               "identity\r\ntransfer-encoding: chunked \r\n\r\n";
   sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-#ifdef ENVOY_ENABLE_UHV
   EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
-#else
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
-    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
-  } else {
-    EXPECT_THAT(response, StartsWith("HTTP/1.1 501 Not Implemented\r\n"));
-  }
-#endif
 }
 
 TEST_P(IntegrationTest, TestPipelinedResponses) {
@@ -1536,6 +1527,36 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
       lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithMixedScheme) {
+  // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
+  // encountered via absolute URL with a port.
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithMixedSchemeLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme", "false");
+
+  // Mixed scheme requests will be rejected
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {

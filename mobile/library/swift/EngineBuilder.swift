@@ -19,7 +19,6 @@ open class EngineBuilder: NSObject {
     case custom(String)
   }
 
-  private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
@@ -59,7 +58,6 @@ open class EngineBuilder: NSObject {
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var runtimeGuards: [String: Bool] = [:]
-  private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var rtdsLayerName: String?
   private var rtdsTimeoutSeconds: UInt32 = 0
@@ -621,22 +619,6 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-#if ENVOY_ADMIN_FUNCTIONALITY
-  /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-  /// used for development/debugging purposes only. Enabling it in production may open
-  /// your app to security vulnerabilities.
-  ///
-  /// Note this will not work with the default production build, as it builds with admin
-  /// functionality disabled via --define=admin_functionality=disabled
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableAdminInterface() -> Self {
-    self.adminInterfaceEnabled = true
-    return self
-  }
-#endif
-
 #if canImport(EnvoyCxxSwiftInterop)
   /// Use Swift's experimental C++ interop support to generate the bootstrap object
   /// instead of going through the Objective-C layer.
@@ -693,18 +675,8 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add a direct response to be used when configuring the engine.
-  /// This function is internal so it is not publicly exposed to production builders,
-  /// but is available for use by the `TestEngineBuilder`.
-  ///
-  /// - parameter directResponse: The response configuration to add.
-  func addDirectResponseInternal(_ directResponse: DirectResponse) {
-    self.directResponses.append(directResponse)
-  }
-
   func makeConfig() -> EnvoyConfiguration {
     EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,
@@ -733,7 +705,6 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
@@ -773,9 +744,6 @@ private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
     var cxxBuilder = Envoy.Platform.EngineBuilder()
     cxxBuilder.addLogLevel(self.logLevel.toCXX())
-#if ENVOY_ADMIN_FUNCTIONALITY
-    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
-#endif
     if let grpcStatsDomain = self.grpcStatsDomain {
       cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
     }
@@ -814,10 +782,6 @@ private extension EngineBuilder {
 
     for (runtimeGuard, value) in self.runtimeGuards {
       cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for directResponse in self.directResponses {
-      cxxBuilder.addDirectResponse(directResponse.toCXX())
     }
 
     for filter in self.nativeFilterChain.reversed() {
