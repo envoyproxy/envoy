@@ -138,14 +138,6 @@ public:
   virtual size_t maxSessionKeys() const PURE;
 
   /**
-   * @return const std::string& with the signature algorithms for the context.
-   *         This is a :-delimited list of algorithms, see
-   *         https://tools.ietf.org/id/draft-ietf-tls-tls13-21.html#rfc.section.4.2.3
-   *         for names.
-   */
-  virtual const std::string& signingAlgorithmsForTest() const PURE;
-
-  /**
    * @return true if the enforcement that handshake will fail if the keyUsage extension is present
    * and incompatible with the TLS usage is enabled.
    */
