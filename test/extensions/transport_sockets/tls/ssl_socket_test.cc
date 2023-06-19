@@ -7077,9 +7077,9 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
 
 #if defined(WIN32)
-  // SSL library behaves differently on windows platform, the failure reason was not populated.
+  // SSL library on windows platform behaves differently, the failure reason was not populated.
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
-                                 /*expected_server_transport_failure_reason_empty_=*/false);
+                                 /*expected_server_transport_failure_reason_empty=*/true);
 #else
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
 #endif
