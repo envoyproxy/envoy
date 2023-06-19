@@ -61,6 +61,10 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   envoy::config::core::v3::Address address;
   Network::Utility::addressToProtobufAddress(*host.address(), address);
   *event.mutable_host() = std::move(address);
+  if (host.metadata() != nullptr) {
+    *event.mutable_metadata() = *host.metadata();
+  }
+  *event.mutable_locality() = host.locality();
 
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 

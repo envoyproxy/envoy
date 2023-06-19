@@ -89,6 +89,7 @@ message LatencyThresholdOverride {
     GetEphemerals = 23;
     GetAllChildrenNumber = 24;
     SetWatches2 = 25;
+    AddWatch = 26;
   }
 
   // The ZooKeeper opcodes. Can be found as part of the ZooKeeper source code:

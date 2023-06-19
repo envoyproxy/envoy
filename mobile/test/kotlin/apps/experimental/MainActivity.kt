@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.android.SharedPreferencesStore
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.CompressionAlgorithm
-import io.envoyproxy.envoymobile.EngineBuilderAdminUtil.enableAdminInterface
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
@@ -57,7 +56,6 @@ class MainActivity : Activity() {
       .addPlatformFilter(::DemoFilter)
       .addPlatformFilter(::BufferDemoFilter)
       .addPlatformFilter(::AsyncDemoFilter)
-      .enableAdminInterface()
       .enableDNSCache(true)
       // required by DNS cache
       .addKeyValueStore("reserved.platform_store", SharedPreferencesStore(preferences))

@@ -294,6 +294,10 @@ std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool c
   return copy;
 }
 
+bool TestStore::histogramRecordedValues(const std::string& name) const {
+  return histogram_values_map_.contains(name);
+}
+
 // TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.

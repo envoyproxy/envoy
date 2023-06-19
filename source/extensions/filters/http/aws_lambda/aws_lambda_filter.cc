@@ -312,10 +312,11 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
                                Buffer::Instance& body) {
   using source::extensions::filters::http::aws_lambda::Response;
   Response json_resp;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromJson(json_buf.toString(), json_resp,
                               ProtobufMessage::getNullValidationVisitor());
-  } catch (EnvoyException& ex) {
+  }
+  END_TRY catch (EnvoyException& ex) {
     // We would only get here if all of the following are true:
     // 1- Passthrough is set to false
     // 2- Lambda returned a 200 OK

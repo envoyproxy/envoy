@@ -21,37 +21,34 @@ std::string genSoPath(std::string name) {
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
   HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 100), 100);
 }
 
 TEST(DsoManagerTest, Pub) {
   auto id = "simple.so";
+  auto plugin_name = "example";
   auto path = genSoPath(id);
 
   // get before load http filter dso
-  auto dso = DsoManager<HttpFilterDsoImpl>::getDsoByID(id);
+  auto dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
   EXPECT_EQ(dso, nullptr);
 
   // first time load http filter dso
-  auto res = DsoManager<HttpFilterDsoImpl>::load(id, path);
-  EXPECT_EQ(res, true);
+  dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
+  EXPECT_NE(dso, nullptr);
 
   // get after load http filter dso
-  dso = DsoManager<HttpFilterDsoImpl>::getDsoByID(id);
+  dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
   EXPECT_NE(dso, nullptr);
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 200), 200);
 
   // second time load http filter dso
-  res = DsoManager<HttpFilterDsoImpl>::load(id, path);
-  EXPECT_EQ(res, true);
+  dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
+  EXPECT_NE(dso, nullptr);
 
   // first time load cluster specifier dso
-  res = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
-  EXPECT_EQ(res, true);
-
-  // get after load cluster specifier dso
-  auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::getDsoByID(id);
-  EXPECT_NE(cluster_dso, nullptr);
+  auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
+  EXPECT_NE(dso, nullptr);
 
   EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
 }
@@ -61,6 +58,24 @@ TEST(DsoInstanceTest, BadSo) {
   auto path = genSoPath("bad.so");
   ClusterSpecifierDsoPtr dso(new ClusterSpecifierDsoImpl(path));
   EXPECT_EQ(dso->loaded(), false);
+}
+
+// remove plugin config
+TEST(DsoInstanceTest, RemovePluginConfig) {
+  auto path = genSoPath("simple.so");
+  HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+  // new again, return 0, since it's already existing
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 0);
+
+  // remove it
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  // new again, after removed.
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+
+  // remove twice should be ok
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300);
 }
 
 } // namespace

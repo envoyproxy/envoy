@@ -110,6 +110,11 @@ message Bootstrap {
         // support all the format flags specified in the :option:`--log-format`
         // command line options section, except for the ``%v`` and ``%_`` flags.
         google.protobuf.Struct json_format = 1;
+
+        // Flush application log in a format defined by a string. The text format
+        // can support all the format flags specified in the :option:`--log-format`
+        // command line option section.
+        string text_format = 2;
       }
     }
 
