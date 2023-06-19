@@ -101,9 +101,9 @@ public:
   virtual void onCloseRequest() PURE;
   virtual void onResponseBytes(uint64_t bytes) PURE;
   virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
-                                 const std::chrono::milliseconds& latency) PURE;
+                                 const std::chrono::milliseconds latency) PURE;
   virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
-                          const std::chrono::milliseconds& latency) PURE;
+                          const std::chrono::milliseconds latency) PURE;
   virtual void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path,
                             int64_t zxid, int32_t error) PURE;
 };
@@ -174,7 +174,7 @@ private:
   void ensureMaxLength(int32_t len) const;
   std::string pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
-                            const std::chrono::milliseconds& latency);
+                            const std::chrono::milliseconds latency);
   void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
                        int32_t error);
   bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);

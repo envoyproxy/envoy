@@ -60,6 +60,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cluster_manager_impl_test",
+    size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
     args = [
         # Force creation of c-ares DnsResolverImpl when running test on macOS.
@@ -181,6 +182,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/health_check/event_sinks/file:file_sink_lib",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
@@ -203,6 +205,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_check/event_sinks/file/v3:pkg_cc_proto",
     ],
 )
 

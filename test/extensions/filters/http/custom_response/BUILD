@@ -82,6 +82,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.custom_response"],
     shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/config:well_known_names",

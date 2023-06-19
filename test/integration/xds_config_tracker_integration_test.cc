@@ -138,10 +138,10 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+        Network::Test::getLoopbackAddressString(ipVersion()));
     cluster2_ = ConfigHelper::buildStaticCluster(
         ClusterName2, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+        Network::Test::getLoopbackAddressString(ipVersion()));
 
     acceptXdsConnection();
     registerTestServerPorts({});

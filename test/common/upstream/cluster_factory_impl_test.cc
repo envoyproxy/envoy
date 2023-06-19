@@ -90,7 +90,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   auto create_result =
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
-  auto cluster = create_result.first;
+  auto cluster = create_result->first;
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
@@ -134,7 +134,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
   auto create_result =
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
-  auto cluster = create_result.first;
+  auto cluster = create_result->first;
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
@@ -176,7 +176,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
   auto create_result =
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
-  auto cluster = create_result.first;
+  auto cluster = create_result->first;
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
@@ -211,17 +211,15 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
           "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
           priority: 10
   )EOF";
-  // the factory is not registered, expect to throw
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-        auto create_result = ClusterFactoryImplBase::create(
-            cluster_config, server_context_, cm_, dns_resolver_fn_, ssl_context_manager_,
-            std::move(outlier_event_logger_), false);
-      },
-      EnvoyException,
-      "Didn't find a registered cluster factory implementation for name: "
-      "'envoy.clusters.bad_cluster_name'");
+  // the factory is not registered, expect to fail
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result =
+      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
+                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  EXPECT_FALSE(create_result.ok());
+  EXPECT_EQ(create_result.status().message(),
+            "Didn't find a registered cluster factory implementation for name: "
+            "'envoy.clusters.bad_cluster_name'");
 }
 
 TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
@@ -244,16 +242,14 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
         name: envoy.clusters.test_static
     )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-        auto create_result = ClusterFactoryImplBase::create(
-            cluster_config, server_context_, cm_, dns_resolver_fn_, ssl_context_manager_,
-            std::move(outlier_event_logger_), false);
-      },
-      EnvoyException,
-      "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
-      "'envoy.clusters.test_static'");
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result =
+      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
+                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  EXPECT_FALSE(create_result.ok());
+  EXPECT_EQ(create_result.status().message(),
+            "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+            "'envoy.clusters.test_static'");
 }
 
 } // namespace

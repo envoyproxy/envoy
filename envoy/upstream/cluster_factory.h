@@ -94,10 +94,10 @@ public:
    * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
-   * @return a pair containing the cluster instance as well as an option thread aware load
-   *         balancer if this cluster has an integrated load balancer.
+   * @return a pair containing the cluster instance as well as an option thread aware load balancer
+   * if this cluster has an integrated load balancer or an absl::Satus error on failure.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.clusters"; }

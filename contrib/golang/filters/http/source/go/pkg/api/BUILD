@@ -6,6 +6,7 @@ go_library(
     name = "api",
     srcs = [
         "capi.go",
+        "cgocheck.go",
         "filter.go",
         "type.go",
     ],

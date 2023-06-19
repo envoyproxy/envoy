@@ -26,6 +26,7 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche_platform_impl/quiche_flags_impl.h"
@@ -271,17 +272,39 @@ void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   }
 }
 
-// Handle an absolutely awful corner case where we explicitly shove a yaml percent in a proto string
-// value.
+// Handle an awful corner case where we explicitly shove a yaml percent in a proto string
+// value. Basically due to prior parsing logic we have to handle any combination
+// of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
+// E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
 void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator:")) {
+  if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
+    return;
+  }
+
+  const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
+
+  std::string match_string;
+  if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
+    return;
+  }
+
+  uint32_t numerator;
+  if (!absl::SimpleAtoi(match_string, &numerator)) {
     return;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  TRY_ASSERT_MAIN_THREAD { entry.fractional_percent_value_ = converted_fractional_percent; }
-  END_TRY
-  catch (const ProtoValidationException& ex) {
+  converted_fractional_percent.set_numerator(numerator);
+  entry.fractional_percent_value_ = converted_fractional_percent;
+
+  if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
     return;
+  }
+  if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
+    entry.fractional_percent_value_->set_denominator(
+        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  }
+  if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
+    entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   }
 }
 

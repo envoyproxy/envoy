@@ -332,6 +332,7 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
   }
 
   bool done = false;
+  Buffer::OwnedImpl body;
   switch (state.state()) {
   case FilterState::WaitingTrailer:
     done = doTrailerGo(state, trailers);
@@ -344,11 +345,15 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
     // do data first
     if (!state.isBufferDataEmpty()) {
       done = doDataGo(state, state.getBufferData(), false);
-    }
-    // NP: can not use done as condition here, since done will be false
-    // maybe we can remove the done variable totally? by using state_ only?
-    // continue trailers
-    if (state.state() == FilterState::WaitingTrailer) {
+      // NP: can not use done as condition here, since done will be false
+      // maybe we can remove the done variable totally? by using state_ only?
+      // continue trailers
+      if (state.state() == FilterState::WaitingTrailer) {
+        state.continueDoData();
+        done = doTrailerGo(state, trailers);
+      }
+    } else {
+      state.continueDoData();
       done = doTrailerGo(state, trailers);
     }
     break;
@@ -820,7 +825,7 @@ CAPIStatus Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value, headerAction act) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -835,7 +840,85 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  trailers_->setCopy(Http::LowerCaseString(key), value);
+  if (state.isThreadSafe()) {
+    switch (act) {
+    case HeaderAdd:
+      trailers_->addCopy(Http::LowerCaseString(key), value);
+      break;
+
+    case HeaderSet:
+      trailers_->setCopy(Http::LowerCaseString(key), value);
+      break;
+
+    default:
+      RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+    }
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+    auto value_str = std::string(value);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and
+    // writing in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
+        switch (act) {
+        case HeaderAdd:
+          trailers_->addCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        case HeaderSet:
+          trailers_->setCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        default:
+          RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+        }
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setTrailer");
+      }
+    });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::removeTrailer(absl::string_view key) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (trailers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+  if (state.isThreadSafe()) {
+    trailers_->remove(Http::LowerCaseString(key));
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        Thread::LockGuard lock(mutex_);
+        trailers_->remove(Http::LowerCaseString(key_str));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in removeTrailer");
+      }
+    });
+  }
   return CAPIStatus::CAPIOK;
 }
 
@@ -982,6 +1065,47 @@ void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filte
   state.streamInfo().setDynamicMetadata(filter_name, value);
 }
 
+CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
+                                        int state_type, int life_span, int stream_sharing) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    state.streamInfo().filterState()->setData(
+        key, std::make_shared<GoStringFilterState>(value),
+        static_cast<StreamInfo::FilterState::StateType>(state_type),
+        static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+        static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+  } else {
+    auto key_str = std::string(key);
+    auto filter_state = std::make_shared<GoStringFilterState>(value);
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post(
+        [this, &state, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
+          if (!weak_ptr.expired() && !hasDestroyed()) {
+            Thread::LockGuard lock(mutex_);
+            state.streamInfo().filterState()->setData(
+                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
+                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+          } else {
+            ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+          }
+        });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -1023,12 +1147,13 @@ uint64_t FilterConfig::getConfigId() {
     return config_id_;
   }
 
-  std::string str;
-  auto res = plugin_config_.SerializeToString(&str);
+  std::string buf;
+  auto res = plugin_config_.SerializeToString(&buf);
   ASSERT(res, "SerializeToString is always successful");
-  auto ptr = reinterpret_cast<unsigned long long>(str.data());
-  auto len = str.length();
-  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(ptr, len);
+  auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
+  auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
+  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
+                                                          buf.length());
   ASSERT(config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 
@@ -1044,7 +1169,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;
     auto route_plugin = it.second;
-    RoutePluginConfigPtr conf(new RoutePluginConfig(route_plugin));
+    RoutePluginConfigPtr conf(new RoutePluginConfig(plugin_name, route_plugin));
     ENVOY_LOG(debug, "per route golang filter config, type_url: {}",
               route_plugin.config().type_url());
     plugins_config_.insert({plugin_name, std::move(conf)});
@@ -1067,24 +1192,27 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
+  auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
   auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {
-    std::string str;
-    auto res = plugin_config_.SerializeToString(&str);
+    std::string buf;
+    auto res = plugin_config_.SerializeToString(&buf);
     ASSERT(res, "SerializeToString is always successful");
-    auto ptr = reinterpret_cast<unsigned long long>(str.data());
-    auto len = str.length();
-    config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
+    auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
+    config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
+                                                        buf.length());
     ASSERT(config_id_, "config id is always grows");
-    ENVOY_LOG(debug, "golang filter new per route plugin config, id: {}", config_id_);
+    ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
+              config_id_);
   }
 
-  merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(parent_id, config_id_);
+  merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(name_ptr, plugin_name_.length(),
+                                                               parent_id, config_id_);
   ASSERT(merged_config_id_, "config id is always grows");
-  ENVOY_LOG(debug, "golang filter merge plugin config, from {} + {} to {}", parent_id, config_id_,
-            merged_config_id_);
+  ENVOY_LOG(debug, "golang filter merge '{}' plugin config, from {} + {} to {}", plugin_name_,
+            parent_id, config_id_, merged_config_id_);
   return merged_config_id_;
 };
 
@@ -1126,6 +1254,8 @@ void FilterLogger::log(uint32_t level, absl::string_view message) const {
 
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
+
+uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER().level()); }
 
 } // namespace Golang
 } // namespace HttpFilters

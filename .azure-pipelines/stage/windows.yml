@@ -46,13 +46,13 @@ jobs:
       testRunTitle: "windows"
       searchFolder: $(Build.StagingDirectory)/tmp
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: windows.release
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
 
 - job: docker
   displayName: Build Docker image
@@ -101,7 +101,7 @@ jobs:
       pathtoPublish: "$(Build.StagingDirectory)/build_images"
       artifactName: docker_windows
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
 
 - job: released
   displayName: Complete

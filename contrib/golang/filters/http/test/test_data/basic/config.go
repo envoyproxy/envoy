@@ -8,7 +8,7 @@ import (
 const Name = "basic"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
 }
 
 func ConfigFactory(interface{}) api.StreamFilterFactory {

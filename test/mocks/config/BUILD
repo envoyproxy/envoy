@@ -32,6 +32,6 @@ envoy_cc_mock(
     srcs = ["custom_config_validators.cc"],
     hdrs = ["custom_config_validators.h"],
     deps = [
-        "//source/common/config:custom_config_validators_interface",
+        "//envoy/config:config_validator_interface",
     ],
 )

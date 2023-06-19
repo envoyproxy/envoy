@@ -6,27 +6,8 @@ parameters:
   type: string
   default: ""
 
-jobs:
-- job: examples
-  displayName: Examples (Docker/x64)
-  condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
-  pool:
-    vmImage: "ubuntu-20.04"
-  steps:
-  - bash: .azure-pipelines/cleanup.sh
-    displayName: "Removing tools from agent"
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "docker"
-      itemPattern: "docker/envoy*.tar"
-      targetPath: $(Build.StagingDirectory)
-  - bash: ./ci/do_ci.sh verify_examples
-    env:
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      NO_BUILD_SETUP: 1
-      # ENVOY_EXAMPLES_DEBUG: 1
 
+jobs:
 - job: packages_x64
   displayName: Debs (x64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -51,6 +32,7 @@ jobs:
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
     displayName: "Verify packages"
+
 - job: packages_arm64
   displayName: Debs (arm64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -77,7 +59,7 @@ jobs:
 
 - job: verified
   displayName: Verification complete
-  dependsOn: ["examples", "packages_x64", "packages_arm64"]
+  dependsOn: ["packages_x64", "packages_arm64"]
   pool:
     vmImage: "ubuntu-20.04"
   # This condition ensures that this (required) check passes if all of
@@ -87,7 +69,6 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:

@@ -14,11 +14,13 @@
 namespace Envoy {
 namespace Upstream {
 
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    Server::Configuration::ServerFactoryContext& server_context, ClusterManager& cm,
-    LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
+ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
+                               Server::Configuration::ServerFactoryContext& server_context,
+                               ClusterManager& cm, LazyCreateDnsResolver dns_resolver_fn,
+                               Ssl::ContextManager& ssl_context_manager,
+                               Outlier::EventLoggerSharedPtr outlier_event_logger,
+                               bool added_via_api) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -47,14 +49,14 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
       cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing() &&
       cluster.type() != envoy::config::cluster::v3::Cluster::STRICT_DNS) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "Cannot use hostname for consistent hashing loadbalancing for cluster of type: '{}'",
         cluster_type));
   }
   ClusterFactory* factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_type);
 
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
@@ -89,7 +91,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   return context.dnsResolver();
 }
 
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
 
@@ -101,7 +103,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     if (cluster.health_checks().size() != 1) {
-      throw EnvoyException("Multiple health checks not supported");
+      return absl::InvalidArgumentError("Multiple health checks not supported");
     } else {
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
           cluster.health_checks()[0], *new_cluster_pair.first, server_context.runtime(),

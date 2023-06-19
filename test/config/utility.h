@@ -139,12 +139,16 @@ public:
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
+  // Sets up config with the provided bootstrap.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
                const std::string& config = httpProxyConfig(false, false));
 
   static void
@@ -204,19 +208,23 @@ public:
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster
   buildStaticCluster(const std::string& name, int port, const std::string& address,
-                     const std::string& lb_policy = "ROUND_ROBIN");
+                     const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::cluster::v3::Cluster
-  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
-                                              const std::string& address,
-                                              const std::string& lb_policy = "ROUND_ROBIN");
+  static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
+      const std::string& name, int port, const std::string& address,
+      const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
-  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildCluster(const std::string& name,
+               const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                   envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::cluster::v3::Cluster
-  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildTlsCluster(const std::string& name,
+                  const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                      envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);

@@ -557,6 +557,7 @@ private:
 
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
+  Status checkProtocolVersion(RequestHeaderMap& headers);
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;

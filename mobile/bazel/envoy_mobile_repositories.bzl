@@ -38,15 +38,6 @@ def upstream_envoy_overrides():
         build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
     )
 
-    # This should be kept in sync with Envoy itself, we just need to apply this patch
-    # Remove this once https://boringssl-review.googlesource.com/c/boringssl/+/37804 is in master-with-bazel
-    http_archive(
-        name = "boringssl",
-        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
-        strip_prefix = "boringssl-648cbaf033401b7fe7acdce02f275b06a88aab5c",
-        urls = ["https://github.com/google/boringssl/archive/648cbaf033401b7fe7acdce02f275b06a88aab5c.tar.gz"],
-    )
-
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",

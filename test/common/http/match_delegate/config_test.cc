@@ -315,6 +315,63 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
   delegating_filter->decodeComplete();
 }
 
+// This function creates the matcher tree only with on_no_match set.
+template <class InputType, class ActionType>
+Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) {
+  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+      std::make_unique<InputType>(name),
+      Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
+          []() { return std::make_unique<ActionType>(); }, nullptr});
+
+  // No action is set on match. i.e., nullptr action factory cb.
+  tree->addChild(
+      value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; }, nullptr});
+  return tree;
+}
+
+TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {
+  // The filter is added, but the `on_no_match` action will be invoked since it is not matched on
+  // request header. The skip action is provided to `on_no_match` so we skip this filter.
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+
+  auto match_tree =
+      createMatchTreeWithOnNoMatch<Envoy::Http::Matching::HttpRequestHeadersDataInput, SkipAction>(
+          "match-header", "match");
+  auto delegating_filter =
+      std::make_shared<DelegatingStreamFilter>(match_tree, decoder_filter, nullptr);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{
+      new Envoy::Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                                {":path", "/"},
+                                                {":method", "GET"},
+                                                {"match-header", "not_match"},
+                                                {"content-type", "application/grpc"}}};
+  Envoy::Http::RequestTrailerMapPtr request_trailers{
+      new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
+  Envoy::Http::MetadataMap metadata_map;
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
+            delegating_filter->decodeMetadata(metadata_map));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->decodeTrailers(*request_trailers));
+  delegating_filter->decodeComplete();
+}
+
 TEST(DelegatingFilterTest, MatchTreeQueryParamsSkipActionDecodingHeaders) {
   // The filter is added, but since we match on the request header we skip the filter.
   std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(

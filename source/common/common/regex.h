@@ -28,15 +28,12 @@ public:
   explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config);
 
   // CompiledMatcher
-  bool match(absl::string_view value) const override {
-    return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
-  }
+  bool match(absl::string_view value) const override { return re2::RE2::FullMatch(value, regex_); }
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
     std::string result = std::string(value);
-    re2::RE2::GlobalReplace(&result, regex_,
-                            re2::StringPiece(substitution.data(), substitution.size()));
+    re2::RE2::GlobalReplace(&result, regex_, substitution);
     return result;
   }
 

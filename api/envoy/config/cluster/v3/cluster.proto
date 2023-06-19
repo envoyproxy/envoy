@@ -719,7 +719,7 @@ message Cluster {
     google.protobuf.DoubleValue per_upstream_preconnect_ratio = 1
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
 
-    // Indicates how many many streams (rounded up) can be anticipated across a cluster for each
+    // Indicates how many streams (rounded up) can be anticipated across a cluster for each
     // stream, useful for low QPS services. This is currently supported for a subset of
     // deterministic non-hash-based load-balancing algorithms (weighted round robin, random).
     // Unlike ``per_upstream_preconnect_ratio`` this preconnects across the upstream instances in a

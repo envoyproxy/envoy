@@ -177,9 +177,10 @@ public:
                                    Event::Dispatcher::RunType::NonBlock);
     connection_helper_.GetClock()->Now();
 
-    ON_CALL(writer_, WritePacket(_, _, _, _, _))
+    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
-                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*) {
+                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*,
+                                 const quic::QuicPacketWriterParams&) {
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));

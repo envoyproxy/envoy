@@ -1,6 +1,7 @@
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "test/common/integration/base_client_integration_test.h"
+#include "test/common/mocks/common/mocks.h"
 #include "test/integration/autonomous_upstream.h"
 
 #include "library/common/data/utility.h"
@@ -8,6 +9,8 @@
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
+using testing::_;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -22,10 +25,18 @@ public:
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
+
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
+  void trickleTest();
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -33,7 +44,156 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 void ClientIntegrationTest::basicTest() {
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+    if (end_stream) {
+      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+}
+
+TEST_P(ClientIntegrationTest, Basic) {
   initialize();
+  basicTest();
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
+TEST_P(ClientIntegrationTest, LargeResponse) {
+  initialize();
+  std::string data(1024 * 32, 'a');
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->setResponseBody(data);
+  basicTest();
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 32828);
+}
+
+void ClientIntegrationTest::trickleTest() {
+  autonomous_upstream_ = false;
+
+  initialize();
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
+    if (explicit_flow_control_) {
+      // Allow reading up to 100 bytes
+      stream_->readData(100);
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  if (explicit_flow_control_) {
+    // Allow reading up to 100 bytes
+    stream_->readData(100);
+  }
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  FakeHttpConnectionPtr upstream_connection;
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection));
+  ASSERT_TRUE(
+      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
+
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  for (int i = 0; i < 10; ++i) {
+    upstream_request->encodeData(1, i == 9);
+  }
+
+  terminal_callback_.waitReady();
+}
+
+TEST_P(ClientIntegrationTest, TrickleNoMinDelivery) {
+  min_delivery_size_ = 0;
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
+}
+
+TEST_P(ClientIntegrationTest, TrickleNoNoMinDeliveryExplicitFlowControl) {
+  min_delivery_size_ = 0;
+  explicit_flow_control_ = true;
+  trickleTest();
+  ASSERT_LE(cc_.on_data_calls, 11);
+}
+
+TEST_P(ClientIntegrationTest, TrickleMinDelivery) {
+  trickleTest();
+  ASSERT_EQ(cc_.on_data_calls, 2);
+}
+
+TEST_P(ClientIntegrationTest, TrickleNoMinDeliveryExplicitFlowControl) {
+  explicit_flow_control_ = true;
+  trickleTest();
+  ASSERT_EQ(cc_.on_data_calls, 2);
+}
+
+TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(false));
+
+  expect_data_streams_ = false;
+  initialize();
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+    if (end_stream) {
+      EXPECT_EQ(Data::Utility::copyToString(c_data), "Cleartext is not permitted");
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "400");
+  ASSERT_EQ(cc_.on_data_calls, 1);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, BasicHttps) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+  builder_.enablePlatformCertificatesValidation(true);
+
+  upstream_tls_ = true;
+
+  initialize();
+  default_request_headers_.setScheme("https");
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -68,8 +228,6 @@ void ClientIntegrationTest::basicTest() {
   ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
 }
-
-TEST_P(ClientIntegrationTest, Basic) { basicTest(); }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
   initialize();

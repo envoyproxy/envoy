@@ -10,6 +10,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/string_view.h"
@@ -191,7 +192,7 @@ public:
         mock_server_connection_, mock_server_callbacks_,
         Http2::CodecStats::atomicGet(http2_stats_, scope), random_, server_settings_,
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
 
     Buffer::OwnedImpl payload;
     payload.add(Http2Frame::Preamble, 24);
@@ -212,6 +213,7 @@ private:
   NiceMock<Network::MockConnection> mock_server_connection_;
   NiceMock<MockServerConnectionCallbacks> mock_server_callbacks_;
   NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 
   ServerConnectionPtr server_;
 };

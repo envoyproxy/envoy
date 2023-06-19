@@ -278,7 +278,7 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
 }
 
-void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id) {
   char* new_connection_id_data = new_connection_id.mutable_data();
   const char* old_connection_id_ptr = old_connection_id.data();
