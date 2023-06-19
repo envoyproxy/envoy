@@ -225,7 +225,7 @@ protected:
         i = normalHeaders().emplace(normalHeaders().end(), std::forward<Key>(key),
                                     std::forward<Value>(value)...);
 
-        // If same list is used for inline headers and normal headers, update preudo_headers_end_
+        // If same list is used for inline headers and normal headers, update pseudo_headers_end_
         // when first normal header is inserted.
         if (!use_separated_inline_headers_list_ && pseudo_headers_end_ == normalHeaders().end()) {
           pseudo_headers_end_ = i;
