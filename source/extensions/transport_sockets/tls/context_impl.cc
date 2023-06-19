@@ -559,12 +559,14 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
+#ifndef BORINGSSL_FIPS
   // Set the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an error
   // but is allowed because the enforcement that rsa key usage and tls usage need to be matched has
   // been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.set(1);
   }
+#endif
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

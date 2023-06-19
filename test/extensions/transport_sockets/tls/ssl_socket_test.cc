@@ -7051,8 +7051,10 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   // be successful.
   TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
   // `was_key_usage_invalid` stats is expected to set to report the mismatched usage.
+#ifndef BORINGSSL_FIPS
   test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
   testUtilV2(test_options);
+#endif
 }
 
 TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
