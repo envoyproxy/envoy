@@ -2266,6 +2266,7 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
       });
   // Prior response headers have already been sent. The stream is reset.
   ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
 }
 
 // Test clear route cache in both upstream and downstream header and body processing.
