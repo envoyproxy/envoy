@@ -2265,7 +2265,6 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
         return true;
       });
   // Prior response headers have already been sent. The stream is reset.
-  cleanupUpstreamAndDownstream();
   ASSERT_TRUE(response->waitForReset());
 }
 
