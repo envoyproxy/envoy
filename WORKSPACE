@@ -1,11 +1,5 @@
 workspace(name = "envoy")
 
-local_repository(
-    name = "envoy_build_config",
-    # Relative paths are also supported.
-    path = ".local",
-)
-
 load("//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()
