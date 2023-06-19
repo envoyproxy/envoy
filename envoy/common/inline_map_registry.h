@@ -345,6 +345,17 @@ public:
     return size;
   }
 
+  /**
+   * Initialize the custom inline key registrations. This may be called multiple times but only
+   * the first call will have effect and the rest will be no-op.
+   */
+  static void initialize() {
+    // registerRegistry() will be called on first use. Static ensures the same scope only be
+    // registered once.
+    static bool initialized = InlineMapRegistryManager::registerRegistry<Scope>();
+    RELEASE_ASSERT(initialized, "InlineMapRegistryManager::registerRegistry() failed");
+  }
+
 private:
   friend class InlineMapRegistryManager;
 
@@ -367,17 +378,6 @@ private:
     // Mark the registry as finalized to ensure that no further changes are allowed.
     mutableFinalized() = true;
     return debugInfo();
-  }
-
-  /**
-   * Initialize the custom inline key registrations. This may be called multiple times but only
-   * the first call will have effect and the rest will be no-op.
-   */
-  static void initialize() {
-    // registerRegistry() will be called on first use. Static ensures the same scope only be
-    // registered once.
-    static bool initialized = InlineMapRegistryManager::registerRegistry<Scope>();
-    RELEASE_ASSERT(initialized, "InlineMapRegistryManager::registerRegistry() failed");
   }
 
   static bool& mutableFinalized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool); }

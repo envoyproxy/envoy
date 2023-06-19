@@ -15,7 +15,7 @@ public:
     std::vector<typename InlineMapRegistry<InlineMapRegistryTestScope>::InlineHandle> handles;
 
     // Force the inline map registry to be initialized and be added to the registry manager.
-    InlineMapRegistry<InlineMapRegistryTestScope>::scopeId();
+    InlineMapRegistry<InlineMapRegistryTestScope>::initialize();
 
     for (size_t i = 0; i < N; ++i) {
       std::string key = "key_" + std::to_string(i);
@@ -23,7 +23,7 @@ public:
     }
 
     // Force the inline map registry to be finalized.
-    InlineMapRegistryManager::registryInfos();
+    InlineMapRegistryManager::registriesInfo();
 
     return handles;
   }
