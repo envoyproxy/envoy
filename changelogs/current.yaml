@@ -98,6 +98,12 @@ minor_behavior_changes:
   change: |
     Changed behavior of the unpausing connect with 2xx status codes. This change can be reverted temporarily by
     setting the runtime guard ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` to false.
+- area: http
+  change: |
+    The order of different HTTP headers in the request will not be reserved when the request is forwarded to upstream.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.separated_header_list_for_inline_headers`` to false. But the order of headers that
+    have the same name will still be reserved.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
