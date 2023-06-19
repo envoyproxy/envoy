@@ -2264,9 +2264,9 @@ TEST_P(ExtProcIntegrationTest, ResponseHeaderMutationResultSizeTest) {
         addMutationSetHeaders(8, *trailer_resp.mutable_header_mutation());
         return true;
       });
-  // The response header is already sent. So just wait for disconnect.
+  // Prior response headers have already been sent. The stream is reset.
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForReset());
 }
 
 // Test clear route cache in both upstream and downstream header and body processing.
