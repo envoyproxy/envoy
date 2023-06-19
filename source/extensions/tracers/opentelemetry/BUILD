@@ -36,7 +36,7 @@ envoy_cc_library(
         "tracer.h",
     ],
     deps = [
-        ":grpc_trace_exporter",
+        ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -47,9 +47,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_trace_exporter",
+    name = "trace_exporter",
     srcs = ["grpc_trace_exporter.cc"],
-    hdrs = ["grpc_trace_exporter.h"],
+    hdrs = [
+      "grpc_trace_exporter.h",
+      "trace_exporter.h"
+      ],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
