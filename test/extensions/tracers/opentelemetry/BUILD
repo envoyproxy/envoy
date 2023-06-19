@@ -73,7 +73,7 @@ envoy_extension_cc_test(
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
-        "//source/extensions/tracers/opentelemetry:grpc_trace_exporter",
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",

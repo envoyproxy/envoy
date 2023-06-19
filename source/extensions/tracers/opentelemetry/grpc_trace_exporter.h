@@ -7,6 +7,8 @@
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
+#include "trace_exporter.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -80,17 +82,15 @@ public:
   const Protobuf::MethodDescriptor& service_method_;
 };
 
-class OpenTelemetryGrpcTraceExporter : Logger::Loggable<Logger::Id::tracing> {
+class OpenTelemetryGrpcTraceExporter : public OpenTelemetryTraceExporter {
 public:
   OpenTelemetryGrpcTraceExporter(const Grpc::RawAsyncClientSharedPtr& client);
 
-  bool log(const ExportTraceServiceRequest& request);
+  bool log(const ExportTraceServiceRequest& request) override;
 
 private:
   OpenTelemetryGrpcTraceExporterClient client_;
 };
-
-using OpenTelemetryGrpcTraceExporterPtr = std::unique_ptr<OpenTelemetryGrpcTraceExporter>;
 
 } // namespace OpenTelemetry
 } // namespace Tracers
