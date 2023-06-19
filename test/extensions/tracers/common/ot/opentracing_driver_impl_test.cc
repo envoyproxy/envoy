@@ -151,8 +151,8 @@ public:
   }
 
   TestDriver(const std::shared_ptr<ContextIteratingTracer>& tracer, Stats::Scope& scope)
-      : OpenTracingDriver{scope},
-        propagation_mode_{PropagationMode::TracerNative}, recorder_{nullptr}, tracer_{tracer} {}
+      : OpenTracingDriver{scope}, propagation_mode_{PropagationMode::TracerNative},
+        recorder_{nullptr}, tracer_{tracer} {}
 
   const opentracing::mocktracer::InMemoryRecorder& recorder() const { return *recorder_; }
 

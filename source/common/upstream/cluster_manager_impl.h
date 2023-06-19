@@ -449,8 +449,8 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
-                                                                                    host)} {}
+          : host_handle_(host->acquireHandle()),
+            pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
@@ -654,8 +654,8 @@ private:
                 bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()),
-          added_via_api_(added_via_api), added_or_updated_{} {}
+          last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
+          added_or_updated_{} {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 

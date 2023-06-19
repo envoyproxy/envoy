@@ -196,7 +196,7 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, upstreamResponse, (ResponsePtr response, ExtendedOptions options));
   MOCK_METHOD(void, completeDirectly, ());
-  MOCK_METHOD(void, bindUpstreamConn, (Upstream::TcpPoolData &&));
+  MOCK_METHOD(void, bindUpstreamConn, (Upstream::TcpPoolData&&));
   MOCK_METHOD(OptRef<UpstreamManager>, boundUpstreamConn, ());
 
   bool has_upstream_manager_{};

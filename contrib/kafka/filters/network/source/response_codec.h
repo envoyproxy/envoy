@@ -66,8 +66,8 @@ public:
                   const ResponseParserResolver& response_parser_resolver,
                   const std::vector<ResponseCallbackSharedPtr> callbacks)
 
-      : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{
-                                                                  response_parser_resolver} {};
+      : AbstractMessageDecoder{callbacks}, factory_{factory},
+        response_parser_resolver_{response_parser_resolver} {};
 
   /**
    * Registers an expected message.
