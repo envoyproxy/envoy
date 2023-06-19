@@ -12,32 +12,10 @@
 
 namespace Envoy {
 
-class UntypedInlineHandle {
-public:
-  UntypedInlineHandle(uint64_t inline_scope_id, uint64_t inline_entry_id,
-                      absl::string_view inline_entry_key)
-      : inline_scope_id_(inline_scope_id), inline_entry_id_(inline_entry_id),
-        inline_entry_key_(inline_entry_key) {}
-
-  uint64_t inlineScopeId() const { return inline_scope_id_; }
-
-  uint64_t inlineEntryId() const { return inline_entry_id_; }
-
-  absl::string_view inlineEntryKey() const { return inline_entry_key_; }
-
-private:
-  uint64_t inline_scope_id_{};
-  uint64_t inline_entry_id_{};
-  absl::string_view inline_entry_key_;
-};
-
 /**
  * Information about the registry. This is used to print out the registry debug information.
  */
 struct InlineMapRegistryDebugInfo {
-  // Registry scope id for the registry, this is generated dynamically by the
-  // InlineMapRegistryManager.
-  uint64_t registry_scope_id;
   // Registry scope name for the registry, typically short string from
   // scope type.
   absl::string_view registry_scope_name;
@@ -45,43 +23,43 @@ struct InlineMapRegistryDebugInfo {
   std::vector<absl::string_view> registry_inline_keys;
 };
 
+/**
+ * Inline map registry manager that used to get all the inline map registries debug info.
+ * This is used to print out the inline map registries debug information and try to finalize
+ * all the inline map registries when the server is starting up.
+ */
 class InlineMapRegistryManager {
 public:
-  static const std::vector<InlineMapRegistryDebugInfo>& registryInfos() {
+  static const std::vector<InlineMapRegistryDebugInfo>& registriesInfo() {
     // Call finalize() to ensure that all finalizers are called.
     finalize();
-    return mutableRegistryInfos();
+    return mutableRegistriesInfo();
   }
 
   /**
-   * Generate a scope id for the given scope and register a finalizer to be called when
-   * InlineMapRegistry::finalize() is called.
+   * Register a finalizer to be called when InlineMapRegistry::finalize() is called.
    *
-   * NOTE: This is called by InlineMapRegistry::scopeId() and should never be called
+   * NOTE: This is called by InlineMapRegistry::finalize() and should never be called
    * manually.
    */
-  template <class Scope> static uint64_t generateScopeId();
+  template <class Scope> static bool registerRegistry();
 
 private:
   using Finalizer = std::function<InlineMapRegistryDebugInfo()>;
-
-  static uint64_t nextScopeId() {
-    static uint64_t next_scope_id = 0;
-    return next_scope_id++;
-  }
 
   /**
    * Call all finalizers. This should only be called once, after all registrations are
    * complete.
    */
   static void finalize() {
-    while (!mutableFinalizers().empty()) {
-      mutableRegistryInfos().push_back(mutableFinalizers().back()());
-      mutableFinalizers().pop_back();
+    auto& registries_info = mutableRegistriesInfo();
+    for (const auto& finalizer : mutableFinalizers()) {
+      registries_info.push_back(finalizer());
     }
+    mutableFinalizers().clear();
   }
 
-  static std::vector<InlineMapRegistryDebugInfo>& mutableRegistryInfos() {
+  static std::vector<InlineMapRegistryDebugInfo>& mutableRegistriesInfo() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(std::vector<InlineMapRegistryDebugInfo>);
   }
 
@@ -168,10 +146,6 @@ public:
     const T* lookup(InlineHandle handle) const { return lookupImpl(handle); }
     T* lookup(InlineHandle handle) { return lookupImpl(handle); }
 
-    // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
-    const T* lookup(UntypedInlineHandle handle) const { return lookupImpl(handle); }
-    T* lookup(UntypedInlineHandle handle) { return lookupImpl(handle); }
-
     // Set the entry for the given key. If the key is already present, overwrite it.
     void insert(absl::string_view key, TPtr value) {
       // Compute the hash value for the key and avoid computing it again in the lookup.
@@ -190,23 +164,6 @@ public:
       resetInlineMapEntry(handle.inlineEntryId(), std::move(value));
     }
 
-    // Set the entry for the given untyped handle. If the handle is not valid, do nothing.
-    void insert(UntypedInlineHandle handle, TPtr value) {
-      // If the scope id does not match, the handle is not valid.
-      if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
-        return;
-      }
-
-      // If the entry id is valid, it is an inline entry.
-      if (handle.inlineEntryId() < InlineMapRegistry::registrationMapSize()) {
-        resetInlineMapEntry(handle.inlineEntryId(), std::move(value));
-        return;
-      }
-
-      // Otherwise, try normal map entry.
-      normal_entries_[handle.inlineEntryKey()] = std::move(value);
-    }
-
     // Remove the entry for the given key. If the key is not found, do nothing.
     void remove(absl::string_view key) {
       // Compute the hash value for the key and avoid computing it again in the lookup.
@@ -221,23 +178,6 @@ public:
 
     // Remove the entry for the given handle. If the handle is not valid, do nothing.
     void remove(InlineHandle handle) { resetInlineMapEntry(handle.inlineEntryId()); }
-
-    // Remove the entry for the given untyped handle. If the handle is not valid, do nothing.
-    void remove(UntypedInlineHandle handle) {
-      // If the scope id does not match, the handle is not valid.
-      if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
-        return;
-      }
-
-      // If the entry id is valid, it is an inline entry.
-      if (handle.inlineEntryId() < InlineMapRegistry::registrationMapSize()) {
-        resetInlineMapEntry(handle.inlineEntryId());
-        return;
-      }
-
-      // Otherwise, try normal map entry.
-      normal_entries_.erase(handle.inlineEntryKey());
-    }
 
     void iterate(std::function<bool(absl::string_view, T*)> callback) const {
       for (const auto& entry : normal_entries_) {
@@ -301,25 +241,6 @@ public:
     T* lookupImpl(InlineHandle handle) const {
       ASSERT(handle.inlineEntryId() < InlineMapRegistry::registrationMapSize());
       return inline_entries_[handle.inlineEntryId()];
-    }
-
-    // Get the entry for the given untyped handle. If the handle is not valid, return nullptr.
-    T* lookupImpl(UntypedInlineHandle handle) const {
-      // If the scope id does not match, the handle is not valid.
-      if (handle.inlineScopeId() != InlineMapRegistry::scopeId()) {
-        return nullptr;
-      }
-
-      // If the entry id is valid, it is an inline entry.
-      if (handle.inlineEntryId() < InlineMapRegistry::registrationMapSize()) {
-        return inline_entries_[handle.inlineEntryId()];
-      }
-
-      // Otherwise, try normal map entry.
-      if (auto it = normal_entries_.find(handle.inlineEntryKey()); it != normal_entries_.end()) {
-        return it->second.get();
-      }
-      return nullptr;
     }
 
     void resetInlineMapEntry(uint64_t inline_entry_id, TPtr new_entry = nullptr) {
@@ -424,16 +345,6 @@ public:
     return size;
   }
 
-  /**
-   * Get the scope id for this registry. When called for the first time, this will generate a
-   * id and register a finalizer to the InlineMapRegistryManager.
-   */
-  static uint64_t scopeId() {
-    // Scope id is generated on first use. Static ensures that it is only generated once.
-    static uint64_t scope_id = InlineMapRegistryManager::generateScopeId<Scope>();
-    return scope_id;
-  }
-
 private:
   friend class InlineMapRegistryManager;
 
@@ -447,10 +358,10 @@ private:
    * in the registrationMapSize.
    */
   static InlineMapRegistryDebugInfo finalize() {
-    // Initialize the custom inline key registrations. If the initialize() or scopeId() is never
-    // called before, this call here will generate a scope id and register a finalizer to the
-    // manager to ensure that the InlineMapRegistryManager always could get all the debug info.
-    // If the initialize() or scopeId() is already called before, this will be a no-op.
+    // Initialize the custom inline key registrations. If the initialize()is never be called before,
+    // this call here will register a finalizer to the manager to ensure
+    // that the InlineMapRegistryManager always could get all the debug info. If the initialize() is
+    // already called before, this will be a no-op.
     initialize();
 
     // Mark the registry as finalized to ensure that no further changes are allowed.
@@ -463,8 +374,10 @@ private:
    * the first call will have effect and the rest will be no-op.
    */
   static void initialize() {
-    // Call scopeId() to ensure that the scope is initialized.
-    scopeId();
+    // registerRegistry() will be called on first use. Static ensures the same scope only be
+    // registered once.
+    static bool initialized = InlineMapRegistryManager::registerRegistry<Scope>();
+    RELEASE_ASSERT(initialized, "InlineMapRegistryManager::registerRegistry() failed");
   }
 
   static bool& mutableFinalized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool); }
@@ -486,20 +399,18 @@ private:
       all_inline_keys.push_back(absl::string_view(entry.first));
     }
 
-    return {scopeId(), Scope::name(), std::move(all_inline_keys)};
+    return {Scope::name(), std::move(all_inline_keys)};
   }
 };
 
-template <class Scope> uint64_t InlineMapRegistryManager::generateScopeId() {
+template <class Scope> bool InlineMapRegistryManager::registerRegistry() {
   // This function should never be called multiple times for same scope.
   static bool initialized = false;
   RELEASE_ASSERT(!initialized,
                  "InlineMapRegistryManager::generateScopeId() called twice for same scope");
 
-  const uint64_t scope_id = nextScopeId();
-  mutableFinalizers().push_back([scope_id]() -> InlineMapRegistryDebugInfo {
+  mutableFinalizers().push_back([]() -> InlineMapRegistryDebugInfo {
     using Registry = InlineMapRegistry<Scope>;
-    ASSERT(Registry::scopeId() == scope_id);
     return Registry::finalize();
   });
 
@@ -507,7 +418,7 @@ template <class Scope> uint64_t InlineMapRegistryManager::generateScopeId() {
   // if this function is called twice.
   initialized = true;
 
-  return scope_id;
+  return true;
 }
 
 } // namespace Envoy

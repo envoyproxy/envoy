@@ -9,8 +9,8 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   auto map =
       InlineMapRegistry<InlineMapRegistryTestScope<0>>::InlineMap<std::string>::createInlineMap();
 
-  EXPECT_EQ(InlineMapRegistryManager::registryInfos().size(), 1);
-  EXPECT_EQ(InlineMapRegistryManager::registryInfos()[0].registry_scope_name,
+  EXPECT_EQ(InlineMapRegistryManager::registriesInfo().size(), 1);
+  EXPECT_EQ(InlineMapRegistryManager::registriesInfo()[0].registry_scope_name,
             InlineMapRegistryTestScope<0>::name());
 
   // Insert keys.
@@ -24,22 +24,8 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
     EXPECT_EQ(*map->lookup("key_" + std::to_string(i)), "value_" + std::to_string(i));
   }
 
-  // Lookup by untyped inline handle.
-  for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    UntypedInlineHandle handle(InlineMapRegistry<InlineMapRegistryTestScope<0>>::scopeId(), i, key);
-    EXPECT_EQ(*map->lookup(handle), "value_" + std::to_string(i));
-  }
-
   // Lookup non-existing keys.
   EXPECT_EQ(map->lookup("non_existing_key"), nullptr);
-
-  // remove keys by untyped inline handle.
-  for (size_t i = 0; i < 100; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    UntypedInlineHandle handle(InlineMapRegistry<InlineMapRegistryTestScope<0>>::scopeId(), i, key);
-    map->remove(handle);
-  }
 
   // Remove keys.
   for (size_t i = 0; i < 200; ++i) {
@@ -65,14 +51,6 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
     EXPECT_EQ(*map->lookup("key_" + std::to_string(i)), "value_" + std::to_string(i));
   }
 
-  // Lookup by untyped inline handle.
-  for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    UntypedInlineHandle handle(InlineMapRegistry<InlineMapRegistryTestScope<20>>::scopeId(), i,
-                               key);
-    EXPECT_EQ(*map->lookup(handle), "value_" + std::to_string(i));
-  }
-
   // Lookup by typed inline handle.
   for (size_t i = 0; i < inline_hanldes.size(); ++i) {
     const std::string key = "key_" + std::to_string(i);
@@ -92,16 +70,8 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
     map->remove(handle);
   }
 
-  // Remove keys by untyped inline handle.
-  for (size_t i = 10; i < 30; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    UntypedInlineHandle handle(InlineMapRegistry<InlineMapRegistryTestScope<20>>::scopeId(), i,
-                               key);
-    map->remove(handle);
-  }
-
   // Remove keys.
-  for (size_t i = 30; i < 200; ++i) {
+  for (size_t i = 10; i < 200; ++i) {
     map->remove("key_" + std::to_string(i));
   }
 
