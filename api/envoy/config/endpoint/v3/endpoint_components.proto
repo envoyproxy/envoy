@@ -57,6 +57,11 @@ message Endpoint {
     bool disable_active_health_check = 4;
   }
 
+  message AdditionalAddress {
+    // Additional address that is associated with the endpoint.
+    core.v3.Address address = 1;
+  }
+
   // The upstream host address.
   //
   // .. attention::
@@ -82,6 +87,13 @@ message Endpoint {
   // that require a hostname, like
   // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
   string hostname = 3;
+
+  // An ordered list of addresses that together with `address` comprise the
+  // list of addresses for an endpoint. The address given in the `address` is
+  // prepended to this list. It is assumed that the list must already be
+  // sorted by preference order of the addresses. This will only be supported
+  // for STATIC and EDS clusters.
+  repeated AdditionalAddress additional_addresses = 4;
 }
 
 // An Endpoint that Envoy can route traffic to.

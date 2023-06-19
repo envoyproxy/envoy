@@ -1422,8 +1422,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   Network::MockTransportSocketFactory socket_factory;
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
       address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
@@ -1472,8 +1472,8 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   Network::MockTransportSocketFactory socket_factory;
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
       address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();

@@ -178,4 +178,50 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   codec_client_->close();
 }
 
+class ListenerMaxConnectionPerSocketEventTest : public OverloadIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerMaxConnectionPerSocketEventTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
+  auto set_max_connections_per_socket_event_to_two =
+      [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+          listener_config.mutable_max_connections_to_accept_per_socket_event()->set_value(2);
+        }
+      };
+  config_helper_.addConfigModifier(set_max_connections_per_socket_event_to_two);
+
+  initialize();
+  // Put envoy in overloaded state and check that it doesn't accept the new client connection.
+  updateResource(file_updater_1_, 0.95);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               1);
+
+  // The TCP stack will accept the connections, but the Envoy listener will not
+  // not yet acknowledge the connection.
+  std::vector<IntegrationCodecClientPtr> client_codecs;
+  for (int i = 0; i < 10; ++i) {
+    client_codecs.push_back(makeHttpConnection(makeClientConnection((lookupPort("http")))));
+    ASSERT_TRUE(client_codecs[i]->connected());
+  }
+
+  const std::string downstream_cx_active = (version_ == Network::Address::IpVersion::v4)
+                                               ? "listener.127.0.0.1_0.downstream_cx_active"
+                                               : "listener.[__1]_0.downstream_cx_active";
+  test_server_->waitForGaugeEq(downstream_cx_active, 0);
+
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 2 new connections", 5, {
+    // Reduce load a little to allow the connection to be accepted.
+    updateResource(file_updater_1_, 0.8);
+
+    // As we are using level trigger for listeners, all new connections get recognized.
+    test_server_->waitForGaugeEq(downstream_cx_active, 10);
+  });
+
+  std::for_each(client_codecs.begin(), client_codecs.end(),
+                [](IntegrationCodecClientPtr& client_codec) { client_codec->close(); });
+}
+
 } // namespace Envoy

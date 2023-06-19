@@ -1471,10 +1471,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
   auto excluded_list = std::make_shared<ExcludedHostVector>();
 
   for (const auto& host : hosts) {
-    if (host->coarseHealth() == Host::Health::Healthy) {
+    const Host::Health health_status = host->coarseHealth();
+    if (health_status == Host::Health::Healthy) {
       healthy_list->get().emplace_back(host);
-    }
-    if (host->coarseHealth() == Host::Health::Degraded) {
+    } else if (health_status == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
     if (excludeBasedOnHealthFlag(*host)) {
@@ -1527,6 +1527,7 @@ void ClusterImplBase::onPreInitComplete() {
 }
 
 void ClusterImplBase::onInitDone() {
+  info()->configUpdateStats().warming_state_.set(0);
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
@@ -1853,6 +1854,7 @@ void PriorityStateManager::initializePriorityFor(
 
 void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
   auto metadata = lb_endpoint.has_metadata()
@@ -1862,6 +1864,9 @@ void PriorityStateManager::registerHostForPriority(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
+  if (!address_list.empty()) {
+    host->setAddressList(address_list);
+  }
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

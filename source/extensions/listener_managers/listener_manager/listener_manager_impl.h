@@ -192,8 +192,9 @@ public:
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
-                           const std::string& version_info, bool added_via_api) override;
+  absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                           const std::string& version_info,
+                                           bool added_via_api) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                     const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);
