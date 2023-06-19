@@ -26,12 +26,14 @@ constexpr const char* GetAccessTokenBodyFormatString =
 
 } // namespace
 
-void OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::string& secret) {
+void OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id,
+                                           const std::string& secret) {
   const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
   const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
 
   Http::RequestMessagePtr request = createPostRequest();
-  const std::string body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
+  const std::string body =
+      fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
   request->body().add(body);
   request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");

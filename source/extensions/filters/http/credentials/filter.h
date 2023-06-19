@@ -7,7 +7,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
-#include "envoy/extensions/filters/http/credentials/v3alpha/injector.pb.h"
+#include "envoy/extensions/filters/http/credentials/v3alpha/credential_injector.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
@@ -19,7 +19,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/http/rest_api_fetcher.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -36,8 +36,8 @@ namespace Credentials {
 /**
  * All stats for the Credentials Injector filter. @see stats_macros.h
  */
-#define ALL_CREDENTIAL_FILTER_STATS(COUNTER)                                                            \
-  COUNTER(credential_injected)                                                                          \
+#define ALL_CREDENTIAL_FILTER_STATS(COUNTER)                                                       \
+  COUNTER(credential_injected)                                                                     \
   COUNTER(credential_error)
 
 /**
@@ -53,9 +53,9 @@ struct FilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::credentials::v3alpha::Injector& proto_config,
-               CredentialSourcePtr credential_source,
-               Stats::Scope& scope,
+  FilterConfig(const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
+                   proto_config,
+               CredentialSourcePtr credential_source, Stats::Scope& scope,
                const std::string& stats_prefix);
   FilterStats& stats() { return stats_; }
   CredentialSource& credentialSource() const { return *credential_source_; }

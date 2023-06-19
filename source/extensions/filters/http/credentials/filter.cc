@@ -35,23 +35,20 @@ namespace HttpFilters {
 namespace Credentials {
 
 namespace {
-  constexpr absl::string_view UnauthorizedBodyMessage = "Credential aquisition flow failed.";
+constexpr absl::string_view UnauthorizedBodyMessage = "Credential aquisition flow failed.";
 }
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::credentials::v3alpha::Injector&,
-    CredentialSourcePtr credential_source,
-    Stats::Scope& scope, const std::string& stats_prefix)
-    : stats_(FilterConfig::generateStats(stats_prefix, scope)), credential_source_(std::move(credential_source)) {
-}
+    const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&,
+    CredentialSourcePtr credential_source, Stats::Scope& scope, const std::string& stats_prefix)
+    : stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      credential_source_(std::move(credential_source)) {}
 
 FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return {ALL_CREDENTIAL_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  return {ALL_CREDENTIAL_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
-Filter::Filter(FilterConfigSharedPtr config) :
-  config_(std::move(config)) {
-}
+Filter::Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
@@ -60,8 +57,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto authorization = headers.get(Http::CustomHeaders::get().Authorization);
   if (!authorization.empty()) {
-      // skip requests with an explicit `Authorization` header
-      return Http::FilterHeadersStatus::Continue;
+    // skip requests with an explicit `Authorization` header
+    return Http::FilterHeadersStatus::Continue;
   }
 
   request_headers_ = &headers;
@@ -90,7 +87,7 @@ void Filter::onFailure() {
 
 void Filter::onDestroy() {
   if (in_flight_credential_request_ != nullptr) {
-      in_flight_credential_request_->cancel();
+    in_flight_credential_request_->cancel();
   }
 }
 
