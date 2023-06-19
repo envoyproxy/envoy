@@ -71,6 +71,12 @@ TEST(UtilsTest, MaybeSetApplicationLogFormat) {
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
+    log_config.mutable_log_format()->mutable_text_format();
+    EXPECT_NO_THROW(Utility::maybeSetApplicationLogFormat(log_config));
+  }
+
+  {
+    envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     auto* format = log_config.mutable_log_format()->mutable_json_format();
     format->mutable_fields()->operator[]("Message").set_string_value("%v");
     EXPECT_THROW_WITH_MESSAGE(Utility::maybeSetApplicationLogFormat(log_config), EnvoyException,

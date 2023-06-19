@@ -2068,7 +2068,8 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
-// callback on the filter when header modifications are also present.
+// callback on the filter for inbound traffic when header modifications are also present.
+// Also verify it does not make the callback for outbound traffic.
 TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   initialize(R"EOF(
   grpc_service:
@@ -2079,7 +2080,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
-
+  // Call ClearRouteCache() for inbound traffic with header mutation.
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
@@ -2096,9 +2097,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   Buffer::OwnedImpl buffered_response_data;
   setUpEncodingBuffering(buffered_response_data);
 
+  // There is no ClearRouteCache() call for outbound traffic.
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
-
-  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
@@ -2109,6 +2109,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   filter_->onDestroy();
 
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
@@ -2116,7 +2118,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 }
 
 // Verify that the "disable_route_cache_clearing" setting prevents the "clear_route_cache" flag
-// from performing route clearing callbacks when enabled.
+// from performing route clearing callbacks for inbound traffic when enabled.
 TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   initialize(R"EOF(
   grpc_service:
@@ -2127,6 +2129,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   disable_clear_route_cache: true
   )EOF");
 
+  // The ClearRouteCache() call is disabled for inbound traffic.
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
@@ -2143,6 +2146,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   Buffer::OwnedImpl buffered_response_data;
   setUpEncodingBuffering(buffered_response_data);
 
+  // There is no ClearRouteCache() call for outbound traffic regardless.
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
@@ -2154,8 +2158,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
 
   filter_->onDestroy();
 
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 1);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
-  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 2);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
@@ -2163,7 +2167,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag does not preform
-// route clearing callbacks on the filter when no header changes are present.
+// route clearing callbacks for inbound traffic when no header changes are present.
 TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
   initialize(R"EOF(
   grpc_service:
@@ -2173,6 +2177,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
     response_body_mode: "BUFFERED"
   )EOF");
 
+  // Do not call ClearRouteCache() for inbound traffic without header mutation.
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2185,6 +2190,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
   Buffer::OwnedImpl buffered_response_data;
   setUpEncodingBuffering(buffered_response_data);
 
+  // There is no ClearRouteCache() call for outbound traffic regardless.
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2192,7 +2198,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
 
   filter_->onDestroy();
 
-  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 2);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 1);
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);

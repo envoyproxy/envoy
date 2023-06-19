@@ -28,6 +28,8 @@ upstreams and control plane xDS clusters.
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
+.. _config_cluster_stats:
+
 Every cluster has a statistics tree rooted at *cluster.<name>.* with the following statistics:
 
 .. csv-table::
@@ -102,6 +104,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch
+  warming_state, Gauge, Current cluster warming state
   max_host_weight, Gauge, Maximum weight of any host in the cluster
   bind_errors, Counter, Total errors binding the socket to the configured source address
   assignment_timeout_received, Counter, Total assignments received with endpoint lease information.

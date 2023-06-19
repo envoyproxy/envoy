@@ -299,8 +299,8 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
-      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      String grpcStatsDomain, long connectTimeoutSeconds, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,

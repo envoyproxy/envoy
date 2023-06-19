@@ -50,12 +50,17 @@ HttpFilterDsoImpl::HttpFilterDsoImpl(const std::string dso_name) : HttpFilterDso
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
       envoy_go_filter_merge_http_plugin_config_, handler_, dso_name,
       "envoyGoFilterMergeHttpPluginConfig");
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_destroy_http_plugin_config_)>(
+      envoy_go_filter_destroy_http_plugin_config_, handler_, dso_name,
+      "envoyGoFilterDestroyHttpPluginConfig");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
       envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
       envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
       envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_go_request_sema_dec_)>(
+      envoy_go_filter_go_request_sema_dec_, handler_, dso_name, "envoyGoRequestSemaDec");
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
@@ -68,6 +73,11 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUi
                                                                GoUint64 p2, GoUint64 p3) {
   ASSERT(envoy_go_filter_merge_http_plugin_config_ != nullptr);
   return envoy_go_filter_merge_http_plugin_config_(p0, p1, p2, p3);
+}
+
+void HttpFilterDsoImpl::envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) {
+  ASSERT(envoy_go_filter_destroy_http_plugin_config_ != nullptr);
+  return envoy_go_filter_destroy_http_plugin_config_(p0);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
@@ -85,6 +95,11 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1
 void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
   ASSERT(envoy_go_filter_on_http_destroy_ != nullptr);
   envoy_go_filter_on_http_destroy_(p0, GoUint64(p1));
+}
+
+void HttpFilterDsoImpl::envoyGoRequestSemaDec(httpRequest* p0) {
+  ASSERT(envoy_go_filter_go_request_sema_dec_ != nullptr);
+  envoy_go_filter_go_request_sema_dec_(p0);
 }
 
 ClusterSpecifierDsoImpl::ClusterSpecifierDsoImpl(const std::string dso_name)

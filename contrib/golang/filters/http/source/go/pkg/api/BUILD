@@ -5,7 +5,6 @@ licenses(["notice"])  # Apache 2
 go_library(
     name = "api",
     srcs = [
-        "capi.go",
         "cgocheck.go",
         "filter.go",
         "type.go",
