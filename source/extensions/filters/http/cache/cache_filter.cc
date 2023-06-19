@@ -33,7 +33,7 @@ using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
 CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
                          const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
+                         OptRef<HttpCache> http_cache)
     : time_source_(time_source), cache_(http_cache),
       vary_allow_list_(config.allowed_vary_headers()) {}
 
@@ -58,6 +58,10 @@ void CacheFilter::onStreamComplete() {
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
+  if (!cache_) {
+    filter_state_ = FilterState::NotServingFromCache;
+    return Http::FilterHeadersStatus::Continue;
+  }
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
   if (!end_stream) {
     ENVOY_STREAM_LOG(
@@ -79,7 +83,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
-  lookup_ = cache_.makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
+  lookup_ = cache_->makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
   getHeaders(headers);
@@ -102,6 +106,18 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (lookup_result_ == nullptr) {
+    // Filter chain iteration is paused while a lookup is outstanding, but the filter chain manager
+    // can still generate a local reply. One case where this can happen is when a downstream idle
+    // timeout fires, which may mean that the HttpCache isn't correctly setting deadlines on its
+    // asynchronous operations or is otherwise getting stuck.
+    ENVOY_BUG(Http::Utility::getResponseStatus(headers) !=
+                  Envoy::enumToInt(Http::Code::RequestTimeout),
+              "Request timed out while cache lookup was outstanding.");
+    filter_state_ = FilterState::NotServingFromCache;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
@@ -118,14 +134,15 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
+    insert_ = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     // TODO(capoferro): Note that there is currently no way to communicate back to the CacheFilter
     // that an insert has failed. If an insert fails partway, it's better not to send additional
     // chunks to the cache if we're already in a failure state and should abort, but we can only do
     // that if we can communicate failures back to the filter, so we should fix this.
-    insert_->insertHeaders(headers, metadata, end_stream);
+    insert_->insertHeaders(
+        headers, metadata, [](bool) {}, end_stream);
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
@@ -175,7 +192,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   response_has_trailers_ = !trailers.empty();
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers);
+    insert_->insertTrailers(trailers, [](bool) {});
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 
@@ -212,11 +229,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we
-        // should convert this to an ENVOY_BUG.
-        ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                      "response required validation, but filter state is ",
-                                      filter_state));
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state));
       }
       return LookupStatus::Unknown;
     }
@@ -227,12 +242,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we should
-    // convert this to an ENVOY_BUG.
-    ENVOY_LOG(error,
-              absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                  std::to_string(static_cast<int>(filter_state))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
@@ -277,25 +289,16 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   lookup_->getHeaders([self, &request_headers,
                        &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
-    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
-    // LookupResult is non-copyable as LookupResult::headers_ is a unique_ptr, which is
-    // non-copyable. Hence, "result" is decomposed when captured, and re-instantiated inside the
-    // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
-    // unique_ptr when the result is re-instantiated.
-    dispatcher.post([self, &request_headers, status = result.cache_entry_status_,
-                     headers_raw_ptr = result.headers_.release(),
-                     range_details = std::move(result.range_details_),
-                     content_length = result.content_length_,
-                     has_trailers = result.has_trailers_]() mutable {
-      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
-      Http::ResponseHeaderMapPtr headers = absl::WrapUnique(headers_raw_ptr);
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onHeaders(
-            LookupResult{status, std::move(headers), content_length, range_details, has_trailers},
-            request_headers);
-      }
-    });
+    dispatcher.post(
+        [self, &request_headers, status = result.cache_entry_status_,
+         headers = std::move(result.headers_), range_details = std::move(result.range_details_),
+         content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
+          if (CacheFilterSharedPtr cache_filter = self.lock()) {
+            cache_filter->onHeaders(LookupResult{status, std::move(headers), content_length,
+                                                 range_details, has_trailers},
+                                    request_headers);
+          }
+        });
   });
 }
 
@@ -314,13 +317,7 @@ void CacheFilter::getBody() {
   lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
                                              Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
-    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
-    // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
-    // wrapped in a unique_ptr inside the lambda.
-    dispatcher.post([self, body_raw_ptr = body.release()] {
-      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
-      Buffer::InstancePtr body = absl::WrapUnique(body_raw_ptr);
+    dispatcher.post([self, body = std::move(body)]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
         cache_filter->onBody(std::move(body));
       }
@@ -344,13 +341,8 @@ void CacheFilter::getTrailers() {
   lookup_->getTrailers([self, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
-    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
-    // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
-    // pointer then wrapped in a unique_ptr inside the lambda.
-    dispatcher.post([self, trailers_raw_ptr = trailers.release()] {
-      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
-      Http::ResponseTrailerMapPtr trailers = absl::WrapUnique(trailers_raw_ptr);
+    // The lambda must be mutable as it captures trailers as a unique_ptr.
+    dispatcher.post([self, trailers = std::move(trailers)]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
         cache_filter->onTrailers(std::move(trailers));
       }
@@ -361,6 +353,11 @@ void CacheFilter::getTrailers() {
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
   if (filter_state_ == FilterState::Destroyed) {
     // The filter is being destroyed, any callbacks should be ignored.
+    return;
+  }
+  if (filter_state_ == FilterState::NotServingFromCache) {
+    // A response was injected into the filter chain before the cache lookup finished, e.g. because
+    // the request stream timed out.
     return;
   }
 
@@ -554,7 +551,8 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata);
+    cache_->updateHeaders(*lookup_, response_headers, metadata,
+                          [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     insert_status_ = InsertStatus::HeaderUpdate;
   }
 

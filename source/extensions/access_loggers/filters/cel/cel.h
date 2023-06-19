@@ -22,7 +22,8 @@ public:
 
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers,
+                AccessLog::AccessLogType access_log_type) const override;
 
 private:
   const google::api::expr::v1alpha1::Expr parsed_expr_;

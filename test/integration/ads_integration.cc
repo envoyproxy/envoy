@@ -33,10 +33,11 @@ AdsIntegrationTest::AdsIntegrationTest()
   // 'ads_cluster'.
   skip_tag_extraction_rule_check_ = true;
 
-  if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-      sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                    (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                     sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                        ? "true"
+                                        : "false");
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
@@ -46,17 +47,18 @@ AdsIntegrationTest::AdsIntegrationTest()
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
-envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
-                                                                     const std::string& lb_policy) {
+envoy::config::cluster::v3::Cluster
+AdsIntegrationTest::buildCluster(const std::string& name,
+                                 envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
   return ConfigHelper::buildCluster(name, lb_policy);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
-  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN");
+  return ConfigHelper::buildTlsCluster(name, envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "MAGLEV");
+  return ConfigHelper::buildCluster(name, envoy::config::cluster::v3::Cluster::MAGLEV);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -290,19 +292,19 @@ void AdsIntegrationTest::testBasicFlow() {
 }
 
 envoy::admin::v3::ClustersConfigDump AdsIntegrationTest::getClustersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "clusters")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::ListenersConfigDump AdsIntegrationTest::getListenersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::RoutesConfigDump AdsIntegrationTest::getRoutesConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "routes")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 }

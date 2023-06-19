@@ -194,6 +194,10 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<ConnectMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule);
+  case RouteMatch::PathSpecifierCase::kPathMatchPolicy:
+    // TODO(silverstar194): Implement matcher for template based match
+    throw EnvoyException("RouteMatch: path_match_policy is not supported");
+    break;
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }

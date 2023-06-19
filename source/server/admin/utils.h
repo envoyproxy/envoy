@@ -13,10 +13,7 @@ namespace Envoy {
 namespace Server {
 namespace Utility {
 
-enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint };
-
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed);
+enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint, Detailed };
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 

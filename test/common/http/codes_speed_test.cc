@@ -20,7 +20,7 @@ namespace Http {
 template <class SymbolTableClass> class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
-      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
+      : global_store_(symbol_table_), cluster_store_(symbol_table_), code_stats_(symbol_table_),
         pool_(symbol_table_), from_az_(pool_.add("from_az")), prefix_(pool_.add("prefix")),
         req_vcluster_name_(pool_.add("req_vcluster_name")),
         test_cluster_(pool_.add("test-cluster")), test_vhost_(pool_.add("test-vhost")),
@@ -32,8 +32,8 @@ public:
                    Stats::StatName request_route_name = Stats::StatName(),
                    Stats::StatName from_az = Stats::StatName(),
                    Stats::StatName to_az = Stats::StatName()) {
-    Http::CodeStats::ResponseStatInfo info{global_store_,
-                                           cluster_scope_,
+    Http::CodeStats::ResponseStatInfo info{*global_store_.rootScope(),
+                                           *cluster_store_.rootScope(),
                                            prefix_,
                                            code,
                                            internal_request,
@@ -62,16 +62,23 @@ public:
 
   void responseTiming() {
     Stats::StatName empty_stat_name;
-    Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, prefix_,         std::chrono::milliseconds(5), true,
-        true,          vhost_name_,    empty_stat_name, req_vcluster_name_,           from_az_,
-        to_az_};
+    Http::CodeStats::ResponseTimingInfo info{*global_store_.rootScope(),
+                                             *cluster_store_.rootScope(),
+                                             prefix_,
+                                             std::chrono::milliseconds(5),
+                                             true,
+                                             true,
+                                             vhost_name_,
+                                             empty_stat_name,
+                                             req_vcluster_name_,
+                                             from_az_,
+                                             to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 
   SymbolTableClass symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
-  Stats::IsolatedStoreImpl cluster_scope_;
+  Stats::IsolatedStoreImpl cluster_store_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
   const Stats::StatName from_az_;

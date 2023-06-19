@@ -1103,7 +1103,6 @@ TEST(BufferHelperTest, AddFragments) {
     }
   }
 }
-
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

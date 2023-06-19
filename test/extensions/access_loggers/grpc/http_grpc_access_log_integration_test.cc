@@ -90,10 +90,12 @@ public:
     log_entry->mutable_common_properties()->clear_downstream_direct_remote_address();
     log_entry->mutable_common_properties()->clear_downstream_local_address();
     log_entry->mutable_common_properties()->clear_start_time();
+    log_entry->mutable_common_properties()->clear_duration();
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
+    log_entry->mutable_common_properties()->clear_stream_id();
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
       node->clear_extensions();
@@ -139,14 +141,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
       scheme: http
       authority: host
+      downstream_header_bytes_received: 11
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -163,14 +170,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -212,14 +224,19 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      access_log_type: DownstreamEnd
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -314,8 +331,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);
 
   // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

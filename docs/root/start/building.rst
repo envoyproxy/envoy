@@ -17,11 +17,11 @@ Linux/Mac Target Requirements
 -----------------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
-recent Linux including Ubuntu 18.04 LTS.
+recent Linux including Ubuntu 20.04 LTS.
 
 Building Envoy has the following requirements:
 
-* GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred where Clang is used (see below).
+* Recent GCC/Clang versions - please see :repo:`bazel/README.md#supported-compiler-versions` for current requirements.
 * About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyperthreading). See
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.

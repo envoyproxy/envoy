@@ -26,7 +26,8 @@ namespace Oauth2 {
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                                   const std::string& secret, const std::string& cb_url) PURE;
+                                   const std::string& secret, const std::string& cb_url,
+                                   AuthType auth_type = AuthType::UrlEncodedBody) PURE;
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -35,7 +36,7 @@ public:
                  Http::AsyncClient::FailureReason f) override PURE;
 };
 
-class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
+class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
       : cm_(cm), uri_(uri) {}
@@ -51,7 +52,8 @@ public:
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                           const std::string& secret, const std::string& cb_url) override;
+                           const std::string& secret, const std::string& cb_url,
+                           AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

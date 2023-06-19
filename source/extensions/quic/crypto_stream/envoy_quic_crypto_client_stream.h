@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {

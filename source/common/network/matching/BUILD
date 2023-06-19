@@ -18,7 +18,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "inputs_lib",
-    srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     deps = [
         "//envoy/http:filter_interface",

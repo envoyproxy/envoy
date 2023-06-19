@@ -34,6 +34,7 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
     "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_go_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_go_proto",
+    "@opentelemetry_proto//:metrics": "@opentelemetry_proto//:metrics_go_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_go_proto",
 }
 
@@ -45,16 +46,18 @@ EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_cc",
     "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_cc_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_cc_proto",
+    "@opentelemetry_proto//:metrics": "@opentelemetry_proto//:metrics_cc_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_cc_proto",
 }
 
 # This maps from the Bazel proto_library target to the Python language binding target for external dependencies.
 EXTERNAL_PROTO_PY_BAZEL_DEP_MAP = {
-    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:checked_py_proto",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_py_proto",
+    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_py_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_py",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_py",
     "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_py_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_py_proto",
+    "@opentelemetry_proto//:metrics": "@opentelemetry_proto//:metrics_py_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_py_proto",
 }

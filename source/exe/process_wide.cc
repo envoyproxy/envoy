@@ -1,11 +1,11 @@
 #include "source/exe/process_wide.h"
 
+#include "envoy/network/dns_resolver.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/http/http2/nghttp2.h"
 #include "source/server/proto_descriptors.h"
-
-#include "ares.h"
 
 namespace Envoy {
 namespace {
@@ -21,7 +21,7 @@ struct InitData {
 InitData& processWideInitData() { MUTABLE_CONSTRUCT_ON_FIRST_USE(InitData); };
 } // namespace
 
-ProcessWide::ProcessWide() {
+ProcessWide::ProcessWide(bool validate_proto_descriptors) {
   // Note that the following lock has the dual use of making sure that initialization is complete
   // before a second caller can enter and leave this function.
   auto& init_data = processWideInitData();
@@ -30,9 +30,10 @@ ProcessWide::ProcessWide() {
   if (init_data.count_++ == 0) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
-    ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
-    Envoy::Server::validateProtoDescriptors();
+    if (validate_proto_descriptors) {
+      Envoy::Server::validateProtoDescriptors();
+    }
     Http::Http2::initializeNghttp2Logging();
 
     // We do not initialize Google gRPC here -- we instead instantiate
@@ -58,7 +59,7 @@ ProcessWide::~ProcessWide() {
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {
-    ares_library_cleanup();
+    Network::DnsResolverFactory::terminateFactories();
   }
 }
 

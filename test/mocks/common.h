@@ -124,7 +124,8 @@ public:
 
 class MockKeyValueStore : public KeyValueStore {
 public:
-  MOCK_METHOD(void, addOrUpdate, (absl::string_view, absl::string_view));
+  MOCK_METHOD(void, addOrUpdate,
+              (absl::string_view, absl::string_view, absl::optional<std::chrono::seconds> ttl));
   MOCK_METHOD(void, remove, (absl::string_view));
   MOCK_METHOD(absl::optional<absl::string_view>, get, (absl::string_view));
   MOCK_METHOD(void, flush, ());
@@ -140,6 +141,18 @@ public:
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
   std::string category() const override { return "envoy.common.key_value"; }
   std::string name() const override { return "mock_key_value_store_factory"; }
+};
+
+struct MockLogSink : Logger::SinkDelegate {
+  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~MockLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
 };
 
 } // namespace Envoy

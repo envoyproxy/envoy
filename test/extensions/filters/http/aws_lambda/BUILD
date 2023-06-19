@@ -25,6 +25,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "aws_lambda_filter_integration_test",
+    size = "large",
     srcs = ["aws_lambda_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_lambda"],
     deps = [

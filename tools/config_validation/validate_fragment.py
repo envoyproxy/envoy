@@ -10,13 +10,11 @@ import pathlib
 
 from envoy.base.utils import ProtobufValidator
 
-from bazel_tools.tools.python.runfiles import runfiles
-
 # These functions are maintained for backward compatibility, and to provide a CLI validator
 # Do not use these functions as library code - use `envoy.base.utils.ProtobufValidator` directly.
 
 
-def validate_fragment(type_name, fragment, descriptor_path=None):
+def validate_fragment(type_name, fragment, descriptor_path):
     """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
     Throws Protobuf errors on parsing exceptions, successful validations produce
@@ -28,16 +26,10 @@ def validate_fragment(type_name, fragment, descriptor_path=None):
         fragment: a dictionary representing the parsed JSON/YAML configuration
           fragment.
     """
-    if not descriptor_path:
-        r = runfiles.Create()
-        descriptor_path = r.Rlocation('envoy_api/v3_proto_set')
     ProtobufValidator(descriptor_path).validate_fragment(fragment, type_name)
 
 
-def validate_yaml(type_name, content, descriptor_path=None):
-    if not descriptor_path:
-        r = runfiles.Create()
-        descriptor_path = r.Rlocation('envoy_api/v3_proto_set')
+def validate_yaml(type_name, content, descriptor_path):
     ProtobufValidator(descriptor_path).validate_yaml(content, message_type)
 
 

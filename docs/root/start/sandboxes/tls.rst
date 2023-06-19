@@ -53,9 +53,9 @@ The upstream services listen on the internal Docker network on ports ``80`` and 
 
   $ pwd
   envoy/examples/tls
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
          Name                            Command                 State          Ports
   -----------------------------------------------------------------------------------------------

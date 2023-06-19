@@ -102,7 +102,7 @@ public:
 
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
   bool isTerminalFilterByProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 };
@@ -122,6 +122,7 @@ public:
       - filters:
         - name: envoy.test.router
           typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
       )EOF");
   }
 

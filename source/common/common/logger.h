@@ -15,6 +15,7 @@
 #include "source/common/common/logger_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/non_copyable.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -24,6 +25,12 @@
 
 namespace Envoy {
 namespace Logger {
+
+#ifdef ENVOY_DISABLE_LOGGING
+const static bool should_log = false;
+#else
+const static bool should_log = true;
+#endif
 
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
@@ -64,9 +71,12 @@ namespace Logger {
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
+  FUNCTION(multi_connection)                                                                       \
+  FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
+  FUNCTION(rate_limit_quota)                                                                       \
   FUNCTION(rbac)                                                                                   \
   FUNCTION(rds)                                                                                    \
   FUNCTION(redis)                                                                                  \
@@ -80,7 +90,8 @@ namespace Logger {
   FUNCTION(tracing)                                                                                \
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
-  FUNCTION(wasm)
+  FUNCTION(wasm)                                                                                   \
+  FUNCTION(websocket)
 
 // clang-format off
 enum class Id {
@@ -190,16 +201,18 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class... Args>
+  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, Args... msg) {
+                         absl::string_view component, FmtStr fmt_str, Args... msg) {
     auto tls_sink = tlsDelegate();
     if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      tls_sink->logWithStableName(stable_name, level, component,
+                                  fmt::format(fmt::runtime(fmt_str), msg...));
       return;
     }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+    sink_->logWithStableName(stable_name, level, component,
+                             fmt::format(fmt::runtime(fmt_str), msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
@@ -342,6 +355,16 @@ public:
   static void setLogFormat(const std::string& log_format);
 
   /**
+   * Sets the log format from a struct as a JSON string.
+   */
+  static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
+
+  /**
+   * @return true if JSON log format was set using setJsonLogFormat.
+   */
+  static bool jsonLogFormatSet() { return json_log_format_set_; }
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -358,6 +381,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static bool json_log_format_set_;
 };
 
 /**
@@ -375,6 +400,30 @@ protected:
     return instance;
   }
 };
+
+namespace Utility {
+
+constexpr static absl::string_view TagsPrefix = "[Tags: ";
+constexpr static absl::string_view TagsSuffix = "] ";
+constexpr static absl::string_view TagsSuffixForSearch = "\"] ";
+
+/**
+ * Sets the log format for a specific logger.
+ */
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
+
+/**
+ * Serializes custom log tags to a string that will be prepended to the log message.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escaping.
+ */
+std::string serializeLogTags(const std::map<std::string, std::string>& tags);
+
+/**
+ * Escapes the payload to a JSON string and writes the output to the destination buffer.
+ */
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest);
+
+} // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
 // https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.
@@ -418,6 +467,31 @@ public:
   constexpr static char Placeholder = 'j';
 };
 
+class ExtractedTags : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedTags>();
+  }
+
+  constexpr static char Placeholder = '*';
+  constexpr static char JsonPropertyDeimilter = ',';
+};
+
+class ExtractedMessage : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedMessage>();
+  }
+
+  constexpr static char Placeholder = '+';
+};
+
 } // namespace CustomFlagFormatter
 } // namespace Logger
 
@@ -436,7 +510,7 @@ public:
 // The same filtering will also occur in spdlog::logger.
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
       LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
                  __VA_ARGS__);                                                                     \
     }                                                                                              \
@@ -450,7 +524,7 @@ public:
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+    if (Envoy::Logger::should_log && Envoy::Logger::Context::useFineGrainLogger()) {               \
       FINE_GRAIN_LOG(LEVEL, ##__VA_ARGS__);                                                        \
     } else {                                                                                       \
       ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \
@@ -489,6 +563,25 @@ public:
  * Command line options for log macros: use Fine-Grain Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
+/**
+ * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
+ * are serialized and prepended to the log message.
+ * For example, the map {{"key1","val1","key2","val2"}} would be serialized to:
+ * [Tags: "key1":"val1","key2":"val2"]. The serialization pattern is defined by
+ * Envoy::Logger::Utility::serializeLogTags function.
+ */
+#define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
+  ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to

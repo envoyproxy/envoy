@@ -4,8 +4,8 @@ Local rate limit
 ================
 
 * Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`
-* This filter should be configured with the name *envoy.filters.http.local_ratelimit*.
 
 The HTTP local rate limit filter applies a :ref:`token bucket
 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.token_bucket>` rate
@@ -93,8 +93,8 @@ Example filter configuration using descriptors:
    :lineno-start: 21
    :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
-In this example, requests are rate-limited for routes prefixed with "/foo" as
-follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
+In this example, requests are rate-limited for routes prefixed with "/foo" as follows.
+If requests come from a downstream service cluster "foo" for "/foo/bar"
 path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.

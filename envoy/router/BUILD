@@ -64,6 +64,8 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":internal_redirect_interface",
+        ":path_matcher_interface",
+        ":path_rewriter_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:conn_pool_interface",
         "//envoy/common:matchers_interface",
@@ -76,7 +78,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
         "//envoy/tcp:conn_pool_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
@@ -142,5 +144,27 @@ envoy_cc_library(
         ":router_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_matcher_interface",
+    hdrs = ["path_matcher.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_rewriter_interface",
+    hdrs = ["path_rewriter.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

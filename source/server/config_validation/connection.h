@@ -17,9 +17,10 @@ public:
                            Network::Address::InstanceConstSharedPtr remote_address,
                            Network::Address::InstanceConstSharedPtr source_address,
                            Network::TransportSocketPtr&& transport_socket,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           const Network::TransportSocketOptionsConstSharedPtr& transport_options)
       : Network::ClientConnectionImpl(dispatcher, remote_address, source_address,
-                                      std::move(transport_socket), options) {}
+                                      std::move(transport_socket), options, transport_options) {}
 
   // Unit tests may instantiate it without proper event machine and leave opened sockets.
   // Do some cleanup before invoking base class's destructor.

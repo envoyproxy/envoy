@@ -1,0 +1,28 @@
+# proto-file: third_party/envoy/src/test/extensions/filters/http/jwt_authn/jwt_authn_fuzz.proto
+# proto-message: JwtAuthnFuzzInput
+
+# bypass_cors_preflight
+config {
+  bypass_cors_preflight: true
+}
+request_data {
+  headers {
+    headers {
+      key: "access-control-request-method"
+      value: "GET,POST"
+    }
+    headers {
+      key: ":path"
+      value: "/foo/bar"
+    }
+    headers {
+      key: "origin"
+      value: "abc.com"
+    }
+    headers {
+      key: ":method"
+      value: "OPTIONS"
+    }
+  }
+}
+num_calls: 3

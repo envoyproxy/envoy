@@ -14,6 +14,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/const_singleton.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
@@ -116,7 +118,7 @@ uint64_t fractionalPercentDenominatorToInt(
 // @param default_value supplies the default if the field is not present.
 //
 // TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
-// Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
+// Issue: https://github.com/bufbuild/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   ([](const auto& msg) {                                                                           \
@@ -250,6 +252,7 @@ public:
    */
   static std::size_t hash(const Protobuf::Message& message);
 
+#ifdef ENVOY_ENABLE_YAML
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
@@ -267,6 +270,7 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+#endif
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -322,12 +326,14 @@ public:
     }
   }
 
+#ifdef ENVOY_ENABLE_YAML
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     loadFromYaml(yaml, message, validation_visitor);
     validate(message, validation_visitor);
   }
+#endif
 
   /**
    * Downcast and validate protoc-gen-validate constraints on a given protobuf.
@@ -356,6 +362,18 @@ public:
    * @throw EnvoyException if the message does not unpack.
    */
   static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+
+  /**
+   * Convert from google.protobuf.Any to a typed message. This should be used
+   * instead of the inbuilt UnpackTo as it performs validation of results.
+   *
+   * @param any_message source google.protobuf.Any message.
+   * @param message destination to unpack to.
+   *
+   * @return absl::Status
+   */
+  static absl::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                      Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
@@ -435,6 +453,7 @@ public:
     return reflection->GetString(message, name_field);
   }
 
+#ifdef ENVOY_ENABLE_YAML
   /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
    * messages to/from google.protobuf.Struct.
@@ -443,6 +462,7 @@ public:
    * @param source message.
    * @param dest message.
    */
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
   static void jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest);
   static void jsonConvert(const ProtobufWkt::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -478,25 +498,6 @@ public:
                            bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON as string from a google.protobuf.Message, crashing if the conversion to JSON
-   * fails. This method is safe so long as the message does not contain an Any proto with an
-   * unrecognized type or invalid data.
-   * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @param pretty_print whether the returned JSON should be formatted.
-   * @param always_print_primitive_fields whether to include primitive fields set to their default
-   * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return std::string of formatted JSON object.
-   */
-  static std::string getJsonStringFromMessageOrDie(const Protobuf::Message& message,
-                                                   bool pretty_print = false,
-                                                   bool always_print_primitive_fields = false) {
-    auto json_or_error =
-        getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
-    RELEASE_ASSERT(json_or_error.ok(), json_or_error.status().ToString());
-    return std::move(json_or_error).value();
-  }
-
-  /**
    * Extract JSON as string from a google.protobuf.Message, returning some error string if the
    * conversion to JSON fails.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
@@ -508,6 +509,7 @@ public:
   static std::string getJsonStringFromMessageOrError(const Protobuf::Message& message,
                                                      bool pretty_print = false,
                                                      bool always_print_primitive_fields = false);
+#endif
 
   /**
    * Utility method to create a Struct containing the passed in key/value strings.
@@ -562,16 +564,24 @@ public:
    * @throw EnvoyException if a conversion error occurs.
    */
   static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
+
+  /**
+   * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
+   * the input string is valid UTF-8, it will be returned unmodified.
+   */
+  static std::string sanitizeUtf8String(absl::string_view str);
 };
 
 class ValueUtil {
 public:
   static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
 
+#ifdef ENVOY_ENABLE_YAML
   /**
    * Load YAML string into ProtobufWkt::Value.
    */
   static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
+#endif
 
   /**
    * Compare two ProtobufWkt::Values for equality.
@@ -673,6 +683,14 @@ public:
    * @throw OutOfRangeException when duration is out-of-range.
    */
   static uint64_t durationToMilliseconds(const ProtobufWkt::Duration& duration);
+
+  /**
+   * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
+   * @param duration protobuf.
+   * @return duration in milliseconds or an error status.
+   */
+  static absl::StatusOr<uint64_t>
+  durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration);
 
   /**
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.

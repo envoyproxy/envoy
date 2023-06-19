@@ -132,8 +132,22 @@ TagNameValues::TagNameValues() {
   // internal state of the regex which performs better.
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
+  // Extract ext_authz stat_prefix field
+  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "cluster.*.ext_authz.$.**");
+  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "http.*.ext_authz.$.**");
+
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
+
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  // listener_manager.(worker_<id>.)*
+  // server.(worker_<id>.)*
+  addRe2(
+      WORKER_ID,
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
   addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
@@ -149,14 +163,23 @@ TagNameValues::TagNameValues() {
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
-  // listener_manager.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
-
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
 
   // thrift.(<stat_prefix>.)*
   addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
+
+  // (<stat_prefix>.).http_local_rate_limit.**
+  addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
+
+  // local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_NETWORK_RATELIMIT_PREFIX, "local_rate_limit.$.**");
+
+  // listener_local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_LISTENER_RATELIMIT_PREFIX, "listener_local_ratelimit.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -171,6 +172,7 @@ TEST_F(BinaryProtocolTest, ReadStructEnd) {
 
 TEST_F(BinaryProtocolTest, ReadFieldBegin) {
   BinaryProtocolImpl proto;
+  TestScopedRuntime scoped_runtime;
 
   // Insufficient data
   {
@@ -233,7 +235,7 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(buffer.length(), 0);
   }
 
-  // field id < 0
+  // field id < 0 and not allowed negative id
   {
     Buffer::OwnedImpl buffer;
     std::string name = "-";
@@ -242,6 +244,8 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
 
     buffer.writeByte(FieldType::I32);
     buffer.writeBEInt<int16_t>(-1);
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.thrift_allow_negative_field_ids", "false"}});
 
     EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
                               EnvoyException, "invalid binary protocol field id -1");
@@ -249,6 +253,25 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(field_type, FieldType::String);
     EXPECT_EQ(field_id, 1);
     EXPECT_EQ(buffer.length(), 3);
+  }
+
+  // field id < 0 and allowed negative id
+  {
+    Buffer::OwnedImpl buffer;
+    std::string name = "-";
+    FieldType field_type = FieldType::String;
+    int16_t field_id = 1;
+
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int16_t>(-1);
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.thrift_allow_negative_field_ids", "true"}});
+
+    EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
+    EXPECT_EQ(name, "");
+    EXPECT_EQ(field_type, FieldType::I32);
+    EXPECT_EQ(field_id, -1);
+    EXPECT_EQ(buffer.length(), 0);
   }
 }
 

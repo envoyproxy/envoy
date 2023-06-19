@@ -50,7 +50,7 @@ void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
   bool timer_fired = false;
-  if (!saw_end_stream_) {
+  while (!saw_end_stream_) {
     Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
       timer_fired = true;
       dispatcher_.exit();
@@ -59,8 +59,7 @@ AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::millisec
     waiting_for_end_stream_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
     if (!saw_end_stream_) {
-      // HTTP/1.1 may end stream by disconnecting.
-      ENVOY_LOG_MISC(warn, "No explicit end stream detected.");
+      ENVOY_LOG_MISC(warn, "non-end stream event.");
     }
     if (timer_fired) {
       return AssertionFailure() << "Timed out waiting for end stream\n";

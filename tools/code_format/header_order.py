@@ -13,7 +13,6 @@
 # canonical paths.
 
 import argparse
-import common
 import pathlib
 import re
 import sys
@@ -110,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--include_dir_order',
         type=str,
-        default=','.join(common.include_dir_order()),
+        default='',
         help='specify the header block include directory order')
     args = parser.parse_args()
     target_path = args.path

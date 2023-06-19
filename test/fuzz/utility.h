@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
@@ -53,7 +53,7 @@ inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
-    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+    if (http2::adapter::HeaderValidator::IsValidAuthority(absl::string_view(&c, 1))) {
       filtered.push_back(c);
     } else {
       filtered.push_back('0');
@@ -207,17 +207,6 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
 
   return data_chunks;
 }
-
-// Returns a vector of differences between expected and actual. An empty array indicates
-// expected==actual
-std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual);
-
-#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
-  {                                                                                                \
-    std::vector<std::string> diffs = fuzzFindDiffs(expected, actual);                              \
-    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
-                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
-  }
 
 } // namespace Fuzz
 } // namespace Envoy

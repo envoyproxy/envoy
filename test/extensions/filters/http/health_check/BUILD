@@ -41,10 +41,12 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "health_check_integration_test",
+    size = "large",
     srcs = [
         "health_check_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.health_check"],
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",

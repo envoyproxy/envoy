@@ -20,23 +20,35 @@ static_resources:
               - "*"
               routes:
               - match:
+                  prefix: "/multiple/lua/scripts"
+                route:
+                  cluster: web_service
+                typed_per_filter_config:
+                  lua_filter_with_custom_name_1:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+                    source_code:
+                      inline_string: |
+                        function envoy_on_response(response_handle)
+                          response_handle:headers():add("header_key_1", "header_value_1")
+                        end
+              - match:
                   prefix: "/"
                 route:
                   cluster: web_service
           http_filters:
-          - name: envoy.filters.http.lua
+          - name: lua_filter_with_custom_name_0
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-              inline_code: |
-                local mylibrary = require("lib.mylibrary")
+              default_source_code:
+                inline_string:
+                  local mylibrary = require("lib.mylibrary")
 
-                function envoy_on_request(request_handle)
-                  request_handle:headers():add("foo", mylibrary.foobar())
-                end
-                function envoy_on_response(response_handle)
-                  body_size = response_handle:body():length()
-                  response_handle:headers():add("response-body-size", tostring(body_size))
-                end
+                  function envoy_on_request(request_handle)
+                    request_handle:headers():add("foo", mylibrary.foobar())
+                  end
+          - name: lua_filter_with_custom_name_1
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -53,4 +65,4 @@ static_resources:
             address:
               socket_address:
                 address: web_service
-                port_value: 80
+                port_value: 8080

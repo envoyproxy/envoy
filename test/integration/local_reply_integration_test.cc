@@ -33,11 +33,11 @@ mappers:
       - header:
           key: foo
           value: bar
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
       - header:
           key: content-type
           value: "application/json-custom"
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
 body_format:
   json_format:
     level: TRACE
@@ -60,7 +60,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -123,7 +123,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -175,7 +175,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/package.service/method"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"content-type", "application/grpc"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -227,7 +227,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/package.service/method"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"content-type", "application/grpc"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -278,7 +278,7 @@ mappers:
       - header:
           key: foo
           value: bar
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
     body:
       inline_string: "customized body text"
     body_format_override:
@@ -308,7 +308,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -385,7 +385,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -449,7 +449,7 @@ mappers:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value-2"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -507,7 +507,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value-2"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -565,7 +565,7 @@ body_format:
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"test-header", "exact-match-value-2"}});
   auto response = std::move(encoder_decoder.second);
 

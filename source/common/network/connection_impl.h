@@ -22,7 +22,7 @@ class TestPauseFilter;
 
 namespace Network {
 
-class HappyEyeballsConnectionImpl;
+class MultiConnectionBaseImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -65,8 +65,14 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override { return enable_half_close_; }
+  bool isHalfCloseEnabled() const override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
+  void close(ConnectionCloseType type, absl::string_view details) override {
+    if (!details.empty()) {
+      setLocalCloseReason(details);
+    }
+    close(type);
+  }
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
@@ -82,7 +88,10 @@ public:
     return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override {
+    // SSL info may be overwritten by a filter in the provider.
+    return socket_->connectionInfoProvider().sslConnection();
+  }
   State state() const override;
   bool connecting() const override {
     ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
@@ -161,7 +170,7 @@ protected:
 
   // This is called when the underlying socket is connected, not when the
   // connected event is raised.
-  virtual void onConnected() {}
+  virtual void onConnected();
 
   void setFailureReason(absl::string_view failure_reason);
   const std::string& failureReason() const { return failure_reason_; }
@@ -187,7 +196,7 @@ protected:
   bool bind_error_{false};
 
 private:
-  friend class HappyEyeballsConnectionImpl;
+  friend class MultiConnectionBaseImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -235,13 +244,13 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                         Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
+  bool initializeReadFilters() override;
 
 private:
   void onTransportSocketConnectTimeout();
@@ -262,11 +271,14 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
   ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
   // Network::ClientConnection
   void connect() override;

@@ -18,10 +18,22 @@ load(
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
+    _envoy_select_admin_functionality = "envoy_select_admin_functionality",
+    _envoy_select_admin_html = "envoy_select_admin_html",
+    _envoy_select_admin_no_html = "envoy_select_admin_no_html",
     _envoy_select_boringssl = "envoy_select_boringssl",
+    _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
+    _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
+    _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
+    _envoy_select_enable_yaml = "envoy_select_enable_yaml",
+    _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
+    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
+    _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_signal_trace = "envoy_select_signal_trace",
+    _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
@@ -43,14 +55,19 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 load(
+    ":envoy_mobile_defines.bzl",
+    _envoy_mobile_defines = "envoy_mobile_defines",
+)
+load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
+    "MOBILE_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
-def envoy_package():
-    native.package(default_visibility = ["//visibility:public"])
+def envoy_package(default_visibility = ["//visibility:public"]):
+    native.package(default_visibility = default_visibility)
 
 def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
     native.package(default_visibility = default_visibility)
@@ -64,6 +81,11 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
         name = "is_enabled",
         flag_values = {":enabled": "True"},
     )
+
+def envoy_mobile_package():
+    # Mobile packages should only be visible to other mobile packages, not any other
+    # parts of the Envoy codebase.
+    envoy_extension_package(default_visibility = MOBILE_PACKAGE_VISIBILITY)
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
@@ -96,14 +118,17 @@ def envoy_cmake(
         name,
         cache_entries = {},
         debug_cache_entries = {},
+        default_cache_entries = {"CMAKE_BUILD_TYPE": "Bazel"},
         lib_source = "",
         postfix_script = "",
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         generate_crosstool_file = False,
+        generate_args = ["-GNinja"],
+        targets = ["", "install"],
         **kwargs):
-    cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
+    cache_entries.update(default_cache_entries)
     cache_entries_debug = dict(cache_entries)
     cache_entries_debug.update(debug_cache_entries)
 
@@ -131,8 +156,8 @@ def envoy_cmake(
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         }),
-        generate_args = ["-GNinja"],
-        targets = ["", "install"],
+        generate_args = generate_args,
+        targets = targets,
         # TODO: Remove install target and make this work
         install = False,
         # TODO(lizan): Make this always true
@@ -206,10 +231,22 @@ def envoy_google_grpc_external_deps():
 # from the other bzl files (e.g. envoy_select.bzl, envoy_binary.bzl, etc.)
 
 # Select wrappers (from envoy_select.bzl)
+envoy_select_admin_html = _envoy_select_admin_html
+envoy_select_admin_no_html = _envoy_select_admin_no_html
+envoy_select_admin_functionality = _envoy_select_admin_functionality
+envoy_select_static_extension_registration = _envoy_select_static_extension_registration
+envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
+envoy_select_envoy_mobile_stats_reporting = _envoy_select_envoy_mobile_stats_reporting
+envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_boringssl = _envoy_select_boringssl
+envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
+envoy_select_enable_yaml = _envoy_select_enable_yaml
+envoy_select_disable_exceptions = _envoy_select_disable_exceptions
 envoy_select_hot_restart = _envoy_select_hot_restart
+envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
+envoy_select_signal_trace = _envoy_select_signal_trace
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
@@ -243,3 +280,6 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
+
+# Envoy Mobile defines (from envoy_mobile_defines.bz)
+envoy_mobile_defines = _envoy_mobile_defines

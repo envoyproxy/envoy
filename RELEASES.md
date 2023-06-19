@@ -51,7 +51,7 @@ Major releases are handled by the maintainer on-call and do not involve any back
 The details are outlined in the "Cutting a major release" section below.
 Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
 responsible for approving and merging backports, with responsibilties outlined
-[in this doc](https://docs.google.com/document/d/1AnIqmJlGlN0nZaxDme2uMjcO9VJxIokGDMYsq2IZM98/edit).
+in [BACKPORTS.md](BACKPORTS.md).
 The Fix Lead is a member of the security
 team and is responsible for coordinating the overall release. This includes identifying
 issues to be fixed in the release, communications with the Envoy community, and the
@@ -68,7 +68,8 @@ actual mechanics of the release itself.
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                       |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                       |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist)) |
-| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | TBD                                                                   |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)           |
+| 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                |
 
 ## Major release schedule
 
@@ -89,7 +90,11 @@ deadline of 3 weeks.
 | 1.20.0  | 2021/09/30 | 2021/10/05 |   +5 days  | 2022/10/05  |
 | 1.21.0  | 2022/01/15 | 2022/01/12 |   -3 days  | 2023/01/12  |
 | 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
-| 1.23.0  | 2022/07/15 |            |            |             |
+| 1.23.0  | 2022/07/15 | 2022/07/15 |    0 days  | 2023/07/15  |
+| 1.24.0  | 2022/10/15 | 2022/10/19 |   +4 days  | 2023/10/19  |
+| 1.25.0  | 2023/01/15 | 2023/01/18 |   +3 days  | 2024/01/18  |
+| 1.26.0  | 2023/04/15 | 2023/04/18 |   +3 days  | 2024/04/18  |
+| 1.27.0  | 2023/07/14 |            |            |             |
 
 ### Cutting a major release
 
@@ -104,33 +109,33 @@ deadline of 3 weeks.
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
-  * Switch the repo to "release" mode by running `bazel run //tools/project:release`. See the [project
+  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. See the [project
     tool](tools/project/README.md#bazel-run-toolsprojectrelease) for further information. This tool
     will create a commit with the necessary changes for a release.
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Create a pull request with the commit created by the project tool and wait for tests to
-  pass on [main](https://dev.azure.com/cncf/envoy/_build).
-* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
-  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
-  [VERSION](VERSION).**
+* Create a pull request with the commit created by the project tool and **wait for tests to
+  pass**.
+* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release.
 * From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
-  from the tagged release, e.g. "release/v1.6". It will be used for the
+  using the minor version from the tagged release, e.g. `1.6.0` -> `release/v1.6`. It will be used for the
   [stable releases](RELEASES.md#stable-releases).
 * Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
   tag build to make sure that the final docker images get pushed along with
-  the final docs. The final documentation will end up in the
+  the final docs and [release assets](https://github.com/envoyproxy/envoy/releases). The final documentation will end up in the
   [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
-* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
+* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) with the new release version.
+* Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Switch the repo back to "dev" mode by running `bazel run //tools/project:dev`. See the [project
+* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. See the [project
   tool](tools/project/README.md#bazel-run-toolsprojectdev) for further information. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with commit created by the project tool.
+* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+
 
 ## Security release schedule
 

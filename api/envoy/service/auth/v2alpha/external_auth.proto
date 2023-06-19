@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.service.auth.v2alpha;
 
 option java_multiple_files = true;
-option java_generic_services = true;
 option java_outer_classname = "CertsProto";
 option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2alpha";

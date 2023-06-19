@@ -52,8 +52,7 @@ class GrpcClientIntegrationParamTest
 public:
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
-    return fmt::format("{}_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+    return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
@@ -73,8 +72,7 @@ public:
       const ::testing::TestParamInfo<
           std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>>& p) {
     return fmt::format(
-        "{}_{}_{}",
-        std::get<0>(std::get<0>(p.param)) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
         std::get<1>(std::get<0>(p.param)) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
                                                                           : "EnvoyGrpc",
         std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
@@ -95,8 +93,7 @@ public:
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion, ClientType, LegacyOrUnified>>& p) {
-    return fmt::format("{}_{}_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
                        std::get<2>(p.param) == LegacyOrUnified::Legacy ? "Legacy" : "Unified");
   }
@@ -115,8 +112,7 @@ public:
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<
                              std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>>& p) {
-    return fmt::format("{}_{}_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
                        std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
@@ -150,6 +146,12 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified))
+#define DELTA_SOTW_UNIFIED_GRPC_CLIENT_INTEGRATION_PARAMS                                          \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta,              \
+                                   Grpc::SotwOrDelta::UnifiedSotw,                                 \
+                                   Grpc::SotwOrDelta::UnifiedDelta))
 
 } // namespace Grpc
 } // namespace Envoy

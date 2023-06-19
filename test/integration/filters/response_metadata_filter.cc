@@ -43,14 +43,14 @@ public:
   }
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     metadata_map = {{"duplicate", "duplicate"}};
     metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
-    return Http::FilterHeadersStatus::Continue;
+    return Http::Filter1xxHeadersStatus::Continue;
   }
 
   // Adds new metadata to metadata_map directly, and consumes metadata when the keys are equal to

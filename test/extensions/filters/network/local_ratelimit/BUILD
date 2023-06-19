@@ -29,8 +29,12 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "local_ratelimit_integration_test",
+    size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.network.local_ratelimit"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/extensions/filters/network/local_ratelimit:config",
         "//source/extensions/filters/network/tcp_proxy:config",

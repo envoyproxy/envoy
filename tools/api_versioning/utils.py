@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """Utility functions for accessing the API version (X.Y.Z format).
 """
 from collections import namedtuple

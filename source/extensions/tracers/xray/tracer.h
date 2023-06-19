@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
@@ -42,8 +42,7 @@ public:
    */
   Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
       : time_source_(time_source), random_(random), broker_(broker),
-        id_(Hex::uint64ToHex(random_.random())), server_error_(false), response_status_code_(0),
-        sampled_(true) {}
+        id_(Hex::uint64ToHex(random_.random())) {}
 
   /**
    * Sets the Span's trace ID.
@@ -258,9 +257,9 @@ private:
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
-  bool server_error_;
-  uint64_t response_status_code_;
-  bool sampled_;
+  bool server_error_{false};
+  uint64_t response_status_code_{0};
+  bool sampled_{true};
 };
 
 using SpanPtr = std::unique_ptr<Span>;

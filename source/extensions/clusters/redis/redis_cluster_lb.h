@@ -149,7 +149,7 @@ public:
   void onHostHealthUpdate() override;
 
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override;
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override;
 
 private:
   class RedisShard {

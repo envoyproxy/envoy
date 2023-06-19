@@ -26,8 +26,8 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  return std::make_unique<UpstreamProxyProtocolSocketFactory>(std::move(inner_transport_factory),
-                                                              outer_config.config());
+  return std::make_unique<UpstreamProxyProtocolSocketFactory>(
+      std::move(inner_transport_factory), outer_config.config(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {

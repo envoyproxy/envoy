@@ -160,7 +160,7 @@ public:
       }
     };
     FakeSingletonManager fsm;
-    ON_CALL(mock_factory_ctx, singletonManager()).WillByDefault(ReturnRef(fsm));
+    ON_CALL(mock_factory_ctx.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
     envoy::extensions::transport_sockets::alts::v3::Alts alts_config;
@@ -196,7 +196,8 @@ public:
     auto client_transport_socket = makeAltsTransportSocket();
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+                                               std::move(client_transport_socket), nullptr,
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {

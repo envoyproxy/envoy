@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -236,6 +237,7 @@ TEST_F(CompactProtocolTest, ReadStruct) {
 
 TEST_F(CompactProtocolTest, ReadFieldBegin) {
   CompactProtocolImpl proto;
+  TestScopedRuntime scoped_runtime;
 
   // Insufficient data
   {
@@ -325,7 +327,7 @@ TEST_F(CompactProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(buffer.length(), 4);
   }
 
-  // Long-form field header, field id < 0
+  // Long-form field header, field id < 0 and not allowed negative field id
   {
     Buffer::OwnedImpl buffer;
     std::string name = "-";
@@ -335,12 +337,33 @@ TEST_F(CompactProtocolTest, ReadFieldBegin) {
     buffer.writeByte(0x05);
     addSeq(buffer, {0x01}); // zigzag(1) = -1
 
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.thrift_allow_negative_field_ids", "false"}});
     EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
                               EnvoyException, "invalid compact protocol field id -1");
     EXPECT_EQ(name, "-");
     EXPECT_EQ(field_type, FieldType::String);
     EXPECT_EQ(field_id, 1);
     EXPECT_EQ(buffer.length(), 2);
+  }
+
+  // Long-form field header, field id < 0 and allowed negative field id
+  {
+    Buffer::OwnedImpl buffer;
+    std::string name = "-";
+    FieldType field_type = FieldType::String;
+    int16_t field_id = 1;
+
+    buffer.writeByte(0x05);
+    addSeq(buffer, {0x01}); // zigzag(1) = -1
+
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.thrift_allow_negative_field_ids", "true"}});
+    EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
+    EXPECT_EQ(name, "");
+    EXPECT_EQ(field_type, FieldType::I32);
+    EXPECT_EQ(field_id, -1);
+    EXPECT_EQ(buffer.length(), 0);
   }
 
   // Unknown compact protocol field type

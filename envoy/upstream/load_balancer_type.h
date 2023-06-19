@@ -15,7 +15,7 @@ namespace Upstream {
 /**
  * Type of load balancing to perform.
  */
-enum class LoadBalancerType {
+enum class LoadBalancerType : uint8_t {
   RoundRobin,
   LeastRequest,
   Random,
@@ -73,6 +73,13 @@ public:
    */
   virtual envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
+
+  /**
+   * @return LbSubsetMetadataFallbackPolicy the fallback policy used to try different route metadata
+   * until a host is found
+   */
+  virtual envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
+  metadataFallbackPolicy() const PURE;
 
   /**
    * @return ProtobufWkt::Struct the struct describing the metadata for a

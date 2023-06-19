@@ -6,6 +6,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -40,10 +41,11 @@ public:
   }
 
   void setupUpstream() {
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
     upstream_ = std::make_unique<T>(callbacks_, *this->config_, downstream_stream_info_);
     upstream_->setRequestEncoder(encoder_, true);
   }
+
   NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
@@ -51,6 +53,7 @@ public:
   TcpProxy_TunnelingConfig config_message_;
   std::unique_ptr<TunnelingConfigHelper> config_;
   std::unique_ptr<HttpUpstream> upstream_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 using testing::Types;
@@ -191,6 +194,25 @@ TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
 }
 
+TYPED_TEST(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  this->upstream_->doneWriting();
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_));
+  this->upstream_->doneWriting();
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
 public:
   HttpUpstreamRequestEncoderTest() {
@@ -207,14 +229,23 @@ public:
   }
 
   void setupUpstream() {
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
     upstream_ = std::make_unique<T>(callbacks_, *this->config_, this->downstream_stream_info_);
+  }
+
+  void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
+                        const std::string& key, const std::string& value) {
+    ProtobufWkt::Struct struct_obj;
+    auto& fields_map = *struct_obj.mutable_fields();
+    fields_map[key] = ValueUtil::stringValue(value);
+    (*metadata.mutable_filter_metadata())[ns] = struct_obj;
   }
 
   NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 
   std::unique_ptr<HttpUpstream> upstream_;
   TcpProxy_TunnelingConfig config_message_;
@@ -224,35 +255,12 @@ public:
 
 TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
 
-TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderOld) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
-
-  this->setupUpstream();
-  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
-  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->hostname()},
-  });
-
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
-
-  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
-  this->upstream_->setRequestEncoder(this->encoder_, false);
-}
-
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->hostname()},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
   });
 
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
@@ -265,7 +273,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "POST"},
-      {Http::Headers::get().Host, this->config_->hostname()},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
       {Http::Headers::get().Path, "/"},
   });
 
@@ -278,6 +286,33 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
+  this->config_message_.set_use_post(true);
+  this->config_message_.set_post_path("/test");
+  this->setupUpstream();
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "POST"},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
+      {Http::Headers::get().Path, "/test"},
+  });
+
+  if (this->is_http2_) {
+    expected_headers->addReference(Http::Headers::get().Scheme,
+                                   Http::Headers::get().SchemeValues.Http);
+  }
+
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
+  this->config_message_.set_use_post(false);
+  this->config_message_.set_post_path("/test");
+  EXPECT_THROW_WITH_MESSAGE(this->setupUpstream(), EnvoyException,
+                            "Can't set a post path when POST method isn't used");
+}
+
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
@@ -288,19 +323,19 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value1");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value2");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->hostname()},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
   });
 
   expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
@@ -316,19 +351,19 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   auto* hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value1");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value2");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->hostname()},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
   });
 
   expected_headers->setCopy(Http::LowerCaseString("key"), "value1");
@@ -365,13 +400,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
   hdr = header->mutable_header();
   hdr->set_key("downstream_local_port");
   hdr->set_value("%DOWNSTREAM_LOCAL_PORT%");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->hostname()},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
   });
 
   expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
@@ -383,7 +418,55 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
       *Network::Test::getCanonicalLoopbackAddress(ip_versions[0]), 80);
   Network::ConnectionInfoSetterImpl connection_info(ip_port, ip_port);
   EXPECT_CALL(this->downstream_stream_info_, downstreamAddressProvider)
-      .WillOnce(testing::ReturnRef(connection_info));
+      .WillRepeatedly(testing::ReturnRef(connection_info));
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest,
+           RequestEncoderHostnameWithDownstreamInfoRequestedServerName) {
+  this->config_message_.set_hostname("%REQUESTED_SERVER_NAME%:443");
+  this->setupUpstream();
+
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Host, "www.google.com:443"},
+  });
+
+  auto ip_versions = TestEnvironment::getIpVersionsForTest();
+  ASSERT_FALSE(ip_versions.empty());
+
+  auto ip_port = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(ip_versions[0]), 80);
+  Network::ConnectionInfoSetterImpl connection_info(ip_port, ip_port);
+  connection_info.setRequestedServerName("www.google.com");
+  EXPECT_CALL(this->downstream_stream_info_, downstreamAddressProvider)
+      .Times(2)
+      .WillRepeatedly(testing::ReturnRef(connection_info));
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest,
+           RequestEncoderHostnameWithDownstreamInfoDynamicMetadata) {
+  this->config_message_.set_hostname("%DYNAMIC_METADATA(tunnel:address)%:443");
+  this->setupUpstream();
+
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Host, "www.google.com:443"},
+  });
+
+  auto ip_versions = TestEnvironment::getIpVersionsForTest();
+  ASSERT_FALSE(ip_versions.empty());
+
+  envoy::config::core::v3::Metadata metadata;
+  this->populateMetadata(metadata, "tunnel", "address", "www.google.com");
+
+  EXPECT_CALL(testing::Const(this->downstream_stream_info_), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }

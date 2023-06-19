@@ -26,15 +26,12 @@ envoy_cmake(
         "BUILD_AVX512": "on",
         "BUILD_AVX512VBMI": "on",
         "BUILD_EXAMPLES": "off",
+        "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        "FAT_RUNTIME": "on",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
-    env = select({
-        "//bazel:clang_build": {
-            "CXXFLAGS": "-Wno-error=unused-but-set-variable -Wno-error=bitwise-instead-of-logical",
-        },
-        "//conditions:default": {},
-    }),
+    default_cache_entries = {},
     lib_source = "@io_hyperscan//:all",
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
@@ -45,14 +42,14 @@ envoy_cmake(
 )
 
 envoy_cc_library(
-    name = "hyperscan_lib",
+    name = "matcher_lib",
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
     deps = [
         ":hyperscan",
+        "//envoy/common:regex_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/thread_local:thread_local_interface",
-        "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -74,7 +71,7 @@ envoy_cc_contrib_extension(
         "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [
-            ":hyperscan_lib",
+            ":matcher_lib",
         ],
         "//conditions:default": [
         ],

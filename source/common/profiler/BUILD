@@ -13,4 +13,7 @@ envoy_cc_library(
     srcs = ["profiler.cc"],
     hdrs = ["profiler.h"],
     tcmalloc_dep = 1,
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+    ],
 )

@@ -40,5 +40,5 @@ rather than the address at which the listener is listening at. Furthermore, :ref
 destination cluster <arch_overview_service_discovery_types_original_destination>` may be used to
 forward HTTP requests or TCP connections to the restored destination address.
 
-* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
-* This filter should be configured with the name *envoy.filters.listener.original_dst*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.listener.original_dst.v3.OriginalDst>`

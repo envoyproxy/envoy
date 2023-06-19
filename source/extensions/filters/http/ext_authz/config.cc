@@ -52,7 +52,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                 proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              proto_config.grpc_service(), context.scope(), true, Grpc::CacheOption::AlwaysCache),
+              proto_config.grpc_service(), context.scope(), true),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
@@ -65,7 +65,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                 timeout_ms](Http::FilterChainFactoryCallbacks& callbacks) {
       Grpc::RawAsyncClientSharedPtr raw_client =
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              grpc_service, context.scope(), true, Grpc::CacheOption::AlwaysCache);
+              grpc_service, context.scope(), true);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           raw_client, std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
@@ -85,8 +85,8 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(ExtAuthzFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ext_authz"};
+LEGACY_REGISTER_FACTORY(ExtAuthzFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.ext_authz");
 
 } // namespace ExtAuthz
 } // namespace HttpFilters

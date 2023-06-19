@@ -8,11 +8,12 @@ import shlex
 import shutil
 import subprocess
 
-BAZEL_OPTIONS = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", ""))
+BAZEL_OPTIONS = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", ""))
+BAZEL_STARTUP_OPTIONS = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
 
 
 def bazel_info(name, bazel_extra_options=[]):
-    return subprocess.check_output(["bazel", "info", name] + BAZEL_OPTIONS
+    return subprocess.check_output(["bazel", *BAZEL_STARTUP_OPTIONS, "info", name] + BAZEL_OPTIONS
                                    + bazel_extra_options).decode().strip()
 
 
@@ -38,7 +39,8 @@ def binary_path(bazel_bin, target):
 
 def build_binary_with_debug_info(target):
     targets = [target, target + ".dwp"]
-    subprocess.check_call(["bazel", "build", "-c", "dbg"] + BAZEL_OPTIONS + targets)
+    subprocess.check_call(["bazel", *BAZEL_STARTUP_OPTIONS, "build", "-c", "dbg"] + BAZEL_OPTIONS
+                          + targets)
 
     bazel_bin = bazel_info("bazel-bin", ["-c", "dbg"])
     return binary_path(bazel_bin, target)

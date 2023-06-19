@@ -4,6 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
@@ -136,7 +137,7 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ClientConnectionImpl(dispatcher, remote_address, source_address,
-                             std::move(transport_socket), options) {}
+                             std::move(transport_socket), options, nullptr) {}
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
     transport_socket_ = std::move(transport_socket);
@@ -273,7 +274,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // StartTlsSwitchFilter will switch transport socket on the
   // receiver side upon receiving "switch" message and send
   // back the message "usetls".
-  payload_reader_->set_data_to_wait_for("usetls");
+  payload_reader_->setDataToWaitFor("usetls");
   buffer.add("switch");
   conn_->write(buffer, false);
 
@@ -344,7 +345,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
   ASSERT_TRUE(fake_upstream_connection->write(data, false));
 
   // Wait for confirmation
-  payload_reader_->set_data_to_wait_for("usetls");
+  payload_reader_->setDataToWaitFor("usetls");
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.

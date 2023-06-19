@@ -48,22 +48,29 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
 bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher);
 
 bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_match) {
-  if (on_match.has_matcher() && !validateMatcherConfig(on_match.matcher())) {
+  switch (on_match.on_match_case()) {
+  case xds::type::matcher::v3::Matcher_OnMatch::kMatcher: {
+    return validateMatcherConfig(on_match.matcher());
+  }
+  case xds::type::matcher::v3::Matcher_OnMatch::kAction: {
+    // Only envoy...Route is allowed as typed_config here.
+    if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") ==
+        std::string::npos) {
+      return false;
+    }
+    envoy::config::route::v3::Route on_match_route_action_config;
+    MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
+    ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
+                   on_match_route_action_config.DebugString());
+    return !isUnsupportedRouteConfig(on_match_route_action_config);
+  }
+  case xds::type::matcher::v3::Matcher_OnMatch::ON_MATCH_NOT_SET: {
+    // This alternative should never occur. But of course it does. By returning false the
+    // fuzzer will not follow this path any further.
     return false;
   }
-  // Only envoy...Route is allowed as typed_config here.
-  if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") ==
-      std::string::npos) {
-    return false;
   }
-  envoy::config::route::v3::Route on_match_route_action_config;
-  MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
-  ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
-                 on_match_route_action_config.DebugString());
-  if (isUnsupportedRouteConfig(on_match_route_action_config)) {
-    return false;
-  }
-  return true;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
@@ -101,7 +108,7 @@ bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
       }
     }
   }
-  if (matcher.on_no_match().has_action() && !validateOnMatchConfig(matcher.on_no_match())) {
+  if (!validateOnMatchConfig(matcher.on_no_match())) {
     ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
     return false;
   }

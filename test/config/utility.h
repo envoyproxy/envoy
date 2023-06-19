@@ -9,6 +9,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -110,6 +111,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -129,16 +135,21 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
+    bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
+
+  // Sets up config with the provided bootstrap.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig(false));
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
+               const std::string& config = httpProxyConfig(false, false));
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -154,10 +165,11 @@ public:
   static std::string baseConfigNoListeners();
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
-  static std::string baseConfig();
+  static std::string baseConfig(bool multiple_addresses = false);
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0",
+                                           bool multiple_addresses = false);
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
@@ -168,9 +180,10 @@ public:
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig(bool downstream_use_quic = false);
+  static std::string httpProxyConfig(bool downstream_use_quic = false,
+                                     bool multiple_addresses = false);
   // A basic configuration for L7 proxying with QUIC transport.
-  static std::string quicHttpProxyConfig();
+  static std::string quicHttpProxyConfig(bool multiple_addresses = false);
   // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
   // A string for a small buffer filter, which can be used with prependFilter()
@@ -188,23 +201,30 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // but there are no listeners.
+  static std::string clustersNoListenerBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster
   buildStaticCluster(const std::string& name, int port, const std::string& address,
-                     const std::string& lb_policy = "ROUND_ROBIN");
+                     const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::cluster::v3::Cluster
-  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
-                                              const std::string& address,
-                                              const std::string& lb_policy = "ROUND_ROBIN");
+  static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
+      const std::string& name, int port, const std::string& address,
+      const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
-  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildCluster(const std::string& name,
+               const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                   envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::cluster::v3::Cluster
-  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildTlsCluster(const std::string& name,
+                  const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                      envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
@@ -277,7 +297,9 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
-  void prependFilter(const std::string& filter_yaml);
+  // By default, this prepends a downstream filter, but if downstream is set to
+  // false it will prepend an upstream filter.
+  void prependFilter(const std::string& filter_yaml, bool downstream = true);
 
   // Add an HTTP filter prior to existing filters.
   // TODO(rgs1): remove once envoy-filter-example has been updated.
@@ -380,7 +402,9 @@ public:
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
-                               bool http3 = false);
+                               bool http3 = false,
+                               absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
+                                   proxy_protocol_version = absl::nullopt);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
@@ -400,14 +424,13 @@ public:
   static envoy::config::core::v3::Http3ProtocolOptions
   http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                               size_t http3_max_stream_receive_window);
-
-private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
 
+private:
   // Load the first FilterType struct from the first listener into a parsed proto.
   template <class FilterType> bool loadFilter(const std::string& name, FilterType& filter) {
     RELEASE_ASSERT(!finalized_, "");
@@ -456,7 +479,7 @@ public:
 
   // Set CDS contents on filesystem.
   void setCds(const std::vector<envoy::config::cluster::v3::Cluster>& cluster);
-  const std::string& cds_path() const { return cds_path_; }
+  const std::string& cdsPath() const { return cds_path_; }
 
 private:
   const std::string cds_path_;
@@ -474,7 +497,7 @@ public:
   void setEdsAndWait(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&
                          cluster_load_assignments,
                      IntegrationTestServerStats& server_stats);
-  const std::string& eds_path() const { return eds_path_; }
+  const std::string& edsPath() const { return eds_path_; }
 
 private:
   const std::string eds_path_;

@@ -1,7 +1,10 @@
 #include "source/extensions/compression/gzip/common/base.h"
 
 namespace Envoy {
-namespace Zlib {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
+namespace Common {
 
 Base::Base(uint64_t chunk_size, std::function<void(z_stream*)> zstream_deleter)
     : chunk_size_{chunk_size}, chunk_char_ptr_(new unsigned char[chunk_size]),
@@ -20,5 +23,8 @@ void Base::updateOutput(Buffer::Instance& output_buffer) {
   zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
-} // namespace Zlib
+} // namespace Common
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

@@ -5,10 +5,12 @@ namespace Server {
 
 // Pretend that handler was added successfully.
 bool ValidationAdmin::addStreamingHandler(const std::string&, const std::string&, GenRequestFn,
-                                          bool, bool) {
+                                          bool, bool, const ParamDescriptorVec&) {
   return true;
 }
-bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) {
+
+bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
+                                 const ParamDescriptorVec&) {
   return true;
 }
 

@@ -34,7 +34,8 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  MutationUtils::headersToProto(headers, proto_headers);
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -69,6 +70,10 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("3");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("x-remove-and-append-this");
+  s->mutable_header()->set_value("4");
+  s = mutation.add_set_headers();
   s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_value("no");
@@ -84,6 +89,8 @@ TEST(MutationUtils, TestApplyMutations) {
   mutation.add_set_headers();
 
   mutation.add_remove_headers("x-remove-this");
+  // remove is applied before append, so the header entry will be in the final headers.
+  mutation.add_remove_headers("x-remove-and-append-this");
   // Attempts to remove ":" and "host" headers should be ignored
   mutation.add_remove_headers("host");
   mutation.add_remove_headers(":method");
@@ -138,6 +145,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-append-this", "1"},
       {"x-append-this", "2"},
       {"x-append-this", "3"},
+      {"x-remove-and-append-this", "4"},
       {"x-replace-this", "nope"},
       {"x-envoy-strange-thing", "No"},
   };
@@ -179,6 +187,46 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
       {":status", "400"},
   };
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains invalid character.
+  s->mutable_header()->set_key("x-append-this\n");
+  s->mutable_header()->set_value("value");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  mutation.Clear();
+  s = mutation.add_set_headers();
+  // Test header value contains invalid character.
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("value\r");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
+TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("host\n");
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
 // Ensure that we actually replace the body
@@ -235,6 +283,55 @@ TEST(MutationUtils, TestBodyMutationNothing) {
   BodyMutation mut;
   MutationUtils::applyBodyMutations(mut, buf);
   EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
+
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+  envoy::config::core::v3::HeaderMap proto_headers;
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  string_matcher.set_ignore_case(true);
+  header_matchers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
 } // namespace

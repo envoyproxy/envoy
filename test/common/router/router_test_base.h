@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Router {
 
 using ::testing::NiceMock;
+using ::testing::Return;
 
 class RouterTestFilter : public Filter {
 public:
@@ -60,6 +61,7 @@ class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                  bool suppress_grpc_request_failure_code_stats,
+                 bool flush_upstream_log_on_upstream_stream,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
   void expectResponseTimerCreate();
@@ -104,7 +106,7 @@ public:
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
-  RouterTestFilter router_;
+  std::unique_ptr<RouterTestFilter> router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Event::MockTimer* per_try_idle_timeout_{};

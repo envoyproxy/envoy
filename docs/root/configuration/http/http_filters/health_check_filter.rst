@@ -4,8 +4,8 @@ Health check
 ============
 
 * Health check filter :ref:`architecture overview <arch_overview_health_checking_filter>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.health_check.v3.HealthCheck>`
-* This filter should be configured with the name *envoy.filters.http.health_check*.
 
 .. note::
 

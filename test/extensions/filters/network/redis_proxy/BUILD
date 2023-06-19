@@ -50,6 +50,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
+        "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/common/redis:mocks_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
@@ -77,6 +78,7 @@ envoy_extension_cc_test(
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
+        "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
@@ -146,8 +148,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
@@ -157,6 +162,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
+    size = "large",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [

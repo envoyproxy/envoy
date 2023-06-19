@@ -25,6 +25,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "auto_sni_integration_test",
+    size = "large",
     srcs = ["auto_sni_integration_test.cc"],
     data = [
         "//test/config/integration/certs",

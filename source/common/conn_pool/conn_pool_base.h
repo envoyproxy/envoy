@@ -11,6 +11,7 @@
 #include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/ostream.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -65,6 +66,9 @@ public:
 
     return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
   }
+
+  // Initialize upstream read filters. Called when connected.
+  virtual void initializeReadFilters() PURE;
 
   // Closes the underlying connection.
   virtual void close() PURE;
@@ -410,3 +414,8 @@ private:
 
 } // namespace ConnectionPool
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+template <> struct formatter<Envoy::ConnectionPool::ConnPoolImplBase> : ostream_formatter {};
+} // namespace fmt

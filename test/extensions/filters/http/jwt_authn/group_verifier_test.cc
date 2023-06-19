@@ -150,6 +150,9 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: sec-istio-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-aud
+      claim_name: aud
     from_params:
     - jwta
     - jwtb
@@ -177,10 +180,12 @@ rules:
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
       {"sec-istio-auth-userinfo", ""},
+      {"x-jwt-claim-aud", ""},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-aud"));
 }
 
 // require alls that just ends

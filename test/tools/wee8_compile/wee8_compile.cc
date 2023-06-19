@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 
+#include "src/flags/flags.h"
 #include "src/wasm/c-api.h"
 #include "v8-version.h"
 #include "wasm-api/wasm.hh"
@@ -149,6 +150,8 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
 }
 
 wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>& content) {
+  ::v8::internal::v8_flags.liftoff = false;
+  ::v8::internal::v8_flags.wasm_max_mem_pages = 16384; /* 16,384 * 64 KiB pages == 1 GiB limit */
   const auto engine = wasm::Engine::make();
   if (engine == nullptr) {
     std::cerr << "ERROR: Failed to start V8." << std::endl;

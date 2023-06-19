@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(

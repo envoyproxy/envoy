@@ -156,9 +156,14 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 * Three weeks notice will be provided to private distributors from patch
   availability until the embargo deadline.
 
-* Public zero days will be fixed ASAP, but there is no SLO for this, since this
-  will depend on the severity and impact to the organizations backing the Envoy
-  security team.
+* Public zero days which affect the optimized binary will be fixed ASAP, but there is
+  no SLO for this, since this will depend on the severity and impact to the
+  organizations backing the Envoy security team. After a zero day bug fix is in, the
+  PST will kick off point releases unless the bug is deemed unlikely to be encountered
+  in production (e.g. only triggered by trace logs) at which point there will instead be an email
+  to envoy-announce and users can request point releases if they believe they will be affected.
+  Publicly announced bugs which only affect debug binaries will neither trigger point
+  releases nor announce emails.
 
 ### Fix Disclosure Process
 
@@ -335,6 +340,11 @@ use of Envoy should:
           **10** slots. Periodic review (see below) may allow new slots to open, so please continue
           to apply if it seems your organization would otherwise qualify. The security team also
           reserves the right to change this limit in the future.
+       5. Note that in this context "end user" is defined as an organization that *directly*
+          operates Envoy in order to serve traffic for 1st party use cases. The 1st party use case
+          can be either internal or external facing. Critically, vendors of cloud native software
+          and solutions can *also* be end users. Being a vendor does not preclude an organization
+          from being an end user as long as it satisfies the 1st party usage criteria.
 2. Have a user or customer base not limited to your own organization (except for option 3 above).
    We will use the size of the user or customer base as part of the criteria to determine
    eligibility.
@@ -473,3 +483,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | Square        | Yes      | 05/21       |
 | Apple         | Yes      | 05/21       |
 | Spotify       | Yes      | 06/21       |
+| Netflix       | Yes      | 06/22       |

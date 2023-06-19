@@ -85,7 +85,7 @@ public:
                       Event::Dispatcher& dispatcher,
                       Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
-  const Network::Connection& connection() { return *client_; }
+
   testing::AssertionResult
   run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block,
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -94,7 +94,7 @@ public:
     return callbacks_->last_connection_event_;
   }
   // Wait until connected or closed().
-  void waitForConnection();
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
   bool allBytesSent() const;
@@ -208,6 +208,8 @@ public:
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                            Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);
+
+  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(absl::string_view config);
 };
 
 // A set of connection callbacks which tracks connection state.
@@ -242,7 +244,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
-  void set_data_to_wait_for(const std::string& data, bool exact_match = true) {
+  void setDataToWaitFor(const std::string& data, bool exact_match = true) {
     data_to_wait_for_ = data;
     exact_match_ = exact_match;
   }

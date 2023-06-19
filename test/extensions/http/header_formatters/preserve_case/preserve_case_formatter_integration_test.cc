@@ -1,8 +1,11 @@
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
@@ -15,8 +18,7 @@ struct FormatterOnEnvoyHeadersTestParams {
 
 std::string formatterOnEnvoyHeadersTestParamsToString(
     const ::testing::TestParamInfo<FormatterOnEnvoyHeadersTestParams>& p) {
-  return fmt::format("{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
                      p.param.formatter_type_on_envoy_headers);
 }
 

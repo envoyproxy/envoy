@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "test/mocks/upstream/basic_resource_limit.h"
@@ -38,8 +39,10 @@ public:
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                            bool is_proxy_request,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
-    MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
+    MockLoadDnsCacheEntryResult result =
+        loadDnsCacheEntry_(host, default_port, is_proxy_request, callbacks);
     return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
   }
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
@@ -47,7 +50,7 @@ public:
     return std::unique_ptr<Upstream::ResourceAutoIncDec>(raii_ptr);
   }
   MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
-              (absl::string_view host, uint16_t default_port,
+              (absl::string_view host, uint16_t default_port, bool is_proxy_request,
                LoadDnsCacheEntryCallbacks& callbacks));
 
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override {
@@ -117,6 +120,18 @@ public:
   ~MockLoadDnsCacheEntryCallbacks() override;
 
   MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
+};
+
+class MockDfpCluster : public DfpCluster {
+public:
+  MockDfpCluster() = default;
+  ~MockDfpCluster() override = default;
+
+  // Extensions::Common::DynamicForwardProxy::DfpCluster
+  MOCK_METHOD(bool, enableSubCluster, (), (const));
+  MOCK_METHOD((std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>),
+              createSubClusterConfig, (const std::string&, const std::string&, const int));
+  MOCK_METHOD(bool, touch, (const std::string&));
 };
 
 } // namespace DynamicForwardProxy

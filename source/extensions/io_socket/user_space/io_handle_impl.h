@@ -185,7 +185,7 @@ private:
 class PassthroughStateImpl : public PassthroughState, public Logger::Loggable<Logger::Id::io> {
 public:
   void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                  std::unique_ptr<FilterStateObjects> filter_state_objects) override;
+                  const StreamInfo::FilterState::Objects& filter_state_objects) override;
   void mergeInto(envoy::config::core::v3::Metadata& metadata,
                  StreamInfo::FilterState& filter_state) override;
 
@@ -193,7 +193,7 @@ private:
   enum class State { Created, Initialized, Done };
   State state_{State::Created};
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
-  std::unique_ptr<FilterStateObjects> filter_state_objects_;
+  StreamInfo::FilterState::Objects filter_state_objects_;
 };
 
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;

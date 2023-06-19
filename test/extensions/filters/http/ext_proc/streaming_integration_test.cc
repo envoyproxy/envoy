@@ -44,7 +44,7 @@ protected:
   void initializeConfig() {
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
-
+    proto_config_.set_allow_mode_override(true);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Create a cluster for our gRPC server pointing to the address that is running the gRPC
       // server.
@@ -80,7 +80,7 @@ protected:
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
     // Make sure that we have control over when buffers will fill up.
@@ -671,11 +671,28 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         stream->Write(response);
 
         ProcessingRequest header_resp;
-        if (stream->Read(&header_resp)) {
-          ASSERT_TRUE(header_resp.has_response_headers());
+        bool seen_response_headers = false;
+
+        // Reading from the stream, we might receive the response headers
+        // later if we execute the local reply after the filter executes.
+        const int num_reads_for_response_headers =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")
+                ? 2
+                : 1;
+        for (int i = 0; i < num_reads_for_response_headers; ++i) {
+          if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
+            seen_response_headers = true;
+            break;
+          }
         }
+
+        ASSERT_TRUE(seen_response_headers);
       });
 
+  // Increase beyond the default to avoid timing out before getting the
+  // sidecar response.
+  proto_config_.mutable_message_timeout()->set_seconds(2);
   initializeConfig();
   HttpIntegrationTest::initialize();
   sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {

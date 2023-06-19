@@ -63,7 +63,7 @@ def main():
 
     # output the generated rst files to a tarfile for consumption
     # by other bazel rules
-    with tarfile.open(output_filename, "w") as tar:
+    with tarfile.open(output_filename, "w:gz") as tar:
         tar.add("rst-out", arcname=".")
 
 

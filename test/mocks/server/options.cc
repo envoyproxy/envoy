@@ -2,6 +2,8 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 
+#include "source/common/config/well_known_names.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

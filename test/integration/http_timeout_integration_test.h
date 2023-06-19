@@ -24,6 +24,7 @@ public:
   void testRouterRequestAndResponseWithHedgedPerTryTimeout(uint64_t request_size,
                                                            uint64_t response_size,
                                                            bool first_request_wins);
+  void testIsTimeoutRetryHeader(bool use_hedged_retry);
 
   void initialize() override {
     if (respect_expected_rq_timeout) {

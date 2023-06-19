@@ -7,7 +7,6 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -64,14 +63,6 @@ constexpr int messageTruncatedOption() {
 
 namespace Network {
 
-bool IoSocketHandleImpl::forceV6ForAndroid() {
-#ifndef __ANDROID_API__
-  return false;
-#else
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.android_always_use_v6");
-#endif
-}
-
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
     IoSocketHandleImpl::close();
@@ -104,6 +95,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= max_length);
+
+  if (num_slices_to_read == 1) {
+    // Avoid paying the VFS overhead when there is only one IO buffer to work with
+    return sysCallResultToIoCallResult(
+        Api::OsSysCallsSingleton::get().recv(fd_, iov[0].iov_base, iov[0].iov_len, 0));
+  }
+
   auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
   return result;
@@ -138,6 +136,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
   }
+
+  if (num_slices_to_write == 1) {
+    // Avoid paying the VFS overhead when there is only one IO buffer to work with
+    return sysCallResultToIoCallResult(
+        Api::OsSysCallsSingleton::get().send(fd_, iov[0].iov_base, iov[0].iov_len, 0));
+  }
+
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
   return result;
@@ -233,8 +238,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
 }
 
-Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
-                                                             uint32_t self_port, os_fd_t fd) {
+Address::InstanceConstSharedPtr
+maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port, os_fd_t fd, bool v6only) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
@@ -243,7 +248,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -253,7 +258,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd, v6only);
   }
 
   return nullptr;
@@ -315,7 +320,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(
+      peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -324,7 +330,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
 
       if (output.msg_[0].local_address_ == nullptr) {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
+            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[0].local_address_ = std::move(addr);
@@ -413,12 +420,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    output.msg_[i].peer_address_ =
-        Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
+    output.msg_[i].peer_address_ = Address::addressFromSockAddrOrDie(
+        raw_addresses[i], hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
+            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[i].local_address_ = std::move(addr);
@@ -477,9 +485,9 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
   auto sockaddr_to_use = address->sockAddr();
   auto sockaddr_len_to_use = address->sockAddrLen();
-#ifdef __ANDROID_API__
+#if defined(__APPLE__) || defined(__ANDROID_API__)
   sockaddr_in6 sin6;
-  if (sockaddr_to_use->sa_family == AF_INET && forceV6ForAndroid()) {
+  if (sockaddr_to_use->sa_family == AF_INET && Address::forceV6()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
 
     // Android always uses IPv6 dual stack. Convert IPv4 to the IPv6 mapped address when
@@ -487,8 +495,13 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
     memset(&sin6, 0, sizeof(sin6));
     sin6.sin6_family = AF_INET6;
     sin6.sin6_port = sin4.sin_port;
+#if defined(__ANDROID_API__)
     sin6.sin6_addr.s6_addr32[2] = htonl(0xffff);
     sin6.sin6_addr.s6_addr32[3] = sin4.sin_addr.s_addr;
+#elif defined(__APPLE__)
+    sin6.sin6_addr.__u6_addr.__u6_addr32[2] = htonl(0xffff);
+    sin6.sin6_addr.__u6_addr.__u6_addr32[3] = sin4.sin_addr.s_addr;
+#endif
     ASSERT(IN6_IS_ADDR_V4MAPPED(&sin6.sin6_addr));
 
     sockaddr_to_use = reinterpret_cast<sockaddr*>(&sin6);
@@ -555,7 +568,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
@@ -569,9 +582,6 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  // TODO(mattklein123): If forceV6ForAndroid() is true, we should probably remap back to IPv4 from
-  // the mapped IPv6 address. Currently though it doesn't look like we use this function in the
-  // client path so this probably doesn't matter. If it turns out to matter we can fix this.
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
@@ -633,7 +643,7 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
 
   absl::optional<std::string> selected_interface_name{};
   for (const auto& interface_address : interface_addresses) {

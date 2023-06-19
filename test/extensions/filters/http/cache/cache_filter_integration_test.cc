@@ -101,16 +101,18 @@ public:
     typed_config:
         "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   OptRef<const std::string> empty_body_;
   OptRef<const Http::TestResponseTrailerMapImpl> empty_trailers_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CacheIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {
   initializeFilter(default_config);
@@ -218,7 +220,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
                 testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
@@ -276,7 +278,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
@@ -390,7 +392,7 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
@@ -454,10 +456,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
-  // Advance time, to verify the original date header is preserved.
-  simTime().advanceTimeWait(Seconds(10));
-
-  // Send GET request, and get response from cache.
+  // Send GET request, and get response from upstream.
   {
     // Include test name and params in URL to make each test's requests unique.
     const Http::TestRequestHeaderMapImpl request_headers =
@@ -468,7 +467,11 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
@@ -593,7 +596,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 

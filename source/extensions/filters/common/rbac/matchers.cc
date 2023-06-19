@@ -76,6 +76,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const NotMatcher>(principal.not_id());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
     return std::make_shared<const PathMatcher>(principal.url_path());
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
+    return std::make_shared<const FilterStateMatcher>(principal.filter_state());
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
@@ -231,6 +233,11 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
   return matcher_.match(info.dynamicMetadata());
+}
+
+bool FilterStateMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                                 const StreamInfo::StreamInfo& info) const {
+  return matcher_.match(info.filterState());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,

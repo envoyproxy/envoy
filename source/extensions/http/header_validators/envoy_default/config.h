@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/http/header_validator.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -17,9 +17,9 @@ namespace EnvoyDefault {
  */
 class HeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactoryConfig {
 public:
-  ::Envoy::Http::HeaderValidatorFactorySharedPtr
+  ::Envoy::Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) override;
+                  Server::Configuration::ServerFactoryContext& server_context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -60,9 +60,6 @@ public:
           cluster = weighted_clusters->add_clusters();
           cluster->set_cluster_header(std::string(Envoy::RepickClusterFilter::ClusterHeaderName));
           cluster->mutable_weight()->set_value(weights[1]);
-
-          weighted_clusters->mutable_total_weight()->set_value(
-              std::accumulate(weights.begin(), weights.end(), 0UL));
         });
 
     HttpIntegrationTest::initialize();

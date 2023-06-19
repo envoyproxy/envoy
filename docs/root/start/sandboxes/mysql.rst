@@ -15,6 +15,11 @@ In this example, we show how the :ref:`MySQL filter <config_network_filters_mysq
 The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.
 
+.. note::
+   The current implementation of the protocol filter was tested extensively with MySQL
+   v5.7. It may also work with other versions. This example uses the current latest version.
+
+
 Step 1: Build the sandbox
 *************************
 
@@ -22,34 +27,27 @@ Change to the ``examples/mysql`` directory.
 
 Build and start the containers.
 
-Terminal 1
-
 .. code-block:: console
 
   $ pwd
   envoy/examples/mysql
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
       Name                   Command               State                             Ports
-  ------------------------------------------------------------------------------------------------------------------
+  ----------------------------------------------------------------------------------------------------
   mysql_mysql_1   docker-entrypoint.sh mysqld      Up      3306/tcp
-  mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
+  mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 1999/tcp, 0.0.0.0:8001->8001/tcp
 
 Step 2: Issue commands using mysql
 **********************************
 
-Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
-that the current implementation of the protocol filter was tested with MySQL
-v5.7. It may, however, not work with other versions of MySQL due to differences
-in the protocol implementation, but it won't affect normal progress of client-server communication.
-
-Terminal 1
+Use ``mysql`` to issue some commands and verify they are routed via Envoy.
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh mysql:5.7 mysql -h proxy -P 1999 -u root --skip-ssl
+  $ docker run --rm -it --network mysql_default mysql:5.7 mysql -h proxy -P 1999 -u root --skip-ssl
   ... snip ...
 
   mysql> CREATE DATABASE test;
@@ -87,8 +85,6 @@ Step 3: Check egress stats
 
 Check egress stats were updated.
 
-Terminal 1
-
 .. code-block:: console
 
   $ curl -s "http://localhost:8001/stats?filter=egress_mysql"
@@ -108,8 +104,6 @@ Step 4: Check TCP stats
 ***********************
 
 Check TCP stats were updated.
-
-Terminal 1
 
 .. code-block:: console
 

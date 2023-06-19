@@ -18,11 +18,10 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
 
 InitDumpHandler::InitDumpHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code InitDumpHandler::handlerInitDump(absl::string_view url,
-                                            Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&) const {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
-  const auto mask = maskParam(query_params);
+Http::Code InitDumpHandler::handlerInitDump(Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response,
+                                            AdminStream& admin_stream) const {
+  const auto mask = maskParam(admin_stream.queryParams());
 
   envoy::admin::v3::UnreadyTargetsDumps dump = *dumpUnreadyTargets(mask);
   MessageUtil::redact(dump);

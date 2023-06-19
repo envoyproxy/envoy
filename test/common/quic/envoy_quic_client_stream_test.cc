@@ -13,16 +13,23 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace Quic {
 
+namespace {
+
 using testing::_;
 using testing::Invoke;
 
+constexpr unsigned int kStreamId = 4u;
+
+} // namespace
+
 class MockDelegate : public PacketsToReadDelegate {
 public:
-  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class EnvoyQuicClientStreamTest : public testing::Test {
@@ -36,10 +43,10 @@ public:
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         54321)),
-        quic_connection_(new EnvoyQuicClientConnection(
+        quic_connection_(new MockEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr), connection_id_generator_)),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -60,19 +67,20 @@ public:
                       quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
               return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
             }));
-    EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
+    EXPECT_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
-                                  const quic::QuicSocketAddress&, quic::PerPacketOptions*) {
+                                  const quic::QuicSocketAddress&, quic::PerPacketOptions*,
+                                  const quic::QuicPacketWriterParams&) {
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
   }
 
   void SetUp() override {
     quic_session_.Initialize();
-    quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->setEnvoyConnection(quic_session_, quic_session_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
-        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+        std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
 
     setQuicConfigWithDefaultValues(quic_session_.config());
@@ -123,6 +131,38 @@ public:
     return data.length();
   }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
+    EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
+    quic_stream_->useCapsuleProtocol();
+
+    // Encodes a CONNECT-UDP request.
+    Http::TestRequestHeaderMapImpl request_headers = {
+        {":authority", host_},        {":method", "CONNECT"},
+        {":protocol", "connect-udp"}, {":path", "/.well-known/masque/udp/192.0.2.6/443/"},
+        {":scheme", "https"},         {"capsule-protocol", "?1"}};
+    const auto result = quic_stream_->encodeHeaders(request_headers, close_send_stream);
+    EXPECT_TRUE(result.ok());
+
+    // Decodes the response.
+    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
+        .WillOnce([](const Http::ResponseHeaderMapPtr& headers, bool) {
+          Http::HeaderMap::GetResult capsule_protocol =
+              headers->get(Http::LowerCaseString("Capsule-Protocol"));
+          EXPECT_FALSE(capsule_protocol.empty());
+          EXPECT_EQ("200", headers->getStatusValue());
+          EXPECT_EQ(capsule_protocol[0]->value().getStringView(), "?1");
+        });
+    spdy::Http2HeaderBlock response_headers;
+    response_headers[":status"] = "200";
+    response_headers["capsule-protocol"] = "?1";
+    std::string payload = spdyHeaderToHttp3StreamPayload(response_headers);
+    quic::QuicStreamFrame frame(stream_id_, close_recv_stream, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  }
+#endif
+
 protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -134,10 +174,12 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
-  EnvoyQuicClientConnection* quic_connection_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
+  MockEnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
-  quic::QuicStreamId stream_id_{4u};
+  quic::QuicStreamId stream_id_{kStreamId};
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -147,10 +189,21 @@ protected:
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
-  spdy::SpdyHeaderBlock spdy_response_headers_;
-  spdy::SpdyHeaderBlock spdy_trailers_;
+  spdy::Http2HeaderBlock spdy_response_headers_;
+  spdy::Http2HeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                                                         "08"               // capsule length
+                                                         "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+  );
+  std::string datagram_fragment_ =
+      absl::HexStringToBytes(absl::StrCat(absl::Hex(kStreamId / quic::kHttpDatagramStreamIdDivisor,
+                                                    absl::kZeroPad2), // Quarter Stream ID
+                                          "a1a2a3a4a5a6a7a8")         // HTTP Datagram Payload
+      );
+#endif
 };
 
 TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
@@ -266,7 +319,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
   for (const std::string& status : {"100", "199", "100"}) {
-    spdy::SpdyHeaderBlock continue_header;
+    spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
     std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
@@ -285,7 +338,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  spdy::SpdyHeaderBlock continue_header;
+  spdy::Http2HeaderBlock continue_header;
   continue_header[":status"] = "101";
   std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
   quic::QuicStreamFrame frame(stream_id_, false, 0u, data);
@@ -419,16 +472,25 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
+}
+
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteOpen) {
+  quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
+      quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
+  EXPECT_TRUE(quic_stream_->rst_received());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
@@ -561,6 +623,30 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   quic_stream_->OnStreamFrame(frame);
 }
 
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
+  request_headers_.addCopy("x-foo\r\n", "hello world");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
+  request_headers_.addCopy("x-foo", "hello\r\n\r\nGET /evil HTTP/1.1");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header value for: x-foo"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
+}
+#endif
+
 TEST_F(EnvoyQuicClientStreamTest, EncodeHeadersOnClosedStream) {
   // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(stream_callbacks_,
@@ -618,6 +704,27 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
                    "encodeTrailers is called on write-closed stream");
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
+  setUpCapsuleProtocol(false, true);
+  Buffer::OwnedImpl buffer(capsule_fragment_);
+  EXPECT_CALL(*quic_connection_, SendMessage(_, _, _))
+      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+        EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
+        return quic::MESSAGE_STATUS_SUCCESS;
+      });
+  quic_stream_->encodeData(buffer, /*end_stream=*/true);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
+  setUpCapsuleProtocol(true, false);
+  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
+  quic_session_.OnMessageReceived(datagram_fragment_);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+#endif
 
 } // namespace Quic
 } // namespace Envoy

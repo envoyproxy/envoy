@@ -83,7 +83,7 @@ public:
     auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
                                                           &callbacks_encoder, host);
     callbacks_->onPoolReady(std::move(upstream), host,
-                            callbacks_encoder.getStream().connectionLocalAddress(), info, protocol);
+                            callbacks_encoder.getStream().connectionInfoProvider(), info, protocol);
   }
 };
 

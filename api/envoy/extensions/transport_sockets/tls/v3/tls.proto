@@ -55,7 +55,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -123,6 +123,11 @@ message DownstreamTlsContext {
   // an accompanying OCSP response or if the response expires at runtime.
   // Defaults to LENIENT_STAPLING
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
+
+  // Multiple certificates are allowed in Downstream transport socket to serve different SNI.
+  // If the client provides SNI but no such cert matched, it will decide to full scan certificates or not based on this config.
+  // Defaults to false. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
+  google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
 }
 
 // TLS key log configuration.
@@ -210,13 +215,13 @@ message CommonTlsContext {
         [(validate.rules).message = {required: true}];
 
     // Certificate provider for fetching CA certs. This will populate the
-    // *default_validation_context.trusted_ca* field.
+    // ``default_validation_context.trusted_ca`` field.
     // [#not-implemented-hide:]
     CertificateProvider validation_context_certificate_provider = 3
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Certificate provider instance for fetching CA certs. This will populate the
-    // *default_validation_context.trusted_ca* field.
+    // ``default_validation_context.trusted_ca`` field.
     // [#not-implemented-hide:]
     CertificateProviderInstance validation_context_certificate_provider_instance = 4
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -227,15 +232,12 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
+  // Only a single TLS certificate is supported in client contexts. In server contexts,
   // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
-  // same context to allow both RSA and ECDSA certificates.
+  // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
   //
-  // Only a single TLS certificate is supported in client contexts. In server contexts, the first
-  // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
-  // used for clients that support ECDSA.
-  //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -247,18 +249,17 @@ message CommonTlsContext {
   // The same number and types of certificates as :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
   // are valid in the the certificates fetched through this setting.
   //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 2}];
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
   // Certificate provider instance for fetching TLS certs.
   //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
 

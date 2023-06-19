@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -26,6 +27,7 @@ envoy_cc_library(
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/router:router_lib",
@@ -47,6 +49,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "character_set_validation_lib",
+    hdrs = ["character_set_validation.h"],
+)
+
+envoy_cc_library(
     name = "codec_client_lib",
     srcs = ["codec_client.cc"],
     hdrs = ["codec_client.h"],
@@ -57,6 +64,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -67,8 +75,9 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
+        "//source/common/runtime:runtime_features_lib",
     ] + envoy_select_enable_http3([
-        "//source/common/quic:codec_lib",
+        "//source/common/quic:client_codec_lib",
     ]),
 )
 
@@ -119,6 +128,35 @@ envoy_cc_library(
         ":codes_lib",
         ":user_agent_lib",
         "//envoy/http:context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "dependency_manager",
+    srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_helper_lib",
+    srcs = ["filter_chain_helper.cc"],
+    hdrs = ["filter_chain_helper.h"],
+    deps = [
+        ":dependency_manager",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/filter:config_discovery_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -209,13 +247,17 @@ envoy_cc_library(
     deps = [
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
+        "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
+        "//envoy/router:scopes_interface",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/tracing:tracer_config_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -279,6 +321,8 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_errors",
+        "//envoy/http:header_validator_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
@@ -308,6 +352,7 @@ envoy_cc_library(
         "//source/common/http/match_delegate:config",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:quic_server_factory_stub_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/common/stats:timespan_lib",
@@ -405,21 +450,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rest_api_fetcher_lib",
-    srcs = ["rest_api_fetcher.cc"],
-    hdrs = ["rest_api_fetcher.h"],
-    deps = [
-        ":message_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:enum_to_int",
-        "//source/common/config:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "user_agent_lib",
     srcs = ["user_agent.cc"],
     hdrs = ["user_agent.h"],
@@ -443,13 +473,15 @@ envoy_cc_library(
         "abseil_node_hash_set",
         "abseil_optional",
         "http_parser",
-        "nghttp2",
+        "quiche_http2_protocol",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
         ":message_lib",
+        "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -474,15 +506,19 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",
         "//envoy/common:matchers_interface",
         "//envoy/common:regex_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//source/common/common:matchers_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -490,7 +526,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        "@com_github_google_quiche//:quiche_common_structured_headers_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -534,5 +572,18 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_mutation_lib",
+    srcs = ["header_mutation.cc"],
+    hdrs = ["header_mutation.h"],
+    deps = [
+        ":header_map_lib",
+        ":utility_lib",
+        "//envoy/http:header_evaluator",
+        "//source/common/router:header_parser_lib",
+        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )

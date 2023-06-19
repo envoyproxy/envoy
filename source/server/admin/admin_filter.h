@@ -51,6 +51,7 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
+  Http::Utility::QueryParams queryParams() const override;
 
 private:
   /**

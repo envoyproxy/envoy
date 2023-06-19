@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/common/fmt.h"
@@ -20,6 +19,32 @@ class FilterState;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
+// Objects stored in the filter state can optionally be shared between the
+// upstream and downstream filter state. Note that sharing happens at the
+// connection level and in some cases may significantly reduce performance by
+// preventing pooling of multiple downstream requests to a single
+// upstream connection.
+enum class StreamSharingMayImpactPooling {
+  // None implies the object is exclusive to the stream.
+  None,
+
+  // Mark a filter state object as shared with the upstream connection.
+  // Shared filter state objects are copied by reference from the downstream
+  // requests and connections to the upstream connection filter state. When
+  // upstream connections are re-used between streams, the downstream objects
+  // are captured for the first, initiating stream. To force distinct
+  // upstream connections, the shared filter state object must implement the
+  // hashing interface. Shared objects with distinct hashes will use distinct
+  // upstream connections. Note that this affects connection pooling,
+  // preventing any re-use of the upstream connections in the worst case.
+  SharedWithUpstreamConnection,
+
+  // Same as SharedWithUpstreamConnection, except that the filter state is
+  // not transitively shared. The filter state is imported into the upstream
+  // connection filter state as exclusive to the upstream connection.
+  SharedWithUpstreamConnectionOnce,
+};
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -27,6 +52,7 @@ using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 class FilterState {
 public:
   enum class StateType { ReadOnly, Mutable };
+
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -45,6 +71,17 @@ public:
   //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
+  //
+  // Note that for more accurate book-keeping it is recommended to subscribe to
+  // the stream callbacks instead of relying on the destruction of the filter
+  // state.
+  //
+  // As a special case, objects that are marked as shared with the upstream
+  // become bound to the upstream connection life span in addition to the
+  // original stream life span. That means, for example, that a shared request
+  // span object may outlive the original request when it is shared, because it
+  // may be captured by an upstream connection for the original downstream
+  // request, which remains open after the downstream request completes.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   class Object {
@@ -66,6 +103,16 @@ public:
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
+  struct FilterObject {
+    std::shared_ptr<Object> data_;
+    StateType state_type_{StateType::ReadOnly};
+    StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
+    std::string name_;
+  };
+
+  using Objects = std::vector<FilterObject>;
+  using ObjectsPtr = std::unique_ptr<Objects>;
+
   virtual ~FilterState() = default;
 
   /**
@@ -82,8 +129,10 @@ public:
    * This is to enforce a single authoritative source for each piece of
    * data stored in FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+  virtual void
+  setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType state_type,
+          LifeSpan life_span = LifeSpan::FilterChain,
+          StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
@@ -112,14 +161,12 @@ public:
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a shared pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;
 
@@ -156,6 +203,11 @@ public:
    * either the top LifeSpan or the parent is not yet created.
    */
   virtual FilterStateSharedPtr parent() const PURE;
+
+  /**
+   * @return filter objects that are shared with the upstream connection.
+   **/
+  virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
 };
 
 } // namespace StreamInfo

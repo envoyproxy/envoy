@@ -28,9 +28,9 @@ Change to the ``examples/local_ratelimit`` directory and bring up the docker com
 
     $ pwd
     envoy/examples/ratelimit
-    $ docker-compose build --pull
-    $ docker-compose up -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
     Name                        Command                          State   Ports
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     ratelimtit_envoy-stat_1     /docker-entrypoint.sh /usr ...   Up      0.0.0.0:10000->10000/tcp,:::10000->10000/tcp, 0.0.0.0:9901->9901/tcp,:::9901->9901/tcp, 0.0.0.0:9902->9902/tcp,:::9902->9902/tcp
@@ -43,7 +43,7 @@ The sandbox is configured with ``10000`` port for upstream service.
 
 If a request reaches the rate limit, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
 
-Now, use ``curl`` to make a request five times for the limited upsteam service:
+Now, use ``curl`` to make a request five times for the limited upstream service:
 
 .. code-block:: console
 

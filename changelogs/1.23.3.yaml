@@ -1,0 +1,12 @@
+date: December 2, 2022
+
+bug_fixes:
+- area: ci
+  change: |
+    assorted fixes.
+- area: dependencies
+  change: |
+    update Curl, Kafka, Wasm to mitigate CVEs.
+- area: docker
+  change: |
+    update Docker images (``distroless`` -> ``4b22ca3c6``) to resolve CVE issues in container packages.

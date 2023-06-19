@@ -29,6 +29,8 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -51,7 +53,7 @@ using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-using PostCb = std::function<void()>;
+using PostCb = absl::AnyInvocable<void()>;
 
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
@@ -210,13 +212,15 @@ public:
    * @param transport_socket supplies a transport socket to be used by the connection.
    * @param options the socket options to be set on the underlying socket before anything is sent
    *        on the socket.
+   * @param transport socket options used to create the transport socket.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+  virtual Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

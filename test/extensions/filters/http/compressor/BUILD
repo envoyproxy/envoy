@@ -34,6 +34,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "compressor_filter_integration_test",
+    size = "large",
     srcs = [
         "compressor_filter_integration_test.cc",
     ],
@@ -45,6 +46,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
     ],
 )
 
@@ -78,7 +80,10 @@ envoy_cc_benchmark_binary(
     deps = [
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/compression/brotli/compressor:compressor_lib",
+        "//source/extensions/compression/brotli/compressor:config",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -99,6 +104,7 @@ envoy_benchmark_test(
 
 envoy_cc_test(
     name = "compressor_integration_tests",
+    size = "large",
     srcs = [
         "compressor_integration_tests.cc",
         "compressor_integration_tests.h",

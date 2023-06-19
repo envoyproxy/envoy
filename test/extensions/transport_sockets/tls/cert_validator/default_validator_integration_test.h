@@ -5,6 +5,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -32,9 +33,7 @@ public:
           std::tuple<Network::Address::IpVersion,
                      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol>>&
           params) {
-    return fmt::format("{}_TLSv1_{}",
-                       std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
-                                                                                    : "IPv6",
+    return fmt::format("{}_TLSv1_{}", TestUtility::ipVersionToString(std::get<0>(params.param)),
                        std::get<1>(params.param) - 1);
   }
 

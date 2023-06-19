@@ -20,10 +20,10 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(
-    RouteConfigUpdatePtr& config_update_info,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    absl::optional<Rds::RouteConfigProvider*>& route_config_provider_opt)
+VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   Rds::RouteConfigProvider* route_config_provider)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       config_update_info_(config_update_info),
@@ -36,7 +36,7 @@ VhdsSubscription::VhdsSubscription(
                      subscription_->start(
                          {config_update_info_->protobufConfigurationCast().name()});
                    }),
-      route_config_provider_opt_(route_config_provider_opt) {
+      route_config_provider_(route_config_provider) {
   const auto& config_source = config_update_info_->protobufConfigurationCast()
                                   .vhds()
                                   .config_source()
@@ -90,8 +90,8 @@ void VhdsSubscription::onConfigUpdate(
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
               config_update_info_->protobufConfigurationCast().name(),
               config_update_info_->configHash());
-    if (route_config_provider_opt_.has_value()) {
-      route_config_provider_opt_.value()->onConfigUpdate();
+    if (route_config_provider_ != nullptr) {
+      route_config_provider_->onConfigUpdate();
     }
   }
 

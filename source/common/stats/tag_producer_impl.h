@@ -69,15 +69,11 @@ private:
   void reserveResources(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
-   * Adds all default extractors from well_known_names.cc into the
-   * collection. Returns a set of names of all default extractors
-   * into a string-set for dup-detection against new stat names
-   * specified in the configuration.
+   * Adds all default extractors from well_known_names.cc into the collection.
+   *
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
-   * @return names absl::node_hash_set<std::string> the set of names to populate
    */
-  absl::node_hash_set<std::string>
-  addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
+  void addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling
@@ -102,7 +98,12 @@ private:
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
-  TagVector default_tags_;
+
+  // Keep track of which names have extractors. If an extractor is added and there's
+  // already one for that name, we set a bit in the extractor so we can decide whether
+  // we need do elide duplicate extractors during extraction. It is not valid to
+  // send duplicate tag names to Prometheus so this needs to be filtered out.
+  absl::flat_hash_map<absl::string_view, std::reference_wrapper<TagExtractor>> extractor_map_;
 };
 
 } // namespace Stats

@@ -110,8 +110,9 @@ protected:
     // For simplicity's sake the dispatcher just runs the function immediately
     // - since the mock is capturing callbacks, we're effectively triggering
     // the dispatcher when we resolve the callback.
-    EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_))
-        .WillRepeatedly([](std::function<void()> fn) { fn(); });
+    EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_)).WillRepeatedly([](Event::PostCb fn) {
+      fn();
+    });
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
@@ -169,6 +170,19 @@ TEST_F(FileSystemBufferFilterTest, PassesRequestHeadersThroughOnNoBody) {
 
 TEST_F(FileSystemBufferFilterTest, PassesResponseHeadersThroughOnNoBody) {
   createFilterFromYaml(minimal_config); // Default filter config.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+}
+
+TEST_F(FileSystemBufferFilterTest, FullyBypassingAllowsUnspecifiedManager) {
+  createFilterFromYaml(R"(
+    request:
+      behavior:
+        bypass: {}
+    response:
+      behavior:
+        bypass: {}
+  )");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 }
 
@@ -336,17 +350,11 @@ TEST_F(FileSystemBufferFilterTest,
   EXPECT_EQ(response_sent_on_, "");
   expectAsyncFileCreated();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
-  std::cout << "A" << std::endl;
   auto handle = completeCreateFileAndExpectWrite("wor");
-  std::cout << "B" << std::endl;
   expectWriteWithPosition(handle, "ld", 3);
-  std::cout << "C" << std::endl;
   completeWriteOfSize(3); // "wor"
-  std::cout << "D" << std::endl;
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, true));
-  std::cout << "E" << std::endl;
   completeWriteOfSize(2); // "ld"
-  std::cout << "F" << std::endl;
   EXPECT_EQ(response_sent_on_, "");
   expectRead(handle, 0, 3); // "wor"
   sendResponseLowWatermark();
@@ -731,13 +739,13 @@ TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInDispatcherI
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
   completeCreateFileAndExpectWrite("1234567890");
-  std::function<void()> intercepted_dispatcher_callback;
+  Event::PostCb intercepted_dispatcher_callback;
   // Our default mock dispatcher behavior calls the callback immediately - here we intercept
   // one so we can call it after a 'realistic' delay during which something else happened to
   // destroy the filter.
   EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_))
-      .WillOnce([&intercepted_dispatcher_callback](std::function<void()> fn) {
-        intercepted_dispatcher_callback = fn;
+      .WillOnce([&intercepted_dispatcher_callback](Event::PostCb fn) {
+        intercepted_dispatcher_callback = std::move(fn);
       });
   completeWriteOfSize(10);
   destroyFilter();
@@ -777,7 +785,7 @@ TEST_F(FileSystemBufferFilterTest, MergesRouteConfig) {
 
 TEST_F(FileSystemBufferFilterTest, PassesThrough1xxHeaders) {
   createFilterFromYaml(minimal_config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
 }
 
 TEST_F(FileSystemBufferFilterTest, PassesThroughMetadata) {

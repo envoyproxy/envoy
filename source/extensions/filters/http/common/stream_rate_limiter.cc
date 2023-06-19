@@ -17,8 +17,8 @@ StreamRateLimiter::StreamRateLimiter(
     uint64_t max_kbps, uint64_t max_buffered_data, std::function<void()> pause_data_cb,
     std::function<void()> resume_data_cb,
     std::function<void(Buffer::Instance&, bool)> write_data_cb, std::function<void()> continue_cb,
-    std::function<void(uint64_t, bool)> write_stats_cb, TimeSource& time_source,
-    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+    std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb,
+    TimeSource& time_source, Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
     std::shared_ptr<TokenBucket> token_bucket, std::chrono::milliseconds fill_interval)
     : fill_interval_(std::move(fill_interval)), write_data_cb_(write_data_cb),
       continue_cb_(continue_cb), write_stats_cb_(std::move(write_stats_cb)), scope_(scope),
@@ -63,7 +63,7 @@ void StreamRateLimiter::onTokenTimer() {
   // Move the data to write into the output buffer with as little copying as possible.
   // NOTE: This might be moving zero bytes, but that should work fine.
   data_to_write.move(buffer_, bytes_to_write);
-  write_stats_cb_(bytes_to_write, buffer_.length() > 0);
+  write_stats_cb_(bytes_to_write, buffer_.length() > 0, fill_interval_);
 
   // If the buffer still contains data in it, we couldn't get enough tokens, so schedule the next
   // token available time.

@@ -19,8 +19,9 @@ namespace {
 class ListenerFilterBufferImplTest : public testing::Test {
 public:
   void initialize() {
-    EXPECT_CALL(io_handle_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                             Event::FileReadyType::Read))
+    EXPECT_CALL(io_handle_,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(SaveArg<1>(&file_event_callback_));
 
     listener_buffer_ = std::make_unique<ListenerFilterBufferImpl>(

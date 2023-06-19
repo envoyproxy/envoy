@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -89,6 +91,109 @@ std::string HostUtility::healthFlagsToString(const Host& host) {
   } else {
     return health_status;
   }
+}
+
+HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+  HostStatusSet override_host_status;
+
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_detailed_override_host_statuses")) {
+    // Old code path that should be removed once the runtime flag is removed directly.
+    // Coarse health status is used here.
+
+    if (!common_config.has_override_host_status()) {
+      // No override host status and 'Healthy' and 'Degraded' will be applied by default.
+      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+      return override_host_status;
+    }
+
+    for (auto single_status : common_config.override_host_status().statuses()) {
+      switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case envoy::config::core::v3::HealthStatus::UNKNOWN:
+      case envoy::config::core::v3::HealthStatus::HEALTHY:
+        override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+        break;
+      case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+      case envoy::config::core::v3::HealthStatus::DRAINING:
+      case envoy::config::core::v3::HealthStatus::TIMEOUT:
+        override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
+        break;
+      case envoy::config::core::v3::HealthStatus::DEGRADED:
+        override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+        break;
+      }
+    }
+    return override_host_status;
+  }
+
+  if (!common_config.has_override_host_status()) {
+    // No override host status and [UNKNOWN, HEALTHY, DEGRADED] will be applied by default.
+    override_host_status.set(static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::UNKNOWN));
+    override_host_status.set(static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::HEALTHY));
+    override_host_status.set(
+        static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::DEGRADED));
+    return override_host_status;
+  }
+
+  for (auto single_status : common_config.override_host_status().statuses()) {
+    switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::HealthStatus::UNKNOWN:
+    case envoy::config::core::v3::HealthStatus::HEALTHY:
+    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+    case envoy::config::core::v3::HealthStatus::DRAINING:
+    case envoy::config::core::v3::HealthStatus::TIMEOUT:
+    case envoy::config::core::v3::HealthStatus::DEGRADED:
+      override_host_status.set(static_cast<uint32_t>(single_status));
+      break;
+    }
+  }
+  return override_host_status;
+}
+
+HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
+                                                   LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return nullptr;
+  }
+
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+
+  auto host_iter = host_map->find(override_host.value());
+
+  // The override host cannot be found in the host map.
+  if (host_iter == host_map->end()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = host_iter->second;
+  ASSERT(host != nullptr);
+
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_detailed_override_host_statuses")) {
+    // Old code path that should be removed once the runtime flag is removed directly.
+    // Coarse health status is used here.
+
+    if (status[static_cast<size_t>(host->coarseHealth())]) {
+      return host;
+    }
+    return nullptr;
+  }
+
+  if (status[static_cast<uint32_t>(host->healthStatus())]) {
+    return host;
+  }
+  return nullptr;
 }
 
 } // namespace Upstream

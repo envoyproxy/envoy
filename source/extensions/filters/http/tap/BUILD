@@ -3,6 +3,7 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_select_admin_functionality",
 )
 
 licenses(["notice"])  # Apache 2
@@ -37,8 +38,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tap_filter_lib",
-    srcs = ["tap_filter.cc"],
-    hdrs = ["tap_filter.h"],
+    srcs = envoy_select_admin_functionality(["tap_filter.cc"]),
+    hdrs = envoy_select_admin_functionality(["tap_filter.h"]),
     deps = [
         ":tap_config_interface",
         "//envoy/access_log:access_log_interface",
@@ -50,8 +51,8 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    srcs = envoy_select_admin_functionality(["config.cc"]),
+    hdrs = envoy_select_admin_functionality(["config.h"]),
     deps = [
         ":tap_config_impl",
         ":tap_filter_lib",

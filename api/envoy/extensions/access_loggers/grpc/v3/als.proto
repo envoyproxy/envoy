@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC Access Log Service (ALS)]
 
-// Configuration for the built-in *envoy.access_loggers.http_grpc*
+// Configuration for the built-in ``envoy.access_loggers.http_grpc``
 // :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
 // populate :ref:`StreamAccessLogsMessage.http_logs
 // <envoy_v3_api_field_service.accesslog.v3.StreamAccessLogsMessage.http_logs>`.
@@ -46,8 +46,8 @@ message HttpGrpcAccessLogConfig {
   repeated string additional_response_trailers_to_log = 4;
 }
 
-// Configuration for the built-in *envoy.access_loggers.tcp_grpc* type. This configuration will
-// populate *StreamAccessLogsMessage.tcp_logs*.
+// Configuration for the built-in ``envoy.access_loggers.tcp_grpc`` type. This configuration will
+// populate ``StreamAccessLogsMessage.tcp_logs``.
 // [#extension: envoy.access_loggers.tcp_grpc]
 message TcpGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
@@ -87,7 +87,7 @@ message CommonGrpcAccessLogConfig {
 
   // Additional filter state objects to log in :ref:`filter_state_objects
   // <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.filter_state_objects>`.
-  // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
+  // Logger will call ``FilterState::Object::serializeAsProto`` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
 
   // Sets the retry policy when the establishment of a gRPC stream fails.

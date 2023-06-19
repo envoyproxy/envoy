@@ -106,6 +106,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "passthrough_decoder_event_handler_lib",
+    hdrs = ["passthrough_decoder_event_handler.h"],
+    deps = [
+        ":decoder_events_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
@@ -198,6 +206,7 @@ envoy_cc_library(
         ":twitter_protocol_lib",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -212,7 +221,9 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":protocol_interface",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -228,7 +239,9 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":protocol_interface",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -246,6 +259,7 @@ envoy_cc_library(
         ":thrift_object_lib",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -295,8 +309,10 @@ envoy_cc_library(
     name = "thrift_lib",
     hdrs = ["thrift.h"],
     deps = [
+        "//envoy/tcp:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -341,6 +357,7 @@ envoy_cc_library(
         ":unframed_transport_lib",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -356,6 +373,7 @@ envoy_cc_library(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -372,6 +390,7 @@ envoy_cc_library(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -387,4 +406,5 @@ envoy_cc_library(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )

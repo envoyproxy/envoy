@@ -4,8 +4,8 @@ Dynamic forward proxy
 =====================
 
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-* This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
 
 The following is a complete configuration that configures both the
 :ref:`dynamic forward proxy HTTP filter

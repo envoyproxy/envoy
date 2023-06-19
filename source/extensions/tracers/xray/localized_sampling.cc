@@ -78,7 +78,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
 } // namespace
 
 LocalizedSamplingRule LocalizedSamplingRule::createDefault() {
-  return LocalizedSamplingRule(DefaultFixedTarget, DefaultRate);
+  return {DefaultFixedTarget, DefaultRate};
 }
 
 bool LocalizedSamplingRule::appliesTo(const SamplingRequest& request) const {
@@ -94,9 +94,8 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
   }
 
   ProtobufWkt::Struct document;
-  try {
-    MessageUtil::loadFromJson(rule_json, document);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { MessageUtil::loadFromJson(rule_json, document); }
+  END_TRY catch (EnvoyException& e) {
     fail("invalid JSON format");
     return;
   }

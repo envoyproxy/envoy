@@ -72,6 +72,7 @@ TEST(StartTlsTest, BasicSwitch) {
 
   // Now switch to Tls. During the switch, the new socket should register for callbacks
   // and connect.
+  EXPECT_CALL(*ssl_socket, ssl());
   EXPECT_CALL(*ssl_socket, setTransportSocketCallbacks(_));
   EXPECT_CALL(*ssl_socket, onConnected);
   // Make sure that raw socket is destructed.
@@ -180,6 +181,9 @@ TEST(StartTls, BasicFactoryTest) {
       Network::UpstreamTransportSocketFactoryPtr(raw_buffer_factory),
       Network::UpstreamTransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
+  ASSERT_EQ(factory->sslCtx(), ssl_factory->sslCtx());
+  ASSERT_EQ(factory->clientContextConfig().has_value(),
+            ssl_factory->clientContextConfig().has_value());
   std::vector<uint8_t> key;
   factory->hashKey(key, nullptr);
   EXPECT_EQ(0, key.size());

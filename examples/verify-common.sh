@@ -6,7 +6,14 @@ MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
+ENVOY_EXAMPLES_DEBUG="${ENVOY_EXAMPLES_DEBUG:-}"
 
+
+if [[ -n "$DOCKER_COMPOSE" ]]; then
+    read -ra DOCKER_COMPOSE <<< "$DOCKER_COMPOSE"
+else
+    DOCKER_COMPOSE=(docker compose)
+fi
 
 run_log () {
     echo -e "\n> [${NAME}] ${*}"
@@ -16,20 +23,33 @@ bring_up_example_stack () {
     local args path up_args
     args=("${UPARGS[@]}")
     path="$1"
-    read -ra up_args <<< "up --build -d ${args[*]}"
+    read -ra up_args <<< "up --quiet-pull --pull missing --build --wait -d ${args[*]}"
+
     if [[ -z "$DOCKER_NO_PULL" ]]; then
         run_log "Pull the images ($path)"
-        docker-compose pull
+        "${DOCKER_COMPOSE[@]}" pull -q
         echo
     fi
     run_log "Bring up services ($path)"
-    docker-compose "${up_args[@]}" || return 1
+    "${DOCKER_COMPOSE[@]}" "${up_args[@]}" || return 1
+
+    if [[ -n "$ENVOY_EXAMPLES_DEBUG" ]]; then
+        echo "----------------------------------------------"
+        docker system df -v
+        echo
+        sudo du -ch / | grep "[0-9]G"
+        echo
+        df -h
+        echo
+        echo "----------------------------------------------"
+    fi
     echo
 }
 
 bring_up_example () {
     local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
+
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
         bring_up_example_stack "$path" || {
@@ -44,30 +64,67 @@ bring_up_example () {
     fi
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
-        docker-compose ps
-        docker-compose logs
+        "${DOCKER_COMPOSE[@]}" ps
+        "${DOCKER_COMPOSE[@]}" logs
         popd > /dev/null || return 1
     done
 }
 
-cleanup_stack () {
-    local path
-    path="$1"
-    run_log "Cleanup ($path)"
-    docker-compose down
-}
-
-cleanup () {
+bring_down_example () {
     local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
         cleanup_stack "$path" || {
             echo "ERROR: cleanup ${NAME} ${path}" >&2
-            return 1
         }
         popd > /dev/null
     done
+}
+
+cleanup_stack () {
+    local path down_args
+    path="$1"
+    down_args=(--remove-orphans)
+
+    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
+        down_args+=(--rmi all)
+    fi
+
+    # Remove sandbox volumes by default
+    if [[ -z "$DOCKER_SAVE_VOLUMES" ]]; then
+        down_args+=(--volumes)
+    fi
+
+    run_log "Cleanup ($path)"
+    "${DOCKER_COMPOSE[@]}" down "${down_args[@]}"
+}
+
+debug_failure () {
+    >&2 echo "FAILURE DEBUG"
+    >&2 echo "DISK SPACE"
+    df -h
+    >&2 echo "DOCKER COMPOSE LOGS"
+    "${DOCKER_COMPOSE[@]}" logs
+    >&2 echo "DOCKER COMPOSE PS"
+    "${DOCKER_COMPOSE[@]}" ps
+}
+
+cleanup () {
+    local code="$?"
+
+    if [[ "$code" -ne 0 ]]; then
+        debug_failure
+    fi
+
+    bring_down_example
+
+    if [[ "$code" -ne 0 ]]; then
+        run_log Failed
+    else
+        run_log Success
+    fi
+    echo
 }
 
 _curl () {
@@ -147,7 +204,7 @@ wait_for () {
     local i=1 returns=1 seconds="$1"
     shift
     while ((i<=seconds)); do
-        if "$@"; then
+        if "${@}" &> /dev/null; then
             returns=0
             break
         else
@@ -155,6 +212,9 @@ wait_for () {
             ((i++))
         fi
     done
+    if [[ "$returns" != 0 ]]; then
+        echo "Wait (${seconds}) failed: ${*}" >&2
+    fi
     return "$returns"
 }
 
@@ -168,3 +228,11 @@ fi
 if [[ -z "$MANUAL" ]]; then
     bring_up_example
 fi
+
+
+# These allow the functions to be used in subshells, e.g. in `wait_for`
+export -f responds_with
+export -f responds_without
+export -f responds_with_header
+export -f responds_without_header
+export -f _curl

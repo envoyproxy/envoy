@@ -84,18 +84,6 @@ private:
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
   StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
 
-  // Retain storage for deleted stats; these are no longer in maps because
-  // the matcher-pattern was established after they were created. Since the
-  // stats are held by reference in code that expects them to be there, we
-  // can't actually delete the stats.
-  //
-  // It seems like it would be better to have each client that expects a stat
-  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
-  // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
-  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
-
   template <typename StatType> using StatPointerSet = absl::flat_hash_set<StatType*>;
   // Stat pointers that participate in the flush to sink process.
   StatPointerSet<Counter> sinked_counters_ ABSL_GUARDED_BY(mutex_);
@@ -107,6 +95,18 @@ private:
   SymbolTable& symbol_table_;
 
   Thread::ThreadSynchronizer sync_;
+
+  // Retain storage for deleted stats; these are no longer in maps because
+  // the matcher-pattern was established after they were created. Since the
+  // stats are held by reference in code that expects them to be there, we
+  // can't actually delete the stats.
+  //
+  // It seems like it would be better to have each client that expects a stat
+  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
+  // but that would be fairly complex to change.
+  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
+  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

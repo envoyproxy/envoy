@@ -49,7 +49,7 @@ std::string StatsdSinkFactory::name() const { return StatsdName; }
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(StatsdSinkFactory, Server::Configuration::StatsSinkFactory){"envoy.statsd"};
+LEGACY_REGISTER_FACTORY(StatsdSinkFactory, Server::Configuration::StatsSinkFactory, "envoy.statsd");
 
 } // namespace Statsd
 } // namespace StatSinks

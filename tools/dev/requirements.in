@@ -1,0 +1,26 @@
+# Remote-pdb can be used inside build jobs, or parallelized aspects
+# remote-pdb
+
+# Add temporary dev requirements here
+#
+# Note: This file should always be empty on `main`.
+#
+# After updating this file you will need to re-run `pip-compile` - eg:
+#
+#   $ cd tools/dev
+#   $ pip-compile --generate-hashes --reuse-hashes --allow-unsafe requirements.in
+#
+# Only paths to files are allowed (ie no git etc), so if loading from the filesystem
+# you will either need to create a tarball from the egg directory or build
+# it into a wheel before re-running `pip-compile`
+#
+# Examples:
+#
+# Github at commit:
+#
+#   https://github.com/envoyproxy/pytooling/archive/135fd2cf03f5327eecbaf3ffaa43c5bec31d2f2c.zip#egg=envoy.code.check&subdirectory=envoy.code.check
+#
+# Local filesystem (path must be available to bazel, eg inside container):
+#
+#   file:///src/workspace/pytooling/envoy.code.check/dist/envoy.code.check-0.3.5.dev0-py3-none-any.whl
+#

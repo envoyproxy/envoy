@@ -11,20 +11,18 @@ namespace Envoy {
 namespace Http {
 
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
-  uint32_t initial_streams = 1;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
-        http_server_properties_cache_, origin_, host());
-  }
+  uint32_t initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
+      http_server_properties_cache_, origin_, host());
   return std::make_unique<Tcp::ActiveTcpClient>(
-      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, absl::nullopt);
 }
 
 CodecClientPtr
 HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   auto protocol = protocol_ == Protocol::Http11 ? CodecType::HTTP1 : CodecType::HTTP2;
   CodecClientPtr codec{new CodecClientProd(protocol, std::move(data.connection_),
-                                           data.host_description_, dispatcher_, random_generator_)};
+                                           data.host_description_, dispatcher_, random_generator_,
+                                           transportSocketOptions())};
   return codec;
 }
 

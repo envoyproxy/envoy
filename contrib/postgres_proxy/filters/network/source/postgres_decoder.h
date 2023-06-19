@@ -44,6 +44,9 @@ public:
   virtual void processQuery(const std::string&) PURE;
 
   virtual bool onSSLRequest() PURE;
+  virtual bool shouldEncryptUpstream() const PURE;
+  virtual void sendUpstream(Buffer::Instance&) PURE;
+  virtual void encryptUpstream(bool, Buffer::Instance&) PURE;
 };
 
 // Postgres message decoder.
@@ -88,7 +91,13 @@ public:
 
   bool encrypted() const { return encrypted_; }
 
-  enum class State { InitState, InSyncState, OutOfSyncState, EncryptedState };
+  enum class State {
+    InitState,
+    InSyncState,
+    OutOfSyncState,
+    EncryptedState,
+    NegotiatingUpstreamSSL
+  };
   State state() const { return state_; }
   void state(State state) { state_ = state; }
 
@@ -98,6 +107,7 @@ protected:
   Result onDataInit(Buffer::Instance& data, bool frontend);
   Result onDataInSync(Buffer::Instance& data, bool frontend);
   Result onDataIgnore(Buffer::Instance& data, bool frontend);
+  Result onDataInNegotiating(Buffer::Instance& data, bool frontend);
 
   // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
@@ -187,6 +197,11 @@ protected:
 
   MsgParserDict BE_errors_;
   MsgParserDict BE_notices_;
+
+  // Buffer used to temporarily store a downstream postgres packet
+  // while sending other packets. Currently used only when negotiating
+  // upstream SSL.
+  Buffer::OwnedImpl temp_storage_;
 
   // MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
   // as maximum size of initial packet.

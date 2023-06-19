@@ -83,7 +83,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
@@ -113,6 +113,7 @@ public:
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
         .WillOnce(
             Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+              entry.mutable_common_properties()->clear_duration();
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
@@ -121,6 +122,7 @@ public:
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.start_time_ = SystemTime(1h);
     stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", request_method},
@@ -140,6 +142,7 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  access_log_type: NotSet
   upstream_local_address:
     socket_address:
       address: "127.1.2.3"
@@ -152,7 +155,8 @@ request:
 response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -204,12 +208,15 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
                                        StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.onRequestComplete();
+
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -241,7 +248,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -251,6 +258,7 @@ response: {}
     EXPECT_CALL(time_system, monotonicTime)
         .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
     stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+    stream_info.onRequestComplete();
 
     expectLog(R"EOF(
 common_properties:
@@ -258,6 +266,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -277,7 +286,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -314,6 +323,7 @@ response: {}
     stream_info.setRouteName(route_name_view);
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
@@ -334,6 +344,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -394,7 +405,8 @@ response:
   response_body_bytes: 20
   response_code_details: "via_upstream"
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
+    access_log_->log(&request_headers, &response_headers, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -402,6 +414,7 @@ response:
     stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
     stream_info.upstream_info_->setUpstreamTransportFailureReason("TLS error");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -413,6 +426,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -433,7 +447,8 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   {
@@ -458,6 +473,7 @@ response: {}
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -469,6 +485,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -503,7 +520,8 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1.2
@@ -522,6 +540,7 @@ response: {}
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -533,6 +552,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -557,7 +577,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1.1
@@ -576,6 +596,7 @@ response: {}
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -587,6 +608,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -611,7 +633,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // TLSv1
@@ -630,6 +652,7 @@ response: {}
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -641,6 +664,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -665,7 +689,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 
   // Unknown TLS version (TLSv1.4)
@@ -684,6 +708,7 @@ response: {}
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -695,6 +720,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -719,7 +745,75 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  }
+
+  // Intermediate log entry.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    stream_info.start_time_ = SystemTime(1h);
+    stream_info.start_time_monotonic_ = MonotonicTime(1h);
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::hours(1) + std::chrono::milliseconds(2))));
+    stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+    StreamInfo::TimingUtility timing(stream_info);
+    ASSERT(timing.lastDownstreamTxByteSent().has_value());
+    stream_info.downstream_connection_info_provider_->setLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("/foo"));
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
+    stream_info.filter_state_->setData("string_accessor",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("uint32_accessor",
+                                       std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+
+    expectLog(R"EOF(
+common_properties:
+  intermediate_log_entry: true
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  access_log_type: NotSet
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  downstream_local_address:
+    pipe:
+      path: "/foo"
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  start_time:
+    seconds: 3600
+  time_to_last_downstream_tx_byte:
+    nanos: 2000000
+  metadata:
+    filter_metadata:
+      foo: {}
+  filter_state_objects:
+    string_accessor:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: test_value
+    uint32_accessor:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+      value: 42
+    serialized:
+      "@type": type.googleapis.com/google.protobuf.Duration
+      value: 10s
+request: {}
+response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
   }
 }
 
@@ -747,6 +841,7 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.onRequestComplete();
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
@@ -779,6 +874,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -813,7 +909,92 @@ response:
     "x-logged-trailer": "value,response_trailer_value"
     "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
+                     AccessLog::AccessLogType::NotSet);
+  }
+}
+
+// Test sanitizing non-UTF-8 header values.
+TEST_F(HttpGrpcAccessLogTest, SanitizeUTF8) {
+  InSequence s;
+
+  config_.add_additional_request_headers_to_log("X-Request");
+  config_.add_additional_response_headers_to_log("X-Response");
+  config_.add_additional_response_trailers_to_log("X-Trailer");
+
+  init();
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    stream_info.start_time_ = SystemTime(1h);
+    std::string non_utf8("prefix");
+    non_utf8.append(1, char(0xc3));
+    non_utf8.append(1, char(0xc7));
+    non_utf8.append("suffix");
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", non_utf8},
+        {":method", "POST"},
+        {"x-envoy-max-retries", "3"}, // test inline header not
+                                      // otherwise logged
+        {"x-request", non_utf8},
+        {"x-request", non_utf8},
+    };
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+        {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
+        {"x-response", non_utf8},
+        {"x-response", non_utf8},
+    };
+
+    Http::TestResponseTrailerMapImpl response_trailers{
+        {"x-trailer", non_utf8},
+        {"x-trailer", non_utf8},
+    };
+
+    stream_info.onRequestComplete();
+    expectLog(fmt::format(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  access_log_type: NotSet
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  start_time:
+    seconds: 3600
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "{0}"
+  request_method: "POST"
+  request_headers_bytes: 140
+  request_headers:
+    "x-request": "{0},{0}"
+response:
+  response_headers_bytes: 97
+  response_headers:
+    "x-response": "{0},{0}"
+  response_trailers:
+    "x-trailer": "{0},{0}"
+)EOF",
+                          "prefix!!suffix"));
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
+                     AccessLog::AccessLogType::NotSet);
   }
 }
 
@@ -842,6 +1023,7 @@ literal:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.start_time_ = SystemTime(1h);
+  stream_info.onRequestComplete();
 
   expectLog(R"EOF(
 common_properties:
@@ -849,6 +1031,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -873,7 +1056,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
@@ -899,6 +1082,7 @@ metadata:
       "foo", MessageUtil::keyValueStruct("bar", "baz")));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   stream_info.upstreamInfo()->setUpstreamHost(host);
+  stream_info.onRequestComplete();
 
   expectLog(R"EOF(
 common_properties:
@@ -906,6 +1090,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -930,7 +1115,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadataDefaultValue) {
@@ -953,6 +1138,7 @@ metadata:
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   stream_info.upstreamInfo()->setUpstreamHost(host);
+  stream_info.onRequestComplete();
 
   expectLog(R"EOF(
 common_properties:
@@ -960,6 +1146,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -984,7 +1171,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace

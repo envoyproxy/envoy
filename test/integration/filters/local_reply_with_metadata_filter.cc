@@ -36,5 +36,8 @@ constexpr char LocalReplyWithMetadataFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyWithMetadataFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyWithMetadataFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

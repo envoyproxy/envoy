@@ -16,7 +16,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::SaveArg;
 
 class MockTsiHandshakerCallbacks : public TsiHandshakerCallbacks {
 public:
@@ -150,15 +149,15 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   handshaker->setHandshakerCallbacks(client_callbacks_);
 
   Buffer::OwnedImpl empty;
-  std::function<void()> done;
+  Event::PostCb done;
 
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&done));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&done](Event::PostCb cb) { done = std::move(cb); });
 
   handshaker->next(empty);
   handshaker->deferredDelete();
 
   // Make sure the handshaker is not in dispatcher_ queue, since the next call is not done.
-  EXPECT_NE(dispatcher_.to_delete_.back().get(), handshaker.get());
+  EXPECT_TRUE(dispatcher_.to_delete_.empty());
 
   // After deferredDelete, the callback should be never invoked, in real use it might be already
   // a dangling pointer.

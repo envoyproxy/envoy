@@ -30,8 +30,8 @@ message TokenBucket {
   google.protobuf.UInt32Value tokens_per_fill = 2 [(validate.rules).uint32 = {gt: 0}];
 
   // The fill interval that tokens are added to the bucket. During each fill interval
-  // `tokens_per_fill` are added to the bucket. The bucket will never contain more than
-  // `max_tokens` tokens.
+  // ``tokens_per_fill`` are added to the bucket. The bucket will never contain more than
+  // ``max_tokens`` tokens.
   google.protobuf.Duration fill_interval = 3 [(validate.rules).duration = {
     required: true
     gt {}

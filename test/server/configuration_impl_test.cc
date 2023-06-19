@@ -61,12 +61,14 @@ protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
-            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-            server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options(),
-            server_.quic_stat_names_, server_) {}
+            server_context_, server_.stats(), server_.threadLocal(), server_.httpContext(),
+            [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
+            server_.sslContextManager(), server_.secretManager(), server_.quic_stat_names_,
+            server_) {
+    ON_CALL(server_context_.api_, threadFactory())
+        .WillByDefault(
+            Invoke([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); }));
+  }
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -75,6 +77,7 @@ protected:
   }
 
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };

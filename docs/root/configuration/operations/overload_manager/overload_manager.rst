@@ -8,8 +8,12 @@ The :ref:`overload manager <arch_overview_overload_manager>` is configured in th
 field.
 
 An example configuration of the overload manager is shown below. It shows a
-configuration to drain HTTP/X connections when heap memory usage reaches 95%
-and to stop accepting requests when heap memory usage reaches 99%.
+configuration to drain HTTP/X connections when heap memory usage reaches 92%
+(configured via ``envoy.overload_actions.disable_http_keepalive``), to stop
+accepting requests when heap memory usage reaches 95% (configured via
+``envoy.overload_actions.stop_accepting_requests``) and to stop accepting new
+TCP connections when memory usage reaches 95% (configured via
+``envoy.load_shed_points.tcp_listener_accept``).
 
 .. code-block:: yaml
 
@@ -26,12 +30,18 @@ and to stop accepting requests when heap memory usage reaches 99%.
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.95
+             value: 0.92
      - name: "envoy.overload_actions.stop_accepting_requests"
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.99
+             value: 0.95
+    loadshed_points:
+      - name: "envoy.load_shed_points.tcp_listener_accept"
+        triggers:
+          - name: "envoy.resource_monitors.fixed_heap"
+            threshold:
+              value: 0.95
 
 Resource monitors
 -----------------
@@ -101,6 +111,59 @@ The following overload actions are supported:
   * - envoy.overload_actions.reset_high_memory_stream
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
+
+
+Load Shed Points
+----------------
+
+Load Shed Points are similar to overload actions as they are dependent on a
+given trigger to activate which determines whether Envoy ends up shedding load at
+the given point in a connection or stream lifecycle.
+
+For a given request on a newly created connection, we can think of the
+configured load shed points as a decision tree at key junctions of a connection
+/ stream lifecycle. While a connection / stream might pass one junction, it
+is possible that later on the conditions might change causing Envoy to shed load
+at a later junction.
+
+In comparision to analogous overload actions, Load Shed Points are more
+reactive to changing conditions, especially in cases of large traffic spikes.
+Overload actions can be better suited in cases where Envoy is deciding to shed load
+but the worker threads aren't actively processing the connections or streams that
+Envoy wants to shed. For example
+``envoy.overload_actions.reset_high_memory_stream`` can reset streams that are
+using a lot of memory even if those streams aren't actively making progress.
+
+Compared to overload actions, Load Shed Points are also more flexible to
+integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
+has access to the Overload Manager to request the custom Load Shed Point.
+
+The following core load shed points are supported:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 2
+
+  * - Name
+    - Description
+
+  * - envoy.load_shed_points.tcp_listener_accept
+    - Envoy will reject (close) new TCP connections. This occurs before the
+      :ref:`Listener Filter Chain <life_of_a_request>` is created.
+
+  * - envoy.load_shed_points.http_connection_manager_decode_headers
+    - Envoy will reject new HTTP streams by sending a local reply. This occurs
+      right after the http codec has finished parsing headers but before the
+      :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
+
+  * - envoy.load_shed_points.http1_server_abort_dispatch
+    - Envoy will reject processing HTTP1 at the codec level. If a response has
+      not yet started, Envoy will send a local reply. Envoy will then close the
+      connection.
+
+  * - envoy.load_shed_points.http2_server_go_away_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level which will eventually drain the HTTP/2 connection.
 
 .. _config_overload_manager_reducing_timeouts:
 
@@ -187,7 +250,8 @@ Reset Streams
    Resetting streams via an overload action currently only works with HTTP2.
 
 The ``envoy.overload_actions.reset_high_memory_stream`` overload action will reset
-expensive streams. This requires `minimum_account_to_track_power_of_two` to be
+expensive streams. This requires :ref:`minimum_account_to_track_power_of_two
+<envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>` to be
 configured via :ref:`buffer_factory_config
 <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
 To understand the memory class scheme in detail see :ref:`minimum_account_to_track_power_of_two
@@ -211,8 +275,9 @@ threshold for tracking and a single overload action entry that resets streams:
 
 We will only track streams using >=
 :math:`2^{minimum\_account\_to\_track\_power\_of\_two}` worth of allocated memory in
-buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
-to `20` we will track streams using >= 1MiB since :math:`2^{20}` is 1MiB. Streams
+buffers. In this case, by setting the :ref:`minimum_account_to_track_power_of_two
+<envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>`
+to 20 we will track streams using >= 1MiB since :math:`2^{20}` is 1MiB. Streams
 using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
 the number of buckets is hardcoded to 8.  For this example, the buckets are as
 follows:
@@ -252,22 +317,22 @@ locking up and triggering the Watchdog system.
 
 Given that there are only 8 buckets, we partition the space with a gradation of
 :math:`gradation = (saturation\_threshold - scaling\_threshold)/8`. Hence at 85%
-heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
+heap usage we reset streams in the last bucket e.g. those using ``>= 128MiB``. At
 :math:`85\% + 1 * gradation` heap usage we reset streams in the last two buckets
-e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since
+e.g. those using ``>= 64MiB``, prioritizing the streams in the last bucket since
 there's a hard limit on the number of streams we can reset per invokation.
 At :math:`85\% + 2 * gradation` heap usage we reset streams in the last three
-buckets e.g. those using `>= 32MiB`. And so forth as the heap usage is higher.
+buckets e.g. those using ``>= 32MiB``. And so forth as the heap usage is higher.
 
 It's expected that the first few gradations shouldn't trigger anything, unless
-there's something seriously wrong e.g. in this example streams using `>=
-128MiB` in buffers.
+there's something seriously wrong e.g. in this example streams using ``>=
+128MiB`` in buffers.
 
 
 Statistics
 ----------
 
-Each configured resource monitor has a statistics tree rooted at *overload.<name>.*
+Each configured resource monitor has a statistics tree rooted at ``overload.<name>.``
 with the following statistics:
 
 .. csv-table::
@@ -277,6 +342,7 @@ with the following statistics:
   pressure, Gauge, Resource pressure as a percent
   failed_updates, Counter, Total failed attempts to update the resource pressure
   skipped_updates, Counter, Total skipped attempts to update the resource pressure due to a pending update
+  refresh_interval_delay, Histogram, Latencies for the delay between overload manager resource refresh loops
 
 Each configured overload action has a statistics tree rooted at *overload.<name>.*
 with the following statistics:

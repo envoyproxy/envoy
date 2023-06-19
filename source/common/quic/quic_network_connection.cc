@@ -15,5 +15,17 @@ QuicNetworkConnection::~QuicNetworkConnection() {
 
 uint64_t QuicNetworkConnection::id() const { return envoy_connection_->id(); }
 
+void QuicNetworkConnection::setEnvoyConnection(Network::Connection& connection,
+                                               QuicWriteEventCallback& write_callback) {
+  envoy_connection_ = &connection;
+  write_callback_ = &write_callback;
+}
+
+void QuicNetworkConnection::onWriteEventDone() {
+  if (write_callback_ != nullptr) {
+    write_callback_->onWriteEventDone();
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy

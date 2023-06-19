@@ -187,6 +187,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
 %PROTOCOL%
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -346,6 +370,8 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_duration:
+
 %DURATION%
   HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
@@ -387,12 +413,37 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%ROUNDTRIP_DURATION%
+  HTTP/3 (QUIC)
+    Total duration in milliseconds of the request from the start time to receiving the final ack from
+    the downstream.
+
+  HTTP/1 and HTTP/2
+    Not implemented ("-").
+
+  TCP/UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_TX_DURATION%
   HTTP
     Total duration in milliseconds of the request from the first byte read from the upstream host to the last
     byte sent downstream.
 
   TCP/UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+%DOWNSTREAM_HANDSHAKE_DURATION%
+  HTTP
+    Not implemented ("-").
+
+  TCP
+    Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -425,7 +476,7 @@ The following command operators are supported:
     * **RLSE**: The request was rejected because there was an error in rate limit service.
     * **IH**: The request was rejected because it set an invalid value for a
       :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
-    * **SI**: Stream idle timeout in addition to 408 response code.
+    * **SI**: Stream idle timeout in addition to 408 or 504 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached max stream duration.
@@ -489,6 +540,18 @@ The following command operators are supported:
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
   TCP/UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_transport_failure_reason:
+
+%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP/TCP
+    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured downstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+  UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
@@ -578,8 +641,19 @@ The following command operators are supported:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
-%GRPC_STATUS%
-  gRPC status code which is easy to interpret with text message corresponding with number.
+.. _config_access_log_format_stream_id:
+
+%STREAM_ID%
+  An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
+  Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.
+  And it's value should be same with %REQ(X-REQUEST-ID)% for HTTP request.
+  This should be used to replace %CONNECTION_ID% and %REQ(X-REQUEST-ID)% in most cases.
+
+%GRPC_STATUS(X)%
+  `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
+  For example, if the grpc status is ``INVALID_ARGUMENT`` (represented by number 3), the formatter will return ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
+  If ``X`` isn't provided, ``CAMEL_STRING`` will be used.
 
 %GRPC_STATUS_NUMBER%
   gRPC status code.
@@ -636,28 +710,50 @@ The following command operators are supported:
 
   UDP
     For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
-    NAMESPACE should be always set to "udp.proxy", optional KEYs are as follows:
+    when NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
 
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
     * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in the session.
-    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
-      Since the receiving errors are counted in at the listener level (vs. the session), this counter is global to all sessions and may not be directly attributable to the session being logged.
     * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
     * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
 
-    Recommended access log format for UDP proxy:
+    Recommended session access log format for UDP proxy:
 
     .. code-block:: none
 
-      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
-      %DYNAMIC_METADATA(udp.proxy:bytes_sent)%
-      %DYNAMIC_METADATA(udp.proxy:bytes_received)%
-      %DYNAMIC_METADATA(udp.proxy:errors_sent)%
-      %DYNAMIC_METADATA(udp.proxy:errors_received)%
-      %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
-      %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
+      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy.session:cluster_name)%
+      %DYNAMIC_METADATA(udp.proxy.session:bytes_sent)%
+      %DYNAMIC_METADATA(udp.proxy.session:bytes_received)%
+      %DYNAMIC_METADATA(udp.proxy.session:errors_sent)%
+      %DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%
+      %DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%\n
+
+    when NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
+
+    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in UDP proxy.
+    * ``bytes_received``: Total number of downstream bytes received from the upstream in UDP proxy.
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in UDP proxy.
+    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
+    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in UDP proxy.
+    * ``datagrams_received``: Number of datagrams received from the upstream successfully in UDP proxy.
+    * ``no_route``: Number of times that no upstream cluster found in UDP proxy.
+    * ``session_total``: Total number of sessions in UDP proxy.
+    * ``idle_timeout``: Number of times that sessions idle timeout occurred in UDP proxy.
+
+    Recommended proxy access log format for UDP proxy:
+
+    .. code-block:: none
+
+      [%START_TIME%]
+      %DYNAMIC_METADATA(udp.proxy.proxy:bytes_sent)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:errors_sent)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:errors_received)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:datagrams_sent)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:datagrams_received)%
+      %DYNAMIC_METADATA(udp.proxy.proxy:session_total)%\n
 
   THRIFT
     For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
@@ -736,6 +832,40 @@ The following command operators are supported:
   .. note::
 
    CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
+.. _config_access_log_format_upstream_host_metadata:
+
+%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
+  HTTP/TCP
+    :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following upstream host metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %UPSTREAM_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_key)% will log: ``foo``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
+    * %UPSTREAM_METADATA(com.unknown_filter)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  UDP/THRIFT
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored.
+
+  .. note::
+
+   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_filter_state:
 
@@ -943,7 +1073,25 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+.. _config_access_log_format_access_log_type:
+
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

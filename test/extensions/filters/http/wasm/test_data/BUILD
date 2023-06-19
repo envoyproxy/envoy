@@ -1,7 +1,7 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
@@ -112,7 +112,7 @@ wasm_rust_binary(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_cpp_plugin",
     srcs = [
         "test_async_call_cpp.cc",

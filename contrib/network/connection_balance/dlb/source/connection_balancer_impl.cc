@@ -1,6 +1,5 @@
 #include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 
-#include <bits/types/FILE.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 
@@ -18,13 +17,43 @@ namespace Dlb {
 
 Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
-    const Protobuf::Message&, Server::Configuration::FactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
+  const auto& typed_config =
+      dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(config);
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
+  auto status = Envoy::MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb_config);
+  if (!status.ok()) {
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
+  }
+
+  const uint32_t worker_num = context.options().concurrency();
+
+  if (worker_num > 32) {
+    ExceptionUtil::throwEnvoyException(
+        "Dlb connection balanncer only supports up to 32 worker threads, "
+        "please decrease the number of threads by `--concurrency`");
+  }
+
+  const uint& config_id = dlb_config.id();
+  const auto& result = detectDlbDevice(config_id, "/dev");
+  if (!result.has_value()) {
+    ExceptionUtil::throwEnvoyException("no available dlb hardware");
+  }
+
+  const uint& device_id = result.value();
+  if (device_id != config_id) {
+    ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", config_id, device_id);
+  }
+
 #ifdef DLB_DISABLED
-  context.localInfo();
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
+
+  max_retries = dlb_config.max_retries();
+
   dlb_resources_t rsrcs;
-  if (dlb_open(1, &dlb) == -1) {
+  if (dlb_open(device_id, &dlb) == -1) {
     ExceptionUtil::throwEnvoyException(fmt::format("dlb_open {}", errorDetails(errno)));
   }
   if (dlb_get_dev_capabilities(dlb, &cap)) {
@@ -38,21 +67,20 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   }
 
   ENVOY_LOG(debug,
-            "dlb available resources: {}, domains: {}, LDB queues: {}, LDB ports: {}, SN slots: {} "
-            "{}, ES entries: {}, Contig ES entries: {}, LDB credits: {}, Contig LDB cred: {}, LDB "
-            "credit pls: {}",
+            "dlb available resources: domains: {}, LDB queues: {}, LDB ports: {}, "
+            "ES entries: {}, Contig ES entries: {}, LDB credits: {}, Config LDB credits: {}, LDB "
+            "credit pools: {}",
             rsrcs.num_sched_domains, rsrcs.num_ldb_queues, rsrcs.num_ldb_ports,
-            rsrcs.num_sn_slots[0], rsrcs.num_sn_slots[1], rsrcs.num_ldb_event_state_entries,
-            rsrcs.max_contiguous_ldb_event_state_entries, rsrcs.num_ldb_credits,
-            rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
+            rsrcs.num_ldb_event_state_entries, rsrcs.max_contiguous_ldb_event_state_entries,
+            rsrcs.num_ldb_credits, rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
 
-  uint num_seq_numbers;
-  if (dlb_get_ldb_sequence_number_allocation(dlb, 0, &num_seq_numbers)) {
+  if (rsrcs.num_ldb_ports < 2 * worker_num) {
     ExceptionUtil::throwEnvoyException(
-        fmt::format("dlb_get_ldb_sequence_number_allocation {}", errorDetails(errno)));
+        fmt::format("no available dlb port resources, request: {}, available: {}", 2 * worker_num,
+                    rsrcs.num_ldb_ports));
   }
 
-  domain_id = createSchedDomain(dlb, rsrcs, cap);
+  domain_id = createSchedDomain(dlb, rsrcs, cap, 2 * worker_num);
   if (domain_id == -1) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
@@ -98,14 +126,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ExceptionUtil::throwEnvoyException(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
   }
 
-  const int num = context.options().concurrency();
-  if (num > 32) {
-    ExceptionUtil::throwEnvoyException(
-        "Dlb connection balanncer only supports up to 32 worker threads, "
-        "please decrease the number of threads by `--concurrency`");
-  }
-
-  for (int i = 0; i < num; i++) {
+  for (uint i = 0; i < worker_num; i++) {
     int tx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (tx_port_id == -1) {
       ExceptionUtil::throwEnvoyException(
@@ -202,6 +223,8 @@ DlbConnectionBalanceFactory::~DlbConnectionBalanceFactory() {
   }
 }
 
+REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
+
 void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
   auto listener = dynamic_cast<Envoy::Server::ActiveTcpListener*>(&handler_);
 
@@ -212,9 +235,9 @@ void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
   dlb_event_->setEnabled(Event::FileReadyType::Read);
 }
 
-void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socket) {
+void DlbBalancedConnectionHandlerImpl::post(
+    [[maybe_unused]] Network::ConnectionSocketPtr&& socket) {
 #ifdef DLB_DISABLED
-  socket->isOpen();
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
   // The pointer will be casted to unique_ptr in onDlbEvents(), no need to consider free.
@@ -225,7 +248,33 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
   events[0].adv_send.udata64 = reinterpret_cast<std::uintptr_t>(s);
   int ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
   if (ret != 1) {
-    ENVOY_LOG(error, "{} dlb fail send {}", name_, errorDetails(errno));
+    if (DlbConnectionBalanceFactorySingleton::get().max_retries > 0) {
+      uint i = 0;
+      while (i < DlbConnectionBalanceFactorySingleton::get().max_retries) {
+        ENVOY_LOG(debug, "{} dlb_send fail, start retry, errono: {}", name_, errno);
+        ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
+        if (ret == 1) {
+          ENVOY_LOG(warn, "{} dlb_send retry {} times and succeed", name_, i + 1);
+          break;
+        }
+        i++;
+      }
+
+      if (ret != 1) {
+        ENVOY_LOG(error,
+                  "{} dlb_send fail with {} times retry, errono: {}, message: {}, increase "
+                  "max_retries may help",
+                  name_, DlbConnectionBalanceFactorySingleton::get().max_retries, errno,
+                  errorDetails(errno));
+      }
+    } else {
+      ENVOY_LOG(error,
+                "{} dlb_send fail without retry, errono: {}, message: {}, set "
+                "max_retries may help",
+                name_, DlbConnectionBalanceFactorySingleton::get().max_retries, errno,
+                errorDetails(errno));
+    }
+
   } else {
     ENVOY_LOG(debug, "{} dlb send fd {}", name_, s->ioHandle().fdDoNotUse());
   }

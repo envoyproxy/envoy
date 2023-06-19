@@ -16,19 +16,46 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-using Activation = google::api::expr::runtime::Activation;
+using Activation = google::api::expr::runtime::BaseActivation;
 using ActivationPtr = std::unique_ptr<Activation>;
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
+// Base class for the context used by the CEL evaluator to look up attributes.
+class StreamActivation : public google::api::expr::runtime::BaseActivation {
+public:
+  StreamActivation(const StreamInfo::StreamInfo& info,
+                   const ::Envoy::Http::RequestHeaderMap* request_headers,
+                   const ::Envoy::Http::ResponseHeaderMap* response_headers,
+                   const ::Envoy::Http::ResponseTrailerMap* response_trailers)
+      : activation_info_(&info), activation_request_headers_(request_headers),
+        activation_response_headers_(response_headers),
+        activation_response_trailers_(response_trailers) {}
+
+  StreamActivation() = default;
+
+  absl::optional<CelValue> FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
+  std::vector<const google::api::expr::runtime::CelFunction*>
+  FindFunctionOverloads(absl::string_view) const override {
+    return {};
+  }
+
+protected:
+  void resetActivation() const;
+  mutable const StreamInfo::StreamInfo* activation_info_{nullptr};
+  mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
+  mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
+  mutable const ::Envoy::Http::ResponseTrailerMap* activation_response_trailers_{nullptr};
+};
+
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
-ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
-                               const Http::RequestHeaderMap* request_headers,
-                               const Http::ResponseHeaderMap* response_headers,
-                               const Http::ResponseTrailerMap* response_trailers);
+ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+                               const ::Envoy::Http::RequestHeaderMap* request_headers,
+                               const ::Envoy::Http::ResponseHeaderMap* response_headers,
+                               const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
@@ -43,14 +70,14 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 // results and potentially the final value.
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
                                   const StreamInfo::StreamInfo& info,
-                                  const Http::RequestHeaderMap* request_headers,
-                                  const Http::ResponseHeaderMap* response_headers,
-                                  const Http::ResponseTrailerMap* response_trailers);
+                                  const ::Envoy::Http::RequestHeaderMap* request_headers,
+                                  const ::Envoy::Http::ResponseHeaderMap* response_headers,
+                                  const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
 // Evaluates an expression and returns true if the expression evaluates to "true".
 // Returns false if the expression fails to evaluate.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers);
+             const ::Envoy::Http::RequestHeaderMap& headers);
 
 // Returns a string for a CelValue.
 std::string print(CelValue value);

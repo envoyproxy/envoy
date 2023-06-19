@@ -36,9 +36,9 @@ static_resources:
                   connect_matcher:
                     {}
                   headers:
-                    - name: foo
-                      string_match:
-                        exact: bar
+                  - name: foo
+                    string_match:
+                      exact: bar
                 route:
                   cluster: local_original_dst
                   upgrade_configs:

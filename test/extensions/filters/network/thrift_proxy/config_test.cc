@@ -1,5 +1,5 @@
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
@@ -63,7 +63,7 @@ public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_));
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -199,7 +199,17 @@ stat_prefix: ingress
 route_config:
   name: local_route
 thrift_filters:
-  - name: envoy.filters.thrift.mock_filter
+  - name: envoy.filters.thrift.mock_decoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_encoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_bidirectional_filter
     typed_config:
       "@type": type.googleapis.com/google.protobuf.Struct
       value:
@@ -209,7 +219,7 @@ thrift_filters:
       "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
-  ThriftFilters::MockFilterConfigFactory factory;
+  ThriftFilters::MockBidirectionalFilterConfigFactory factory;
   Registry::InjectFactory<ThriftFilters::NamedThriftFilterConfigFactory> registry(factory);
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =

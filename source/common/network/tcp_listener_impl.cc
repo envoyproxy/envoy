@@ -60,7 +60,8 @@ void TcpListenerImpl::onSocketEvent(short flags) {
       io_handle->close();
       cb_.onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit);
       continue;
-    } else if (random_.bernoulli(reject_fraction_)) {
+    } else if ((listener_accept_ != nullptr && listener_accept_->shouldShedLoad()) ||
+               random_.bernoulli(reject_fraction_)) {
       io_handle->close();
       cb_.onReject(TcpListenerCallbacks::RejectCause::OverloadAction);
       continue;
@@ -125,6 +126,12 @@ void TcpListenerImpl::disable() {
 
 void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
   reject_fraction_ = reject_fraction;
+}
+
+void TcpListenerImpl::configureLoadShedPoints(
+    Server::LoadShedPointProvider& load_shed_point_provider) {
+  listener_accept_ =
+      load_shed_point_provider.getLoadShedPoint("envoy.load_shed_points.tcp_listener_accept");
 }
 
 } // namespace Network

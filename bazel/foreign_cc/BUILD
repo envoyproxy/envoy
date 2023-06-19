@@ -11,7 +11,10 @@ configure_make(
     name = "liburing",
     configure_in_place = True,
     lib_source = "@com_github_axboe_liburing//:all",
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
 )
 
 # autotools packages are unusable on Windows as-is
@@ -52,7 +55,7 @@ cc_library(
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
@@ -95,24 +98,37 @@ configure_make(
 )
 
 configure_make(
-    name = "moonjit",
-    configure_command = "build.py",
-    env = select({
-        # This shouldn't be needed! See
-        # https://github.com/envoyproxy/envoy/issues/6084
-        # TODO(htuch): Remove when #6084 is fixed
-        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
-        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
-        "//conditions:default": {},
-    }),
-    lib_source = "@com_github_moonjit_moonjit//:all",
-    out_include_dir = "include/moonjit-2.2",
-    out_static_libs = ["libluajit-5.1.a"],
+    name = "colm",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-shared",
+        "--enable-static",
+    ],
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_colm//:all",
+    out_binaries = ["colm"],
     tags = ["skip_on_windows"],
 )
 
 configure_make(
     name = "ragel",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-manual",
+        "--disable-shared",
+        "--enable-static",
+        "--with-colm=$EXT_BUILD_DEPS/colm",
+    ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
@@ -121,6 +137,7 @@ configure_make(
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
+    deps = [":colm"],
 )
 
 # ICU used by the language detection filter (i18n).
@@ -137,6 +154,7 @@ configure_make(
         "--disable-draft",
         "--disable-dyload",
         "--disable-extras",
+        "--disable-icuio",
         "--disable-plugins",
         "--disable-samples",
         "--disable-shared",
@@ -145,7 +163,7 @@ configure_make(
     ],
     data = ["@com_github_unicode_org_icu//:all"],
     env = {
-        "CXXFLAGS": "-fPIC",
+        "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
@@ -160,20 +178,6 @@ configure_make(
 
 cc_library(
     name = "unicode_icu",
-    defines = [
-        "UCONFIG_ONLY_HTML_CONVERSION=1",
-        "U_CHARSET_IS_UTF8=1",
-        "U_USING_ICU_NAMESPACE=0",
-        "UNISTR_FROM_STRING_EXPLICIT=",
-        "UNISTR_FROM_CHAR_EXPLICIT=",
-    ] + select({
-        "//bazel:windows_x86_64": [
-            "U_STATIC_IMPLEMENTATION",
-            "UNICODE",
-            "_UNICODE",
-        ],
-        "//conditions:default": [],
-    }),
     tags = ["skip_on_windows"],
     # Can not be used for the core dataplane due to security concerns
     visibility = ["//contrib/language/filters/http/source:__pkg__"],
@@ -194,7 +198,8 @@ envoy_cmake(
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
-    deps = ["@boringssl//:ssl"],
+    # Use boringssl alias to select fips vs non-fips version.
+    deps = ["//bazel:boringssl"],
 )
 
 envoy_cmake(
@@ -230,6 +235,7 @@ envoy_cmake(
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",
+        "CURL_USE_LIBPSL": "off",
         "CURL_BROTLI": "off",
         "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
@@ -462,15 +468,17 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "WAMR_BUILD_INTERP": "1",
-        "WAMR_BUILD_FAST_INTERP": "1",
-        "WAMR_BUILD_JIT": "0",
-        "WAMR_BUILD_LAZY_JIT": "0",
         "WAMR_BUILD_AOT": "0",
-        "WAMR_BUILD_SIMD": "0",
-        "WAMR_BUILD_MULTI_MODULE": "1",
+        "WAMR_BUILD_FAST_INTERP": "1",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
         "WAMR_BUILD_LIBC_WASI": "0",
+        "WAMR_BUILD_MULTI_MODULE": "0",
+        "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_TAIL_CALL": "1",
+        "WAMR_BUILD_WASM_CACHE": "0",
+        "WAMR_DISABLE_HW_BOUND_CHECK": "0",
+        "WAMR_DISABLE_STACK_HW_BOUND_CHECK": "1",
     },
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],

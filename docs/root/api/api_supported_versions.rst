@@ -3,11 +3,12 @@
 Supported API versions
 ======================
 
-Envoy's APIs follow a :repo:`versioning scheme <api/API_VERSIONING.md>` in which Envoy supports
-multiple major API versions at any point in time. The following versions are currently supported:
+Envoy's APIs follow a :repo:`versioning scheme <api/API_VERSIONING.md>`. The following version is
+currently supported:
 
-* :ref:`v3 xDS API <envoy_v3_api_reference>` (*active*). Envoy developers and
-  operators are encouraged to be actively adopting and working with v3 xDS.
+* :ref:`v3 xDS API <envoy_v3_api_reference>` (*active*). Per the additional information in the
+  :repo:`versioning scheme <api/API_VERSIONING.md#api-lifecycle>`, the v3 xDS is the final major
+  version and will be supported forever.
 
 The following API versions are no longer supported by Envoy:
 

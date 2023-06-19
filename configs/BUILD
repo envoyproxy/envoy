@@ -34,14 +34,17 @@ filegroup(
             "using_deprecated_config.yaml",
             "**/*.template.yaml",
             "freebind/freebind.yaml",
+            "envoy-tap-config.yaml",
             "envoy-demo.yaml",
         ],
     ) + select({
         "//bazel:apple": ["envoy-demo.yaml"],
         "//bazel:windows_x86_64": [],
+        "//bazel:disable_admin_functionality": [],
         "//conditions:default": [
             "envoy-demo.yaml",
             "freebind/freebind.yaml",
+            "envoy-tap-config.yaml",
         ],
     }),
 )
@@ -60,7 +63,7 @@ genrule(
     ],
     outs = ["example_configs.tar"],
     cmd = (
-        "$(location configgen.sh) $(location configgen) $(@D) " +
+        "$(location configgen.sh) $(location configgen) example_configs.tar $(@D) " +
         "$(locations :configs) " +
         "$(locations //examples:configs) " +
         "$(locations //examples:certs) " +
@@ -68,6 +71,30 @@ genrule(
         "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
         "$(locations //docs:proto_examples) " +
+        "$(locations //test/config/integration/certs)"
+    ),
+    tools = [
+        "configgen.sh",
+        ":configgen",
+    ],
+)
+
+genrule(
+    name = "example_contrib_configs",
+    srcs = [
+        "//docs:contrib_configs",
+        "//contrib:configs",
+        "//examples:contrib_configs",
+        "//examples:certs",
+        "//test/config/integration/certs",
+    ],
+    outs = ["example_contrib_configs.tar"],
+    cmd = (
+        "$(location configgen.sh) NO_CONFIGGEN example_contrib_configs.tar $(@D) " +
+        "$(locations //contrib:configs) " +
+        "$(locations //docs:contrib_configs) " +
+        "$(locations //examples:contrib_configs) " +
+        "$(locations //examples:certs) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [

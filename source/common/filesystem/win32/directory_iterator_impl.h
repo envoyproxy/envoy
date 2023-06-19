@@ -22,7 +22,7 @@ public:
   DirectoryIteratorImpl& operator=(DirectoryIteratorImpl&&) = default;
 
 private:
-  FileType fileType(const WIN32_FIND_DATA& find_data) const;
+  static DirectoryEntry makeEntry(const WIN32_FIND_DATA& find_data);
 
   HANDLE find_handle_;
 };

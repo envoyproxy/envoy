@@ -17,8 +17,8 @@ public:
   size_t execute(const char* slice, int len) override;
   void resume() override;
   CallbackResult pause() override;
-  ParserStatus getStatus() override;
-  uint16_t statusCode() const override;
+  ParserStatus getStatus() const override;
+  Http::Code statusCode() const override;
   bool isHttp11() const override;
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;

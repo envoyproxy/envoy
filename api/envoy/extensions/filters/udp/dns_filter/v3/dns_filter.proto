@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS Filter]
 // DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
-// [#extension: envoy.filters.udp_listener.dns_filter]
+// [#extension: envoy.filters.udp.dns_filter]
 
 // Configuration for the DNS filter.
 message DnsFilterConfig {
@@ -78,12 +78,12 @@ message DnsFilterConfig {
     // or any other DNS resolver types and the related parameters.
     // For example, an object of
     // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
-    // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+    // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
     // :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`
     // configuration.
-    // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-    // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
-    // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+    // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
+    // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+    // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
     // [#extension-category: envoy.network.dns_resolver]
     config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 4;
 

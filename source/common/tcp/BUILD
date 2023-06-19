@@ -35,3 +35,21 @@ envoy_cc_library(
         "//source/common/upstream:upstream_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "async_tcp_client_lib",
+    srcs = [
+        "async_tcp_client_impl.cc",
+    ],
+    hdrs = [
+        "async_tcp_client_impl.h",
+    ],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/tcp:async_tcp_client_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
+        "//source/common/network:filter_lib",
+    ],
+)

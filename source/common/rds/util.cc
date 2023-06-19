@@ -13,7 +13,7 @@ std::string resourceName(ProtoTraits& proto_traits, const Protobuf::Message& rc)
   const Protobuf::FieldDescriptor* field =
       rc.GetDescriptor()->FindFieldByNumber(proto_traits.resourceNameFieldNumber());
   if (!field) {
-    return std::string();
+    return {};
   }
   const Protobuf::Reflection* reflection = rc.GetReflection();
   return reflection->GetString(rc, field);

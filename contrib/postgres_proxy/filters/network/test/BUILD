@@ -3,6 +3,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_contrib_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -54,22 +55,30 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "postgres_integration_proto",
+    srcs = [":postgres_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "postgres_integration_test",
     srcs = [
         "postgres_integration_test.cc",
     ],
     data = [
-        "postgres_test_config.yaml",
+        "postgres_test_config.yaml-template",
         "//test/config/integration/certs",
     ],
     deps = [
+        ":postgres_integration_proto_cc_proto",
+        ":postgres_test_utils_lib",
         "//contrib/postgres_proxy/filters/network/source:config",
         "//contrib/postgres_proxy/filters/network/source:filter",
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],
 )

@@ -1,0 +1,100 @@
+name: mobile_format
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/env.yml
+    secrets: inherit
+
+  formatall:
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    name: format_all
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+      env:
+        CLANG_FORMAT: /opt/llvm/bin/clang-format
+        BUILDIFIER_BIN: /usr/local/bin/buildifier
+        BUILDOZER_BIN: /usr/local/bin/buildozer
+        ENVOY_BAZEL_PREFIX: "@envoy"
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run formatters'
+      run: cd mobile && ./tools/check_format.sh
+  precommit:
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    name: precommit
+    runs-on: macos-12
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v3
+    - name: 'Install precommit'
+      run: brew install pre-commit
+    - name: 'Run precommit'
+      run: cd mobile && find mobile/* | pre-commit run --files
+  swiftlint:
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    name: swift_lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container:
+      image: ghcr.io/realm/swiftlint:0.50.3
+    steps:
+    - uses: actions/checkout@v3
+    - name: 'Run Swift Lint (SwiftLint)'
+      run: swiftlint lint --strict
+      working-directory: mobile
+  drstring:
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    name: drstring
+    runs-on: macos-12
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - name: 'Run DrString'
+      env:
+        DEVELOPER_DIR: /Applications/Xcode_14.1.app
+      run: cd mobile && ./bazelw run @DrString//:drstring check
+  kotlinlint:
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    name: kotlin_lint
+    runs-on: macos-12
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+        distribution: zulu
+    - run: cd mobile && ./ci/mac_ci_setup.sh
+      name: 'Install dependencies'
+    - name: 'Run Kotlin Lint (Detekt)'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw build \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
+            //examples/kotlin/hello_world:hello_envoy_kt_lint
+    - name: 'Run Kotlin Formatter (ktlint)'
+      run: cd mobile && ./bazelw build kotlin_format

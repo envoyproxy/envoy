@@ -1,5 +1,7 @@
 #include <fcntl.h>
 
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -33,12 +35,36 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
-                    flags.creation_, 0, NULL);
+  fd_ = CreateFileA(path().c_str(), flags.access_,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, flags.creation_, 0,
+                    NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
+  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append) &&
+      !in.test(File::Operation::KeepExistingData)) {
+    SetEndOfFile(fd_);
+  }
   return resultSuccess(true);
+}
+
+Api::IoCallBoolResult TmpFileImplWin32::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
+  auto flags = translateFlag(in);
+  for (int tries = 5; tries > 0; tries--) {
+    std::string try_path = generateTmpFilePath(path());
+    fd_ = CreateFileA(try_path.c_str(), flags.access_,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, CREATE_NEW,
+                      FILE_FLAG_DELETE_ON_CLOSE, NULL);
+    if (fd_ != INVALID_HANDLE) {
+      tmp_file_path_ = try_path;
+      return resultSuccess(true);
+    }
+  }
+  return resultFailure(false, ::GetLastError());
 }
 
 Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
@@ -53,15 +79,121 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
 
-  if (truncate_) {
-    SetEndOfFile(fd_);
-  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
     return resultFailure(false, ::GetLastError());
   }
   return resultSuccess(true);
+}
+
+static OVERLAPPED overlappedForOffset(uint64_t offset) {
+  OVERLAPPED overlapped{};
+  overlapped.Offset = offset & 0xffffffff;
+  overlapped.OffsetHigh = offset >> 32;
+  return overlapped;
+}
+
+Api::IoCallSizeResult FileImplWin32::pread(void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD read_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = ReadFile(fd_, buf, count, &read_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(read_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD write_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = WriteFile(fd_, buf, count, &write_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(write_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  ULARGE_INTEGER file_size;
+  file_size.LowPart = data.nFileSizeLow;
+  file_size.HighPart = data.nFileSizeHigh;
+  return static_cast<uint64_t>(file_size.QuadPart);
+}
+
+static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+  // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
+  // intervals since January 1, 1601 (UTC).
+  // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
+  // So we set a SystemTime to that moment, and add that many 100-nanosecond units to that
+  // time, to get a SystemTime representing the same moment as the `FILETIME`, in microsecond
+  // precision.
+  // For timestamps earlier than the unix epoch (1970, `SystemTime{0}`), we assume it's an
+  // invalid value and return nullopt.
+  static const SystemTime windows_file_time_epoch =
+      absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601), absl::UTCTimeZone()));
+  ULARGE_INTEGER tenths_of_microseconds{t.dwLowDateTime, t.dwHighDateTime};
+  uint64_t v = static_cast<uint64_t>(tenths_of_microseconds.QuadPart);
+  SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
+  if (ret <= SystemTime{}) {
+    // If the timestamp is before the unix epoch, return nullopt.
+    return absl::nullopt;
+  }
+  return ret;
+}
+
+static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+    return FileType::Directory;
+  }
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+    return FileType::Other;
+  }
+  return FileType::Regular;
+}
+
+static FileInfo fileInfoFromAttributeData(absl::string_view path,
+                                          const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  absl::optional<uint64_t> sz;
+  FileType type = fileTypeFromAttributeData(data);
+  if (type == FileType::Regular) {
+    sz = fileSizeFromAttributeData(data);
+  }
+  return {
+      std::string{InstanceImplWin32().splitPathFromFilename(path).file_},
+      sz,
+      type,
+      systemTimeFromFileTime(data.ftCreationTime),
+      systemTimeFromFileTime(data.ftLastAccessTime),
+      systemTimeFromFileTime(data.ftLastWriteTime),
+  };
+}
+
+Api::IoCallResult<FileInfo> FileImplWin32::info() {
+  ASSERT(isOpen());
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  BOOL result = GetFileAttributesEx(path().c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return resultSuccess(fileInfoFromAttributeData(path(), data));
+}
+
+Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  std::string full_path{path};
+  BOOL result = GetFileAttributesEx(full_path.c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return resultSuccess(fileInfoFromAttributeData(full_path, data));
+}
+
+Api::IoCallBoolResult InstanceImplWin32::createPath(absl::string_view path) {
+  std::error_code ec;
+  while (!path.empty() && path.back() == '/') {
+    path.remove_suffix(1);
+  }
+  bool result = std::filesystem::create_directories(std::string{path}, ec);
+  return ec ? resultFailure(false, ec.value()) : resultSuccess(result);
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
@@ -74,9 +206,6 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
-    if (!in.test(File::Operation::Append)) {
-      truncate_ = true;
-    }
   }
 
   // Order of tests matter here. There reason for that
@@ -98,6 +227,13 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
     return std::make_unique<FileImplWin32>(file_info);
+  case DestinationType::TmpFile:
+    if (!file_info.path_.empty() &&
+        (file_info.path_.back() == '/' || file_info.path_.back() == '\\')) {
+      return std::make_unique<TmpFileImplWin32>(FilePathAndType{
+          DestinationType::TmpFile, file_info.path_.substr(0, file_info.path_.size() - 1)});
+    }
+    return std::make_unique<TmpFileImplWin32>(file_info);
   case DestinationType::Stderr:
     return std::make_unique<StdStreamFileImplWin32<STD_ERROR_HANDLE>>();
   case DestinationType::Stdout:

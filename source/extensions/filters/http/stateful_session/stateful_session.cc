@@ -52,7 +52,7 @@ PerRouteStatefulSession::PerRouteStatefulSession(
 Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const StatefulSessionConfig* config = config_.get();
   auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
-      "envoy.filters.http.stateful_session", decoder_callbacks_->route());
+      decoder_callbacks_);
 
   if (route_config != nullptr) {
     if (route_config->disabled()) {

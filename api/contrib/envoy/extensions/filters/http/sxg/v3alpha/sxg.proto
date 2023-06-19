@@ -48,20 +48,20 @@ message SXG {
   // URL to retrieve validity data for signature, a CBOR map. See specification [here](https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-00#section-3.6)
   string validity_url = 6 [(validate.rules).string = {min_len: 1 prefix: "/"}];
 
-  // Header that will be set if it is determined that the client can accept SXG (typically `accept: application/signed-exchange;v=b3)
-  // If not set, filter will default to: `x-client-can-accept-sxg`
+  // Header that will be set if it is determined that the client can accept SXG (typically ``accept: application/signed-exchange;v=b3``)
+  // If not set, filter will default to: ``x-client-can-accept-sxg``
   string client_can_accept_sxg_header = 7 [
     (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
   ];
 
   // Header set by downstream service to signal that the response should be transformed to SXG If not set,
-  // filter will default to: `x-should-encode-sxg`
+  // filter will default to: ``x-should-encode-sxg``
   string should_encode_sxg_header = 8 [
     (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
   ];
 
-  // Headers that will be stripped from the SXG document, by listing a prefix (i.e. `x-custom-` will cause
-  // all headers prefixed by `x-custom-` to be omitted from the SXG document)
+  // Headers that will be stripped from the SXG document, by listing a prefix (i.e. ``x-custom-`` will cause
+  // all headers prefixed by ``x-custom-`` to be omitted from the SXG document)
   repeated string header_prefix_filters = 9 [
     (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
   ];

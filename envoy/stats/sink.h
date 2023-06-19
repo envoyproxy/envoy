@@ -61,7 +61,7 @@ public:
   virtual bool includeCounter(const Counter& counter) PURE;
 
   /**
-   * @return true if @param gague needs to be flushed to sinks.
+   * @return true if @param gauge needs to be flushed to sinks.
    */
   virtual bool includeGauge(const Gauge& gauge) PURE;
 
@@ -69,6 +69,13 @@ public:
    * @return true if @param text_readout needs to be flushed to sinks.
    */
   virtual bool includeTextReadout(const TextReadout& text_readout) PURE;
+
+  /*
+   * @return true if @param histogram needs to be flushed to sinks.
+   * Note that this is used only if runtime flag envoy.reloadable_features.enable_include_histograms
+   * (which is false by default) is set to true.
+   */
+  virtual bool includeHistogram(const Histogram& histogram) PURE;
 };
 
 /**

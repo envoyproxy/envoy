@@ -83,10 +83,6 @@ FilterStatus ActiveResponseDecoder::applyMessageEncodedFilters(MessageMetadataSh
   switch (status) {
   case FilterStatus::StopIteration:
     break;
-  case FilterStatus::Retry:
-    response_status_ = DubboFilters::UpstreamResponseStatus::Retry;
-    decoder_->reset();
-    break;
   default:
     ASSERT(FilterStatus::Continue == status);
     break;
@@ -249,16 +245,24 @@ void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSh
   };
 
   auto status = applyDecoderFilters(nullptr, FilterIterationStartState::CanStartFromCurrent);
-  if (status == FilterStatus::StopIteration) {
-    ENVOY_LOG(debug, "dubbo request: stop calling decoder filter, id is {}", metadata->requestId());
+  switch (status) {
+  case FilterStatus::StopIteration:
+    ENVOY_LOG(debug, "dubbo request: pause calling decoder filter, id is {}",
+              metadata->requestId());
     pending_stream_decoded_ = true;
     return;
+  case FilterStatus::AbortIteration:
+    ENVOY_LOG(debug, "dubbo request: abort calling decoder filter, id is {}",
+              metadata->requestId());
+    parent_.deferredMessage(*this);
+    return;
+  case FilterStatus::Continue:
+    ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
+              metadata->requestId());
+    finalizeRequest();
+    return;
   }
-
-  finalizeRequest();
-
-  ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
-            metadata->requestId());
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 void ActiveMessage::finalizeRequest() {
@@ -371,7 +375,7 @@ void ActiveMessage::startUpstreamResponse() {
 DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instance& buffer) {
   ASSERT(response_decoder_ != nullptr);
 
-  try {
+  TRY_NEEDS_AUDIT {
     auto status = response_decoder_->onData(buffer);
     if (status == DubboFilters::UpstreamResponseStatus::Complete) {
       if (requestId() != response_decoder_->requestId()) {
@@ -386,12 +390,14 @@ DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instanc
     }
 
     return status;
-  } catch (const DownstreamConnectionCloseException& ex) {
+  }
+  END_TRY catch (const DownstreamConnectionCloseException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     onReset();
     parent_.stats().response_error_caused_connection_close_.inc();
     return DubboFilters::UpstreamResponseStatus::Reset;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     parent_.stats().response_decoding_error_.inc();
 

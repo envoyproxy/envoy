@@ -44,13 +44,15 @@ def main():
 
     for sp, extensions in security_postures.items():
         output_path = pathlib.Path(security_rst_root, 'secpos_%s.rst' % sp)
-        content = '\n'.join(
+        content = f"Extension security: ``{sp}``"
+        content += f"\n{'=' * len(content)}\n\n"
+        content += '\n'.join(
             format_item(extension, extension_db[extension])
             for extension in sorted(extensions)
             if extension_db[extension].get('status') != 'wip')
         output_path.write_text(content)
 
-    with tarfile.open(output_filename, "w") as tar:
+    with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 

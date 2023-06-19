@@ -13,18 +13,18 @@
 # - https://github.com/envoyproxy/envoy/issues/11657
 #
 diff --git a/go/private/rules/binary.bzl b/go/private/rules/binary.bzl
-index b88dfd96..e68b5ece 100644
+index 91748eda..c1aeb91e 100644
 --- a/go/private/rules/binary.bzl
 +++ b/go/private/rules/binary.bzl
-@@ -128,8 +128,9 @@ def _go_tool_binary_impl(ctx):
+@@ -443,8 +443,9 @@ def _go_tool_binary_impl(ctx):
              content = cmd,
          )
          ctx.actions.run(
 -            executable = bat,
--            inputs = sdk.libs + sdk.headers + sdk.tools + ctx.files.srcs + [sdk.go],
+-            inputs = sdk.headers + sdk.tools + sdk.srcs + ctx.files.srcs + [sdk.go],
 +            executable = "cmd.exe",
 +            arguments = ["/S", "/C", bat.path.replace("/", "\\")],
-+            inputs = sdk.libs + sdk.headers + sdk.tools + ctx.files.srcs + [sdk.go, bat],
-             outputs = [cout],
-             env = {"GOROOT": sdk.root_file.dirname},  # NOTE(#2005): avoid realpath in sandbox
-             mnemonic = "GoToolchainBinaryCompile",
++            inputs = sdk.headers + sdk.tools + sdk.srcs + ctx.files.srcs + [sdk.go, bat],
+             outputs = [out, gopath, gocache],
+             mnemonic = "GoToolchainBinaryBuild",
+         )

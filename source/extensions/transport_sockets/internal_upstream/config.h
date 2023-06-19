@@ -13,10 +13,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace InternalUpstream {
 
-#define ALL_INTERNAL_UPSTREAM_STATS(COUNTER)                                                       \
-  COUNTER(no_metadata)                                                                             \
-  COUNTER(no_filter_state)                                                                         \
-  COUNTER(filter_state_error)
+#define ALL_INTERNAL_UPSTREAM_STATS(COUNTER) COUNTER(no_metadata)
 
 /**
  * Struct definition for all internal transport socket stats. @see stats_macros.h
@@ -33,10 +30,6 @@ public:
       Stats::Scope& scope);
   std::unique_ptr<envoy::config::core::v3::Metadata>
   extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) const;
-  std::unique_ptr<IoSocket::UserSpace::FilterStateObjects>
-  extractFilterState(const StreamInfo::FilterStateSharedPtr& filter_state) const;
-  void hashKey(std::vector<uint8_t>& key,
-               const StreamInfo::FilterStateSharedPtr& filter_state) const;
 
 private:
   enum class MetadataKind { Host, Cluster };
@@ -47,7 +40,6 @@ private:
   };
   InternalUpstreamStats stats_;
   std::vector<MetadataSource> metadata_sources_;
-  std::vector<std::string> filter_state_names_;
 };
 
 class InternalSocketFactory : public PassthroughFactory {
@@ -61,8 +53,6 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                         Upstream::HostDescriptionConstSharedPtr host) const override;
-  void hashKey(std::vector<uint8_t>& key,
-               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   const Config config_;

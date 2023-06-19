@@ -26,6 +26,7 @@ everything that is configured statically when Envoy starts, as opposed to dynami
     :linenos:
     :lines: 1-3
     :emphasize-lines: 1
+    :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`
 
 .. _start_quick_start_static_listeners:
 
@@ -41,8 +42,9 @@ All paths are matched and routed to the ``service_envoyproxy_io``
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 1-34
-    :emphasize-lines: 3-31
+    :lines: 1-36
+    :emphasize-lines: 3-33
+    :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`
 
 .. _start_quick_start_static_clusters:
 
@@ -54,6 +56,7 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 29
-    :lines: 29-51
+    :lineno-start: 31
+    :lines: 31-53
     :emphasize-lines: 5-23
+    :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`

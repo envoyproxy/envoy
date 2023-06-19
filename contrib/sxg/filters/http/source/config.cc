@@ -23,10 +23,11 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory) {
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory);
+                                                            transport_socket_factory, init_manager);
   } else {
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
@@ -43,12 +44,12 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider_certificate =
-      secretsProvider(certificate, secret_manager, transport_socket_factory);
+      secretsProvider(certificate, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_certificate == nullptr) {
     throw EnvoyException("invalid certificate secret configuration");
   }
   auto secret_provider_private_key =
-      secretsProvider(private_key, secret_manager, transport_socket_factory);
+      secretsProvider(private_key, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_private_key == nullptr) {
     throw EnvoyException("invalid private_key secret configuration");
   }

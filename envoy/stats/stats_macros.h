@@ -108,6 +108,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define GENERATE_STAT_NAME_STRUCT(NAME, ...) Envoy::Stats::StatName NAME##_;
 #define GENERATE_STAT_NAME_INIT(NAME, ...) , NAME##_(pool_.add(#NAME))
 
+// Used for defining constrcutors of stat objects
+#define GENERATE_CONSTRUCTOR_PARAM(NAME) Envoy::Stats::Counter &NAME,
+#define GENERATE_CONSTRUCTOR_COUNTER_PARAM(NAME) Envoy::Stats::Counter &NAME,
+#define GENERATE_CONSTRUCTOR_GAUGE_PARAM(NAME, ...) Envoy::Stats::Gauge &NAME,
+#define GENERATE_CONSTRUCTOR_INIT_LIST(NAME, ...) , NAME##_(NAME)
+
 // Macros for declaring stat-structures using StatNames, for those that must be
 // instantiated during operation, and where speed and scale matters. These
 // macros are not for direct use; they are only for use from

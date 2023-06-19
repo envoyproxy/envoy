@@ -120,6 +120,13 @@ generate_cert_chain() {
         cat "i${x}_cert.pem" >> test_long_cert_chain.pem
     done
     mv i4_cert.pem test_random_cert.pem
+
+    # These intermediate files are unnecessary.
+    for x in {1..4}; do
+        rm -f "i${x}_key.pem"
+        rm -f "i${x}_cert.pem"
+        rm -f "i${x}_cert_info.h"
+    done
 }
 
 # Generate ca_cert.pem.
@@ -146,6 +153,10 @@ generate_x509_cert no_san ca
 
 # Concatenate no_san_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat no_san_cert.pem intermediate_ca_cert.pem > no_san_chain.pem
+
+# Generate no_san_cn_cert.pem
+generate_rsa_key no_san_cn
+generate_x509_cert no_san_cn ca
 
 # Generate san_dns_cert.pem.
 generate_rsa_key san_dns
@@ -175,13 +186,45 @@ generate_rsa_key san_dns4
 generate_x509_cert san_dns4 intermediate_ca
 rm -f san_dns4_cert.cfg
 
+# Generate san_wildcard_dns_cert.pem
+generate_rsa_key san_wildcard_dns
+generate_x509_cert san_wildcard_dns ca
+
 # Generate san_multiple_dns_cert.pem.
 generate_rsa_key san_multiple_dns
 generate_x509_cert san_multiple_dns ca
 
+# Generate san_multiple_dns_1_cert.pem
+generate_rsa_key san_multiple_dns_1
+generate_x509_cert san_multiple_dns_1 ca
+
 # Generate san_only_dns_cert.pem.
 generate_rsa_key san_only_dns
 generate_x509_cert san_only_dns ca
+
+# Generate san_dns_rsa_1_cert.pem
+cp san_dns_server1_cert.cfg san_dns_rsa_1_cert.cfg
+generate_rsa_key san_dns_rsa_1
+generate_x509_cert san_dns_rsa_1 ca
+rm -f san_dns_rsa_1_cert.cfg
+
+# Generate san_dns_rsa_2_cert.pem
+cp san_dns_server2_cert.cfg san_dns_rsa_2_cert.cfg
+generate_rsa_key san_dns_rsa_2
+generate_x509_cert san_dns_rsa_2 ca
+rm -f san_dns_rsa_2_cert.cfg
+
+# Generate san_dns_ecdsa_1_cert.pem
+cp san_dns_server1_cert.cfg san_dns_ecdsa_1_cert.cfg
+generate_ecdsa_key san_dns_ecdsa_1
+generate_x509_cert san_dns_ecdsa_1 ca
+rm -f san_dns_ecdsa_1_cert.cfg
+
+# Generate san_dns_ecdsa_2_cert.pem
+cp san_dns_server2_cert.cfg san_dns_ecdsa_2_cert.cfg
+generate_ecdsa_key san_dns_ecdsa_2
+generate_x509_cert san_dns_ecdsa_2 ca
+rm -f san_dns_ecdsa_2_cert.cfg
 
 # Generate san_uri_cert.pem.
 generate_rsa_key san_uri

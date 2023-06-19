@@ -4,8 +4,8 @@ Mongo proxy
 ===========
 
 * MongoDB :ref:`architecture overview <arch_overview_mongo>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.mongo_proxy.v3.MongoProxy>`
-* This filter should be configured with the name *envoy.filters.network.mongo_proxy*.
 
 .. _config_network_filters_mongo_proxy_fault_injection:
 

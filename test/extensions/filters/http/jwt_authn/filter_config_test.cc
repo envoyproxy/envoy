@@ -13,6 +13,7 @@
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
+using testing::HasSubstr;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -309,6 +310,47 @@ requirement_map:
       filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
   EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name. It should be one of [r1,r2]");
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksDurationVeryBig) {
+  // remote_jwks.duration.seconds should be less than half of:
+  // 9223372036 = max_int64 / 1e9, which is about 300 years.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      cache_duration:
+        seconds: 5223372036
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("Duration out-of-range"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
+  // failed_refetch_duration.duration.seconds should be less than:
+  // 9223372036 = max_int64 / 1e9, which is about 300 years.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      async_fetch:
+        failed_refetch_duration:
+          seconds: 9223372136
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("Duration out-of-range"));
 }
 
 } // namespace

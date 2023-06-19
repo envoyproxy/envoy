@@ -25,8 +25,9 @@ public:
    * Constructor that creates a context object from the supplied attributes.
    */
   SpanContext(const absl::string_view& version, const absl::string_view& trace_id,
-              const absl::string_view& parent_id, bool sampled)
-      : version_(version), trace_id_(trace_id), parent_id_(parent_id), sampled_(sampled) {}
+              const absl::string_view& parent_id, bool sampled, const absl::string_view& tracestate)
+      : version_(version), trace_id_(trace_id), parent_id_(parent_id), sampled_(sampled),
+        tracestate_(tracestate) {}
 
   /**
    * @return the span's version as a hex string.
@@ -48,11 +49,17 @@ public:
    */
   bool sampled() const { return sampled_; }
 
+  /**
+   * @return the parsed tracestate header.
+   */
+  const std::string& tracestate() const { return tracestate_; }
+
 private:
   const std::string version_;
   const std::string trace_id_;
   const std::string parent_id_;
   const bool sampled_{false};
+  const std::string tracestate_;
 };
 
 } // namespace OpenTelemetry

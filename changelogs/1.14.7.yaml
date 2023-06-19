@@ -3,7 +3,8 @@ date: April 15, 2020
 changes:
 - area: http
   change: |
-    fixed a crash upon receiving empty HTTP/2 metadata frames. Received empty metadata frames are now counted in the HTTP/2 codec stat :ref:`metadata_empty_frames <config_http_conn_man_stats_per_codec>`.
+    fixed a crash upon receiving empty HTTP/2 metadata frames. Received empty metadata frames are now counted in the HTTP/2
+    codec stat :ref:`metadata_empty_frames <config_http_conn_man_stats_per_codec>`.
 - area: http
   change: |
     fixed a remotely exploitable integer overflow via a very large grpc-timeout value causes undefined behavior.

@@ -184,6 +184,23 @@ TEST_F(IoHandleImplTest, ReadContent) {
   ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
 }
 
+TEST_F(IoHandleImplTest, WriteClearsDrainTrackers) {
+  Buffer::OwnedImpl buf_to_write("abcdefg");
+  {
+    bool called = false;
+    // This drain tracker should be called as soon as the write happens; not on read.
+    buf_to_write.addDrainTracker([&called]() { called = true; });
+    io_handle_peer_->write(buf_to_write);
+    EXPECT_TRUE(called);
+  }
+  // Now the drain tracker refers to a stack variable that no longer exists. If the drain tracker
+  // is called subsequently, this will fail in ASan.
+  Buffer::OwnedImpl buf;
+  auto result = io_handle_->read(buf, 10);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(7, result.return_value_);
+}
+
 // Test read throttling on watermark buffer.
 TEST_F(IoHandleImplTest, ReadThrottling) {
   {
@@ -1131,12 +1148,13 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ProtobufWkt::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
-  auto source_filter_state = std::make_unique<FilterStateObjects>();
+  StreamInfo::FilterState::Objects source_filter_state;
   auto object = std::make_shared<TestObject>(1000);
-  source_filter_state->emplace_back("object_key", object);
+  source_filter_state.push_back(
+      {object, StreamInfo::FilterState::StateType::ReadOnly,
+       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "object_key"});
   ASSERT_NE(nullptr, io_handle_->passthroughState());
-  io_handle_->passthroughState()->initialize(std::move(source_metadata),
-                                             std::move(source_filter_state));
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
 
   StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   envoy::config::core::v3::Metadata dest_metadata;
@@ -1147,21 +1165,6 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
   ASSERT_NE(nullptr, dest_object);
   ASSERT_EQ(object->value_, dest_object->value_);
-}
-
-TEST_F(IoHandleImplTest, PassthroughStateReadOnlyObject) {
-  auto source_filter_state = std::make_unique<FilterStateObjects>();
-  auto object = std::make_shared<TestObject>(1000);
-  source_filter_state->emplace_back("object_key", object);
-  io_handle_->passthroughState()->initialize(nullptr, std::move(source_filter_state));
-  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  auto read_only = std::make_shared<TestObject>(1);
-  dest_filter_state.setData("object_key", read_only, StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
-  envoy::config::core::v3::Metadata dest_metadata;
-  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
-  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
-  ASSERT_EQ(read_only->value_, dest_object->value_);
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {

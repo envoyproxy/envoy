@@ -17,27 +17,14 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-namespace {
-
-// How many times the output buffer is allowed to be bigger than the size of
-// accumulated input. This value is used to detect compression bombs.
-// TODO(rojkov): Re-design the Decompressor interface to handle compression
-// bombs gracefully instead of this quick solution.
-constexpr uint64_t MaxInflateRatio = 100;
-
-} // namespace
-
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
-    : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
-
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
-                                           uint64_t chunk_size)
-    : Zlib::Base(chunk_size,
-                 [](z_stream* z) {
-                   inflateEnd(z);
-                   delete z;
-                 }),
-      stats_(generateStats(stats_prefix, scope)) {
+                                           uint64_t chunk_size, uint64_t max_inflate_ratio)
+    : Common::Base(chunk_size,
+                   [](z_stream* z) {
+                     inflateEnd(z);
+                     delete z;
+                   }),
+      stats_(generateStats(stats_prefix, scope)), max_inflate_ratio_(max_inflate_ratio) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
@@ -54,7 +41,7 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
 
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
-  uint64_t limit = MaxInflateRatio * input_buffer.length();
+  uint64_t limit = max_inflate_ratio_ * input_buffer.length();
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;

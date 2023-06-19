@@ -4,13 +4,15 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
-load(":envoy_pch.bzl", "envoy_pch_copts")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_dbg_linkopts",
+    "envoy_exported_symbols_input",
     "envoy_external_dep_path",
     "envoy_linkstatic",
+    "envoy_select_exported_symbols",
     "envoy_select_force_libcpp",
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
@@ -39,7 +41,7 @@ def _envoy_cc_test_infrastructure_library(
     if disable_pch:
         extra_deps = [envoy_external_dep_path("googletest")]
     else:
-        extra_deps = [repository + "//test:test_pch"]
+        extra_deps = envoy_pch_deps(repository, "//test:test_pch")
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
 
     native.cc_library(
@@ -70,7 +72,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
+    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"]) + envoy_dbg_linkopts() + envoy_select_exported_symbols(["-Wl,-E"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(
@@ -106,7 +108,8 @@ def envoy_cc_fuzz_test(
     native.cc_test(
         name = name,
         copts = envoy_copts("@envoy", test = True),
-        linkopts = _envoy_test_linkopts() + envoy_dbg_linkopts() + select({
+        additional_linker_inputs = envoy_exported_symbols_input(),
+        linkopts = _envoy_test_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
             "//conditions:default": [],
         }),
@@ -166,16 +169,14 @@ def envoy_cc_test(
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
+        additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
-        ] + select({
-            repository + "//bazel:clang_pch_build": [repository + "//test:test_pch"],
-            "//conditions:default": [],
-        }),
+        ] + envoy_pch_deps(repository, "//test:test_pch"),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],
@@ -226,6 +227,7 @@ def envoy_cc_test_binary(
         name,
         tags = [],
         deps = [],
+        stamp = 0,
         **kargs):
     envoy_cc_binary(
         name,
@@ -235,6 +237,7 @@ def envoy_cc_test_binary(
         deps = deps + [
             "@envoy//test/test_common:test_version_linkstamp",
         ],
+        stamp = stamp,
         **kargs
     )
 

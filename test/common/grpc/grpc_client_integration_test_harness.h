@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -243,9 +244,9 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
+        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {}
+        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -294,7 +295,7 @@ public:
   RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::move(async_client_transport_socket_), nullptr);
+        std::move(async_client_transport_socket_), nullptr, nullptr);
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -311,7 +312,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, *stats_store_, *dispatcher_, local_info_, cm_,
+        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, local_info_, cm_,
         runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
@@ -422,8 +423,11 @@ public:
           }
         }));
 
-    stream->grpc_stream_ =
-        grpc_client_->start(*method_descriptor_, *stream, Http::AsyncClient::StreamOptions());
+    auto options = Http::AsyncClient::StreamOptions();
+    envoy::config::core::v3::Metadata m;
+    (*m.mutable_filter_metadata())["com.foo.bar"] = {};
+    options.setMetadata(m);
+    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
@@ -449,12 +453,12 @@ public:
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl(*symbol_table_);
+  Stats::IsolatedStoreImpl stats_store_{*symbol_table_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
-  Stats::ScopeSharedPtr stats_scope_{stats_store_};
-  Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
+  Stats::ScopeSharedPtr stats_scope_{stats_store_.rootScope()};
+  Grpc::StatNames google_grpc_stat_names_{stats_store_.symbolTable()};
   TestMetadata service_wide_initial_metadata_;
   std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
   std::vector<std::pair<std::string, std::string>> channel_args_;
@@ -492,7 +496,7 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
@@ -527,7 +531,7 @@ public:
 
     mock_host_description_->socket_factory_ =
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-            std::move(cfg), context_manager_, *stats_store_);
+            std::move(cfg), context_manager_, *stats_store_.rootScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
@@ -557,9 +561,10 @@ public:
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
 
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   }
 
   bool use_client_cert_{};

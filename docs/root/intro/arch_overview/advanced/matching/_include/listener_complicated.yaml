@@ -54,7 +54,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tls
           cluster: some_service
-# Snippet: 58-102
+    # Snippet: 58-102
     filter_chain_matcher:
       matcher_tree:
         input:

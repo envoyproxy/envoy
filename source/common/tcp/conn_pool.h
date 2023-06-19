@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -86,7 +87,8 @@ public:
   };
 
   ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
-                  const Upstream::HostConstSharedPtr& host, uint64_t concurrent_stream_limit);
+                  const Upstream::HostConstSharedPtr& host, uint64_t concurrent_stream_limit,
+                  absl::optional<std::chrono::milliseconds> idle_timeout);
   ~ActiveTcpClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
@@ -110,8 +112,9 @@ public:
     }
   }
 
+  void initializeReadFilters() override { connection_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return {}; }
-  void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
+  void close() override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
@@ -125,6 +128,11 @@ public:
   }
   virtual void clearCallbacks();
 
+  // Called if the underlying connection is idle over the cluster's tcpPoolIdleTimeout()
+  void onIdleTimeout();
+  void disableIdleTimer();
+  void setIdleTimer();
+
   std::shared_ptr<ConnReadFilter> read_filter_handle_;
   Envoy::ConnectionPool::ConnPoolImplBase& parent_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
@@ -132,6 +140,8 @@ public:
   ConnectionPool::ConnectionStatePtr connection_state_;
   TcpConnectionData* tcp_connection_data_{};
   bool associated_before_{};
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  Event::TimerPtr idle_timer_;
 };
 
 class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase,
@@ -141,9 +151,11 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-               Upstream::ClusterConnectivityState& state)
+               Upstream::ClusterConnectivityState& state,
+               absl::optional<std::chrono::milliseconds> idle_timeout)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options, state) {}
+                                                transport_socket_options, state),
+        idle_timeout_(idle_timeout) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   // Event::DeferredDeletable
@@ -199,7 +211,7 @@ public:
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
     return std::make_unique<ActiveTcpClient>(*this, Envoy::ConnectionPool::ConnPoolImplBase::host(),
-                                             1);
+                                             1, idle_timeout_);
   }
 
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
@@ -210,6 +222,11 @@ public:
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
     callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
+
+    // The tcp client is taken over. Stop the idle timer.
+    if (!connection_data) {
+      tcp_client->disableIdleTimer();
+    }
   }
 
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
@@ -223,6 +240,8 @@ public:
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
+
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 } // namespace Tcp

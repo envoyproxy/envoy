@@ -20,16 +20,16 @@ Network::UpstreamTransportSocketFactoryPtr UpstreamSslSocketFactory::createTrans
           const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ClientSslSocketFactory>(std::move(client_config),
-                                                  context.sslContextManager(), context.scope());
+  return std::make_unique<ClientSslSocketFactory>(
+      std::move(client_config), context.sslContextManager(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext>();
 }
 
-REGISTER_FACTORY(UpstreamSslSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory){"tls"};
+LEGACY_REGISTER_FACTORY(UpstreamSslSocketFactory,
+                        Server::Configuration::UpstreamTransportSocketConfigFactory, "tls");
 
 Network::DownstreamTransportSocketFactoryPtr
 DownstreamSslSocketFactory::createTransportSocketFactory(
@@ -41,15 +41,15 @@ DownstreamSslSocketFactory::createTransportSocketFactory(
           message, context.messageValidationVisitor()),
       context);
   return std::make_unique<ServerSslSocketFactory>(
-      std::move(server_config), context.sslContextManager(), context.scope(), server_names);
+      std::move(server_config), context.sslContextManager(), context.statsScope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>();
 }
 
-REGISTER_FACTORY(DownstreamSslSocketFactory,
-                 Server::Configuration::DownstreamTransportSocketConfigFactory){"tls"};
+LEGACY_REGISTER_FACTORY(DownstreamSslSocketFactory,
+                        Server::Configuration::DownstreamTransportSocketConfigFactory, "tls");
 
 Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(TimeSource& time_source) {
   return std::make_unique<ContextManagerImpl>(time_source);

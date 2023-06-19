@@ -136,9 +136,9 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
       return nullptr;
     }
 
-    if (!matchParameter(absl::string_view(*data.value()), config_data)) {
+    if (!matchParameter(absl::string_view(data.value().get()), config_data)) {
       ENVOY_LOG(debug, "dubbo route matcher: parameter matching failed, index '{}', value '{}'",
-                config_data.index_, *data.value());
+                config_data.index_, data.value().get());
       return nullptr;
     }
   }

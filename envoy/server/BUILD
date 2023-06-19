@@ -109,7 +109,6 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/thread:thread_interface",
-        "//source/server:hot_restart_cc_proto",
     ],
 )
 
@@ -137,7 +136,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
@@ -198,7 +197,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
@@ -223,7 +222,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",

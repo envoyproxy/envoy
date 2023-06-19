@@ -59,7 +59,7 @@ class MockExtractor : public Extractor {
 public:
   MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::RequestHeaderMap& headers),
               (const));
-  MOCK_METHOD(void, sanitizePayloadHeaders, (Http::HeaderMap & headers), (const));
+  MOCK_METHOD(void, sanitizeHeaders, (Http::HeaderMap & headers), (const));
 };
 
 class MockJwtCache : public JwtCache {
@@ -91,9 +91,10 @@ public:
 
 class MockJwksCache : public JwksCache {
 public:
-  MockJwksCache() : stats_(generateMockStats(stats_store_)) {
+  MockJwksCache() : stats_(generateMockStats(*stats_store_.rootScope())) {
     ON_CALL(*this, findByIssuer(_)).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, findByProvider(_)).WillByDefault(::testing::Return(&jwks_data_));
+    ON_CALL(*this, getSingleProvider()).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, stats()).WillByDefault(::testing::ReturnRef(stats_));
   }
 
@@ -103,6 +104,7 @@ public:
 
   MOCK_METHOD(JwksData*, findByIssuer, (const std::string&), ());
   MOCK_METHOD(JwksData*, findByProvider, (const std::string&), ());
+  MOCK_METHOD(JwksData*, getSingleProvider, ());
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

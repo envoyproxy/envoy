@@ -34,11 +34,13 @@ public:
 
   bool filterEnabled() const { return adaptive_concurrency_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
+  Http::Code concurrencyLimitExceededStatus() const { return concurrency_limit_exceeded_status_; }
 
 private:
   const std::string stats_prefix_;
   TimeSource& time_source_;
   Runtime::FeatureFlag adaptive_concurrency_feature_;
+  const Http::Code concurrency_limit_exceeded_status_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =

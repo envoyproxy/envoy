@@ -19,10 +19,10 @@ public:
   ValidationDispatcher(const std::string& name, Api::Api& api, Event::TimeSystem& time_system)
       : DispatcherImpl(name, api, time_system) {}
 
-  Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr,
-                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+      Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
                                       Runtime::Loader& runtime, bool bind_to_port,
                                       bool ignore_global_conn_limit) override;

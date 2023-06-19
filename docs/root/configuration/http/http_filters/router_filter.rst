@@ -8,8 +8,8 @@ that Envoy is deployed for. The filter's main job is to follow the instructions 
 configured :ref:`route table <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. In addition to forwarding and
 redirection, the filter also handles retry, statistics, etc.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.router.v3.Router``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>`
-* This filter should be configured with the name *envoy.filters.http.router*.
 
 .. _config_http_filters_router_headers_consumed:
 
@@ -340,6 +340,15 @@ Sent to the downstream to indicate how many upstream requests took place. The he
 the router did not send any upstream requests. The value will be "1" if only the original upstream
 request was sent, incrementing by one for each retry. Only set if the
 :ref:`include_attempt_count_in_response <envoy_v3_api_field_config.route.v3.VirtualHost.include_attempt_count_in_response>`
+flag is set to true.
+
+.. _config_http_filters_router_x-envoy-is-timeout-retry:
+
+x-envoy-is-timeout-retry
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sent to the upstream to indicate that the request is a retry initiated due to timeouts. Only set if the
+:ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>`
 flag is set to true.
 
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:

@@ -38,8 +38,9 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
+  const std::string next_protocol = connection.nextProtocol();
+  if (!next_protocol.empty()) {
+    return next_protocol;
   }
 
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
@@ -60,38 +61,35 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   }
 }
 
 ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
-    const LocalInfo::LocalInfo& local_info) {
+    const LocalInfo::LocalInfo& local_info, const StreamInfo::StreamInfo& stream_info) {
+
+  for (const auto& extension : config.earlyHeaderMutationExtensions()) {
+    if (!extension->mutate(request_headers, stream_info)) {
+      break;
+    }
+  }
+
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (Utility::isUpgrade(request_headers)) {
-    // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
-    // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
-    // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
-    // content-length both do not exist this means there is no request body. After transfer-encoding
-    // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
-    // "content-length: 0" request header here.
-    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
-    if (no_body) {
-      request_headers.setContentLength(uint64_t(0));
-    }
-  } else {
+  if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
   }
@@ -103,14 +101,11 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeTransferEncoding();
 
   // Sanitize referer field if exists.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
-    auto result = request_headers.get(Http::CustomHeaders::get().Referer);
-    if (!result.empty()) {
-      Utility::Url url;
-      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
-        // A request header shouldn't have multiple referer field.
-        request_headers.remove(Http::CustomHeaders::get().Referer);
-      }
+  auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+  if (!result.empty()) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
+      // A request header shouldn't have multiple referer field.
+      request_headers.remove(Http::CustomHeaders::get().Referer);
     }
   }
 
@@ -144,11 +139,20 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
       }
     }
-    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    // If the prior hop is not a trusted proxy, overwrite any
+    // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
+    // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
     if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
+    if (config.appendXForwardedPort() &&
+        (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
+      const Envoy::Network::Address::Ip* ip =
+          connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+      if (ip) {
+        request_headers.setForwardedPort(ip->port());
+      }
     }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
@@ -179,6 +183,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!request_headers.ForwardedProto()) {
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
+  }
+
+  // Usually, the x-forwarded-port header comes with x-forwarded-proto header. If the
+  // x-forwarded-proto header is not set, set it here if append-x-forwarded-port is configured.
+  if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
+    const Envoy::Network::Address::Ip* ip =
+        connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+    if (ip) {
+      request_headers.setForwardedPort(ip->port());
+    }
   }
 
   if (config.schemeToSet().has_value()) {
@@ -276,11 +290,19 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
+      request_headers.removeEnvoyOriginalPath();
+    }
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
@@ -313,7 +335,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!rid_extension->useRequestIdForTraceSampling()) {
     return Tracing::Reason::Sampling;
   }
-  const auto rid_to_integer = rid_extension->toInteger(request_headers);
+  const auto rid_to_integer = rid_extension->getInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {
     return final_reason;
@@ -542,11 +564,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
     // Check runtime override and throw away fragment from URI path
-    // TODO(yanavlasov): remove this override after deprecation period.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
-      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
-    }
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

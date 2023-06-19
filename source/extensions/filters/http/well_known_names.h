@@ -30,6 +30,8 @@ public:
   const std::string Credentials = "envoy.filters.http.credentials";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
+  // Custom Response filter
+  const std::string CustomResponse = "envoy.filters.http.custom_response";
   // Decompressor filter
   const std::string Decompressor = "envoy.filters.http.decompressor";
   // Dynamo filter

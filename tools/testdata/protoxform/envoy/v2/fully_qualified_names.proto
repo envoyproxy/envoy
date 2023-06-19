@@ -28,4 +28,10 @@ message UsesFullyQualifiedTypeNames {
   .external.PackageLevelType external_package_level_type_fqn = 6;
 
   .RootLevelType external_root_level_type_fqn = 7;
+
+  // [#allow-fully-qualified-name:]
+  .envoy.api.v2.core.Locality another_envoy_type_keep_fqn = 8;
+
+  // [#allow-fully-qualified-name:]
+  repeated .envoy.api.v2.core.Locality repeated_another_envoy_type_keep_fqn = 9;
 }

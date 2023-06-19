@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include <memory>
+#include <string>
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
@@ -13,9 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
-void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
-  std::string id_token = absl::StrCat("Bearer ", token_str);
-  hdrs.addCopy(authorizationHeaderKey(), id_token);
+void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str,
+                       const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header) {
+  if (header.ByteSizeLong() == 0) {
+    std::string id_token = absl::StrCat("Bearer ", token_str);
+    hdrs.setCopy(authorizationHeaderKey(), id_token);
+  } else {
+    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
+    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
+  }
 }
 } // namespace
 
@@ -54,7 +61,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       if (token != nullptr) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_);
+        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
         return FilterHeadersStatus::Continue;
       }
     }
@@ -77,8 +84,10 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     state_ = State::Complete;
   }
 
+  // Stop the iteration for headers as well as data and trailers for the current filter and the
+  // filters following.
   return state_ == State::Complete ? FilterHeadersStatus::Continue
-                                   : Http::FilterHeadersStatus::StopIteration;
+                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -89,11 +98,11 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
   state_ = State::Complete;
   if (!initiating_call_) {
     if (response != nullptr) {
-      // Modify the request header to include the ID token in an `Authorization: Bearer ID_TOKEN`
-      // header.
+      // Modify the request header to include the ID token in a header (by default, the
+      // `Authorization: Bearer ID_TOKEN` header).
       std::string token_str = response->bodyAsString();
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str);
+        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

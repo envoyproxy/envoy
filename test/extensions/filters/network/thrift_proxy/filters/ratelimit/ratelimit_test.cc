@@ -55,7 +55,8 @@ public:
         proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
+    config_ = std::make_shared<Config>(proto_config, local_info_, *stats_store_.rootScope(),
+                                       runtime_, cm_);
 
     request_metadata_ = std::make_shared<ThriftProxy::MessageMetadata>();
 

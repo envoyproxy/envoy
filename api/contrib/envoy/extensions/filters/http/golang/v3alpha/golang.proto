@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.golang.v3alpha;
+
+import "google/protobuf/any.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.golang.v3alpha";
+option java_outer_classname = "GolangProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/golang/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Golang]
+//
+// For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
+// [#extension: envoy.filters.http.golang]
+
+// [#next-free-field: 6]
+message Config {
+  // The meanings are as follows:
+  //
+  // :``MERGE_VIRTUALHOST_ROUTER_FILTER``: Pass all configuration into Go plugin.
+  // :``MERGE_VIRTUALHOST_ROUTER``: Pass merged Virtual host and Router configuration into Go plugin.
+  // :``OVERRIDE``: Pass merged Virtual host, Router, and plugin configuration into Go plugin.
+  //
+  // [#not-implemented-hide:]
+  enum MergePolicy {
+    MERGE_VIRTUALHOST_ROUTER_FILTER = 0;
+    MERGE_VIRTUALHOST_ROUTER = 1;
+    OVERRIDE = 3;
+  }
+
+  // Globally unique ID for a dynamic library file.
+  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Path to a dynamic library implementing the
+  // :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
+  // interface.
+  // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
+  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Globally unique name of the Go plugin.
+  //
+  // This name **must** be consistent with the name registered in ``http::RegisterHttpFilterConfigFactory``,
+  // and can be used to associate :ref:`route and virtualHost plugin configuration
+  // <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.ConfigsPerRoute.plugins_config>`.
+  //
+  string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration for the Go plugin.
+  //
+  // .. note::
+  //     This configuration is only parsed in the go plugin, and is therefore not validated
+  //     by Envoy.
+  //
+  //     See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+  //     for more information about how the plugin's configuration data can be accessed.
+  //
+  google.protobuf.Any plugin_config = 4;
+
+  // Merge policy for plugin configuration.
+  //
+  // The Go plugin configuration supports three dimensions:
+  //
+  // * Virtual host’s :ref:`typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+  // * Route’s :ref:`typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`
+  // * The filter's :ref:`plugin_config <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.plugin_config>`
+  //
+  // [#not-implemented-hide:]
+  MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
+}
+
+message RouterPlugin {
+  oneof override {
+    option (validate.required) = true;
+
+    // [#not-implemented-hide:]
+    // Disable the filter for this particular vhost or route.
+    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // The config field is used for setting per-route and per-virtualhost plugin config.
+    google.protobuf.Any config = 2;
+  }
+}
+
+message ConfigsPerRoute {
+  // Configuration of the Go plugin at the per-router or per-virtualhost level,
+  // keyed on the :ref:`plugin_name <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.plugin_name>`
+  // of the Go plugin.
+  //
+  map<string, RouterPlugin> plugins_config = 1;
+}

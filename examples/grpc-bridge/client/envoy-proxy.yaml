@@ -54,5 +54,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: kv-backend-proxy
+                address: grpc-server-proxy
                 port_value: 8811

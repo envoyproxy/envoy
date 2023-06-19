@@ -4,8 +4,8 @@ Client TLS authentication
 =========================
 
 * Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_auth_filter>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth>`
-* This filter should be configured with the name *envoy.filters.network.client_ssl_auth*.
 
 .. _config_network_filters_client_ssl_auth_stats:
 

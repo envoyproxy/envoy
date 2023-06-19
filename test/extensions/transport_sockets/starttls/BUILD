@@ -33,6 +33,7 @@ envoy_proto_library(
 
 envoy_extension_cc_test(
     name = "starttls_integration_test",
+    size = "large",
     srcs = [
         "starttls_integration_test.cc",
     ],
@@ -53,6 +54,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "upstream_starttls_integration_test",
+    size = "large",
     srcs = [
         "upstream_starttls_integration_test.cc",
     ],

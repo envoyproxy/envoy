@@ -1,4 +1,4 @@
-Stateful Session
+HTTP stateful session
 =====================
 
 .. toctree::

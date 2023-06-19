@@ -7,6 +7,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
@@ -111,12 +112,23 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
     return false;
   }
 
-  if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
-    throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
-  }
+  validateFieldId(id);
   // successful response struct in field id 0, error (IDL exception) in field id greater than 0
   reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
+}
+
+void CompactProtocolImpl::validateFieldId(int32_t id) {
+  if (id >= 0 && id <= std::numeric_limits<int16_t>::max()) {
+    return;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_allow_negative_field_ids") &&
+      id < 0 && id >= std::numeric_limits<int16_t>::min()) {
+    return;
+  }
+
+  throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
 }
 
 bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
@@ -176,10 +188,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
-      throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
-    }
-
+    validateFieldId(id);
     compact_field_type = static_cast<CompactFieldType>(delta_and_type);
     compact_field_id = static_cast<int16_t>(id);
   } else {

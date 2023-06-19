@@ -43,6 +43,12 @@ public:
   virtual const std::string& ecdhCurves() const PURE;
 
   /**
+   * The ':' delimited list of supported signature algorithms.
+   * See https://www.rfc-editor.org/rfc/rfc8446#page-41 for the names.
+   */
+  virtual const std::string& signatureAlgorithms() const PURE;
+
+  /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
    * certificate configs.
    */
@@ -130,14 +136,6 @@ public:
    * @return The maximum number of session keys to store.
    */
   virtual size_t maxSessionKeys() const PURE;
-
-  /**
-   * @return const std::string& with the signature algorithms for the context.
-   *         This is a :-delimited list of algorithms, see
-   *         https://tools.ietf.org/id/draft-ietf-tls-tls13-21.html#rfc.section.4.2.3
-   *         for names.
-   */
-  virtual const std::string& signingAlgorithmsForTest() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
@@ -184,6 +182,12 @@ public:
    * @return True if stateless TLS session resumption is disabled, false otherwise.
    */
   virtual bool disableStatelessSessionResumption() const PURE;
+
+  /**
+   * @return True if we allow full scan certificates when there is no cert matching SNI during
+   * downstream TLS handshake, false otherwise.
+   */
+  virtual bool fullScanCertsOnSNIMismatch() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

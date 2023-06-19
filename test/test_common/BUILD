@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
@@ -31,10 +32,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/common/signal:sigaction_lib"],
-    }),
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
 envoy_cc_test_library(
@@ -113,6 +111,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "test_random_generator_lib",
+    srcs = ["test_random_generator.cc"],
+    hdrs = ["test_random_generator.h"],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -124,6 +131,7 @@ envoy_cc_test_library(
         ":logging_lib",
         ":printers_lib",
         ":resources_lib",
+        ":test_random_generator_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
         "//envoy/buffer:buffer_interface",
@@ -187,6 +195,7 @@ envoy_cc_test_library(
     srcs = ["file_system_for_test.cc"],
     hdrs = ["file_system_for_test.h"],
     deps = [
+        ":test_time_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -273,8 +282,9 @@ envoy_cc_test_library(
     srcs = ["simulated_time_system.cc"],
     hdrs = ["simulated_time_system.h"],
     deps = [
+        ":test_random_generator_lib",
         ":test_time_system_interface",
-        ":utility_lib",
+        ":thread_factory_for_test_lib",
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",

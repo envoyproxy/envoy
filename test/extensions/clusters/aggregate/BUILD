@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -41,6 +42,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/clusters/aggregate:cluster",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:test_cluster_manager",
         "//test/common/upstream:utility_lib",
@@ -57,6 +59,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "cluster_integration_test",
+    size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
     deps = [

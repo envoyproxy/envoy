@@ -8,7 +8,7 @@
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
-#include "source/server/active_tcp_listener.h"
+#include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/io_handle.h"
@@ -136,7 +136,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -152,7 +153,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
           Api::IoCallUint64Result(inspect_size_, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // the filter get enough data, then return Network::FilterStatus::Continue
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(io_handle_, resetFileEvents());
   file_event_callback(Event::FileReadyType::Read);
 }
@@ -170,7 +171,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   // calling the onAcceptWorker() to create the ActiveTcpSocket.
@@ -240,7 +242,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
@@ -279,7 +282,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
   file_event_callback(Event::FileReadyType::Read);
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
   file_event_callback(Event::FileReadyType::Read);
 }
@@ -329,7 +332,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
   Event::FileReadyCb file_event_callback;
 
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, recv)
       .WillOnce([&](void*, size_t size, int) {
@@ -371,7 +375,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
   file_event_callback(Event::FileReadyType::Read);
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
   file_event_callback(Event::FileReadyType::Read);
 }
@@ -389,7 +393,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -424,7 +429,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(io_handle_, recv)
@@ -452,7 +458,8 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
@@ -475,7 +482,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   generic_active_listener_->sockets().front()->onTimeout();
 
   EXPECT_EQ(server_name,
-            tcp_socket->stream_info_->downstreamAddressProvider().requestedServerName());
+            tcp_socket->streamInfo()->downstreamAddressProvider().requestedServerName());
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
@@ -553,7 +560,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
         return Network::FilterStatus::Continue;
       }));
   // Verify that listener1 hands off the connection by not creating network filter chain.
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
+  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
 
   // 2. Redirect to Listener2.
   EXPECT_CALL(conn_handler_, getBalancedHandlerByAddress(_))
@@ -570,7 +577,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
   EXPECT_CALL(conn_handler_, incNumConnections());
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
@@ -652,7 +659,7 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
   EXPECT_CALL(conn_handler_, incNumConnections());
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));

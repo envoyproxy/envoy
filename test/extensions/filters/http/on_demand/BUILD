@@ -29,8 +29,12 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "on_demand_integration_test",
+    size = "large",
     srcs = ["on_demand_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
@@ -48,6 +52,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "odcds_integration_test",
+    size = "large",
     srcs = ["odcds_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
     deps = [

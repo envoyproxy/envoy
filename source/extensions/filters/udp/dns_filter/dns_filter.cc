@@ -169,6 +169,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   } else {
     // In case client_config doesn't exist, create default DNS resolver factory and save it.
     dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    max_pending_lookups_ = 0;
   }
 }
 
@@ -196,16 +197,18 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
   const auto& datasource = config.external_dns_table();
   bool data_source_loaded = false;
-  try {
+  TRY_NEEDS_AUDIT {
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
     MessageUtil::loadFromFile(datasource.filename(), table,
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+  }
+  END_TRY catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;
@@ -260,9 +263,10 @@ Network::FilterStatus DnsFilter::onData(Network::UdpRecvData& client_request) {
   config_->stats().downstream_rx_queries_.inc();
 
   // Setup counters for the parser
-  DnsParserCounters parser_counters(config_->stats().query_buffer_underflow_,
-                                    config_->stats().record_name_overflow_,
-                                    config_->stats().query_parsing_failure_);
+  DnsParserCounters parser_counters(
+      config_->stats().query_buffer_underflow_, config_->stats().record_name_overflow_,
+      config_->stats().query_parsing_failure_, config_->stats().queries_with_additional_rrs_,
+      config_->stats().queries_with_ans_or_authority_rrs_);
 
   // Parse the query, if it fails return an response to the client
   DnsQueryContextPtr query_context =

@@ -30,7 +30,7 @@ public:
   MOCK_METHOD(bool, evaluate,
               (const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                const Http::ResponseHeaderMap& response_headers,
-               const Http::ResponseTrailerMap& response_trailers),
+               const Http::ResponseTrailerMap& response_trailers, AccessLogType access_log_type),
               (const));
 };
 
@@ -57,7 +57,7 @@ public:
               (const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info));
+               const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type));
 };
 
 } // namespace AccessLog

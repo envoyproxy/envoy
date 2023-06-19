@@ -13,23 +13,25 @@ namespace Network {
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  absl::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1));
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1,
+      tcp_only));
 
   if (keepalive_config.keepalive_probes_.has_value()) {
     options->push_back(std::make_shared<Network::SocketOptionImpl>(
         envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_TCP_KEEPCNT,
-        keepalive_config.keepalive_probes_.value()));
+        keepalive_config.keepalive_probes_.value(), tcp_only));
   }
   if (keepalive_config.keepalive_interval_.has_value()) {
     options->push_back(std::make_shared<Network::SocketOptionImpl>(
         envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_TCP_KEEPINTVL,
-        keepalive_config.keepalive_interval_.value()));
+        keepalive_config.keepalive_interval_.value(), tcp_only));
   }
   if (keepalive_config.keepalive_time_.has_value()) {
     options->push_back(std::make_shared<Network::SocketOptionImpl>(
         envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_TCP_KEEPIDLE,
-        keepalive_config.keepalive_time_.value()));
+        keepalive_config.keepalive_time_.value(), tcp_only));
   }
   return options;
 }

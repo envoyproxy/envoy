@@ -1,16 +1,9 @@
 #pragma once
 
-#include <memory>
-
-#include "envoy/buffer/buffer.h"
-
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
-#include "metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -161,8 +154,6 @@ private:
   static absl::string_view domain(absl::string_view sip_header, HeaderType header_type);
   static void getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata);
 
-  int parseTopLine(absl::string_view& top_line);
-
   HeaderType current_header_{HeaderType::TopLine};
   size_t raw_offset_{0};
 
@@ -177,22 +168,10 @@ private:
     HeaderHandler(MessageHandler& parent);
     virtual ~HeaderHandler() = default;
 
-    using HeaderProcessor =
-        absl::flat_hash_map<HeaderType,
-                            std::function<int(HeaderHandler*, absl::string_view& header)>>;
-
     virtual int processVia(absl::string_view& header);
     virtual int processContact(absl::string_view& header);
     virtual int processPath(absl::string_view& header);
-    virtual int processEvent(absl::string_view& header) {
-      UNREFERENCED_PARAMETER(header);
-      return 0;
-    };
     virtual int processRoute(absl::string_view& header);
-    virtual int processCseq(absl::string_view& header) {
-      UNREFERENCED_PARAMETER(header);
-      return 0;
-    }
     virtual int processRecordRoute(absl::string_view& header);
     virtual int processServiceRoute(absl::string_view& header);
     virtual int processWwwAuth(absl::string_view& header);
@@ -213,7 +192,6 @@ private:
     void setFirstServiceRoute(bool flag) { parent_.setFirstServiceRoute(flag); }
 
     MessageHandler& parent_;
-    HeaderProcessor header_processors_;
   };
 
   class MessageHandler {
@@ -265,7 +243,6 @@ private:
   class SUBSCRIBEHeaderHandler : public HeaderHandler {
   public:
     using HeaderHandler::HeaderHandler;
-    int processEvent(absl::string_view& header) override;
   };
 
   class FAILURE4XXHeaderHandler : public HeaderHandler {
@@ -316,18 +293,6 @@ private:
         : MessageHandler(std::make_shared<SUBSCRIBEHeaderHandler>(*this), parent) {}
     ~SUBSCRIBEHandler() override = default;
     void parseHeader(HeaderType& type, absl::string_view& header) override;
-    void setEventType(absl::string_view value) {
-      if (value == "reg") {
-        event_type_ = EventType::REG;
-      } else {
-        event_type_ = EventType::OTHERS;
-      }
-    }
-
-  private:
-    enum class EventType { REG, OTHERS };
-
-    EventType event_type_;
   };
 
   // This is used to handle Other Message

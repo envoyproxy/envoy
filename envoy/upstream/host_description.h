@@ -198,9 +198,10 @@ public:
   virtual void priority(uint32_t) PURE;
 
   /**
-   * @return timestamp in milliseconds of when host was created.
+   * @return timestamp of when host has transitioned from unhealthy to
+   *         healthy state via an active healthchecking.
    */
-  virtual MonotonicTime creationTime() const PURE;
+  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

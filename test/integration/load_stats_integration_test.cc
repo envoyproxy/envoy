@@ -130,7 +130,7 @@ public:
       eds_cluster_config->mutable_eds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
       eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
-          eds_helper_.eds_path());
+          eds_helper_.edsPath());
       eds_cluster_config->set_service_name("service_name_0");
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();

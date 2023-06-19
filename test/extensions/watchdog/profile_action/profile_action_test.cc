@@ -37,7 +37,8 @@ protected:
       : time_system_(std::make_unique<Event::SimulatedTimeSystem>()),
         api_(Api::createApiForTest(stats_, *time_system_)),
         dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_, stats_, "test"}), test_path_(generateTestPath()) {}
+        context_({*api_, *dispatcher_, *stats_.rootScope(), "test"}),
+        test_path_(generateTestPath()) {}
 
   // Generates a unique path for a testcase.
   static std::string generateTestPath() {

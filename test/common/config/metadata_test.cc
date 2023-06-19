@@ -75,7 +75,7 @@ public:
 
     std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Any& d) const override {
       if (!(d.type_url().empty())) {
-        return std::make_unique<Foo>(d.value());
+        return std::make_unique<Foo>(std::string(d.value()));
       }
       throw EnvoyException("Cannot create a Foo when Any metadata is empty.");
     }

@@ -26,6 +26,11 @@ public:
   virtual void sendUnauthorizedResponse() PURE;
 };
 
+/**
+ * Describes the authentication type used by the client when communicating with the auth server.
+ */
+enum class AuthType { UrlEncodedBody, BasicAuth };
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

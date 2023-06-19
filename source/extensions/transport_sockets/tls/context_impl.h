@@ -1,8 +1,11 @@
 #pragma once
 
+#include <openssl/safestack.h>
+
 #include <array>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -63,7 +66,7 @@ struct TlsContext {
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
+  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -88,11 +91,18 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+  // Validate cert asynchronously for a QUIC connection.
+  ValidationResults customVerifyCertChainForQuic(
+      STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      const CertValidator::ExtraValidationContext& validation_context,
+      const std::string& host_name);
 
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
+  friend class ContextImplPeer;
+
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
 
@@ -102,14 +112,21 @@ protected:
    */
   static int sslContextIndex();
 
-  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
-  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+  // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
+  static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 
   bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
+
+  // Helper function to validate cert for TCP connections asynchronously.
+  ValidationResults customVerifyCertChain(
+      Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
+
+  void populateServerNamesMap(TlsContext& ctx, const int pkey_id);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
@@ -146,11 +163,11 @@ public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
+  bssl::UniquePtr<SSL>
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
   int newSessionKey(SSL_SESSION* session);
-  uint16_t parseSigningAlgorithmsForTest(const std::string& sigalgs);
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
@@ -173,6 +190,16 @@ public:
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
+  // Currently, at most one certificate of a given key type may be specified for each exact
+  // server name or wildcard domain name.
+  using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<TlsContext>>;
+  // Both exact server names and wildcard domains are part of the same map, in which wildcard
+  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
+  // between exact and wildcard entries.
+  using ServerNamesMap = absl::flat_hash_map<std::string, PkeyTypesMap>;
+
+  void populateServerNamesMap(TlsContext& ctx, const int pkey_id);
+
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -187,6 +214,9 @@ private:
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
+  ServerNamesMap server_names_map_;
+  bool has_rsa_;
+  bool full_scan_certs_on_sni_mismatch_;
 };
 
 } // namespace Tls

@@ -13,6 +13,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger_utils.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -76,14 +77,77 @@ public:
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
+  virtual ~GrpcAccessLogClient() = default;
+  virtual bool isConnected() PURE;
+  virtual bool log(const LogRequest& request) PURE;
+
+protected:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
                       OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : client_(client), service_method_(service_method), grpc_stream_retry_policy_(retry_policy) {}
+      : client_(client), service_method_(service_method),
+        opts_(createRequestOptionsForRetry(retry_policy)) {}
+
+  Grpc::AsyncClient<LogRequest, LogResponse> client_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const Http::AsyncClient::RequestOptions opts_;
+
+private:
+  Http::AsyncClient::RequestOptions
+  createRequestOptionsForRetry(OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy) {
+    auto opt = Http::AsyncClient::RequestOptions();
+
+    if (!retry_policy) {
+      return opt;
+    }
+
+    const auto grpc_retry_policy =
+        Http::Utility::convertCoreToRouteRetryPolicy(*retry_policy, "connect-failure");
+    opt.setBufferBodyForRetry(true);
+    opt.setRetryPolicy(grpc_retry_policy);
+    return opt;
+  }
+};
+
+template <typename LogRequest, typename LogResponse>
+class UnaryGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
+public:
+  UnaryGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
+                           const Protobuf::MethodDescriptor& service_method,
+                           OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
+      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
+
+  bool isConnected() override { return false; }
+
+  bool log(const LogRequest& request) override {
+    GrpcAccessLogClient<LogRequest, LogResponse>::client_->send(
+        GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request, request_cb_,
+        Tracing::NullSpan::instance(), GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
+    return true;
+  }
+
+  struct RequestCallbacks : public Grpc::AsyncRequestCallbacks<LogResponse> {
+    // Grpc::AsyncRequestCallbacks
+    void onSuccess(Grpc::ResponsePtr<LogResponse>&&, Tracing::Span&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override {}
+  };
+
+private:
+  RequestCallbacks request_cb_;
+};
+
+template <typename LogRequest, typename LogResponse>
+class StreamingGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
+public:
+  StreamingGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
+                               const Protobuf::MethodDescriptor& service_method,
+                               OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
+      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
-    LocalStream(GrpcAccessLogClient& parent) : parent_(parent) {}
+    LocalStream(StreamingGrpcAccessLogClient& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -99,19 +163,21 @@ public:
       }
     }
 
-    GrpcAccessLogClient& parent_;
+    StreamingGrpcAccessLogClient& parent_;
     Grpc::AsyncStream<LogRequest> stream_{};
   };
 
-  bool isStreamStarted() { return stream_ != nullptr && stream_->stream_ != nullptr; }
+  bool isConnected() override { return stream_ != nullptr && stream_->stream_ != nullptr; }
 
-  bool log(const LogRequest& request) {
+  bool log(const LogRequest& request) override {
     if (!stream_) {
       stream_ = std::make_unique<LocalStream>(*this);
     }
 
     if (stream_->stream_ == nullptr) {
-      stream_->stream_ = client_->start(service_method_, *stream_, createStreamOptionsForRetry());
+      stream_->stream_ = GrpcAccessLogClient<LogRequest, LogResponse>::client_->start(
+          GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, *stream_,
+          GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
     }
 
     if (stream_->stream_ != nullptr) {
@@ -126,24 +192,7 @@ public:
     return true;
   }
 
-  Http::AsyncClient::StreamOptions createStreamOptionsForRetry() {
-    auto opt = Http::AsyncClient::StreamOptions();
-
-    if (!grpc_stream_retry_policy_) {
-      return opt;
-    }
-
-    const auto retry_policy =
-        Http::Utility::convertCoreToRouteRetryPolicy(*grpc_stream_retry_policy_, "connect-failure");
-    opt.setBufferBodyForRetry(true);
-    opt.setRetryPolicy(retry_policy);
-    return opt;
-  }
-
-  Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
-  const Protobuf::MethodDescriptor& service_method_;
-  const absl::optional<envoy::config::core::v3::RetryPolicy> grpc_stream_retry_policy_;
 };
 
 } // namespace Detail
@@ -172,14 +221,12 @@ template <typename HttpLogProto, typename TcpLogProto, typename LogRequest, type
 class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto> {
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
-
   GrpcAccessLogger(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
-      const Protobuf::MethodDescriptor& service_method)
-      : client_(client, service_method, GrpcCommon::optionalRetryPolicy(config)),
-        buffer_flush_interval_msec_(
+      const Protobuf::MethodDescriptor& service_method, bool stream = true)
+      : buffer_flush_interval_msec_(
             PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
@@ -187,6 +234,13 @@ public:
         })),
         max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)),
         stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {
+    if (stream) {
+      client_ = std::make_unique<Detail::StreamingGrpcAccessLogClient<LogRequest, LogResponse>>(
+          client, service_method, GrpcCommon::optionalRetryPolicy(config));
+    } else {
+      client_ = std::make_unique<Detail::UnaryGrpcAccessLogClient<LogRequest, LogResponse>>(
+          client, service_method, GrpcCommon::optionalRetryPolicy(config));
+    }
     flush_timer_->enableTimer(buffer_flush_interval_msec_);
   }
 
@@ -210,7 +264,7 @@ public:
   }
 
 protected:
-  Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
+  std::unique_ptr<Detail::GrpcAccessLogClient<LogRequest, LogResponse>> client_;
   LogRequest message_;
 
 private:
@@ -226,11 +280,11 @@ private:
       return;
     }
 
-    if (!client_.isStreamStarted()) {
+    if (!client_->isConnected()) {
       initMessage();
     }
 
-    if (client_.log(message_)) {
+    if (client_->log(message_)) {
       // Clear the message regardless of the success.
       approximate_message_size_bytes_ = 0;
       clearMessage();

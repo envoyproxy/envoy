@@ -28,7 +28,7 @@
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
@@ -47,9 +47,9 @@ public:
   virtual ~Instance() = default;
 
   /**
-   * @return Admin& the global HTTP admin endpoint for the server.
+   * @return OptRef<Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Admin& admin() PURE;
+  virtual OptRef<Admin> admin() PURE;
 
   /**
    * @return Api::Api& the API used by the server.
@@ -282,7 +282,7 @@ public:
   virtual bool enableReusePortDefault() PURE;
 
   /**
-   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   * Set predicates for filtering stats to be flushed to sinks.
    */
   virtual void
   setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;

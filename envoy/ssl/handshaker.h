@@ -38,6 +38,12 @@ public:
    * unset.
    */
   virtual Network::TransportSocketCallbacks* transportSocketCallbacks() PURE;
+
+  /**
+   * A callback to be called upon certificate validation completion if the validation is
+   * asynchronous.
+   */
+  virtual void onAsynchronousCertValidationComplete() PURE;
 };
 
 /**
@@ -107,6 +113,10 @@ struct HandshakerCapabilities {
   // Should return true if this handshaker is FIPS-compliant.
   // Envoy will fail to compile if this returns true and `--define=boringssl=fips`.
   bool is_fips_compliant = true;
+
+  // Whether or not a handshaker implementation provides its own list of
+  // supported signature algorithms.
+  bool provides_sigalgs = false;
 };
 
 class HandshakerFactory : public Config::TypedFactory {

@@ -120,6 +120,10 @@ public:
                         Upstream::HostDescriptionConstSharedPtr host) const override;
   bool implementsSecureTransport() const override { return false; }
   absl::string_view defaultServerNameIndication() const override { return ""; }
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return tls_socket_factory_->sslCtx(); }
+  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override {
+    return tls_socket_factory_->clientContextConfig();
+  }
 
 private:
   Network::UpstreamTransportSocketFactoryPtr raw_socket_factory_;

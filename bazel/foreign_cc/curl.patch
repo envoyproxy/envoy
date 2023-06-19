@@ -40,11 +40,12 @@
 #    Summary exists in this bazel-specific bug report;
 #    https://github.com/bazelbuild/rules_foreign_cc/issues/426
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6a1a6fe8e..777ee122f 100644
+index ed60f07bc..0d2088cb9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -40,4 +40,9 @@
- cmake_minimum_required(VERSION 3.2...3.16 FATAL_ERROR)
+@@ -62,6 +62,11 @@
+ 
+ cmake_minimum_required(VERSION 3.7...3.16 FATAL_ERROR)
  
 +# Revert CMake bug triggered by curl's defined max CMake policy version, see https://gitlab.kitware.com/cmake/cmake/-/issues/21288
 +if(POLICY CMP0091)
@@ -53,7 +54,9 @@ index 6a1a6fe8e..777ee122f 100644
 +
  set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
  include(Utilities)
-@@ -248,7 +253,10 @@ endif()
+ include(Macros)
+@@ -306,9 +311,12 @@ if(ENABLE_MANUAL)
+ endif()
  
  if(CURL_STATIC_CRT)
 -  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -67,3 +70,4 @@ index 6a1a6fe8e..777ee122f 100644
 +  endforeach()
  endif()
  
+ # Disable warnings on Borland to avoid changing 3rd party code.

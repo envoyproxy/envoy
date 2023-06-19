@@ -25,6 +25,7 @@ envoy_cc_test(
         ":test_int_accessor_lib",
         "//envoy/http:protocol_interface",
         "//envoy/upstream:host_description_interface",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -52,6 +53,7 @@ envoy_cc_test_library(
         "//source/common/common:random_generator_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -73,5 +75,13 @@ envoy_cc_test(
     srcs = ["uint32_accessor_impl_test.cc"],
     deps = [
         "//source/common/stream_info:uint32_accessor_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "bool_accessor_impl_test",
+    srcs = ["bool_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:bool_accessor_lib",
     ],
 )

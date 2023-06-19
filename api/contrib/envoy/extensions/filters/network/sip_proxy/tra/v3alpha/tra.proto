@@ -14,10 +14,9 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.
 option java_outer_classname = "TraProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/sip_proxy/tra/v3alpha";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Tra]
+// [#protodoc-title: TRA]
 
 service TraService {
   rpc Create(TraServiceRequest) returns (TraServiceResponse) {
@@ -90,6 +89,8 @@ message TraServiceResponse {
 
 message CreateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message CreateResponse {
@@ -97,6 +98,8 @@ message CreateResponse {
 
 message UpdateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message UpdateResponse {
@@ -104,6 +107,8 @@ message UpdateResponse {
 
 message RetrieveRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message RetrieveResponse {
@@ -112,6 +117,8 @@ message RetrieveResponse {
 
 message DeleteRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message DeleteResponse {

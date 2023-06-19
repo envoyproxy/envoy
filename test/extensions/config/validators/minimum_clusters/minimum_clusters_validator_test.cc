@@ -13,6 +13,8 @@ namespace Config {
 namespace Validators {
 namespace {
 
+using ::testing::Return;
+
 class MinimumClustersValidatorTest : public testing::Test {
 public:
   MinimumClustersValidatorTest() {

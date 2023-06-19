@@ -1,5 +1,5 @@
-DNS Resolver
-=================
+DNS resolver
+============
 
 .. toctree::
   :glob:

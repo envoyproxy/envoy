@@ -51,7 +51,7 @@ protected:
       : api_(Api::createApiForTest(store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         fakeIpp_(std::make_shared<FakeIppCryptoImpl>(true)),
-        stats_(generateCryptoMbStats("cryptomb", store_)) {}
+        stats_(generateCryptoMbStats("cryptomb", *store_.rootScope())) {}
 
   bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
     std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(

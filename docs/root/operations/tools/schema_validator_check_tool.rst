@@ -13,9 +13,9 @@ Input
 
   1. The schema type to check the passed in configuration against. The supported types are:
 
-    * `route` - for :ref:`route configuration<envoy_v3_api_msg_config.route.v3.RouteConfiguration>` validation.
-    * `discovery_response` for :ref:`discovery response<envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` validation.
-    * `bootstrap` for :ref:`bootstrap<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` validation.
+    * ``route`` - for :ref:`route configuration<envoy_v3_api_msg_config.route.v3.RouteConfiguration>` validation.
+    * ``discovery_response`` for :ref:`discovery response<envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` validation.
+    * ``bootstrap`` for :ref:`bootstrap<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` validation.
 
   2. The path to the configuration file.
 

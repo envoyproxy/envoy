@@ -9,24 +9,22 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/common/thread.h"
-#include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration_tcp_client.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
-#include "spdlog/spdlog.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -40,6 +38,14 @@
 #define DISABLE_UNDER_WINDOWS return
 #else
 #define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+#define DISABLE_IF_ADMIN_DISABLED return
+#else
+#define DISABLE_IF_ADMIN_DISABLED                                                                  \
   do {                                                                                             \
   } while (0)
 #endif
@@ -60,7 +66,11 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
+  static const InstanceConstSharedPtrFn defaultAddressFunction(Network::Address::IpVersion version);
 
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
@@ -91,6 +101,9 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  // Get socket option for a specific listener's socket.
+  bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
+                       socklen_t* optlen, int address_index = 0);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -102,7 +115,8 @@ public:
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
                     Network::Address::InstanceConstSharedPtr source_address =
-                        Network::Address::InstanceConstSharedPtr());
+                        Network::Address::InstanceConstSharedPtr(),
+                    absl::string_view destination_address = "");
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -140,14 +154,19 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the nth access log entry, defaulting to log entry 0.
-  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  // If client_connection is provided, flush pending acks to enable deferred logging.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false,
+                               Network::ClientConnection* client_connection = nullptr);
 
   std::string listener_access_log_name_;
 
@@ -208,11 +227,15 @@ public:
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+                                 const std::string& version, FakeStream* stream = nullptr) {
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
@@ -221,7 +244,7 @@ public:
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    xds_stream_->sendGrpcMessage(discovery_response);
+    stream->sendGrpcMessage(discovery_response);
   }
 
   template <class T>
@@ -357,12 +380,24 @@ public:
     return *fake_upstreams_.back();
   }
 
+  // Adds a fake upstream to the integration test setup. If `autonomous_upstream` is true, then a
+  // AutonomousUpstream instance will be created instead of a FakeUpstream instance. If
+  // `autonomous_upstream` is true, then `autonomous_allow_incomplete_streams` determines whether
+  // an end-of-stream is required on connections between the Envoy and the fake upstream. If
+  // `autonomous_upstream` is false, then `autonomous_allow_incomplete_streams` is ignored.
   FakeUpstream&
   addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
-                  Http::CodecType type) {
+                  Http::CodecType type, bool autonomous_upstream,
+                  bool autonomous_allow_incomplete_streams = false) {
     auto config = configWithType(type);
-    fake_upstreams_.emplace_back(
-        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    if (autonomous_upstream) {
+      fake_upstreams_.emplace_back(
+          std::make_unique<AutonomousUpstream>(std::move(transport_socket_factory), 0, version_,
+                                               config, autonomous_allow_incomplete_streams));
+    } else {
+      fake_upstreams_.emplace_back(
+          std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    }
     return *fake_upstreams_.back();
   }
 
@@ -388,10 +423,6 @@ protected:
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
   }
-  void setHeadersWithUnderscoreAction(
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
-    upstream_config_.headers_with_underscores_action_ = value;
-  }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
@@ -407,7 +438,7 @@ protected:
 
   void checkForMissingTagExtractionRules();
 
-  std::unique_ptr<Stats::Scope> upstream_stats_store_;
+  std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
@@ -491,10 +522,16 @@ protected:
   // If true, skip checking stats for missing tag-extraction rules.
   bool skip_tag_extraction_rule_check_{};
 
+  // By default, node metadata (node name, cluster name, locality) for the test server gets set to
+  // hard-coded values in the OptionsImpl ("node_name", "cluster_name", etc.). Set to true if your
+  // test specifies the node metadata in the Bootstrap configuration and that's what you want to use
+  // for node info in Envoy.
+  bool use_bootstrap_node_metadata_{false};
+
 private:
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
-  // True if initialized() has been called.
+  // True if initialize() has been called.
   bool initialized_{};
   // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
   // the proxy uses the default watermark buffer factory to create buffers.

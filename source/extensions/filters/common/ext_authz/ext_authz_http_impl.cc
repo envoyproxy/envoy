@@ -14,6 +14,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
+#include "check_request_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -98,39 +99,12 @@ struct SuccessResponse {
   ResponsePtr response_;
 };
 
-std::vector<Matchers::StringMatcherPtr>
-createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers;
-  for (const auto& matcher : list.patterns()) {
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
-  }
-  return matchers;
-}
-
 } // namespace
-
-// Matchers
-HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
-    : matchers_(std::move(list)) {}
-
-bool HeaderKeyMatcher::matches(absl::string_view key) const {
-  return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto& matcher) { return matcher->match(key); });
-}
-
-NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
-    : matcher_(std::move(list)) {}
-
-bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
-    : request_header_matchers_(
-          toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
-      client_header_matchers_(toClientMatchers(
+    : client_header_matchers_(toClientMatchers(
           config.http_service().authorization_response().allowed_client_headers())),
       client_header_on_success_matchers_(toClientMatchersOnSuccess(
           config.http_service().authorization_response().allowed_client_headers_on_success())),
@@ -144,41 +118,24 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
-          config.http_service().authorization_request().headers_to_add(), false)) {}
-
-MatcherSharedPtr
-ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  const std::vector<Http::LowerCaseString> keys{
-      {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
-       Http::Headers::get().Path, Http::Headers::get().Host}};
-
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
-  for (const auto& key : keys) {
-    envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_exact(key.get());
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
-  }
-
-  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
-}
+          config.http_service().authorization_request().headers_to_add(),
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
 ClientConfig::toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
 ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
@@ -211,7 +168,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
 
 MatcherSharedPtr
 ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  return std::make_unique<HeaderKeyMatcher>(createStringMatchers(list));
+  return std::make_unique<HeaderKeyMatcher>(CheckRequestUtils::createStringMatchers(list));
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
@@ -234,7 +191,13 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   Http::RequestHeaderMapPtr headers;
-  const uint64_t request_length = request.attributes().request().http().body().size();
+
+  const auto& http_request = request.attributes().request().http();
+  const auto& http_request_body =
+      http_request.body().empty() ? http_request.raw_body() : http_request.body();
+
+  uint64_t request_length = http_request_body.size();
+
   if (request_length > 0) {
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
         {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
@@ -242,19 +205,18 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lengthZeroHeader());
   }
 
-  for (const auto& header : request.attributes().request().http().headers()) {
+  for (const auto& header : http_request.headers()) {
     const Http::LowerCaseString key{header.first};
+
     // Skip setting content-length header since it is already configured at initialization.
     if (key == Http::Headers::get().ContentLength) {
       continue;
     }
 
-    if (config_->requestHeaderMatchers()->matches(key.get())) {
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
-      } else {
-        headers->addCopy(key, header.second);
-      }
+    if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+      headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+    } else {
+      headers->addCopy(key, header.second);
     }
   }
 
@@ -263,7 +225,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body().add(request.attributes().request().http().body());
+    message->body().add(http_request_body);
   }
 
   const std::string& cluster = config_->cluster();

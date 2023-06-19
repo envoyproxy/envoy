@@ -3,8 +3,8 @@
 #include "envoy/http/http_server_properties_cache.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
@@ -64,13 +64,20 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    // TODO(https://github.com/envoyproxy/envoy/issues/23564): Http3 Datagram support should be
+    // turned on by returning quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is
+    // completed.
+    return quic::HttpDatagramSupport::kNone;
+  }
+
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
-  size_t numPacketsExpectedPerEventLoop() override {
+  size_t numPacketsExpectedPerEventLoop() const override {
     // Do one round of reading per active stream, or to see if there's a new
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
@@ -81,6 +88,9 @@ public:
 
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
+
+  void OnServerPreferredAddressAvailable(
+      const quic::QuicSocketAddress& server_preferred_address) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 

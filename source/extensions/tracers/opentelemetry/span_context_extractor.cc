@@ -1,6 +1,6 @@
 #include "span_context_extractor.h"
 
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/http/header_map_impl.h"
 
@@ -15,6 +15,10 @@ namespace {
 
 const Http::LowerCaseString& openTelemetryPropagationHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& openTelemetryTraceStateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
 }
 
 // See https://www.w3.org/TR/trace-context/#traceparent-header
@@ -87,7 +91,25 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // See https://w3c.github.io/trace-context/#trace-flags.
   char decoded_trace_flags = absl::HexStringToBytes(trace_flags).front();
   bool sampled = (decoded_trace_flags & 1);
-  SpanContext span_context(version, trace_id, parent_id, sampled);
+
+  // If a tracestate header is received without an accompanying traceparent header,
+  // it is invalid and MUST be discarded. Because we're already checking for the
+  // traceparent header above, we don't need to check here.
+  // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
+  absl::string_view tracestate_key = openTelemetryTraceStateHeader();
+  std::vector<std::string> tracestate_values;
+  // Multiple tracestate header fields MUST be handled as specified by RFC7230 Section 3.2.2 Field
+  // Order.
+  trace_context_.forEach(
+      [&tracestate_key, &tracestate_values](absl::string_view key, absl::string_view value) {
+        if (key == tracestate_key) {
+          tracestate_values.push_back(std::string{value});
+        }
+        return true;
+      });
+  std::string tracestate = absl::StrJoin(tracestate_values, ",");
+
+  SpanContext span_context(version, trace_id, parent_id, sampled, tracestate);
   return span_context;
 }
 
