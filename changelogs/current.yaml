@@ -20,8 +20,8 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: matching
   change: |
-    Changed onMatchCallback interface to return MatchCallbackStatus enum. 
-    If MatchCallbackStatus::StopAndFailStream is returned, the filter chain iteration is stopped and a local reply is issued. 
+    Changed onMatchCallback interface to return MatchCallbackStatus enum. If MatchCallbackStatus::StopAndFailStream is returned, the filter
+    chain iteration is stopped and a local reply is issued.
     This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.enhanced_match_callback`` to false.
 - area: connection pool
   change: |
