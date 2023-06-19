@@ -59,13 +59,13 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-    if (headers_.size() < kMinHeadersForLazyMap) {
+    if (normal_headers_.size() < kMinHeadersForLazyMap) {
       return false;
     }
     // Add all entries from the list into the map.
-    for (auto node = headers_.begin(); node != headers_.end(); ++node) {
-      HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
-      v.push_back(node);
+    lazy_map_.reserve(normal_headers_.size());
+    for (auto node = normal_headers_.begin(); node != normal_headers_.end(); ++node) {
+      lazy_map_[node->key().getStringView()].push_back(node);
     }
   }
   return true;
@@ -82,15 +82,15 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
       for (const HeaderNode& node : header_nodes) {
         ASSERT(node->key() == key);
         removed_bytes += node->key().size() + node->value().size();
-        erase(node, false /* remove_from_map */);
+        erase<false>(node, false /* remove_from_map */);
       }
     }
   } else {
     // Erase all same key entries from the list.
-    for (auto i = headers_.begin(); i != headers_.end();) {
+    for (auto i = normal_headers_.begin(); i != normal_headers_.end();) {
       if (i->key() == key) {
         removed_bytes += i->key().size() + i->value().size();
-        i = erase(i, false /* remove_from_map */);
+        i = erase<false>(i, false /* remove_from_map */);
       } else {
         ++i;
       }
@@ -220,10 +220,14 @@ bool HeaderMapImpl::operator==(const HeaderMap& rhs) const {
   rhs_headers.reserve(rhs.size());
   rhs.iterate(collectAllHeaders(&rhs_headers));
 
-  auto i = headers_.begin();
+  std::vector<std::pair<absl::string_view, absl::string_view>> lhs_headers;
+  lhs_headers.reserve(size());
+  iterate(collectAllHeaders(&lhs_headers));
+
+  auto i = lhs_headers.begin();
   auto j = rhs_headers.begin();
-  for (; i != headers_.end(); ++i, ++j) {
-    if (i->key() != j->first || i->value() != j->second) {
+  for (; i != lhs_headers.end(); ++i, ++j) {
+    if (i->first != j->first || i->second != j->second) {
       return false;
     }
   }
@@ -248,7 +252,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     }
   } else {
     addSize(key.size() + value.size());
-    HeaderNode i = headers_.insert(std::move(key), std::move(value));
+    HeaderNode i = headers_.insert<false>(std::move(key), std::move(value));
     i->entry_ = i;
   }
 }
@@ -335,10 +339,15 @@ uint64_t HeaderMapImpl::byteSize() const { return cached_byte_size_; }
 void HeaderMapImpl::verifyByteSizeInternalForTest() const {
   // Computes the total byte size by summing the byte size of the keys and values.
   uint64_t byte_size = 0;
-  for (const HeaderEntryImpl& header : headers_) {
+  for (const HeaderEntryImpl& header : headers_.inline_headers_) {
     byte_size += header.key().size();
     byte_size += header.value().size();
   }
+  for (const HeaderEntryImpl& header : headers_.normal_headers_) {
+    byte_size += header.key().size();
+    byte_size += header.value().size();
+  }
+
   ASSERT(cached_byte_size_ == byte_size);
 }
 
@@ -378,7 +387,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(absl::string_view key) {
   // If the requested header is not an O(1) header and the lazy map is not in use, we do a full
   // scan. Doing the trie lookup is wasteful in the miss case, but is present for code consistency
   // with other functions that do similar things.
-  for (HeaderEntryImpl& header : headers_) {
+  for (HeaderEntryImpl& header : headers_.normal_headers_) {
     if (header.key() == key) {
       ret.push_back(&header);
     }
@@ -388,17 +397,28 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(absl::string_view key) {
 }
 
 void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb) const {
-  for (const HeaderEntryImpl& header : headers_) {
+  for (const HeaderEntryImpl& header : headers_.inline_headers_) {
     if (cb(header) == HeaderMap::Iterate::Break) {
-      break;
+      return;
+    }
+  }
+  for (const HeaderEntryImpl& header : headers_.normal_headers_) {
+    if (cb(header) == HeaderMap::Iterate::Break) {
+      return;
     }
   }
 }
 
 void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb) const {
-  for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
+  for (auto it = headers_.normal_headers_.rbegin(); it != headers_.normal_headers_.rend(); it++) {
     if (cb(*it) == HeaderMap::Iterate::Break) {
-      break;
+      return;
+    }
+  }
+
+  for (auto it = headers_.inline_headers_.rbegin(); it != headers_.inline_headers_.rend(); it++) {
+    if (cb(*it) == HeaderMap::Iterate::Break) {
+      return;
     }
   }
 }
@@ -457,7 +477,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   }
 
   addSize(key.get().size());
-  HeaderNode i = headers_.insert(key);
+  HeaderNode i = headers_.insert<true>(key);
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -472,7 +492,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   }
 
   addSize(key.get().size() + value.size());
-  HeaderNode i = headers_.insert(key, std::move(value));
+  HeaderNode i = headers_.insert<true>(key, std::move(value));
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -498,7 +518,7 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   const uint64_t size_to_subtract = entry->entry_->key().size() + entry->entry_->value().size();
   subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
-  headers_.erase(entry->entry_, true);
+  headers_.erase<true>(entry->entry_, true);
   return 1;
 }
 

@@ -197,33 +197,64 @@ protected:
     using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
 
-    HeaderList() : pseudo_headers_end_(headers_.end()) {}
+    HeaderList()
+        : use_separated_inline_headers_list_(Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.separated_header_list_for_inline_headers")),
+          inline_headers_ref_(use_separated_inline_headers_list_ ? inline_headers_
+                                                                 : normal_headers_),
+          pseudo_headers_end_(inline_headers_ref_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
-    template <class Key, class... Value> HeaderNode insert(Key&& key, Value&&... value) {
-      const bool is_pseudo_header = isPseudoHeader(key);
-      HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
-                                      std::forward<Key>(key), std::forward<Value>(value)...);
-      if (!lazy_map_.empty()) {
-        lazy_map_[i->key().getStringView()].push_back(i);
+    template <bool Inline, class Key, class... Value>
+    HeaderNode insert(Key&& key, Value&&... value) {
+      HeaderNode i;
+
+      if constexpr (Inline) {
+        const bool is_pseudo_header = isPseudoHeader(key);
+        i = inlineHeaders().emplace(is_pseudo_header ? pseudo_headers_end_ : inlineHeaders().end(),
+                                    std::forward<Key>(key), std::forward<Value>(value)...);
+
+        // First non-pseudo header is inserted and update pseudo_headers_end_.
+        if (!is_pseudo_header && pseudo_headers_end_ == inlineHeaders().end()) {
+          pseudo_headers_end_ = i;
+        }
+      } else {
+        i = normalHeaders().emplace(normalHeaders().end(), std::forward<Key>(key),
+                                    std::forward<Value>(value)...);
+
+        // If same list is used for inline headers and normal headers, update preudo_headers_end_
+        // when first normal header is inserted.
+        if (!use_separated_inline_headers_list_ && pseudo_headers_end_ == normalHeaders().end()) {
+          pseudo_headers_end_ = i;
+        }
       }
-      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
-        pseudo_headers_end_ = i;
+
+      // Update lazy map if necessary.
+      if (!Inline || !use_separated_inline_headers_list_) {
+        if (!lazy_map_.empty()) {
+          lazy_map_[i->key().getStringView()].push_back(i);
+        }
       }
+
       return i;
     }
 
-    HeaderNode erase(HeaderNode i, bool remove_from_map) {
+    template <bool Inline> HeaderNode erase(HeaderNode i, bool remove_from_map) {
       if (pseudo_headers_end_ == i) {
         pseudo_headers_end_++;
       }
       if (remove_from_map) {
         lazy_map_.erase(i->key().getStringView());
       }
-      return headers_.erase(i);
+
+      if constexpr (Inline) {
+        return inlineHeaders().erase(i);
+      } else {
+        return normalHeaders().erase(i);
+      }
     }
 
     template <class UnaryPredicate> void removeIf(UnaryPredicate p) {
@@ -244,7 +275,7 @@ protected:
                   if (pseudo_headers_end_ == it->entry_) {
                     pseudo_headers_end_++;
                   }
-                  headers_.erase(it);
+                  normal_headers_.erase(it);
                   return true;
                 }
                 return false;
@@ -259,9 +290,9 @@ protected:
           }
         }
       } else {
-        // The lazy map isn't used, iterate over the list elements and remove elements that satisfy
-        // the predicate.
-        headers_.remove_if([&](const HeaderEntryImpl& entry) {
+        // The lazy map isn't used, iterate over the list elements and remove elements that
+        // satisfy the predicate.
+        normal_headers_.remove_if([&](const HeaderEntryImpl& entry) {
           const bool to_remove = p(entry);
           if (to_remove) {
             if (pseudo_headers_end_ == entry.entry_) {
@@ -271,6 +302,16 @@ protected:
           return to_remove;
         });
       }
+
+      inline_headers_.remove_if([&](const HeaderEntryImpl& entry) {
+        const bool to_remove = p(entry);
+        if (to_remove) {
+          if (pseudo_headers_end_ == entry.entry_) {
+            pseudo_headers_end_++;
+          }
+        }
+        return to_remove;
+      });
     }
 
     /*
@@ -287,26 +328,34 @@ protected:
      */
     size_t remove(absl::string_view key);
 
-    std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }
-    std::list<HeaderEntryImpl>::iterator end() { return headers_.end(); }
-    std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
-    std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
-    std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
-    std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     HeaderLazyMap::iterator mapFind(absl::string_view key) { return lazy_map_.find(key); }
     HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
-    size_t size() const { return headers_.size(); }
-    bool empty() const { return headers_.empty(); }
+
+    size_t size() const { return inline_headers_.size() + normal_headers_.size(); }
+    bool empty() const { return size() == 0; }
     void clear() {
-      headers_.clear();
-      pseudo_headers_end_ = headers_.end();
+      normal_headers_.clear();
+      inline_headers_.clear();
+
+      pseudo_headers_end_ = inline_headers_ref_.end();
+
       lazy_map_.clear();
     }
 
+    std::list<HeaderEntryImpl>& normalHeaders() { return normal_headers_; }
+    std::list<HeaderEntryImpl>& inlineHeaders() { return inline_headers_ref_; }
+
+    std::list<HeaderEntryImpl> inline_headers_;
+    std::list<HeaderEntryImpl> normal_headers_;
+
   private:
-    std::list<HeaderEntryImpl> headers_;
-    HeaderNode pseudo_headers_end_;
     HeaderLazyMap lazy_map_;
+
+    const bool use_separated_inline_headers_list_{};
+
+    std::list<HeaderEntryImpl>& inline_headers_ref_;
+
+    HeaderNode pseudo_headers_end_;
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
