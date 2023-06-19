@@ -85,9 +85,9 @@ public:
   enum class State { Open, Closing, Closed };
 
   enum class ReadDisableStatus {
+    NoTransition,
     TransitionedToReadEnabled,
-    TransitionedToReadDisabled,
-    NoTransition
+    TransitionedToReadDisabled
   };
 
   /**
