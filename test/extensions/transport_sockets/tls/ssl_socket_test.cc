@@ -854,7 +854,16 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   }
 
   if (!options.expectedClientStats().empty()) {
-    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+    if (client_stats_store.findCounterByString(options.expectedClientStats()).has_value()) {
+      EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+    }
+
+    if (client_stats_store.findGaugeByString(options.expectedClientStats()).has_value()) {
+      EXPECT_EQ(1UL,
+                client_stats_store
+                    .gauge(options.expectedClientStats(), Stats::Gauge::ImportMode::NeverImport)
+                    .value());
+    }
   }
 
   if (options.expectSuccess()) {
