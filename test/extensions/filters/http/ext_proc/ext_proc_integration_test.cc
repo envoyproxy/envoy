@@ -1020,10 +1020,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
       });
 
   processRequestBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+      *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
         auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body("Hello, World!");
+        addMutationSetHeaders(5, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
 
@@ -1037,9 +1038,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
       });
 
   processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+      *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
         body_resp.mutable_response()->mutable_body_mutation()->set_body("123");
+        addMutationSetHeaders(5, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
 
@@ -2072,32 +2074,38 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [this](const HttpHeaders& headers, HeadersResponse& header_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":method", "GET"},
                                                                 {":authority", "host"}};
         // Verify only allowed request headers is received by ext_proc server.
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+        addMutationSetHeaders(5, *header_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
-  processRequestTrailersMessage(*grpc_upstreams_[0], false,
-                                [](const HttpTrailers& trailers, TrailersResponse&) {
-                                  // The request trailer header is not in the allow list.
-                                  EXPECT_EQ(trailers.trailers().headers_size(), 0);
-                                  return true;
-                                });
+  processRequestTrailersMessage(
+      *grpc_upstreams_[0], false,
+      [this](const HttpTrailers& trailers, TrailersResponse& trailer_resp) {
+        // The request trailer header is not in the allow list.
+        EXPECT_EQ(trailers.trailers().headers_size(), 0);
+        addMutationSetHeaders(5, *trailer_resp.mutable_header_mutation());
+        return true;
+      });
   // Send back response with :status 200 and trailer header: x-test-trailers.
   handleUpstreamRequestWithTrailer();
   processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], false, [this](const HttpHeaders& headers, HeadersResponse& header_resp) {
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        addMutationSetHeaders(5, *header_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
   processResponseTrailersMessage(
-      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
+      *grpc_upstreams_[0], false,
+      [this](const HttpTrailers& trailers, TrailersResponse& trailer_resp) {
         // The response trailer header is in the allow list.
         Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+        addMutationSetHeaders(5, *trailer_resp.mutable_header_mutation());
         return true;
       });
   verifyDownstreamResponse(*response, 200);
