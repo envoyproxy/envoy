@@ -44,6 +44,7 @@ void ensuredValidFilter(unsigned int seed, envoy::config::listener::v3::Filter* 
 static void TestOneProtoInput(const test::extensions::filters::network::FilterFuzzTestCase&);
 using FuzzerProtoType = test::extensions::filters::network::FilterFuzzTestCase;
 
+// NOLINTNEXTLINE - suppress clang-tidy, because llvm's lib depends on this identifier.
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max_size,
                                           unsigned int seed) {
   // mutate the config part of the fuzzer only with a probability of
@@ -56,18 +57,18 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
   static ProtobufMessage::ValidatedInputGenerator generator(
       seed, ProtobufMessage::composeFiltersAnyMap(), 20);
   static Random::PsuedoRandomGenerator64 random;
-  static bool _random_inited = [seed] {
+  ABSL_ATTRIBUTE_UNUSED static bool _random_inited = [seed] {
     random.initializeSeed(seed);
     return true;
   }();
-  _random_inited = !_random_inited;
 
   FuzzerProtoType input;
-  input.ParseFromString({reinterpret_cast<const char*>(data), size});
+  protobuf_mutator::ParseTextMessage(data, size, &input);
   if (random.random() % 100 < config_mutation_probability) {
     test::extensions::filters::network::FuzzHelperForActions actions;
     *actions.mutable_actions() = *input.mutable_actions();
     mutator.Mutate(&actions, max_size);
+    *input.mutable_actions() = *actions.mutable_actions();
   } else {
     mutator.Mutate(input.mutable_config(), max_size);
     ensuredValidFilter(seed, input.mutable_config());
