@@ -74,6 +74,7 @@ Envoy::Http::Status UdpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
     // return an error code to avoid replying with 503 Service Unavailable.
     response_headers->setStatus("400");
     response_headers->remove(Envoy::Http::Headers::get().CapsuleProtocol);
+    upstream_to_downstream_->onResetStream(Envoy::Http::StreamResetReason::ConnectError, "");
   } else {
     Api::SysCallIntResult rc = socket_->connect(host_->address());
     if (SOCKET_FAILURE(rc.return_value_)) {

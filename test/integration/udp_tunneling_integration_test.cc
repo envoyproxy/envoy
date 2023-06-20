@@ -16,12 +16,14 @@ namespace {
 // Terminates CONNECT-UDP and sends raw UDP datagrams upstream.
 class ConnectUdpTerminationIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  ConnectUdpTerminationIntegrationTest() {}
+  ConnectUdpTerminationIntegrationTest() = default;
 
-  ~ConnectUdpTerminationIntegrationTest() {
+  ~ConnectUdpTerminationIntegrationTest() override {
     // Since the upstream is a UDP server, there is nothing to check on the upstream side. Simply
     // make sure that the connection is closed to avoid TSAN error.
-    codec_client_->close();
+    if (codec_client_) {
+      codec_client_->close();
+    }
   }
 
   void initialize() override {

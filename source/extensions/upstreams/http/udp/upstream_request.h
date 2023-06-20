@@ -69,8 +69,8 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
-  void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override{};
-  void readDisable(bool) override{};
+  void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override {}
+  void readDisable(bool) override {}
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
@@ -85,10 +85,12 @@ public:
     // TODO(https://github.com/envoyproxy/envoy/issues/23564): Add statistics for CONNECT-UDP
     // upstreams.
     ENVOY_LOG_MISC(warn, "{} UDP datagrams were dropped.", dropped);
+    datagrams_dropped_ += dropped;
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
+  uint32_t numOfDroppedDatagrams() { return datagrams_dropped_; }
 
   // quiche::CapsuleParser::Visitor
   bool OnCapsule(const quiche::Capsule& capsule) override;
@@ -104,6 +106,7 @@ private:
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
   quiche::CapsuleParser capsule_parser_{this};
   quiche::SimpleBufferAllocator capsule_buffer_allocator_;
+  uint32_t datagrams_dropped_ = 0;
 };
 
 } // namespace Udp
