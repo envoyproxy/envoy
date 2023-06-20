@@ -863,19 +863,17 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       mEndStream = endStream;
       @State int originalState;
       @State int updatedState;
-      if (endStream && !data.hasRemaining()) {
-        // This read is the final read.
-        do {
-          originalState = mState.get();
-          updatedState = determineNextState(endStream, originalState, State.COMPLETE);
-        } while (!mState.compareAndSet(originalState, updatedState));
+
+      // When endStream with no data is read, there will be no more calls to read().
+      boolean isFinalRead = endStream && !data.hasRemaining();
+      do {
+        originalState = mState.get();
+        updatedState = determineNextState(endStream, originalState,
+                                          isFinalRead ? State.COMPLETE : State.AWAITING_READ);
+      } while (!mState.compareAndSet(originalState, updatedState));
+      if (isFinalRead) {
         // onComplete still needs to be called - this always returns false.
         mSucceededState.hasReachedFinalState(SucceededState.FINAL_READ_DONE);
-      } else {
-        do {
-          originalState = mState.get();
-          updatedState = determineNextState(endStream, originalState, State.AWAITING_READ);
-        } while (!mState.compareAndSet(originalState, updatedState));
       }
       if (completeAbandonIfAny(originalState, updatedState)) {
         return;
