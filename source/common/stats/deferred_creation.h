@@ -85,8 +85,7 @@ private:
 
 // Non-deferred wrapper over StatsStructType. This is used when
 // :ref:`enable_deferred_creation_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>` is not
-// enabled.
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>` is not enabled.
 template <typename StatsStructType>
 class DirectStats : public DeferredCreationCompatibleInterface<StatsStructType> {
 public:
