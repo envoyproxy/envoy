@@ -220,7 +220,8 @@ new_features:
 - area: access_log
   change: |
     added :ref:`DisableBuiltinLables
-    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.disable_builtin_labels>` to disable envoy builtin resource labels.
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.disable_builtin_labels>` 
+    to disable envoy builtin resource labels.
 - area: dynamic_forward_proxy
   change: |
     added :ref:`sub_clusters_config
