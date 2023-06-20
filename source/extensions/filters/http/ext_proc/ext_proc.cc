@@ -137,7 +137,6 @@ Filter::StreamOpenState Filter::openStream() {
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc()) {
       logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
   return StreamOpenState::Ok;
@@ -148,6 +147,7 @@ void Filter::closeStream() {
     if (grpc_service_.has_envoy_grpc()) {
       logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
       logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
