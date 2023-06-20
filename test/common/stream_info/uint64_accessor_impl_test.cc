@@ -21,9 +21,14 @@ TEST(UInt64AccessorImplTest, IncrementValue) {
 }
 
 TEST(UInt64AccessorImplTest, TestProto) {
-  UInt64AccessorImpl accessor(0xdeadbeefdeadbeef);
+  uint64_t init_value = 0xdeadbeefdeadbeef;
+  UInt64AccessorImpl accessor(init_value);
   auto message = accessor.serializeAsProto();
   EXPECT_NE(nullptr, message);
+
+  auto* uint64_struct = dynamic_cast<ProtobufWkt::UInt64Value*>(message.get());
+  EXPECT_NE(nullptr, uint64_struct);
+  EXPECT_EQ(init_value, uint64_struct->value());
 }
 
 } // namespace
