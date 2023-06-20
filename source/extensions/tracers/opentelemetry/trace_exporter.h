@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-class OpenTelemetryTraceExporter : Logger::Loggable<Logger::Id::tracing> {
+class OpenTelemetryTraceExporter : public Logger::Loggable<Logger::Id::tracing> {
 public:
   virtual ~OpenTelemetryTraceExporter() = default;
 

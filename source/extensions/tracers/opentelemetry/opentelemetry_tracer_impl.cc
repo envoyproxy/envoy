@@ -11,6 +11,9 @@
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
+
+#include "grpc_trace_exporter.h"
+#include "http_trace_exporter.h"
 #include "span_context.h"
 #include "span_context_extractor.h"
 #include "trace_exporter.h"
@@ -37,8 +40,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
           factory->createUncachedRawAsyncClient();
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
+    } else if (opentelemetry_config.has_http_config()) {
+      exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
+        factory_context.clusterManager(), opentelemetry_config.http_config());
     }
-    // TODO: check for HTTP service in config
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, opentelemetry_config.service_name());
