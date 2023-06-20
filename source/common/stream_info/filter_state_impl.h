@@ -57,7 +57,8 @@ public:
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
 
   bool hasDataWithName(absl::string_view) const override;
-  bool hasDataWithHandle(InlineKey data_key) const override;
+  bool hasDataGeneric(absl::string_view data_name) const override;
+  bool hasDataGeneric(InlineKey data_key) const override;
 
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
   const Object* getDataReadOnlyGeneric(InlineKey data_key) const override;
@@ -80,7 +81,7 @@ private:
                        LifeSpan life_span, StreamSharingMayImpactPooling stream_sharing) {
 
     if (life_span > life_span_) {
-      if (hasDataWithNameInternally(data_key)) {
+      if (hasDataInternal(data_key)) {
         IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
                      "conflicting life_span on the same data_name.");
         return;
@@ -89,7 +90,7 @@ private:
       parent_->setData(data_key, data, state_type, life_span, stream_sharing);
       return;
     }
-    if (parent_ && parent_->hasDataWithName(data_key)) {
+    if (parent_ && parent_->hasDataGeneric(data_key)) {
       IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
                    "conflicting life_span on the same data_name.");
       return;

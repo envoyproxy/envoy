@@ -256,14 +256,22 @@ public:
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
-  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
+  virtual bool hasDataGeneric(absl::string_view data_name) const PURE;
 
   /**
    * @param data_key the handle of the data being probed.
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
-  virtual bool hasDataWithHandle(InlineKey data_key) const PURE;
+  virtual bool hasDataGeneric(InlineKey data_key) const PURE;
+
+  /**
+   * @param data_name the name of the data being probed.
+   * @return Whether data of any type and the name specified exists in the
+   * data store.
+   * NOTE: Please use hasDataUnTyped() instead.
+   */
+  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
   /**
    * @param life_span the LifeSpan above which data existence is checked.

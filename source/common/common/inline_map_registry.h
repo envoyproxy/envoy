@@ -164,7 +164,7 @@ public:
           continue;
         }
 
-        if (!callback(id.first, entry.get())) {
+        if (!callback(id.first, entry)) {
           return;
         }
       }
@@ -372,12 +372,14 @@ public:
 
 private:
   template <class Scope> static InlineMapRegistry& mutableRegistry() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(InlineMapRegistry, []() {
+    static InlineMapRegistry* registry = []() {
       auto* registry = new InlineMapRegistry();
       auto result = InlineMapRegistryHelper::mutableRegistries().emplace(Scope::name(), registry);
-      RELEASE_ASSERT(result.second, "Duplicate inline map registry for scope: " + Scope::name());
+      RELEASE_ASSERT(result.second,
+                     absl::StrCat("Duplicate inline map registry for scope: ", Scope::name()));
       return registry;
-    }());
+    }();
+    return *registry;
   }
 
   static ManagedRegistries& mutableRegistries() {

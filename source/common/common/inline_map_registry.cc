@@ -19,7 +19,7 @@ InlineMapRegistry::InlineKey InlineMapRegistry::registerInlineKey(absl::string_v
 
   // Insert the key to the list and keep the reference of the key in the inline handle and
   // registration map.
-  auto result = registration_set_.emplace(registration_set_.end(), key);
+  auto result = registration_set_.emplace(key);
 
   RELEASE_ASSERT(result.second,
                  "The key should not be registered repeatedly and this should not happen.");
@@ -46,7 +46,7 @@ const InlineMapRegistry::RegistrationMap& InlineMapRegistry::registrationMap() c
   return registration_map_;
 }
 
-uint64_t InlineMapRegistry::registrationMapSize() const {
+uint64_t InlineMapRegistry::registrationNum() const {
   ASSERT(finalized_, "Cannot fetch registration map before finalized()");
   return registration_map_.size();
 }

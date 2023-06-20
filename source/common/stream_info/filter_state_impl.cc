@@ -20,8 +20,11 @@ void FilterStateImpl::setData(InlineKey data_key, std::shared_ptr<Object> data,
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
   return hasDataInternal(data_name) || (parent_ && parent_->hasDataWithName(data_name));
 }
-bool FilterStateImpl::hasDataWithHandle(InlineKey data_key) const {
-  return hasDataInternal(data_key) || (parent_ && parent_->hasDataWithHandle(data_key));
+bool FilterStateImpl::hasDataGeneric(absl::string_view data_name) const {
+  return hasDataInternal(data_name) || (parent_ && parent_->hasDataGeneric(data_name));
+}
+bool FilterStateImpl::hasDataGeneric(InlineKey data_key) const {
+  return hasDataInternal(data_key) || (parent_ && parent_->hasDataGeneric(data_key));
 }
 
 const FilterState::Object*
