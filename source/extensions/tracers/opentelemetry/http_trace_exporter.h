@@ -12,9 +12,8 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 
-#include "trace_exporter.h"
-
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "trace_exporter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,8 +26,9 @@ namespace OpenTelemetry {
 class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
                                        public Http::AsyncClient::Callbacks {
 public:
-  OpenTelemetryHttpTraceExporter(Upstream::ClusterManager& cluster_manager,
-                                 envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config);
+  OpenTelemetryHttpTraceExporter(
+      Upstream::ClusterManager& cluster_manager,
+      envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config);
 
   bool log(const ExportTraceServiceRequest& request) override;
 
