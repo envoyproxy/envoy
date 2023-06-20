@@ -586,6 +586,9 @@ envoy_cc_library(
     hdrs = [
         "inline_map_registry.h",
     ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
