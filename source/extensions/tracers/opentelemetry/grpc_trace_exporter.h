@@ -6,7 +6,6 @@
 #include "source/common/grpc/typed_async_client.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-
 #include "trace_exporter.h"
 
 namespace Envoy {

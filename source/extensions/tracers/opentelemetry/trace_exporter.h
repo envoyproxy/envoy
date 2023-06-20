@@ -16,7 +16,6 @@ public:
   virtual bool log(const ExportTraceServiceRequest& request) = 0;
 };
 
-
 using OpenTelemetryTraceExporterPtr = std::unique_ptr<OpenTelemetryTraceExporter>;
 
 } // namespace OpenTelemetry
