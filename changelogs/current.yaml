@@ -24,6 +24,10 @@ behavior_changes:
     The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending
     and receiving messages from the ext_proc server. This behavioral change can be temporarily
     reverted by setting the runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
+- area: ext_proc
+  change: |
+    Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
+    reverted by setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

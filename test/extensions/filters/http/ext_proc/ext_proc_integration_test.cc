@@ -70,6 +70,9 @@ protected:
   void initializeConfig() {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_value_in_bytes", header_value_bytes_}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.send_header_value_in_bytes", filter_mutation_rule_}});
+
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
@@ -386,6 +389,7 @@ protected:
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
   std::string header_value_bytes_{"false"};
+  std::string filter_mutation_rule_{"false"};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1337,6 +1341,48 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
   // The attempt to set the status code to 100 should have been ignored.
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ("{\"reason\": \"Because\"}", response->body());
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with system header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
+  filter_mutation_rule_ = "true";
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  // Disallow system header in the mutation rule config.
+  proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding system header in the ext_proc response.
+    hdr->mutable_header()->set_key(":foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  // The added system header is not sent to the client.
+  EXPECT_THAT(response->headers(), HasNoHeader(":foo"));
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
+  filter_mutation_rule_ = "true";
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is not allowed.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
 }
 
 // Test the filter with request body buffering enabled using
