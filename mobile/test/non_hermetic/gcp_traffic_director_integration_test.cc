@@ -98,12 +98,14 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
 
     // TODO(abeyad): switch to using API key authentication instead of a JWT token.
+    Platform::XdsBuilder xds_builder(/*xds_server_address=*/std::string(TD_API_ENDPOINT),
+                                     /*xds_server_port=*/443);
+    xds_builder.setJwtAuthenticationToken(jwtToken(), Platform::DefaultJwtTokenLifetimeSeconds);
+    xds_builder.setSslRootCerts(std::move(root_certs));
+    xds_builder.addClusterDiscoveryService();
     builder_.addLogLevel(Platform::LogLevel::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
-        .addCdsLayer()
-        .setAggregatedDiscoveryService(std::string(TD_API_ENDPOINT), /*port=*/443, jwtToken(),
-                                       Platform::DefaultJwtTokenLifetimeSeconds,
-                                       std::move(root_certs));
+        .setXds(std::move(xds_builder));
 
     // Other test knobs.
     skip_tag_extraction_rule_check_ = true;
@@ -147,7 +149,7 @@ TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
   //      5. base_clear
   ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 5));
 
-  // TODO(abeyad): Once we have a Envoy Mobile stats/admin API, we can use it to check the
+  // TODO(abeyad): Once we have a Envoy Mobile stats API, we can use it to check the
   // actual cluster names.
 }
 

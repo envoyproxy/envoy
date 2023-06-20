@@ -360,6 +360,11 @@ public:
   static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
 
   /**
+   * @return true if JSON log format was set using setJsonLogFormat.
+   */
+  static bool jsonLogFormatSet() { return json_log_format_set_; }
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -376,6 +381,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static bool json_log_format_set_;
 };
 
 /**
@@ -396,6 +403,10 @@ protected:
 
 namespace Utility {
 
+constexpr static absl::string_view TagsPrefix = "[Tags: ";
+constexpr static absl::string_view TagsSuffix = "] ";
+constexpr static absl::string_view TagsSuffixForSearch = "\"] ";
+
 /**
  * Sets the log format for a specific logger.
  */
@@ -403,8 +414,14 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escaping.
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
+
+/**
+ * Escapes the payload to a JSON string and writes the output to the destination buffer.
+ */
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest);
 
 } // namespace Utility
 
@@ -448,6 +465,31 @@ public:
   }
 
   constexpr static char Placeholder = 'j';
+};
+
+class ExtractedTags : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedTags>();
+  }
+
+  constexpr static char Placeholder = '*';
+  constexpr static char JsonPropertyDeimilter = ',';
+};
+
+class ExtractedMessage : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedMessage>();
+  }
+
+  constexpr static char Placeholder = '+';
 };
 
 } // namespace CustomFlagFormatter
