@@ -39,9 +39,9 @@ const std::string NODE_NAME = "node_name";
 class GrpcAccessLoggerImplTestHelper {
 public:
   GrpcAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
-                                 Grpc::MockAsyncClient* async_client, bool expectCall = true)
+                                 Grpc::MockAsyncClient* async_client, bool expect_call = true)
       : async_client_(async_client) {
-    if (expectCall) {
+    if (expect_call) {
       EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(ZONE_NAME));
       EXPECT_CALL(local_info, clusterName()).WillOnce(ReturnRef(CLUSTER_NAME));
       EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(NODE_NAME));
