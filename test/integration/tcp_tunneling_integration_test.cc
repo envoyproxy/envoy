@@ -682,6 +682,39 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  connect_headers_.setHost("1.2.3.4:80");
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+
+  // Send valid response headers, in HTTP1 all status codes in the 2xx range
+  // are considered valid.
+  default_response_headers_.setStatus(enumToInt(Http::Code::Accepted));
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("202", response_->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -955,8 +988,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* header =

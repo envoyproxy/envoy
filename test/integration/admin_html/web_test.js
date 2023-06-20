@@ -6,6 +6,8 @@
 //
 // Linted with https://validatejavascript.com/, 'Google' settings, long-line
 // checking disabled, indent-checking disabled.
+//
+// See source/server/admin/javascript.md for background info.
 
 
 /**
@@ -28,6 +30,7 @@ function addTest(url, name, testFunction) { // eslint-disable-line no-unused-var
   testList.push({'url': url, 'name': name, 'testFunction': testFunction});
 }
 
+
 /**
  * Provides an async version of the `onload` event.
  *
@@ -41,6 +44,7 @@ function waitForOnload(iframe) {
     };
   });
 }
+
 
 /**
  * Renders a URL, and after 3 seconds delay, runs the 'tester' function.
@@ -97,6 +101,28 @@ function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
 
 
 /**
+ * Checks for less-than, throwing an exception with a comment if it fails.
+ *
+ * @param {Object} a
+ * @param {Object} b
+ */
+function assertLt(a, b) { // eslint-disable-line no-unused-vars
+  assertTrue(a < b, 'assertLt mismatch: ' + a + ' < ' + b);
+}
+
+
+/**
+ * Async version of windows.setTimeout.
+ *
+ * @param {!number} timeoutMs Timeout in milliseconds.
+ * @return {!Promise} a promise that will be resolved when the timeout follows.
+ */
+function asyncTimeout(timeoutMs) { // eslint-disable-line no-unused-vars
+  return new Promise((resolve) => window.setTimeout(resolve, timeoutMs));
+}
+
+
+/**
  * Runs all tests added via addTest() above.
  */
 function runAllTests() {
@@ -112,6 +138,7 @@ function runAllTests() {
   };
   next(0);
 }
+
 
 // Trigger the tests once all JS is loaded.
 window.addEventListener('DOMContentLoaded', runAllTests);

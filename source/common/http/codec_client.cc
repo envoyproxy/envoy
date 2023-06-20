@@ -247,7 +247,6 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
                 .http3Options()
                 .override_stream_error_on_invalid_http_message()
                 .value())) {
-        parent_.host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
         parent_.protocol_error_ = true;
         parent_.close();
       } else {

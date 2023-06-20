@@ -51,10 +51,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       int subs = absl::StrReplaceAll({{matches[0].as_string(), new_format}}, &new_header_value);
       ASSERT(subs > 0);
     }
-    END_TRY
-    catch (Json::Exception& e) {
-      return header_value;
-    }
+    END_TRY CATCH(Json::Exception & e, { return header_value; });
   }
 
   return new_header_value;

@@ -12,7 +12,7 @@ namespace Envoy {
 
 // Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN");
+  return ConfigHelper::buildCluster(name);
 };
 
 envoy::config::endpoint::v3::ClusterLoadAssignment

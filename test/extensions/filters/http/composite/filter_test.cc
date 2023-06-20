@@ -101,7 +101,9 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
   filter_.onDestroy();
 }
 
@@ -120,7 +122,9 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
   filter_.onDestroy();
 }
 

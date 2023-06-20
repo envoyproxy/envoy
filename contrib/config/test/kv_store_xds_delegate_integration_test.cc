@@ -6,7 +6,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -248,8 +248,7 @@ protected:
     on_server_init_function_ = nullptr;
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
-    ConfigHelper helper(version_, *api_,
-                        MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
+    ConfigHelper helper(version_, config_helper_.bootstrap());
 
     // Close the connection between Envoy and the xDS FakeUpstreams.
     closeConnection(sds_connection_);

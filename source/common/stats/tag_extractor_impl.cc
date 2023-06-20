@@ -21,9 +21,8 @@ namespace {
 std::regex parseStdRegex(const std::string& regex) {
   TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
   END_TRY
-  catch (const std::regex_error& e) {
-    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
-  }
+  CATCH(const std::regex_error& e,
+        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
 }
 } // namespace
 

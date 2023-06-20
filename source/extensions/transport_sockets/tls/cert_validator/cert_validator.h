@@ -59,18 +59,6 @@ public:
   virtual void addClientValidationContext(SSL_CTX* context, bool require_client_cert) PURE;
 
   /**
-   * Called by verifyCallback to do the actual cert chain verification.
-   *
-   * @param store_ctx the store context
-   * @param ssl_extended_info the info for storing the validation status
-   * @param leaf_cert the peer certificate to verify
-   * @return 1 to indicate verification success and 0 to indicate verification failure.
-   */
-  virtual int doSynchronousVerifyCertChain(
-      X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
-      const Network::TransportSocketOptions* transport_socket_options) PURE;
-
-  /**
    * Called by customVerifyCallback to do the actual cert chain verification which could be
    * asynchronous. If the verification is asynchronous, Pending will be returned. After the
    * asynchronous verification is finished, the result should be passed back via a

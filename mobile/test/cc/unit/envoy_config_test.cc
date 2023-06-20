@@ -45,9 +45,6 @@ TEST(TestConfig, ConfigIsApplied) {
       .setRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-      .enableAdminInterface(true)
-#endif
       .setForceAlwaysUsev6(true)
 #ifdef ENVOY_GOOGLE_GRPC
       .setNodeId("my_test_node")
@@ -176,19 +173,6 @@ TEST(TestConfig, PerTryIdleTimeout) {
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("per_try_idle_timeout { seconds: 42 }"));
 }
-
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-TEST(TestConfig, EnableAdminInterface) {
-  EngineBuilder engine_builder;
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_FALSE(bootstrap->has_admin());
-
-  engine_builder.enableAdminInterface(true);
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_TRUE(bootstrap->has_admin());
-}
-#endif
 
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;

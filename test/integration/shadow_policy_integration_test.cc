@@ -19,7 +19,8 @@ class ShadowPolicyIntegrationTest
       public SocketInterfaceSwap {
 public:
   ShadowPolicyIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())),
+        SocketInterfaceSwap(Network::Socket::Type::Stream) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     setUpstreamProtocol(Http::CodecType::HTTP2);

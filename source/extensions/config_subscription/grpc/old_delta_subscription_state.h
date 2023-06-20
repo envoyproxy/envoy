@@ -10,9 +10,9 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/ttl.h"
-#include "source/common/config/watch_map.h"
+#include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
+#include "source/extensions/config_subscription/grpc/watch_map.h"
 
 #include "absl/container/node_hash_map.h"
 

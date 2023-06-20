@@ -81,6 +81,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
              stats_.setwatches_resp_slow_, "setwatches_resp");
   initOpCode(OpCodes::SetWatches2, stats_.setwatches2_resp_, stats_.setwatches2_resp_fast_,
              stats_.setwatches2_resp_slow_, "setwatches2_resp");
+  initOpCode(OpCodes::AddWatch, stats_.addwatch_resp_, stats_.addwatch_resp_fast_,
+             stats_.addwatch_resp_slow_, "addwatch_resp");
   initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, stats_.checkwatches_resp_fast_,
              stats_.checkwatches_resp_slow_, "checkwatches_resp");
   initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, stats_.removewatches_resp_fast_,
@@ -351,6 +353,11 @@ void ZooKeeperFilter::onSetWatches2Request() {
   setDynamicMetadata("opname", "setwatches2");
 }
 
+void ZooKeeperFilter::onAddWatchRequest(const std::string& path, const int32_t mode) {
+  config_->stats_.addwatch_rq_.inc();
+  setDynamicMetadata({{"opname", "addwatch"}, {"path", path}, {"mode", std::to_string(mode)}});
+}
+
 void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {
   config_->stats_.getephemerals_rq_.inc();
   setDynamicMetadata({{"opname", "getephemerals"}, {"path", path}});
@@ -368,7 +375,7 @@ void ZooKeeperFilter::onCloseRequest() {
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
                                         const bool readonly,
-                                        const std::chrono::milliseconds& latency) {
+                                        const std::chrono::milliseconds latency) {
   config_->stats_.connect_resp_.inc();
 
   switch (config_->errorBudgetDecision(OpCodes::Connect, latency)) {
@@ -394,7 +401,7 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 }
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
-                                 const int32_t error, const std::chrono::milliseconds& latency) {
+                                 const int32_t error, const std::chrono::milliseconds latency) {
   Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
   std::string opname = "";
   auto iter = config_->op_code_map_.find(opcode);

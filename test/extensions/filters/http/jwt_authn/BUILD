@@ -147,6 +147,9 @@ envoy_extension_cc_test(
     srcs = ["filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     shard_count = 6,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/jwt_authn:config",

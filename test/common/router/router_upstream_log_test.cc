@@ -93,17 +93,17 @@ public:
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    callbacks_.stream_info_.downstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
 
+    auto upstream_log_options = router_proto.mutable_upstream_log_options();
+    upstream_log_options->set_flush_upstream_log_on_upstream_stream(
+        flush_upstream_log_on_upstream_stream);
+
+    if (enable_periodic_upstream_log) {
+      upstream_log_options->mutable_upstream_log_flush_interval()->set_seconds(1);
+    }
     if (upstream_log) {
-      auto upstream_log_options = router_proto.mutable_upstream_log_options();
-      upstream_log_options->set_flush_upstream_log_on_upstream_stream(
-          flush_upstream_log_on_upstream_stream);
-
-      if (enable_periodic_upstream_log) {
-        upstream_log_options->mutable_upstream_log_flush_interval()->set_seconds(1);
-      }
-
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
@@ -116,6 +116,8 @@ public:
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
     config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    config_->upstream_logs_.push_back(mock_upstream_log_);
     router_ = std::make_shared<TestFilter>(*config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
@@ -279,6 +281,7 @@ public:
   std::shared_ptr<TestFilter> router_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  std::shared_ptr<NiceMock<AccessLog::MockInstance>> mock_upstream_log_;
 };
 
 TEST_F(RouterUpstreamLogTest, NoLogConfigured) {
@@ -450,20 +453,9 @@ typed_config:
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-  log_format:
-    text_format_source:
-      inline_string: "%ACCESS_LOG_TYPE%"
-  path: "/dev/null"
-  )EOF";
-
-  envoy::config::accesslog::v3::AccessLog upstream_log;
-  TestUtility::loadFromYaml(yaml, upstream_log);
-
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), false, true);
+  init(absl::nullopt,
+       /*flush_upstream_log_on_upstream_stream=*/false,
+       /*enable_periodic_upstream_log=*/true);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -476,6 +468,7 @@ typed_config:
             response_decoder = &decoder;
             EXPECT_CALL(encoder.stream_, connectionInfoProvider())
                 .WillRepeatedly(ReturnRef(connection_info1_));
+            encoder.stream_.bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
             callbacks.onPoolReady(encoder,
                                   context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
                                   stream_info_, Http::Protocol::Http10);
@@ -487,30 +480,71 @@ typed_config:
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  callbacks_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   router_->decodeHeaders(headers, true);
 
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::No));
+  encoder.stream_.bytes_meter_->addWireBytesReceived(9);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
+  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+
+        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
+                    testing::IsNull());
+        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9);
+        EXPECT_THAT(stream_info.getUpstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
+                    testing::IsNull());
+      }));
   periodic_log_flush_->invokeCallback();
-  EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
+
+  callbacks_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(8);
+  encoder.stream_.bytes_meter_->addWireBytesReceived(7);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
+  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8);
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                      ->bytesAtLastUpstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  10);
+        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7);
+        EXPECT_EQ(stream_info.getUpstreamBytesMeter()
+                      ->bytesAtLastUpstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  9);
+      }));
   periodic_log_flush_->invokeCallback();
-  EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
-  EXPECT_EQ(output_.back(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
 
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
   response_headers->setStatus(200);
 
+  callbacks_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(6);
+  encoder.stream_.bytes_meter_->addWireBytesReceived(5);
+
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putHttpResponseCode(200));
-
+  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamEnd))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8 + 6);
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                      ->bytesAtLastUpstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  10 + 8);
+        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7 + 5);
+        EXPECT_EQ(stream_info.getUpstreamBytesMeter()
+                      ->bytesAtLastUpstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  9 + 7);
+      }));
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
   EXPECT_CALL(*periodic_log_flush_, disableTimer());

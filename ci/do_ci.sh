@@ -8,17 +8,15 @@ set -e
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
-NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
-if [[ -z "$NO_BUILD_SETUP" ]]; then
-    # shellcheck source=ci/setup_cache.sh
-    . "$(dirname "$0")"/setup_cache.sh
-    # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh
+# shellcheck source=ci/setup_cache.sh
+. "$(dirname "$0")"/setup_cache.sh
+# shellcheck source=ci/build_setup.sh
+. "$(dirname "$0")"/build_setup.sh
 
-    echo "building using ${NUM_CPUS} CPUs"
-    echo "building for ${ENVOY_BUILD_ARCH}"
-fi
+echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
+
 cd "${SRCDIR}"
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -163,7 +161,7 @@ function run_ci_verify () {
     # by a strong umask (ie only group readable by default).
     umask 027
     chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}" || exit
+    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}"
 }
 
 CI_TARGET=$1
@@ -202,8 +200,6 @@ case $CI_TARGET in
               //tools/protoprint:protoprint_test
         echo "Validating API structure..."
         "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-        echo "Validate Golang protobuf generation..."
-        "${ENVOY_SRCDIR}"/tools/api/generate_go_protobuf.py
         echo "Testing API..."
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -215,6 +211,43 @@ case $CI_TARGET in
         echo "Building API..."
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               -c fastbuild @envoy_api//envoy/...
+        if [[ -n "$ENVOY_API_ONLY" ]]; then
+            exit 0
+        fi
+        ;&
+
+    api.go)
+        if [[ -z "$NO_BUILD_SETUP" ]]; then
+            setup_clang_toolchain
+        fi
+        GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
+        GO_TARGETS=(@envoy_api//...)
+        read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+        echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --experimental_proto_descriptor_sets_include_source_info \
+              --remote_download_outputs=all \
+              "${GO_PROTOS[@]}"
+        rm -rf build_go
+        mkdir -p build_go
+        echo "Copying go protos -> build_go"
+        BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
+        for GO_PROTO in "${GO_PROTOS[@]}"; do
+             # strip @envoy_api//
+            RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
+            PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
+            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+            OUTPUT_DIR="build_go/${RULE_DIR}"
+            mkdir -p "$OUTPUT_DIR"
+            if [[ ! -e "$INPUT_DIR" ]]; then
+                echo "Unable to find input ${INPUT_DIR}" >&2
+                exit 1
+            fi
+            # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
+            while read -r GO_FILE; do
+                cp -a "$GO_FILE" "$OUTPUT_DIR"
+            done <<< "$(find "$INPUT_DIR" -name "*.go")"
+        done
         ;;
 
     api_compat)
@@ -585,32 +618,18 @@ case $CI_TARGET in
         ;;
 
     publish)
-        # If we are on a non-main release branch but the patch version is 0 - then this branch
-        # has just been created, and the tag/release was cut from `main` - there is no need to
-        # create the tag/release from here
-        version="$(cat VERSION.txt)"
-        patch_version="$(echo "$version" | rev | cut -d. -f1)"
-        if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
-            if [[ "$patch_version" -eq 0 ]]; then
-                # It can take some time to get here in CI so the branch may have changed - create the release
-                # from the current commit (as this only happens on non-PRs we are safe from merges)
-                BUILD_SHA="$(git rev-parse HEAD)"
-                bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
-                # TODO(phlax): move this to pytooling
-                mkdir -p linux/amd64 linux/arm64 publish
-                # linux/amd64
-                tar xf /build/bazel.release/release.tar.zst -C ./linux/amd64
-                cp -a linux/amd64/envoy "publish/envoy-${version}-linux-x86_64"
-                cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${version}-linux-x86_64"
-                # linux/arm64
-                tar xf /build/bazel.release.arm64/release.tar.zst -C ./linux/arm64
-                cp -a linux/arm64/envoy "publish/envoy-${version}-linux-aarch_64"
-                cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${version}-linux-aarch_64"
-                "${ENVOY_SRCDIR}/ci/publish_github_assets.sh" "v${version}" "${PWD}/publish"
-                exit 0
-            fi
+        setup_clang_toolchain
+        BUILD_SHA="$(git rev-parse HEAD)"
+        VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
+        PUBLISH_ARGS=(
+            --publish-commitish="$BUILD_SHA"
+            --publish-assets=/build/release.signed/release.signed.tar.zst)
+        if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
+            PUBLISH_ARGS+=(--dry-run)
         fi
-        echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:publish \
+              -- "${PUBLISH_ARGS[@]}"
         ;;
 
     release)
@@ -666,6 +685,16 @@ case $CI_TARGET in
         bazel_envoy_binary_build release
         ;;
 
+    release.signed)
+        echo "Signing binary packages..."
+        setup_clang_toolchain
+        # The default config expects these files
+        mkdir -p distribution/custom
+        cp -a /build/bazel.*/*64 distribution/custom/
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
+        cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
+        ;;
+
     sizeopt)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
@@ -719,6 +748,39 @@ case $CI_TARGET in
 
     verify_examples)
         run_ci_verify "*" "win32-front-proxy|shared"
+        ;;
+
+    verify.trigger)
+        setup_clang_toolchain
+        WORKFLOW="envoy-verify.yml"
+        # * Note on vars *
+        # `ENVOY_REPO`: Should always be envoyproxy/envoy unless testing
+        # `ENVOY_BRANCH`: Target branch for PRs, source branch for others
+        # `COMMIT`: This may be a merge commit in a PR
+        # `ENVOY_COMMIT`: The actual last commit of branch/PR
+        # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
+        #   cancellation, and to discriminate from other branch CI
+        COMMIT="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        echo "Trigger workflow (${WORKFLOW})"
+        echo "  Repo: ${ENVOY_REPO}"
+        echo "  Branch: ${ENVOY_BRANCH}"
+        echo "  Ref: ${COMMIT}"
+        echo "  Inputs:"
+        echo "    sha: ${ENVOY_COMMIT}"
+        echo "    head_ref: ${ENVOY_HEAD_REF}"
+        GITHUB_APP_KEY="$(echo "$GITHUB_TOKEN" | base64 -d -w0)"
+        export GITHUB_APP_KEY
+        INPUTS="{\"ref\":\"$COMMIT\",\"sha\":\"$ENVOY_COMMIT\",\"head_ref\":\"$ENVOY_HEAD_REF\"}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:trigger \
+              -- --repo="$ENVOY_REPO" \
+                 --trigger-app-id="$GITHUB_APP_ID" \
+                 --trigger-installation-id="$GITHUB_INSTALL_ID" \
+                 --trigger-ref="$ENVOY_BRANCH" \
+                 --trigger-workflow="$WORKFLOW" \
+                 --trigger-inputs="$INPUTS"
         ;;
 
     *)

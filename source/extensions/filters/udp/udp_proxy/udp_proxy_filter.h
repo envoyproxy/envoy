@@ -82,7 +82,9 @@ public:
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true),
         random_(context.api().randomGenerator()) {
-    if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+    if (use_original_src_ip_ &&
+        !Api::OsSysCallsSingleton::get().supportsIpTransparent(
+            context.getServerFactoryContext().options().localAddressIpVersion())) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
           "is not running with the CAP_NET_ADMIN capability.");

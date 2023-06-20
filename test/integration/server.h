@@ -193,6 +193,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
 

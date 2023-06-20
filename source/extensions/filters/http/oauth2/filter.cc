@@ -36,9 +36,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
 constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
-
 constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
@@ -301,6 +299,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, state}})};
       decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
     // Continue on with the filter stack.
@@ -519,10 +518,9 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     max_age = new_expires_;
   }
 
-  // We use HTTP Only cookies for the HMAC and Expiry.
+  // We use HTTP Only cookies.
   const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
   const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
-
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
@@ -535,18 +533,23 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
+    std::string cookie_attribute_httponly =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
+            ? cookie_tail_http_only
+            : cookie_tail;
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
     if (id_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
+      headers.addReferenceKey(
+          Http::Headers::get().SetCookie,
+          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_, cookie_tail));
+      headers.addReferenceKey(Http::Headers::get().SetCookie,
+                              absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
+                                           cookie_attribute_httponly));
     }
   }
 }

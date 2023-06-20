@@ -89,6 +89,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:visitor_lib",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 
