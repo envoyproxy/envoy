@@ -551,7 +551,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     absl::string_view sni_value = parsed_authority.host_;
 
     if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
+        !callbacks_->streamInfo().filterState()->hasDataGeneric(
             Network::UpstreamServerName::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
@@ -560,7 +560,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
 
     if (upstream_http_protocol_options.value().auto_san_validation() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
+        !callbacks_->streamInfo().filterState()->hasDataGeneric(
             Network::UpstreamSubjectAltNames::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamSubjectAltNames::key(),
