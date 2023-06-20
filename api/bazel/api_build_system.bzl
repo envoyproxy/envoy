@@ -17,7 +17,7 @@ _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
-_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
+_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/proto/"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",

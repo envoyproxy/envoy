@@ -7,7 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.config.validators.minimum_clusters.v3";
 option java_outer_classname = "MinimumClustersProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/config/validators/minimum_clusters/v3;minimum_clustersv3";
+option go_package = "github.com/envoyproxy/go-control-plane/proto/envoy/extensions/config/validators/minimum_clusters/v3;minimum_clustersv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Minimum Clusters]

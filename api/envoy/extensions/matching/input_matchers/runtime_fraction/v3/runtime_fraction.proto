@@ -10,7 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.runtime_fraction.v3";
 option java_outer_classname = "RuntimeFractionProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/input_matchers/runtime_fraction/v3;runtime_fractionv3";
+option go_package = "github.com/envoyproxy/go-control-plane/proto/envoy/extensions/matching/input_matchers/runtime_fraction/v3;runtime_fractionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Runtime matcher]

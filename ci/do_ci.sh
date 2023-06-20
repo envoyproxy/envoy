@@ -220,7 +220,7 @@ case $CI_TARGET in
         if [[ -z "$NO_BUILD_SETUP" ]]; then
             setup_clang_toolchain
         fi
-        GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
+        GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane/proto"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
         echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
@@ -230,14 +230,14 @@ case $CI_TARGET in
               "${GO_PROTOS[@]}"
         rm -rf build_go
         mkdir -p build_go
-        echo "Copying go protos -> build_go"
+        echo "Copying Go protos -> build_go"
         BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
         for GO_PROTO in "${GO_PROTOS[@]}"; do
              # strip @envoy_api//
             RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
             PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
             INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-            OUTPUT_DIR="build_go/${RULE_DIR}"
+            OUTPUT_DIR="build_go/proto/${RULE_DIR}"
             mkdir -p "$OUTPUT_DIR"
             if [[ ! -e "$INPUT_DIR" ]]; then
                 echo "Unable to find input ${INPUT_DIR}" >&2

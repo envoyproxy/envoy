@@ -228,7 +228,7 @@ def format_header_from_file(
         name = "".join(file_proto.package.split(".")[-2:])
         golang_package_name = ";" + name
     options.go_package = "".join([
-        "github.com/envoyproxy/go-control-plane/",
+        "github.com/envoyproxy/go-control-plane/proto/",
         file_proto.package.replace(".", "/"), golang_package_name
     ])
 

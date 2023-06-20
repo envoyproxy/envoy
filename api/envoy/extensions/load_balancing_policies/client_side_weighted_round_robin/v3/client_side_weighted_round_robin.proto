@@ -11,7 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3";
 option java_outer_classname = "ClientSideWeightedRoundRobinProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3;client_side_weighted_round_robinv3";
+option go_package = "github.com/envoyproxy/go-control-plane/proto/envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3;client_side_weighted_round_robinv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client-Side Weighted Round Robin Load Balancing Policy]

@@ -9,7 +9,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.quic.server_preferred_address.v3";
 option java_outer_classname = "FixedServerPreferredAddressConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/quic/server_preferred_address/v3;server_preferred_addressv3";
+option go_package = "github.com/envoyproxy/go-control-plane/proto/envoy/extensions/quic/server_preferred_address/v3;server_preferred_addressv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC server preferred address config]

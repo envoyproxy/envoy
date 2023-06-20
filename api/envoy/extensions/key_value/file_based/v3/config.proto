@@ -13,7 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.key_value.file_based.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/key_value/file_based/v3;file_basedv3";
+option go_package = "github.com/envoyproxy/go-control-plane/proto/envoy/extensions/key_value/file_based/v3;file_basedv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Key/value file-based store storage plugin]
