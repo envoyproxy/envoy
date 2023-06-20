@@ -71,7 +71,8 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_value_in_bytes", header_value_bytes_}});
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.send_header_value_in_bytes", filter_mutation_rule_}});
+        {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
+          filter_mutation_rule_}});
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
