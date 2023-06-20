@@ -2,6 +2,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
@@ -35,9 +36,14 @@ public:
     auto mock_socket = std::make_unique<NiceMock<Network::MockSocket>>();
     mock_socket_ = mock_socket.get();
     EXPECT_CALL(*mock_socket_->io_handle_, createFileEvent_);
-    udp_upstream_ = std::make_unique<UdpUpstream>(
-        &mock_upstream_to_downstream_, std::move(mock_socket),
-        std::make_shared<NiceMock<Upstream::MockHost>>(), mock_dispatcher_);
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+    mock_host_ = mock_host.get();
+    ON_CALL(*mock_host_, address)
+        .WillByDefault(
+            Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:80", false)));
+    udp_upstream_ =
+        std::make_unique<UdpUpstream>(&mock_upstream_to_downstream_, std::move(mock_socket),
+                                      std::move(mock_host), mock_dispatcher_);
   }
 
 protected:
@@ -50,6 +56,7 @@ protected:
   NiceMock<Router::MockUpstreamToDownstream> mock_upstream_to_downstream_;
   NiceMock<Network::MockSocket>* mock_socket_;
   NiceMock<Event::MockDispatcher> mock_dispatcher_;
+  NiceMock<Upstream::MockHost>* mock_host_;
   std::unique_ptr<UdpUpstream> udp_upstream_;
 };
 
