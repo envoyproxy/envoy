@@ -226,7 +226,7 @@ new_features:
     event on a listener. If there are more connections to be accepted beyond
     the maximum, the remaining connections would be processed in later
     dispatcher loop iterations. Added listener histogram
-    ``connections_accepted_per_socket_event`` to allow users to empperically
+    ``connections_accepted_per_socket_event`` to allow users to empirically
     determine an appropriate configuration for their deployment.
 - area: load shed point
   change: |
