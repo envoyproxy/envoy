@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+// The structures in this file are merely for JSON serialization to communicate with the X-Ray
+// daemon. The X-Ray daemon does not speak protobuf.
+package source.extensions.tracers.xray.daemon;
+
+import "validate/validate.proto";
+import "google/protobuf/struct.proto";
+
+// see https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
+message Segment {
+  // The logical name of the service that handled the request. Configured via
+  // `segment_name` in XRayConfig.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+  // A 64-bit identifier for the segment, unique among segments in the same trace.
+  string id = 2 [(validate.rules).string = {min_len: 1}];
+  // A unique identifier that connects all segments and sub-segments originating
+  // from a single client request.
+  string trace_id = 3 [(validate.rules).string = {len: 35}];
+  // The time the segment was created.
+  double start_time = 4 [(validate.rules).double = {gt: 0}];
+  // The time the segment was closed.
+  double end_time = 5 [(validate.rules).double = {gt: 0}];
+  // The type of the resource originating the segment. Configured via `origin` field in
+  // `XRayConfig.SegmentFields`. e.g. “AWS::AppMesh::Proxy”.
+  string origin = 9;
+  // Segment ID of the sub-segment's parent segment.
+  string parent_id = 6;
+  // AWS resource metadata dictionary. Configured via `aws` field in
+  // `XRayConfig.SegmentFields`.
+  google.protobuf.Struct aws = 10;
+  // To indicate that a client error occurred.
+  bool error = 11;
+  // To indicate that a server error occurred.
+  bool fault = 12;
+  // To indicate that a request was throttled.
+  bool throttle = 13;
+  // Data block to record details about the HTTP request.
+  http_annotations http = 7;
+  message http_annotations {
+    google.protobuf.Struct request = 1;
+    google.protobuf.Struct response = 2;
+  }
+  // Object containing one or more fields that X-Ray indexes for use with filter expressions.
+  map<string, string> annotations = 8;
+  // Set type to "subsegment" when sending a child span so X-Ray treats it as a subsegment.
+  // https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
+  string type = 14;
+}
+
+message Header {
+  string format = 1;
+  uint32 version = 2;
+}

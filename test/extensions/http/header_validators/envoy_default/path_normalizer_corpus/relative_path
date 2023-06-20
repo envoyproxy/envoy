@@ -1,0 +1,7 @@
+method: "POST"
+path: "/foo/bar/../baz/"
+options {
+    skip_path_normalization: false
+    skip_merging_slashes: false
+    path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+}

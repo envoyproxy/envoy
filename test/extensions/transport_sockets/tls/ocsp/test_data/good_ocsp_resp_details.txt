@@ -1,0 +1,118 @@
+OCSP Response Data:
+    OCSP Response Status: successful (0x0)
+    Response Type: Basic OCSP Response
+    Version: 1 (0x0)
+    Responder Id: C = US, ST = California, L = San Francisco, O = Lyft, OU = Lyft Engineering, CN = ca
+    Produced At: Oct 23 02:24:30 2022 GMT
+    Responses:
+    Certificate ID:
+      Hash Algorithm: sha1
+      Issuer Name Hash: 16C50680A809B68F302789AB234F8F4B30B0E06C
+      Issuer Key Hash: 9CCC1F8D90A0EE92DE24E81860493FBEC3D55689
+      Serial Number: 1000
+    Cert Status: good
+    This Update: Oct 23 02:24:30 2022 GMT
+    Next Update: Oct 22 02:24:30 2024 GMT
+
+    Response Extensions:
+        OCSP Nonce:
+            0410A6DB264F79FBA79B5B4B41EFB5386AFE
+    Signature Algorithm: sha256WithRSAEncryption
+         71:bf:88:91:25:37:99:1a:1b:24:c3:e6:b4:43:68:ae:d6:be:
+         54:11:24:e6:56:23:e9:dc:10:a4:20:c0:07:65:6d:6b:48:ed:
+         24:4d:bd:df:68:9b:ac:12:b0:1b:ac:c8:7a:17:d6:5b:b5:87:
+         c7:6f:39:38:ce:8a:16:5b:1e:22:da:98:01:16:9c:ac:98:73:
+         5c:56:0a:bc:42:f9:49:9d:06:54:26:f8:e7:c9:d1:bc:b2:2a:
+         7c:ca:7a:dd:69:fc:16:71:26:f6:74:85:37:88:3f:4a:22:17:
+         a1:8c:2b:29:96:98:b9:dc:a1:e4:da:96:0f:ef:46:8c:0d:60:
+         a1:1d:0e:29:a7:03:ba:78:c9:7a:1a:4c:01:7c:7e:ef:ae:45:
+         5c:f7:14:49:2c:29:b9:54:c0:b4:e3:5a:05:a9:9c:bb:5c:f1:
+         64:f0:6c:77:54:0f:fc:e7:d2:ce:49:98:24:74:91:67:34:b8:
+         7c:51:55:d4:cf:3d:06:a4:9f:4c:76:91:c7:65:6d:f1:1a:68:
+         ee:90:7a:d3:d5:23:11:7e:eb:8d:c9:11:04:bd:fa:24:50:52:
+         4d:73:f5:00:cd:bf:6c:87:1d:1f:2c:de:99:3a:96:4a:65:c3:
+         25:13:54:05:b8:39:4a:a0:cb:63:40:d2:14:1f:a3:b3:da:ce:
+         9d:c3:f9:76
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            18:84:7a:36:56:75:ee:5c:ab:67:93:7d:b8:ad:a0:d1:02:d6:e5:32
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=California, L=San Francisco, O=Lyft, OU=Lyft Engineering, CN=ca
+        Validity
+            Not Before: Oct 23 02:24:29 2022 GMT
+            Not After : Oct 22 02:24:29 2024 GMT
+        Subject: C=US, ST=California, L=San Francisco, O=Lyft, OU=Lyft Engineering, CN=ca
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                RSA Public-Key: (2048 bit)
+                Modulus:
+                    00:bd:71:2a:8b:17:c0:9a:e0:40:e3:b2:92:42:e4:
+                    89:e1:a4:35:fa:8d:55:bf:01:8c:20:f9:b2:de:87:
+                    98:6e:3d:56:bd:fb:37:e9:83:aa:38:df:6d:16:d3:
+                    b3:8c:ce:6e:f2:00:a4:bf:f1:50:52:70:0b:32:cc:
+                    22:d8:5f:a5:e3:87:fb:8b:b2:85:6f:b8:94:c5:1e:
+                    6a:0b:0d:a4:55:60:a0:cb:2a:96:44:7f:e9:31:9b:
+                    9e:f4:70:45:59:83:69:5c:d6:ab:c9:fd:ba:bc:e6:
+                    26:78:ac:e5:4a:02:6e:28:0f:11:46:e1:78:b0:0b:
+                    4f:43:f3:90:9a:6e:41:fd:69:ed:59:95:16:65:43:
+                    46:08:03:b8:eb:07:0a:28:45:34:4a:22:43:e0:73:
+                    63:7e:ee:f2:21:dd:a7:66:29:17:7d:7a:39:8e:3b:
+                    ea:89:7a:1e:1b:fc:d5:48:e9:27:fc:1d:08:0c:48:
+                    93:61:7f:c0:6d:4a:88:94:35:1d:20:35:a0:d7:15:
+                    36:ed:17:f3:91:cf:05:cb:ac:78:7f:ba:1f:e9:94:
+                    f4:63:36:1b:68:b1:00:4a:14:cd:0d:17:34:69:a2:
+                    01:1b:37:23:5b:5a:d1:cc:18:0e:00:dc:b6:e3:0a:
+                    de:3f:a3:61:d8:73:77:b6:f2:96:b8:78:bf:a0:31:
+                    5a:6b
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier:
+                9C:CC:1F:8D:90:A0:EE:92:DE:24:E8:18:60:49:3F:BE:C3:D5:56:89
+            X509v3 Authority Key Identifier:
+                keyid:9C:CC:1F:8D:90:A0:EE:92:DE:24:E8:18:60:49:3F:BE:C3:D5:56:89
+
+            X509v3 Basic Constraints: critical
+                CA:TRUE
+            X509v3 Key Usage: critical
+                Digital Signature, Certificate Sign, CRL Sign
+    Signature Algorithm: sha256WithRSAEncryption
+         04:f4:be:7c:a2:c6:49:39:dc:f6:22:61:14:f7:1a:63:4a:e6:
+         81:e8:71:d4:c3:2c:78:42:59:e1:c8:1d:3c:3e:6c:ba:34:4d:
+         32:51:ec:db:45:d5:55:98:d1:aa:fe:c5:2d:c6:b3:1e:5a:2f:
+         14:95:b0:c2:aa:2c:b0:f5:8c:c1:87:99:0c:62:1e:a8:7d:d0:
+         b6:be:1f:38:e5:38:e9:f1:0b:37:06:ad:38:96:32:be:4d:2f:
+         b9:ab:cc:42:07:9c:aa:02:e7:fd:77:d3:39:41:86:01:61:03:
+         f9:0c:35:03:9e:8c:94:4f:38:28:69:08:39:73:db:93:9c:e9:
+         12:be:84:ff:c1:2c:5c:f5:f9:51:5d:dd:71:03:81:37:6c:a7:
+         72:cd:03:c8:5f:fe:74:ae:bf:57:6c:77:3b:87:f6:8a:b5:85:
+         72:a3:1c:45:21:5a:74:04:99:65:e1:f3:03:41:f6:a6:2e:fd:
+         d1:80:8e:29:14:58:6a:2d:05:1e:11:39:c8:b3:e9:5c:25:e4:
+         c3:1b:fb:ae:e5:b3:7f:c9:d2:14:9e:67:c5:e5:5d:53:fc:0d:
+         69:d8:e2:66:94:09:dd:bc:e9:03:c4:92:3b:af:4e:04:16:66:
+         4b:a9:d6:8e:93:2f:ee:4d:41:2a:2e:8d:a9:93:e8:3f:c2:f6:
+         bc:a7:1c:67
+-----BEGIN CERTIFICATE-----
+MIID0zCCArugAwIBAgIUGIR6NlZ17lyrZ5N9uK2g0QLW5TIwDQYJKoZIhvcNAQEL
+BQAwcTELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
+DVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5n
+aW5lZXJpbmcxCzAJBgNVBAMMAmNhMB4XDTIyMTAyMzAyMjQyOVoXDTI0MTAyMjAy
+MjQyOVowcTELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNV
+BAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQg
+RW5naW5lZXJpbmcxCzAJBgNVBAMMAmNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEAvXEqixfAmuBA47KSQuSJ4aQ1+o1VvwGMIPmy3oeYbj1Wvfs36YOq
+ON9tFtOzjM5u8gCkv/FQUnALMswi2F+l44f7i7KFb7iUxR5qCw2kVWCgyyqWRH/p
+MZue9HBFWYNpXNaryf26vOYmeKzlSgJuKA8RRuF4sAtPQ/OQmm5B/WntWZUWZUNG
+CAO46wcKKEU0SiJD4HNjfu7yId2nZikXfXo5jjvqiXoeG/zVSOkn/B0IDEiTYX/A
+bUqIlDUdIDWg1xU27Rfzkc8Fy6x4f7of6ZT0YzYbaLEAShTNDRc0aaIBGzcjW1rR
+zBgOANy24wreP6Nh2HN3tvKWuHi/oDFaawIDAQABo2MwYTAdBgNVHQ4EFgQUnMwf
+jZCg7pLeJOgYYEk/vsPVVokwHwYDVR0jBBgwFoAUnMwfjZCg7pLeJOgYYEk/vsPV
+VokwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAYYwDQYJKoZIhvcNAQEL
+BQADggEBAAT0vnyixkk53PYiYRT3GmNK5oHocdTDLHhCWeHIHTw+bLo0TTJR7NtF
+1VWY0ar+xS3Gsx5aLxSVsMKqLLD1jMGHmQxiHqh90La+HzjlOOnxCzcGrTiWMr5N
+L7mrzEIHnKoC5/130zlBhgFhA/kMNQOejJRPOChpCDlz25Oc6RK+hP/BLFz1+VFd
+3XEDgTdsp3LNA8hf/nSuv1dsdzuH9oq1hXKjHEUhWnQEmWXh8wNB9qYu/dGAjikU
+WGotBR4ROciz6Vwl5MMb+67ls3/J0hSeZ8XlXVP8DWnY4maUCd286QPEkjuvTgQW
+Zkup1o6TL+5NQSoujamT6D/C9rynHGc=
+-----END CERTIFICATE-----

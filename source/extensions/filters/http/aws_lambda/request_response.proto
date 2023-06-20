@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+// The structures are used for the purpose of JSON (de)serialization.
+package source.extensions.filters.http.aws_lambda;
+
+import "validate/validate.proto";
+
+message Request {
+  string raw_path = 1 [(validate.rules).string = {min_len: 1}];
+
+  string method = 2 [(validate.rules).string = {min_len: 1}];
+  // HTTP headers with the same name are coalesced into a single comma-separated value.
+  map<string, string> headers = 3;
+
+  // multi-value keys are overwritten. Last one wins.
+  map<string, string> query_string_parameters = 4;
+
+  string body = 5;
+
+  bool is_base64_encoded = 6;
+}
+
+message Response {
+  uint32 status_code = 1;
+  map<string, string> headers = 2;
+  // cookies are split from headers in the response because the headers are coalesced while the HTTP RFC prohibits
+  // coalescing multiple cookie values in the Set-Cookie header.
+  repeated string cookies = 3;
+  string body = 4;
+  bool is_base64_encoded = 5;
+}

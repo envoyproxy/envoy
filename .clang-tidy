@@ -1,0 +1,85 @@
+Checks:           '-clang-analyzer-core.NonNullParamChecker,
+                   -clang-analyzer-optin.cplusplus.UninitializedObject,
+                   abseil-duration-*,
+                   abseil-faster-strsplit-delimiter,
+                   abseil-no-namespace,
+                   abseil-redundant-strcat-calls,
+                   abseil-str-cat-append,
+                   abseil-string-find-startswith,
+                   abseil-upgrade-duration-conversions,
+                   bugprone-assert-side-effect,
+                   bugprone-unused-raii,
+                   bugprone-use-after-move,
+                   clang-analyzer-core.DivideZero,
+                   misc-unused-using-decls,
+                   modernize-deprecated-headers,
+                   modernize-loop-convert,
+                   modernize-make-shared,
+                   modernize-make-unique,
+                   modernize-return-braced-init-list,
+                   modernize-use-default-member-init,
+                   modernize-use-equals-default,
+                   modernize-use-nullptr,
+                   modernize-use-override,
+                   modernize-use-using,
+                   performance-faster-string-find,
+                   performance-for-range-copy,
+                   performance-inefficient-algorithm,
+                   performance-inefficient-vector-operation,
+                   performance-noexcept-move-constructor,
+                   performance-move-constructor-init,
+                   performance-type-promotion-in-math-fn,
+                   performance-unnecessary-copy-initialization,
+                   readability-braces-around-statements,
+                   readability-container-size-empty,
+                   readability-identifier-naming,
+                   readability-redundant-control-flow,
+                   readability-redundant-member-init,
+                   readability-redundant-smartptr-get,
+                   readability-redundant-string-cstr'
+
+WarningsAsErrors:  '*'
+
+CheckOptions:
+  - key:             bugprone-assert-side-effect.AssertMacros
+    value:           'ASSERT'
+
+  - key:             bugprone-dangling-handle.HandleClasses
+    value:           'std::basic_string_view;std::experimental::basic_string_view;absl::string_view'
+
+  - key:             modernize-use-auto.MinTypeNameLength
+    value:           '10'
+
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           'CamelCase'
+
+  # Ignore GoogleTest function macros.
+  - key:             readability-identifier-naming.FunctionIgnoredRegexp
+    value:           '(TEST|TEST_F|TEST_P|INSTANTIATE_TEST_SUITE_P|MOCK_METHOD|TYPED_TEST)'
+
+  - key:             readability-identifier-naming.ParameterCase
+    value:           'lower_case'
+
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           'lower_case'
+
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           '_'
+
+  - key:             readability-identifier-naming.StructCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.TypeAliasCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.UnionCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.FunctionCase
+    value:           'camelBack'

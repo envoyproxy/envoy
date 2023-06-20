@@ -1,0 +1,47 @@
+expression {
+  call_expr {
+    function: "_==_"
+    args {
+      call_expr {
+        function: "_[_]"
+	args {
+	  select_expr {
+	    operand {
+	      ident_expr {
+	        name: "request"
+	      }
+	    }
+	    field: "headers"
+	  }
+	  const_expr {
+	    string_value: "foo"
+	  }
+        }
+      }
+      const_expr {
+        string_value: "bar"
+      }
+    }
+  }
+}
+request_headers {
+  headers{key: ":method" value : "GET"}
+  headers{key: ":path" value : "/"}
+  headers{key: ":scheme" value : "http"}
+  headers{key: ":authority" value : "foo.com"}
+  headers {key: "foo" value: "bar"}
+  headers {}
+  headers {}
+  headers {}
+  headers {}
+}
+response_headers {
+  headers {
+    key: ":status"
+    value : "200"
+  }
+}
+trailers {
+  headers {}
+}
+stream_info {}

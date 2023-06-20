@@ -1,0 +1,13 @@
+config {
+  stat_prefix: "...............................................,"
+  token_bucket {
+    max_tokens: 5
+    fill_interval {
+      nanos: 2
+    }
+  }
+}
+actions {
+  refill {
+  }
+}

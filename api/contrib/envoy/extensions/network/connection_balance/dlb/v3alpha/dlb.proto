@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.network.connection_balance.dlb.v3alpha;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.connection_balance.dlb.v3alpha";
+option java_outer_classname = "DlbProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/connection_balance/dlb/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dlb connection balancer configuration]
+// DLB :ref:`configuration overview <config_connection_balance_dlb>`.
+// [#extension: envoy.network.connection_balance.dlb]
+
+// The Dlb is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCIE device
+// in the CPU package. It interacts with software running on cores and potentially other devices. The Dlb implements the
+// following balancing features:
+//
+// -  Lock-free multi-producer/multi-consumer operation.
+// -  Multiple priorities for varying traffic types.
+// -  Various distribution schemes.
+//
+// Dlb connection balancer uses Dlb hardware to balance connections, and can significantly reduce latency.
+//
+// As the Dlb connection balancer provides assistance from dedicated Dlb hardware, it can be used for a proxy with a large number of connections
+// (e.g., a gateway).
+message Dlb {
+  // The ID of the Dlb hardware, start from 0.
+  // If not specified, use the first available device as default.
+  uint32 id = 1;
+
+  // Maximum number of retries when sending to DLB device fails.
+  // No retry as default.
+  uint32 max_retries = 2;
+}

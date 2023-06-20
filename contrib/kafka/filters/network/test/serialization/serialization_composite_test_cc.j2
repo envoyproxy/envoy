@@ -1,0 +1,90 @@
+{#
+  Creates 'serialization_composite_test.cc'.
+
+  Template for composite serializer tests (the CompositeDeserializerWith_N_Delegates classes).
+  Covers the corner case of 0 delegates, and then uses templating to create tests for 1..N cases.
+#}
+
+#include "contrib/kafka/filters/network/source/external/serialization_composite.h"
+
+#include "contrib/kafka/filters/network/test/serialization_utilities.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+/**
+ * Tests in this class are supposed to check whether serialization operations on composite
+ * deserializers are correct.
+ */
+
+// Tests for composite deserializer with 0 fields (corner case).
+
+struct CompositeResultWith0Fields {
+  uint32_t encode(Buffer::Instance&, EncodingContext&) const { return 0; }
+  bool operator==(const CompositeResultWith0Fields&) const { return true; }
+};
+
+using TestCompositeDeserializer0 = CompositeDeserializerWith0Delegates<CompositeResultWith0Fields>;
+
+// Composite with 0 delegates is special case: it's always ready.
+TEST(CompositeDeserializerWith0Delegates, EmptyBufferShouldBeReady) {
+  // given
+  const TestCompositeDeserializer0 testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), true);
+}
+
+TEST(CompositeDeserializerWith0Delegates, ShouldDeserialize) {
+  const CompositeResultWith0Fields expected{};
+  serializeThenDeserializeAndCheckEquality<TestCompositeDeserializer0>(expected);
+}
+
+// Tests for composite deserializer with N+ fields.
+
+{% for field_count in counts %}
+struct CompositeResultWith{{ field_count }}Fields {
+  {% for field in range(1, field_count + 1) %}
+  const std::string field{{ field }}_;
+  {% endfor %}
+
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    uint32_t written{0};
+    {% for field in range(1, field_count + 1) %}
+    written += encoder.encode(field{{ field }}_, dst);
+    {% endfor %}
+    return written;
+  }
+
+  bool operator==(const CompositeResultWith{{ field_count }}Fields& rhs) const {
+    return true
+    {% for field in range(1, field_count + 1) %} && field{{ field }}_ == rhs.field{{ field }}_
+    {% endfor %};
+  }
+};
+
+using TestCompositeDeserializer{{ field_count }} =
+  CompositeDeserializerWith{{ field_count }}Delegates<
+  CompositeResultWith{{ field_count }}Fields
+  {% for field in range(1, field_count + 1) %}, StringDeserializer{% endfor %}>;
+
+TEST(CompositeDeserializerWith{{ field_count }}Delegates, EmptyBufferShouldNotBeReady) {
+  // given
+  const TestCompositeDeserializer{{ field_count }} testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), false);
+}
+
+TEST(CompositeDeserializerWith{{ field_count }}Delegates, ShouldDeserialize) {
+  const CompositeResultWith{{ field_count }}Fields expected{
+    {% for field in range(1, field_count + 1) %}"s{{ field }}", {% endfor %}
+  };
+  serializeThenDeserializeAndCheckEquality<TestCompositeDeserializer{{ field_count }}>(expected);
+}
+{% endfor %}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

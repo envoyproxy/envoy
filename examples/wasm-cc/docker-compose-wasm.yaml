@@ -1,0 +1,34 @@
+services:
+  wasm_compile_update:
+    build:
+      context: ../shared/build
+    command: >
+      bash -c "
+      bazel build --experimental_repository_downloader_retries=2 --disk_cache=/tmp/disk_cache --repository_cache=/tmp/repository_cache --experimental_repository_cache_hardlinks //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm
+      && cp -a bazel-bin/examples/wasm-cc/*updated*.wasm /output"
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=/tmp
+    working_dir: /source
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
+    - ../..:/source
+    - ./lib:/output
+
+  wasm_compile:
+    build:
+      context: ../shared/build
+    command: >
+      bash -c "
+      bazel build --experimental_repository_downloader_retries=2 --disk_cache=/tmp/disk_cache --repository_cache=/tmp/repository_cache --experimental_repository_cache_hardlinks //examples/wasm-cc:envoy_filter_http_wasm_example.wasm
+      && cp -a bazel-bin/examples/wasm-cc/* /output"
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=/tmp
+    working_dir: /source
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
+    - ../..:/source
+    - ./lib:/output

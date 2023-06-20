@@ -1,0 +1,31 @@
+# https://github.com/bazelbuild/rules_rust/pull/1259
+
+--- rust/platform/triple_mappings.bzl
++++ rust/platform/triple_mappings.bzl
+@@ -269,6 +269,13 @@ def triple_to_constraint_set(target_triple):
+             "@rules_rust//rust/platform/os:unknown",
+         ]
+
++    # Workaround for https://github.com/bazelbuild/bazel/issues/14982
++    if target_triple in ("armv7-linux-androideabi", "thumbv7neon-linux-androideabi"):
++        return [
++            "@platforms//cpu:arm",
++            "@platforms//os:android",
++        ]
++
+     triple_struct = triple(target_triple)
+
+     constraint_set = []
+
+
+--- rust/private/rustc.bzl
++++ rust/private/rustc.bzl
+@@ -1024,7 +1024,7 @@ def rustc_compile_action(
+         ),
+     ]
+
+-    if crate_info.type in ["staticlib", "cdylib"]:
++    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
+         # These rules are not supposed to be depended on by other rust targets, and
+         # as such they shouldn't provide a CrateInfo. However, one may still want to
+         # write a rust_test for them, so we provide the CrateInfo wrapped in a provider

@@ -1,0 +1,109 @@
+date: May 17, 2017
+
+changes:
+- area: envoy
+  change: |
+    As of this release, we now have an official :repo:`breaking change policy <v1.5:/CONTRIBUTING.md#breaking-change-
+    policy>`. Note that there are numerous breaking configuration changes in this release. They are not listed here. Future
+    releases will adhere to the policy and have clear documentation on deprecations and changes.
+- area: build
+  change: |
+    Bazel is now the canonical build system (replacing CMake). There have been a huge number of changes to the
+    development/build/test flow. See :repo:`/bazel/README.md` and :repo:`/ci/README.md` for more information.
+- area: outlier_detection
+  change: |
+    :ref:`Outlier detection <v1.5:arch_overview_outlier_detection>` has been expanded to include success rate variance, and
+    all parameters are now configurable in both runtime and in the JSON configuration.
+- area: listener
+  change: |
+    TCP level listener and cluster connections now have configurable receive buffer limits at which point connection level
+    back pressure is applied. Full end to end flow control will be available in a future release.
+- area: redis
+  change: |
+    :ref:`Redis health checking <v1.5:config_cluster_manager_cluster_hc>` has been added as an active health check type.
+    Full Redis support will be documented/supported in 1.4.0.
+- area: health_checking
+  change: |
+    :ref:`TCP health checking <v1.5:config_cluster_manager_cluster_hc_tcp_health_checking>` now supports a "connect only"
+    mode that only checks if the remote server can be connected to without writing/reading any data.
+- area: ssl
+  change: |
+    `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ is now the only supported TLS provider. The default cipher
+    suites and ECDH curves have been updated with more modern defaults for both listener and cluster connections.
+- area: matching
+  change: |
+    The ``header value match`` rate limit action has been expanded to include an ``expect match`` parameter.
+- area: rate_limiting
+  change: |
+    Route level HTTP rate limit configurations now do not inherit the virtual host level configurations by default. Use
+    ``include_vh_rate_limits`` to inherit the virtual host level options if desired.
+- area: routing
+  change: |
+    HTTP routes can now add request headers on a per route and per virtual host basis via the :ref:`request_headers_to_add
+    <v1.5:config_http_conn_man_headers_custom_request_headers>` option.
+- area: examples
+  change: |
+    The :ref:`example configurations <v1.5:install_ref_configs>` have been refreshed to demonstrate the latest features.
+- area: retry
+  change: |
+    ``per_try_timeout_ms`` can now be configured in a route's retry policy in addition to via the :ref:`x-envoy-upstream-rq-
+    per-try-timeout-ms <v1.5:config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms>` HTTP header.
+- area: matching
+  change: |
+    HTTP virtual host matching now includes support for prefix wildcard domains (e.g., ``*.lyft.com``).
+- area: tracing
+  change: |
+    The default for tracing random sampling has been changed to 100% and is still configurable in :ref:`runtime
+    <v1.5:config_http_conn_man_runtime>`.
+- area: tracing
+  change: |
+    HTTP tracing configuration has been extended to allow tags to be populated from arbitrary HTTP headers.
+- area: rate_limiting
+  change: |
+    The :ref:`HTTP rate limit filter <v1.5:config_http_filters_rate_limit>` can now be applied to internal, external, or all
+    requests via the ``request_type`` option.
+- area: listener
+  change: |
+    :ref:`Listener binding <v1.5:config_listeners>` now requires specifying an ``address`` field. This can be used to bind a
+    listener to both a specific address as well as a port.
+- area: mongodb
+  change: |
+    The :ref:`MongoDB filter <v1.5:config_network_filters_mongo_proxy>` now emits a stat for queries that do not have
+    ``$maxTimeMS`` set.
+- area: mongodb
+  change: |
+    The :ref:`MongoDB filter <v1.5:config_network_filters_mongo_proxy>` now emits logs that are fully valid JSON.
+- area: profiling
+  change: |
+    The CPU profiler output path is now configurable.
+- area: watchdog
+  change: |
+    A watchdog system has been added that can kill the server if a deadlock is detected.
+- area: routing
+  change: |
+    A :ref:`route table checking tool <v1.5:install_tools_route_table_check_tool>` has been added that can be used to test
+    route tables before use.
+- area: examples
+  change: |
+    We have added an :ref:`example repo <v1.5:extending>` that shows how to compile/link a custom filter.
+- area: outlier_detection
+  change: |
+    Added additional cluster wide information related to outlier detection to the :ref:`/clusters admin endpoint
+    <v1.5:operations_admin_interface>`.
+- area: certificates
+  change: |
+    Multiple SANs can now be verified via the ``verify_subject_alt_name`` setting. Additionally, URI type SANs can be
+    verified.
+- area: filters
+  change: |
+    HTTP filters can now be passed opaque configuration specified on a per route basis.
+- area: debugging
+  change: |
+    By default Envoy now has a built in crash handler that will print a back trace. This behavior can be disabled if desired
+    via the ``--define=signal_trace=disabled`` Bazel option.
+- area: zipkin
+  change: |
+    Zipkin has been added as a supported :ref:`tracing provider <v1.5:arch_overview_tracing>`.
+- area: envoy
+  change: |
+    Numerous small changes and fixes not listed here.

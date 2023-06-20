@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.integration.upstream_socket.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Transport Socket wrapper for test]
+// [#extension: envoy.transport_sockets.upstream_socket]
+message Config {
+  // The underlying transport socket being wrapped.
+  envoy.config.core.v3.TransportSocket transport_socket = 1
+      [(validate.rules).message = {required: true}];
+}

@@ -1,0 +1,24 @@
+config {
+  name: "envoy.filters.network.redis_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy"
+    value: "\n\001N\032\032\n\005\020\200\200\200\030\030\001 \377\377\377\337\017*\005\020\200\200\200\0302\000@\001*\010\n\006\032\004\001\000\000\010"
+  }
+}
+actions {
+  on_new_connection {
+
+  }
+}
+
+actions {
+  on_data {
+    data: "\x24\x2d\x31\xd\xa"
+  }
+}
+actions {
+  on_data {
+    data: "0"
+    end_stream: true
+  }
+}

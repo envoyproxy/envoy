@@ -1,0 +1,184 @@
+syntax = "proto3";
+
+package envoy.RouterCheckToolSchema;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "google/protobuf/wrappers.proto";
+import "validate/validate.proto";
+
+// [#protodoc-title: RouterCheckTool Validation]
+
+// The Validation Schema of the envoy router check test files.
+// The accepted input formats for the test are json and yaml.
+// The tool transparently converts json/yaml into this proto schema.
+message Validation {
+  // A collection of test cases.
+  repeated ValidationItem tests = 1 [(validate.rules).repeated .min_items = 1];
+}
+
+// Schema for each test case.
+message ValidationItem {
+  // Name of the test case. There is no uniqueness constraint among the test case names.
+  // The name has to be non empty.
+  string test_name = 1 [(validate.rules).string.min_len = 1];
+
+  // The input constraints of the test case.
+  ValidationInput input = 2 [(validate.rules).message.required = true];
+
+  // The validations that need to be performed on the resultant route.
+  ValidationAssert validate = 3 [(validate.rules).message.required = true];
+}
+
+// Input values sent to the router that determine the returned route.
+// This includes the `pseudo-header <https://http2.github.io/http2-spec/#HttpRequest>`_ fields
+// defined in HTTP2.
+message ValidationInput {
+  reserved 8;
+  // This pseudo-header field includes the authority portion of the target URI.
+  // Clients that generate HTTP/2 requests directly SHOULD use the :authority pseudo-header field
+  // instead of the Host header field.
+  string authority = 1 [(validate.rules).string.min_len = 1];
+
+  // The :path pseudo-header field includes the path and query parts of the target URI.
+  // This pseudo-header field MUST NOT be empty for http or https URIs.
+  // http or https URIs that do not contain a path component MUST include a value of '/'
+  // The exception to this rule is an OPTIONS request for an http or https URI that does not include
+  // a path component.
+  string path = 2 [(validate.rules).string.min_len = 1];
+
+  // This pseudo-header field includes the HTTP method.
+  string method = 4 [(validate.rules).string.min_len = 3];
+
+  // An integer used to identify the target for weighted cluster selection.
+  // The default value of random_value is 0.
+  uint64 random_value = 5;
+
+  // A flag that determines whether to set x-forwarded-proto to https or http.
+  // By setting x-forwarded-proto to a given protocol, the tool is able to simulate the behavior of
+  // a client issuing a request via http or https. By default ssl is false which corresponds to
+  // x-forwarded-proto set to http.
+  bool ssl = 6;
+
+  // A flag that determines whether to set x-envoy-internal to “true”.
+  // If not specified, or if internal is equal to false, x-envoy-internal is not set.
+  bool internal = 7;
+
+  // Additional request or response headers to be added as input for route determination.
+  // The “:authority”, “:path”, “:method”, “x-forwarded-proto”, and “x-envoy-internal” fields are
+  // specified by the other config options and should not be set here.
+  repeated envoy.config.core.v3.HeaderValue additional_request_headers = 10;
+  repeated envoy.config.core.v3.HeaderValue additional_response_headers = 11;
+
+  // Runtime setting key to enable for the test case.
+  // If a route depends on the runtime, the route will be enabled based on the random_value defined
+  // in the test. Only a random_value less than the fractional percentage will enable the route.
+  string runtime = 9;
+}
+
+// The validate object specifies the returned route parameters to match.
+// At least one test parameter must be specified.
+// Use “” (empty string) to indicate that no return value is expected.
+// For example, to test that no cluster match is expected use {“cluster_name”: “”}.
+message ValidationAssert {
+  reserved 7, 8;
+  // Match the cluster name.
+  google.protobuf.StringValue cluster_name = 1;
+
+  // Match the virtual cluster name.
+  google.protobuf.StringValue virtual_cluster_name = 2;
+
+  // Match the virtual host name.
+  google.protobuf.StringValue virtual_host_name = 3;
+
+  // Match the host header field after rewrite.
+  google.protobuf.StringValue host_rewrite = 4;
+
+  // Match the path header field after rewrite.
+  google.protobuf.StringValue path_rewrite = 5;
+
+  // Match the returned redirect path.
+  google.protobuf.StringValue path_redirect = 6;
+
+  // Match the listed request or response header fields. These fields are deprecated, use *_header_matches instead.
+  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9 [deprecated = true];
+  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10 [deprecated = true];
+
+  // Match the listed request or response headers.
+  // Example header fields include the “:path”, “cookie”, and “date” fields.
+  // The header fields are checked after all other test cases.
+  // Thus, the header fields checked will be those of the redirected or rewritten routes when
+  // applicable.
+  repeated envoy.config.route.v3.HeaderMatcher request_header_matches = 11;
+  repeated envoy.config.route.v3.HeaderMatcher response_header_matches = 12;
+
+  // Match the redirect response code
+  google.protobuf.UInt32Value code_redirect = 13;
+}
+
+// The ValidationResult schema contains test results of the envoy router check tool.
+message ValidationResult {
+  // The results of the validation tests.
+  // If the tool was configured to 'only-show-failures',
+  // then 'test_results' contain only results for failed tests.
+  // Otherwise, 'test_results' will contain all the tests results.
+  repeated ValidationItemResult test_results = 1;
+}
+
+// The ValidationItemResult schema specifies the result after running ValidationItem test.
+message ValidationItemResult {
+  // Name of the test case from ValidationItem.
+  string test_name = 1;
+
+  // A flag indicating whether the test passed.
+  // If false, then 'failure' specifies the reason of the failure.
+  bool test_passed = 2;
+
+  // The reason of the test failure.
+  ValidationFailure failure = 3;
+}
+
+// Schema describes the reason of the test failure.
+message ValidationFailure {
+  // Match the cluster name result.
+  google.protobuf.StringValue expected_cluster_name = 1;
+  google.protobuf.StringValue actual_cluster_name = 2;
+
+  // Match the virtual cluster name result.
+  google.protobuf.StringValue expected_virtual_cluster_name = 3;
+  google.protobuf.StringValue actual_virtual_cluster_name = 4;
+
+  // Match the virtual host name result.
+  google.protobuf.StringValue expected_virtual_host_name = 5;
+  google.protobuf.StringValue actual_virtual_host_name = 6;
+
+  // Match the host rewrite result.
+  google.protobuf.StringValue expected_host_rewrite = 7;
+  google.protobuf.StringValue actual_host_rewrite = 8;
+
+  // Match the path rewrite result.
+  google.protobuf.StringValue expected_path_rewrite = 9;
+  google.protobuf.StringValue actual_path_rewrite = 10;
+
+  // Match the path redirect result.
+  google.protobuf.StringValue expected_path_redirect = 11;
+  google.protobuf.StringValue actual_path_redirect = 12;
+
+  // Match the redirect code result.
+  google.protobuf.UInt32Value expected_code_redirect = 13;
+  google.protobuf.UInt32Value actual_code_redirect = 14;
+
+  // Match the request headers results.
+  repeated HeaderMatchFailure request_header_match_failures = 15;
+  // Match the response headers results.
+  repeated HeaderMatchFailure response_header_match_failures = 16;
+}
+
+// Schema for header match validation failure.
+message HeaderMatchFailure {
+  // The header matcher from the ValidationAssert.
+  envoy.config.route.v3.HeaderMatcher header_matcher = 1;
+
+  // The actual header value from the router response.
+  google.protobuf.StringValue actual_header_value = 2;
+}

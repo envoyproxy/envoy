@@ -1,0 +1,3 @@
+node {   id: "    "   cluster: "             " } dynamic_resources {   ads_config {    api_type: REST	transport_api_version: V3	grpc_services {       google_grpc {         target_uri: " "         stat_prefix: "                                        "       }     }   } } admin {   
+  profile_path: "p"
+}

@@ -1,0 +1,11 @@
+namespace Envoy {
+
+void foo() {
+  EXPECT_CALL(a, b);
+  EXPECT_CALL(a, b);
+  EXPECT_CALL(a, b).WillOnce(foo);
+  EXPECT_CALL(a, b).WillOnce(foo);
+  Stats::ScopeSharedPtr scope;
+}
+
+} // namespace Envoy

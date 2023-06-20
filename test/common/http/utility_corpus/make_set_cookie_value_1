@@ -1,0 +1,7 @@
+make_set_cookie_value {
+  key: "token1"
+  value: "world"
+  path: "/hello?="
+  max_age: 10
+  httponly: false
+}

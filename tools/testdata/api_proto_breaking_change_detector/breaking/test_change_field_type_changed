@@ -1,0 +1,6 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+message ChangeFieldTypeMessage {
+    string pi = 314;
+}

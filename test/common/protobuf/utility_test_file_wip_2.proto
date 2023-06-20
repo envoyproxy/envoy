@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package utility_test.file_wip_2;
+
+import "xds/annotations/v3/status.proto";
+
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+message Foo {
+}

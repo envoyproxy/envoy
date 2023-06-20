@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.extensions.http.original_ip_detection.xff.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.original_ip_detection.xff.v3";
+option java_outer_classname = "XffProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/original_ip_detection/xff/v3;xffv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: XFF original IP detection extension]
+
+// This extension allows for the original downstream remote IP to be detected
+// by reading the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
+//
+// [#extension: envoy.http.original_ip_detection.xff]
+message XffConfig {
+  // The number of additional ingress proxy hops from the right side of the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
+  // determining the origin client's IP address. The default is zero if this option
+  // is not specified. See the documentation for
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+  uint32 xff_num_trusted_hops = 1;
+}

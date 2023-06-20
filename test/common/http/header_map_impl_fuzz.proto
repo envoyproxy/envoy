@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "google/protobuf/empty.proto";
+
+import "validate/validate.proto";
+
+// Structured input for header_map_impl_fuzz_test.
+
+message AddReference {
+  string key = 1;
+  string value = 2;
+}
+
+message AddReferenceKey {
+  string key = 1;
+  oneof value_selector {
+    string string_value = 2;
+    uint64 uint64_value = 3;
+  }
+}
+
+message AddCopy {
+  string key = 1;
+  oneof value_selector {
+    string string_value = 2;
+    uint64 uint64_value = 3;
+  }
+}
+
+message SetReference {
+  string key = 1;
+  string value = 2;
+}
+
+message SetReferenceKey {
+  string key = 1;
+  string value = 2;
+}
+
+message GetAndMutate {
+  string key = 1;
+  oneof mutate_selector {
+    string append = 2;
+    google.protobuf.Empty clear = 3;
+    string find = 4;
+    string set_copy = 5;
+    uint64 set_integer = 6;
+    string set_reference = 7;
+  }
+}
+
+message MutateAndMove {
+  string key = 1;
+  oneof mutate_selector {
+    string append = 2;
+    string set_copy = 3;
+    uint64 set_integer = 4;
+    string set_reference = 5;
+  }
+}
+
+message Append {
+  string key = 1;
+  string value = 2;
+}
+
+message Get {
+  string key = 1;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    AddReference add_reference = 1;
+    AddReferenceKey add_reference_key = 2;
+    AddCopy add_copy = 3;
+    SetReference set_reference = 4;
+    SetReferenceKey set_reference_key = 5;
+    GetAndMutate get_and_mutate = 6 [deprecated = true];
+    Get get = 13;
+    MutateAndMove mutate_and_move = 12;
+    Append append = 11;
+    google.protobuf.Empty copy = 7;
+    string remove = 9;
+    string remove_prefix = 10;
+  }
+}
+
+message Config {
+  uint32 lazy_map_min_size = 1;
+}
+
+message HeaderMapImplFuzzTestCase {
+  repeated Action actions = 1;
+  // Optional threshold value configuration for the lazy header-map.
+  Config config = 2;
+}

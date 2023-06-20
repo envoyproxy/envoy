@@ -1,0 +1,100 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "G?T"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.c/m"
+      }
+      headers {
+        key: ":path"
+        value: "foo-968957191215689797641957=bar1"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  stream_action {
+    stream_id: 67108864
+    request {
+      data {
+        size: 67108864
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}

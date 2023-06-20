@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+// Type that doesn't belong to any package.
+//
+// Part of a test suite that verifies normalization of
+// fully-qualified type names.
+message RootLevelType {
+}

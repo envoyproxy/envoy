@@ -1,0 +1,3 @@
+layered_runtime:
+  layers:
+  - name: "foo"

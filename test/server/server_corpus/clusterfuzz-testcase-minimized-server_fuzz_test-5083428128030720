@@ -1,0 +1,26 @@
+static_resources {
+  clusters {
+    name: "^"
+    connect_timeout {
+      nanos: 6
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: "i"
+      }
+    }
+    ring_hash_lb_config {
+      minimum_ring_size {
+        value: 4395513236313604096
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "i"
+    }
+  }
+}

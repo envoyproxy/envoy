@@ -1,0 +1,26 @@
+expression {
+  const_expr {
+    int64_value: 13
+  }
+}
+request_headers {
+  headers{key: ":method" value : "GET"}
+  headers{key: ":path" value : "/"}
+  headers{key: ":scheme" value : "http"}
+  headers{key: ":authority" value : "foo.com"}
+  headers {}
+  headers {}
+  headers {}
+  headers {}
+  headers {}
+}
+response_headers {
+  headers {
+    key: ":status"
+    value : "200"
+  }
+}
+trailers {
+  headers {}
+}
+stream_info {}

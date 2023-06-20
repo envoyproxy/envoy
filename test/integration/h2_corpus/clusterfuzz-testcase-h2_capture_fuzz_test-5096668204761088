@@ -1,0 +1,28 @@
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+      }
+    }
+    h2_frames {
+    }
+    h2_frames {
+      request {
+        stream_index: 1
+        host: "host"
+        path: "/path/to/long/url"
+      }
+    }
+  }
+}
+events {
+}
+events {
+  downstream_send_event {
+    h2_frames {
+      generic {
+        frame_bytes: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+      }
+    }
+  }
+}

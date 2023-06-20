@@ -1,0 +1,5 @@
+load("//some:thing.bzl", "foo")
+
+licenses(["notice"])  # Apache 2
+
+foo()

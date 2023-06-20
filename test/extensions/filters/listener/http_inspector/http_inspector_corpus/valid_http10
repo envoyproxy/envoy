@@ -1,0 +1,1 @@
+data: "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: */*\r\nx-forwarded-proto: http\r\nx-request-id: a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: 15000\r\ncontent-length: 0\r\n\r\n"

@@ -1,0 +1,6 @@
+parse_cookie_value {
+  cookies: "dquote=\"; quoteddquote=\"\"\""
+  cookies: "leadingdquote=\"foobar;"
+  cookies: "abc=def; token=\"abc123\"; Expires=Wed, 09 Jun 2021 10:18:14 GMT"
+  key: "leadingdquote"
+}

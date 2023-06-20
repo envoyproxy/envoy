@@ -1,0 +1,25 @@
+load_balancer_test_case {
+  common_lb_config {
+    healthy_panic_threshold {
+      value: 4.88907830238399e-311
+    }
+    consistent_hashing_lb_config {
+      use_hostname_for_hashing: true
+      hash_balance_factor {
+        value: 1024
+      }
+    }
+  }
+  actions {
+    update_health_flags {
+      host_priority: 270582939648
+      num_degraded_hosts: 4194304
+      random_bytestring: 1
+    }
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 1024
+    random_bytestring: 1
+  }
+  seed_for_prng: 62208
+}

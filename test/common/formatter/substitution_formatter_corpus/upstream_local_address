@@ -1,0 +1,9 @@
+format: "%UPSTREAM_LOCAL_ADDRESS%"
+stream_info {
+  upstream_local_address {
+    socket_address {
+      address: "10.1.2.3",
+      port_value: 10001
+    }
+  }
+}

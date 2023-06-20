@@ -1,0 +1,6 @@
+headers_to_add {
+  header {
+    key: "x-request-start"
+    value: "%UPSTREAM_METADATA(no array)%"
+  }
+}

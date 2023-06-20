@@ -1,0 +1,23 @@
+static_resources {
+  clusters {
+    name: "@"
+    connect_timeout {
+      nanos: 250000000
+    }
+    lb_policy: MAGLEV
+    dns_lookup_family: V4_ONLY
+    typed_dns_resolvers_config {
+      "@type": type.googleapis.com/envoy.config.core.v3.Address    
+      pipe {
+        path: "\014\000"
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.jwt_authn"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication"
+    value: "\n#\n\000\022\037\n\001h\032\000B\025\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000J\001h\022\205\001\n\177\022}TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT\022\002\022\000"
+  }
+}

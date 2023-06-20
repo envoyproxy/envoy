@@ -1,0 +1,1 @@
+cluster_manager {   load_stats_config {     api_type: REST	transport_api_version: V3	grpc_services {       google_grpc {         target_uri: " "         call_credentials {           sts_service {           }         }       }     }   } } 

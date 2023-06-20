@@ -1,0 +1,13 @@
+valid-for-minute:
+  body: This response will stay fresh for one minute
+  headers:
+    cache-control: max-age=4
+    custom-header: any value
+private:
+  body: This is a private response, it will not be cached by Envoy
+  headers:
+    cache-control: private
+no-cache:
+  body: This response can be cached, but it has to be validated on each request
+  headers:
+    cache-control: max-age=0, no-cache

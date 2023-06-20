@@ -1,0 +1,13 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: example_proxy_cluster
+  type: STRICT_DNS
+  load_assignment:
+    cluster_name: example_proxy_cluster
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              address: service1
+              port_value: 8080

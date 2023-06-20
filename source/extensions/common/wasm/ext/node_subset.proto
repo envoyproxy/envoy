@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+package envoy.source.extensions.common.wasm;
+
+// A subset of message Node from api/envoy/config/core/v?/base.proto.
+message NodeSubset {
+  string id = 1;
+  google.protobuf.Struct metadata = 3;
+};

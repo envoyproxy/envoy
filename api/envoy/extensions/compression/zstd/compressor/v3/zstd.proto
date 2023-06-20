@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.extensions.compression.zstd.compressor.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.compression.zstd.compressor.v3";
+option java_outer_classname = "ZstdProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/compression/zstd/compressor/v3;compressorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Zstd Compressor]
+// [#extension: envoy.compression.zstd.compressor]
+
+// [#next-free-field: 6]
+message Zstd {
+  // Reference to http://facebook.github.io/zstd/zstd_manual.html
+  enum Strategy {
+    DEFAULT = 0;
+    FAST = 1;
+    DFAST = 2;
+    GREEDY = 3;
+    LAZY = 4;
+    LAZY2 = 5;
+    BTLAZY2 = 6;
+    BTOPT = 7;
+    BTULTRA = 8;
+    BTULTRA2 = 9;
+  }
+
+  // Set compression parameters according to pre-defined compression level table.
+  // Note that exact compression parameters are dynamically determined,
+  // depending on both compression level and source content size (when known).
+  // Value 0 means default, and default level is 3.
+  // Setting a level does not automatically set all other compression parameters
+  // to default. Setting this will however eventually dynamically impact the compression
+  // parameters which have not been manually set. The manually set
+  // ones will 'stick'.
+  google.protobuf.UInt32Value compression_level = 1;
+
+  // A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
+  bool enable_checksum = 2;
+
+  // The higher the value of selected strategy, the more complex it is,
+  // resulting in stronger and slower compression.
+  // Special: value 0 means "use default strategy".
+  Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
+  // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
+  // that can be used to search the same dictionary during decompression.
+  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  // to train a specific dictionary for compression.
+  config.core.v3.DataSource dictionary = 4;
+
+  // Value for compressor's next output buffer. If not set, defaults to 4096.
+  google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+}

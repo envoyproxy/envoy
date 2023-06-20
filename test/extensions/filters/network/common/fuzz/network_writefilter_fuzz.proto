@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package test.extensions.filters.network;
+import "validate/validate.proto";
+import "envoy/config/listener/v3/listener_components.proto";
+
+message OnWrite {
+  bytes data = 1;
+  bool end_stream = 2;
+}
+
+message AdvanceTime {
+  // Advance the system time by (0,24] hours.
+  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0 lt: 86400000}];
+}
+
+message WriteAction {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onWrite()
+    OnWrite on_write = 2;
+    // Advance time_source_
+    AdvanceTime advance_time = 3;
+  }
+}
+
+message FilterFuzzTestCase {
+  // This is actually a protobuf type for the config of network filters.
+  envoy.config.listener.v3.Filter config = 1;
+  repeated WriteAction actions = 2;
+}

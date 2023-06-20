@@ -1,0 +1,21 @@
+static_resources {
+  clusters {
+    name: "`"
+    connect_timeout {
+      nanos: 20
+    }
+    load_assignment {
+      cluster_name: "`"
+      endpoints {
+        priority: 1030831324
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "`"
+    }
+  }
+}

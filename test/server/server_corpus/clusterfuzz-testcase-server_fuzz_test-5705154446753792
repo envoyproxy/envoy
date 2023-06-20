@@ -1,0 +1,44 @@
+static_resources {
+  clusters {
+    name: "service_google"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 1
+    }
+    lb_policy: MAGLEV
+    hosts {
+      socket_address {
+        address: "127.0.0.1"
+        port_value: 0
+      }
+    }
+    hosts {
+      socket_address {
+        address: "127.0.0.1"
+        port_value: 0
+      }
+    }
+    circuit_breakers {
+      thresholds {
+        max_retries {
+          value: 7564900
+        }
+      }
+    }
+    tls_context {
+      sni: "www.google.com"
+    }
+    lb_subset_config {
+      subset_selectors {
+        keys: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "`"
+    }
+  }
+}

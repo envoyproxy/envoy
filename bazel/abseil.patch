@@ -1,0 +1,13 @@
+diff --git a/absl/flags/commandlineflag.h b/absl/flags/commandlineflag.h
+index f2fa08977f..8e97fdb0ca 100644
+--- a/absl/flags/commandlineflag.h
++++ b/absl/flags/commandlineflag.h
+@@ -153,7 +153,7 @@ class CommandLineFlag {
+   bool ParseFrom(absl::string_view value, std::string* error);
+ 
+  protected:
+-  ~CommandLineFlag() = default;
++  virtual ~CommandLineFlag() = default;
+ 
+  private:
+   friend class flags_internal::PrivateHandleAccessor;

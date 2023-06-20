@@ -1,0 +1,12 @@
+runtime {
+  symlink_root: "/"
+  subdirectory: "tmp"
+  override_subdirectory: "out"
+}
+admin {
+  address {
+    pipe {
+      path: "WW"
+    }
+  }
+}

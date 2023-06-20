@@ -1,0 +1,70 @@
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  host_rewrite: www.google.com
+                  cluster: service_google
+                  cors:
+                    allow_origin:
+                    - "test-origin-1"
+          http_filters:
+          - name: envoy.filters.http.router
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+    type: LOGICAL_DNS
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_google
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: www.google.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: www.google.com
+tracing:
+  http:
+    name: envoy.tracers.zipkin
+    config:
+      collector_cluster: service_google
+      collector_endpoint: /api/v1/spans
+      collector_endpoint_version: HTTP_JSON_V1
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      envoy.deprecated_features:envoy.config.trace.v2.ZipkinConfig.HTTP_JSON_V1: true
+      envoy.deprecated_features:envoy.api.v2.route.CorsPolicy.allow_origin: true

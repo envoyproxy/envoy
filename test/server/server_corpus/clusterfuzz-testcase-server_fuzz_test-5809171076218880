@@ -1,0 +1,12 @@
+admin {
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}
+hds_config {
+  api_type: REST
+  transport_api_version: V3
+  cluster_names: "+"
+}

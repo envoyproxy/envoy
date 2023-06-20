@@ -1,0 +1,8 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+import "validate/validate.proto";
+
+message ChangePGVFieldMessage {
+    string useremail = 1 [(validate.rules).string.email = false];
+}

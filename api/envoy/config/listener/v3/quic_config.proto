@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package envoy.config.listener.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/protocol.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.listener.v3";
+option java_outer_classname = "QuicConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3;listenerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: QUIC listener config]
+
+// Configuration specific to the UDP QUIC listener.
+// [#next-free-field: 10]
+message QuicProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.QuicProtocolOptions";
+
+  core.v3.QuicProtocolOptions quic_protocol_options = 1;
+
+  // Maximum number of milliseconds that connection will be alive when there is
+  // no network activity.
+  //
+  // If it is less than 1ms, Envoy will use 1ms. 300000ms if not specified.
+  google.protobuf.Duration idle_timeout = 2;
+
+  // Connection timeout in milliseconds before the crypto handshake is finished.
+  //
+  // If it is less than 5000ms, Envoy will use 5000ms. 20000ms if not specified.
+  google.protobuf.Duration crypto_handshake_timeout = 3;
+
+  // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
+  // to enabled.
+  core.v3.RuntimeFeatureFlag enabled = 4;
+
+  // A multiplier to number of connections which is used to determine how many packets to read per
+  // event loop. A reasonable number should allow the listener to process enough payload but not
+  // starve TCP and other UDP sockets and also prevent long event loop duration.
+  // The default value is 32. This means if there are N QUIC connections, the total number of
+  // packets to read in each read event will be 32 * N.
+  // The actual number of packets to read in total by the UDP listener is also
+  // bound by 6000, regardless of this field or how many connections there are.
+  google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
+      [(validate.rules).uint32 = {gte: 1}];
+
+  // Configure which implementation of ``quic::QuicCryptoClientStreamBase`` to be used for this listener.
+  // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.crypto_stream.v3.CryptoServerStreamConfig>` will be used.
+  // [#extension-category: envoy.quic.server.crypto_stream]
+  core.v3.TypedExtensionConfig crypto_stream_config = 6;
+
+  // Configure which implementation of ``quic::ProofSource`` to be used for this listener.
+  // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
+  // [#extension-category: envoy.quic.proof_source]
+  core.v3.TypedExtensionConfig proof_source_config = 7;
+
+  // Config which implementation of ``quic::ConnectionIdGeneratorInterface`` to be used for this listener.
+  // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig>` will be used.
+  // [#extension-category: envoy.quic.connection_id_generator]
+  core.v3.TypedExtensionConfig connection_id_generator_config = 8;
+
+  // Configure the server's preferred address to advertise so that client can migrate to it. See :ref:`example <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig>` which configures a pair of v4 and v6 preferred addresses.
+  // The current QUICHE implementation will advertise only one of the preferred IPv4 and IPv6 addresses based on the address family the client initially connects with, and only if the client is also QUICHE-based.
+  // If not specified, Envoy will not advertise any server's preferred address.
+  // [#extension-category: envoy.quic.server_preferred_address]
+  core.v3.TypedExtensionConfig server_preferred_address_config = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+}

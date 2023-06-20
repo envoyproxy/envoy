@@ -1,0 +1,1 @@
+config {   name: "envoy.ext_authz"   typed_config {     type_url: "                   /envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"     value: "`\002"   } } 

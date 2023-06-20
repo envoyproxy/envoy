@@ -1,0 +1,95 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 443
+    listener_filters:
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          http_filters:
+          - name: with-matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+              extension_config:
+                name: envoy.filters.http.fault
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                  abort:
+                    http_status: 503
+                    percentage:
+                      numerator: 0
+                      denominator: HUNDRED
+                  delay:
+                    fixed_delay: 3s
+                    percentage:
+                      numerator: 0
+                      denominator: HUNDRED
+              xds_matcher:
+                # The top level matcher is a matcher tree which conceptually selects one of several subtrees.
+                matcher_tree:
+                  input:
+                    name: request-headers
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: some-header
+                  exact_match_map:
+                    # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
+                    map:
+                      some_value_to_match_on:  # This is the header value we're trying to match against.
+                        # The OnMatch resulting on matching with this branch of the exact matcher is another matcher,
+                        # allowing for recursive matching.
+                        matcher:
+                          # The inner matcher is a matcher list, which attempts to match a list of predicates.
+                          matcher_list:
+                            matchers:
+                            - predicate:
+                                or_matcher:
+                                  predicate:
+                                  - single_predicate:
+                                      input:
+                                        name: request-headers
+                                        typed_config:
+                                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                                          header_name: second-header
+                                      value_match:
+                                        exact: foo
+                                  - single_predicate:
+                                      input:
+                                        name: request-headers
+                                        typed_config:
+                                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                                          header_name: second-header
+                                      value_match:
+                                        exact: bar
+                              on_match:
+                                action:
+                                  name: skip
+                                  typed_config:
+                                    "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            virtual_hosts:
+            - name: default
+              domains: ["*"]
+              routes:
+              - match: {prefix: "/"}
+                route:
+                  cluster: service_foo
+  clusters:
+  - name: service_foo
+    load_assignment:
+      cluster_name: some_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080

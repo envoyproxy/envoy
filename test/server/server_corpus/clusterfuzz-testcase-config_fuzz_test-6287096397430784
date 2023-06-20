@@ -1,0 +1,246 @@
+static_resources {
+  clusters {
+    name: " "
+    connect_timeout {
+      seconds: 2304
+    }
+    per_connection_buffer_limit_bytes {
+      value: 209
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: "z"
+      }
+    }
+    hosts {
+      pipe {
+        path: " "
+      }
+    }
+    hosts {
+      pipe {
+        path: ";"
+      }
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+      success_rate_stdev_factor {
+        value: 268435456
+      }
+    }
+  }
+  clusters {
+    name: "@"
+    connect_timeout {
+      seconds: 2304
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: "@"
+      }
+    }
+    hosts {
+      pipe {
+        path: "X"
+      }
+    }
+    hosts {
+      pipe {
+        path: "@"
+      }
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+      success_rate_stdev_factor {
+        value: 589951
+      }
+    }
+  }
+  clusters {
+    name: "#"
+    connect_timeout {
+      seconds: 2304
+      nanos: 235995425
+    }
+    lb_policy: MAGLEV
+    dns_lookup_family: V4_ONLY
+    cleanup_interval {
+      nanos: 235995425
+    }
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_probes {
+          value: 589824
+        }
+      }
+    }
+  }
+  clusters {
+    name: "X"
+    connect_timeout {
+      seconds: 2304
+    }
+    outlier_detection {
+      success_rate_stdev_factor {
+        value: 589951
+      }
+    }
+    lb_subset_config {
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors {
+      }
+      locality_weight_aware: true
+    }
+    ring_hash_lb_config {
+    }
+  }
+  clusters {
+    name: "0"
+    connect_timeout {
+      seconds: 2304
+    }
+    outlier_detection {
+      success_rate_stdev_factor {
+        value: 589951
+      }
+    }
+    lb_subset_config {
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors {
+      }
+      locality_weight_aware: true
+    }
+  }
+  clusters {
+    name: "`"
+    connect_timeout {
+      seconds: 2304
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: ";"
+      }
+    }
+    hosts {
+      pipe {
+        path: ";"
+      }
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+      success_rate_stdev_factor {
+        value: 589951
+      }
+    }
+    lb_subset_config {
+      default_subset {
+        fields {
+          key: ""
+          value {
+            bool_value: true
+          }
+        }
+      }
+    }
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_probes {
+          value: 589824
+        }
+      }
+    }
+    close_connections_on_host_health_failure: true
+    drain_connections_on_host_removal: true
+  }
+  clusters {
+    name: "z"
+    connect_timeout {
+      seconds: 2304
+    }
+    hosts {
+      pipe {
+        path: "*"
+      }
+    }
+    hosts {
+      pipe {
+        path: "5"
+      }
+    }
+    hosts {
+      pipe {
+        path: "z"
+      }
+    }
+    hosts {
+      pipe {
+        path: "@"
+      }
+    }
+    hosts {
+      pipe {
+        path: "z"
+      }
+    }
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_probes {
+          value: 589824
+        }
+      }
+    }
+    load_assignment {
+      cluster_name: " "
+      endpoints {
+        locality {
+          region: " "
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "\n\000\000\000"
+              }
+            }
+            health_check_config {
+              port_value: 10878976
+            }
+          }
+          health_status: TIMEOUT
+        }
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            health_check_config {
+              port_value: 41216
+            }
+          }
+          health_status: TIMEOUT
+        }
+        priority: 41216
+      }
+      endpoints {
+        locality {
+          region: "\027"
+        }
+        lb_endpoints {
+        }
+      }
+      endpoints {
+        priority: 41216
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "*"
+    }
+  }
+}
+

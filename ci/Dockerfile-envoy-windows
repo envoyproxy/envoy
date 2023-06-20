@@ -1,0 +1,22 @@
+ARG BUILD_OS=mcr.microsoft.com/windows/servercore
+ARG BUILD_TAG=ltsc2019
+
+FROM $BUILD_OS:$BUILD_TAG
+
+USER ContainerAdministrator
+RUN net accounts /MaxPWAge:unlimited
+RUN net user /add "EnvoyUser" /expires:never
+RUN net localgroup "Network Configuration Operators" "EnvoyUser" /add
+
+RUN mkdir "C:\\Program\ Files\\envoy"
+RUN setx /M path "%path%;c:\Program Files\envoy"
+ADD ["windows/amd64/envoy.exe", "C:/Program Files/envoy/"]
+
+RUN mkdir "C:\\ProgramData\\envoy"
+ADD ["configs/envoyproxy_io_proxy.yaml", "C:/ProgramData/envoy/envoy.yaml"]
+
+EXPOSE 10000
+
+COPY ci/docker-entrypoint.bat C:/
+ENTRYPOINT ["C:/docker-entrypoint.bat"]
+CMD ["envoy.exe", "-c", "C:\\ProgramData\\envoy\\envoy.yaml"]

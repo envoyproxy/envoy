@@ -1,0 +1,100 @@
+{#
+  Creates 'serialization_composite.h'.
+
+  Template for composite serializers (the CompositeDeserializerWith_N_Delegates classes).
+  Covers the corner case of 0 delegates, and then uses templating to create declarations for 1..N
+  variants.
+#}
+#pragma once
+
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
+
+#include "source/common/common/byte_order.h"
+#include "source/common/common/fmt.h"
+
+#include "contrib/kafka/filters/network/source/kafka_types.h"
+#include "contrib/kafka/filters/network/source/serialization.h"
+
+#include "absl/strings/string_view.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+/**
+ * This header contains only composite deserializers.
+ * The basic design is composite deserializer creating delegates DeserializerType1..N.
+ * Result of type ResponseType is constructed by getting results of each of delegates.
+ * These deserializers can throw, if any of the delegate deserializers can.
+ */
+
+/**
+ * Composite deserializer that uses 0 deserializer(s) (corner case).
+ * Does not consume any bytes, and is always ready to return the result.
+ * Creates a result value using the no-arg ResponseType constructor.
+ * @param ResponseType type of deserialized data.
+ */
+template <typename ResponseType>
+class CompositeDeserializerWith0Delegates : public Deserializer<ResponseType> {
+public:
+  CompositeDeserializerWith0Delegates(){};
+  uint32_t feed(absl::string_view&) override { return 0; }
+  bool ready() const override { return true; }
+  ResponseType get() const override { return {}; }
+};
+
+{% for field_count in counts %}
+/**
+ * Composite deserializer that uses {{ field_count }} deserializer(s).
+ * Passes data to each of the underlying deserializers (deserializers that are already ready do not
+ * consume data, so it's safe).
+ * The composite deserializer is ready when the last deserializer is ready (what means that all
+ * deserializers before it are ready too).
+ * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }.
+ *
+ * @param ResponseType type of deserialized data{% for field in range(1, field_count + 1) %}.
+ * @param DeserializerType{{ field }} deserializer {{ field }}.
+{% endfor %} */
+template <
+  typename ResponseType{% for field in range(1, field_count + 1) %},
+  typename DeserializerType{{ field }}{% endfor %}
+>
+class CompositeDeserializerWith{{ field_count }}Delegates : public Deserializer<ResponseType> {
+public:
+  CompositeDeserializerWith{{ field_count }}Delegates(){};
+
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t consumed = 0;
+    {% for field in range(1, field_count + 1) %}
+    consumed += delegate{{ field }}_.feed(data);
+    {% endfor %}
+    return consumed;
+  }
+
+  bool ready() const override { return delegate{{ field_count }}_.ready(); }
+
+  ResponseType get() const override {
+    return {
+      {% for field in range(1, field_count + 1) %}delegate{{ field }}_.get(),
+      {% endfor %}};
+  }
+
+protected:
+  {% for field in range(1, field_count + 1) %}
+  DeserializerType{{ field }} delegate{{ field }}_;
+  {% endfor %}
+};
+{% endfor %}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

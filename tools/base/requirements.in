@@ -1,0 +1,43 @@
+abstracts>=0.0.12
+aio.api.bazel
+aiohttp>=3.8.1
+cffi>=1.15.0
+colorama
+coloredlogs
+cryptography>=41.0.1
+dependatool>=0.2.2
+envoy.base.utils>=0.4.11
+envoy.code.check>=0.5.4
+envoy.dependency.check>=0.1.7
+envoy.distribution.release>=0.0.9
+envoy.distribution.repo>=0.0.8
+envoy.distribution.verify>=0.0.11
+envoy.docs.sphinx_runner>=0.2.5
+envoy.gpg.identity>=0.1.1
+envoy.gpg.sign>=0.2.0
+flake8>=6
+frozendict>=2.3.7
+gitpython
+google-cloud-storage
+gsutil
+jinja2
+multidict>=6.0.2
+orjson
+pep8-naming
+ply
+# Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
+# `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
+protobuf<4.22.0
+pygithub
+pyreadline
+pyyaml
+setuptools
+slackclient
+sphinx>=7
+thrift
+verboselogs
+yapf
+yarl>=1.7.2
+
+# This has packaging issues, so use the github tarball until resolved (https://github.com/sphinx-contrib/jquery/issues/15)
+https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip

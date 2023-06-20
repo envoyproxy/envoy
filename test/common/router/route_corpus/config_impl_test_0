@@ -1,0 +1,296 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "lyft.com"
+    domains: "www.lyft.com"
+    domains: "w.lyft.com"
+    domains: "ww.lyft.com"
+    domains: "wwww.lyft.com"
+    routes {
+      match {
+        prefix: "/new_endpoint"
+      }
+      route {
+        cluster: "www2"
+        prefix_rewrite: "/api/new_endpoint"
+      }
+    }
+    routes {
+      match {
+        path: "/"
+      }
+      route {
+        cluster: "root_www2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "www2_staging"
+    domains: "www-staging.lyft.net"
+    domains: "www-staging-orca.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2_staging"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "wildcard"
+    domains: "*.foo.com"
+    domains: "*-bar.baz.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "wildcard"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "wildcard2"
+    domains: "*.baz.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "wildcard2"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "regex"
+    domains: "bat.com"
+    routes {
+      match {
+        regex: "/t[io]c"
+      }
+      route {
+        cluster: "clock"
+      }
+    }
+    routes {
+      match {
+        regex: "/baa+"
+      }
+      route {
+        cluster: "sheep"
+      }
+    }
+    routes {
+      match {
+        regex: ".*/\\d{3}$"
+      }
+      route {
+        cluster: "three_numbers"
+        prefix_rewrite: "/rewrote"
+      }
+    }
+    routes {
+      match {
+        regex: ".*"
+      }
+      route {
+        cluster: "regex_default"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "regex2"
+    domains: "bat2.com"
+    routes {
+      match {
+        regex: ""
+      }
+      route {
+        cluster: "nothingness"
+      }
+    }
+    routes {
+      match {
+        regex: ".*"
+      }
+      route {
+        cluster: "regex_default"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/api/application_data"
+      }
+      route {
+        cluster: "ats"
+      }
+    }
+    routes {
+      match {
+        path: "/api/locations"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "locations"
+        prefix_rewrite: "/rewrote"
+      }
+    }
+    routes {
+      match {
+        prefix: "/api/leads/me"
+      }
+      route {
+        cluster: "ats"
+      }
+    }
+    routes {
+      match {
+        prefix: "/host/rewrite/me"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite: "new_host"
+      }
+    }
+    routes {
+      match {
+        prefix: "/oldhost/rewrite/me"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite: "new_oldhost"
+      }
+    }
+    routes {
+      match {
+        path: "/foo"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/bar"
+      }
+    }
+    routes {
+      match {
+        path: "/tar"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/car"
+      }
+    }
+    routes {
+      match {
+        prefix: "/newhost/rewrite/me"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "ats"
+        host_rewrite: "new_host"
+      }
+    }
+    routes {
+      match {
+        path: "/FOOD"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "ats"
+        prefix_rewrite: "/cAndy"
+      }
+    }
+    routes {
+      match {
+        path: "/ApplEs"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/oranGES"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "instant-server"
+        timeout {
+          seconds: 30
+        }
+      }
+    }
+    virtual_clusters {
+      pattern: "^/rides$"
+      name: "ride_request"
+      method: POST
+    }
+    virtual_clusters {
+      pattern: "^/rides/\\d+$"
+      name: "update_ride"
+      method: PUT
+    }
+    virtual_clusters {
+      pattern: "^/users/\\d+/chargeaccounts$"
+      name: "cc_add"
+      method: POST
+    }
+    virtual_clusters {
+      pattern: "^/users/\\d+/chargeaccounts/(?!validate)\\w+$"
+      name: "cc_add"
+      method: PUT
+    }
+    virtual_clusters {
+      pattern: "^/users$"
+      name: "create_user_login"
+      method: POST
+    }
+    virtual_clusters {
+      pattern: "^/users/\\d+$"
+      name: "update_user"
+      method: PUT
+    }
+    virtual_clusters {
+      pattern: "^/users/\\d+/location$"
+      name: "ulu"
+      method: POST
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "api.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

@@ -1,0 +1,37 @@
+static_resources:
+  listeners:
+  - name: mysql_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 1999
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.mysql_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy
+          stat_prefix: egress_mysql
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: mysql_tcp
+          cluster: mysql_cluster
+
+  clusters:
+  - name: mysql_cluster
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: mysql_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: mysql
+                port_value: 3306
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001

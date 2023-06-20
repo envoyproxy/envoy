@@ -1,0 +1,63 @@
+static_resources {
+  clusters {
+    name: "6"
+    connect_timeout {
+      seconds: 2321
+    }
+    lb_policy: MAGLEV
+    hosts {
+      pipe {
+        path: "="
+      }
+    }
+    hosts {
+      pipe {
+        path: "="
+      }
+    }
+    hosts {
+      pipe {
+        path: "t"
+      }
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        max_requests_per_connection {
+          value: 67108864
+        }
+      }
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+      success_rate_minimum_hosts {
+        value: 4096
+      }
+    }
+    common_lb_config {
+      locality_weighted_lb_config {
+      }
+    }
+  }
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J :2222222222222222222222222\022"
+  }
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J.:*static\'_resourc\022es {(\n  cluster`s"
+  }
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J :2222222222222222222222221\022"
+  }
+}
+stats_flush_interval {
+  nanos: 2883584
+}

@@ -1,0 +1,10 @@
+stats_flush_interval {
+  seconds: 13792273858822144
+}
+admin {
+  address {
+    pipe {
+      path: "\177"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+static_resources {
+  clusters {
+    name: "o"
+    connect_timeout {
+      nanos: 15118976
+    }
+    metadata {
+      filter_metadata {
+        key: ""
+      }
+      filter_metadata {
+        key: "\000\000"
+      }
+      filter_metadata {
+        key: "\000\000\001\002z3r90\000\000"
+      }
+      filter_metadata {
+        key: "\000\001\000"
+      }
+      filter_metadata {
+        key: "\000\\959798428\001\002z32902546264\23297677535337\000"
+      }
+      filter_metadata {
+        key: "\0147,83648\000\001\001"
+      }
+      filter_metadata {
+        key: "0"
+      }
+      filter_metadata {
+        key: "@"
+      }
+      filter_metadata {
+        key: "@@"
+      }
+      filter_metadata {
+        key: "UPST128\tAM_HO\001\202\247ST"
+        value {
+        }
+      }
+      filter_metadata {
+        key: "g"
+        value {
+        }
+      }
+      filter_metadata {
+        key: "m"
+        value {
+        }
+      }
+      filter_metadata {
+        key: "y"
+      }
+    }
+  }
+}

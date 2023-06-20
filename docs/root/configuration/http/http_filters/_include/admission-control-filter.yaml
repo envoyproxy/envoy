@@ -1,0 +1,73 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.admission_control
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl
+              enabled:
+                default_value: true
+                runtime_key: admission_control.enabled
+              sampling_window: 60s
+              sr_threshold:
+                default_value:
+                  value: 95.0
+                runtime_key: admission_control.sr_threshold
+              aggression:
+                default_value: 1.0
+                runtime_key: admission_control.aggression
+              rps_threshold:
+                default_value: 1
+                runtime_key: admission_control.rps_threshold
+              max_rejection_probability:
+                default_value:
+                  value: 95.0
+                runtime_key: admission_control.max_rejection_probability
+              success_criteria:
+                http_criteria:
+                  http_success_status:
+                  - start: 100
+                    end: 400
+                  - start: 404
+                    end: 404
+                grpc_criteria:
+                  grpc_success_status:
+                  - 0
+                  - 1
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: local_service
+              routes:
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
+  clusters:
+  - name: default_service
+    load_assignment:
+      cluster_name: default_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

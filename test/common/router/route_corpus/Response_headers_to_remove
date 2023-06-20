@@ -1,0 +1,140 @@
+config {
+  virtual_hosts {
+    name: "j"
+    domains: "$"
+    routes {
+      match {
+        path: ")"
+      }
+      route {
+        weighted_clusters {
+          clusters {
+            name: "$$"
+            weight {
+              value: 870
+            }
+            metadata_match {
+              filter_metadata {
+                key: "envoy.lb"
+                value {
+                }
+              }
+            }
+            request_headers_to_remove: "&"
+          }
+          clusters {
+            name: "$"
+            weight {
+              value: 1868759072
+            }
+            metadata_match {
+              filter_metadata {
+                key: "envoy.lb"
+                value {
+                  fields {
+                    key: ""
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "  "
+                    value {
+                    }
+                  }
+                  fields {
+                    key: ")"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "-209"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "1"
+                    value {
+                      string_value: "z"
+                    }
+                  }
+                  fields {
+                    key: "2"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "5"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "8"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "@"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "Q"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "]"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "^"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "i"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "j"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "p"
+                    value {
+                    }
+                  }
+                  fields {
+                    key: "x"
+                    value {
+                    }
+                  }
+                }
+              }
+            }
+          }
+          runtime_key_prefix: "\177"
+        }
+        metadata_match {
+          filter_metadata {
+            key: "envoy.lb"
+            value {
+              fields {
+                key: "9"
+                value {
+                }
+              }
+            }
+          }
+        }
+        upgrade_configs {
+        }
+      }
+    }
+    response_headers_to_remove: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+    include_attempt_count_in_response: true
+  }
+}

@@ -1,0 +1,66 @@
+date: March 7, 2017
+
+changes:
+- area: cds
+  change: |
+    :ref:`Cluster discovery service (CDS) API <v1.5:config_cluster_manager_cds>`.
+- area: outlier_detection
+  change: |
+    :ref:`Outlier detection <v1.5:arch_overview_outlier_detection>` (passive health checking).
+- area: config
+  change: |
+    Envoy configuration is now checked against a JSON schema.
+- area: routing
+  change: |
+    :ref:`Ring hash <v1.5:arch_overview_load_balancing_types>` consistent load balancer, as well as HTTP consistent hash
+    routing based on a policy.
+- area: rate_limiting
+  change: |
+    Vastly :ref:`enhanced global rate limit configuration <v1.5:arch_overview_rate_limit>` via the HTTP rate limiting
+    filter.
+- area: routing
+  change: |
+    HTTP routing to a cluster retrieved from a header.
+- area: routing
+  change: |
+    Weighted cluster HTTP routing.
+- area: routing
+  change: |
+    Auto host rewrite during HTTP routing.
+- area: matching
+  change: |
+    Regex header matching during HTTP routing.
+- area: logging
+  change: |
+    HTTP access log runtime filter.
+- area: lightstep
+  change: |
+    LightStep tracer :ref:`parent/child span association <v1.5:arch_overview_tracing>`.
+- area: routing
+  change: |
+    :ref:`Route discovery service (RDS) API <v1.5:config_http_conn_man_rds>`.
+- area: routing
+  change: |
+    HTTP router :ref:`x-envoy-upstream-rq-timeout-alt-response header
+    <v1.5:config_http_filters_router_x-envoy-upstream-rq-timeout-alt-response>` support.
+- area: listener
+  change: |
+    ``use_original_dst`` and ``bind_to_port`` :ref:`listener options <v1.5:config_listeners>` (useful for iptables based
+    transparent proxy support).
+- area: routing
+  change: |
+    TCP proxy filter :ref:`route table support <v1.5:config_network_filters_tcp_proxy>`.
+- area: stats
+  change: |
+    Configurable stats flush interval.
+- area: ssl
+  change: |
+    Various :ref:`third party library upgrades <v1.5:install_requirements>`, including using BoringSSL as the default SSL
+    provider.
+- area: http2
+  change: |
+    No longer maintain closed HTTP/2 streams for priority calculations. Leads to substantial memory savings for large
+    meshes.
+- area: envoy
+  change: |
+    Numerous small changes and fixes not listed here.

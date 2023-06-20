@@ -1,0 +1,13 @@
+diff --git a/BUILD b/BUILD
+index 69c9bda..d293092 100644
+--- a/BUILD
++++ b/BUILD
+@@ -88,7 +88,7 @@ cc_library(
+         ":headers",
+     ] + select({
+         "//bazel:crypto_system": [],
+-        "//conditions:default": ["@boringssl//:crypto"],
++        "//conditions:default": ["@envoy//bazel:boringcrypto"],
+     }),
+     alwayslink = 1,
+ )

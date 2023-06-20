@@ -1,0 +1,6 @@
+/generated_api_shadow/envoy/** linguist-generated=true
+/generated_api_shadow/bazel/** linguist-generated=true
+*.svg binary
+/test/extensions/transport_sockets/tls/test_data/aes_128_key binary
+/test/extensions/transport_sockets/tls/test_data/ticket_key_* binary
+/test/**/*_corpus/* linguist-generated=true

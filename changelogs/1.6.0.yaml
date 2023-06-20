@@ -1,0 +1,227 @@
+date: March 20, 2018
+
+changes:
+- area: access log
+  change: |
+    added ``DOWNSTREAM_REMOTE_ADDRESS``, ``DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, and ``DOWNSTREAM_LOCAL_ADDRESS``
+    :ref:`access log formatters <config_access_log_format>`. ``DOWNSTREAM_ADDRESS`` access log formatter has been
+    deprecated.
+- area: access log
+  change: |
+    added less than or equal (LE) :ref:`comparison filter <envoy_api_msg_config.filter.accesslog.v2.ComparisonFilter>`.
+- area: access log
+  change: |
+    added configuration to :ref:`runtime filter <envoy_api_msg_config.filter.accesslog.v2.RuntimeFilter>` to set default
+    sampling rate, divisor, and whether to use independent randomness or not.
+- area: admin
+  change: |
+    added :ref:`/runtime <operations_admin_interface_runtime>` admin endpoint to read the current runtime values.
+- area: build
+  change: |
+    added support for :repo:`building Envoy with exported symbols <bazel#enabling-optional-features>`. This change allows
+    scripts loaded with the Lua filter to load shared object libraries such as those installed via `LuaRocks
+    <https://luarocks.org/>`_.
+- area: config
+  change: |
+    added support for sending error details as `grpc.rpc.Status
+    <https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto>`_ in :ref:`DiscoveryRequest
+    <envoy_api_msg_DiscoveryRequest>`.
+- area: config
+  change: |
+    added support for :ref:`inline delivery <envoy_api_msg_core.DataSource>` of TLS certificates and private keys.
+- area: config
+  change: |
+    added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ConfigSource>` of xDS resources. For
+    filesystem based xDS the file must exist at configuration time. For cluster based xDS the backing cluster must be
+    statically defined and be of non-EDS type.
+- area: grpc
+  change: |
+    the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services overview
+    <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_core.GrpcService>`.
+- area: grpc-json
+  change: |
+    added support for :ref:`inline descriptors
+    <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.proto_descriptor_bin>`.
+- area: health check
+  change: |
+    added :ref:`gRPC health check <envoy_api_field_core.HealthCheck.grpc_health_check>` based on `grpc.health.v1.Health
+    <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_ service.
+- area: health check
+  change: |
+    added ability to set :ref:`host header value <envoy_api_field_core.HealthCheck.HttpHealthCheck.host>` for http health
+    check.
+- area: health check
+  change: |
+    extended the health check filter to support computation of the health check response based on the :ref:`percentage of
+    healthy servers in upstream clusters
+    <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>`.
+- area: health check
+  change: |
+    added setting for :ref:`no-traffic interval <envoy_api_field_core.HealthCheck.no_traffic_interval>`.
+- area: http
+  change: |
+    added idle timeout for :ref:`upstream http connections <envoy_api_field_core.HttpProtocolOptions.idle_timeout>`.
+- area: http
+  change: |
+    added support for :ref:`proxying 100-Continue responses
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.proxy_100_continue>`.
+- area: http
+  change: |
+    added the ability to pass a URL encoded PEM encoded peer certificate in the
+    :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+- area: http
+  change: |
+    added support for trusting additional hops in the :ref:`config_http_conn_man_headers_x-forwarded-for` request header.
+- area: http
+  change: |
+    added support for :ref:`incoming HTTP/1.0 <envoy_api_field_core.Http1ProtocolOptions.accept_http_10>`.
+- area: hot restart
+  change: |
+    added SIGTERM propagation to children to :ref:`hot-restarter.py <operations_hot_restarter>`, which enables using it as a
+    parent of containers.
+- area: ip tagging
+  change: |
+    added :ref:`HTTP IP Tagging filter <config_http_filters_ip_tagging>`.
+- area: listeners
+  change: |
+    added support for :ref:`listening for both IPv4 and IPv6 <envoy_api_field_core.SocketAddress.ipv4_compat>` when binding
+    to ::.
+- area: listeners
+  change: |
+    added support for listening on :ref:`UNIX domain sockets <envoy_api_field_core.Address.pipe>`.
+- area: listeners
+  change: |
+    added support for :ref:`abstract unix domain sockets <envoy_api_msg_core.Pipe>` on Linux. The abstract namespace can be
+    used by prepending '@' to a socket path.
+- area: load balancer
+  change: |
+    added cluster configuration for :ref:`healthy panic threshold
+    <envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>` percentage.
+- area: load balancer
+  change: |
+    added :ref:`Maglev <arch_overview_load_balancing_types_maglev>` consistent hash load balancer.
+- area: load balancer
+  change: |
+    added support for :ref:`LocalityLbEndpoints <envoy_api_msg_endpoint.LocalityLbEndpoints>` priorities.
+- area: lua
+  change: |
+    added headers :ref:`replace() <config_http_filters_lua_header_wrapper>` API.
+- area: lua
+  change: |
+    extended to support :ref:`metadata object <config_http_filters_lua_metadata_wrapper>` API.
+- area: redis
+  change: |
+    added local ``PING`` support to the :ref:`Redis filter <arch_overview_redis>`.
+- area: redis
+  change: |
+    added ``GEORADIUS_RO`` and ``GEORADIUSBYMEMBER_RO`` to the :ref:`Redis command splitter <arch_overview_redis>`
+    allowlist.
+- area: router
+  change: |
+    added ``DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, ``DOWNSTREAM_LOCAL_ADDRESS``,
+    ``DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT``, ``PROTOCOL``, and ``UPSTREAM_METADATA`` :ref:`header formatters
+    <config_http_conn_man_headers_custom_request_headers>`. The ``CLIENT_IP`` header formatter has been deprecated.
+- area: router
+  change: |
+    added gateway-error :ref:`retry-on <config_http_filters_router_x-envoy-retry-on>` policy.
+- area: router
+  change: |
+    added support for route matching based on :ref:`URL query string parameters
+    <envoy_api_msg_route.QueryParameterMatcher>`.
+- area: router
+  change: |
+    added support for more granular weighted cluster routing by allowing the :ref:`total_weight
+    <envoy_api_field_route.WeightedCluster.total_weight>` to be specified in configuration.
+- area: router
+  change: |
+    added support for :ref:`custom request/response headers <config_http_conn_man_headers_custom_request_headers>` with
+    mixed static and dynamic values.
+- area: router
+  change: |
+    added support for :ref:`direct responses <envoy_api_field_route.Route.direct_response>`. I.e., sending a preconfigured
+    HTTP response without proxying anywhere.
+- area: router
+  change: |
+    added support for :ref:`HTTPS redirects <envoy_api_field_route.RedirectAction.https_redirect>` on specific routes.
+- area: router
+  change: |
+    added support for :ref:`prefix_rewrite <envoy_api_field_route.RedirectAction.prefix_rewrite>` for redirects.
+- area: router
+  change: |
+    added support for :ref:`stripping the query string <envoy_api_field_route.RedirectAction.strip_query>` for redirects.
+- area: router
+  change: |
+    added support for downstream request/upstream response :ref:`header manipulation
+    <config_http_conn_man_headers_custom_request_headers>` in :ref:`weighted cluster <envoy_api_msg_route.WeightedCluster>`.
+- area: router
+  change: |
+    added support for :ref:`range based header matching <envoy_api_field_route.HeaderMatcher.range_match>` for request
+    routing.
+- area: squash
+  change: |
+    added support for the :ref:`Squash microservices debugger <config_http_filters_squash>`. Allows debugging an incoming
+    request to a microservice in the mesh.
+- area: stats
+  change: |
+    added metrics service API implementation.
+- area: stats
+  change: |
+    added native :ref:`DogStatsd <envoy_api_msg_config.metrics.v2.DogStatsdSink>` support.
+- area: stats
+  change: |
+    added support for :ref:`fixed stats tag values <envoy_api_field_config.metrics.v2.TagSpecifier.fixed_value>` which will
+    be added to all metrics.
+- area: tcp proxy
+  change: |
+    added support for specifying a :ref:`metadata matcher
+    <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.metadata_match>` for upstream clusters in the tcp filter.
+- area: tcp proxy
+  change: |
+    improved TCP proxy to correctly proxy TCP half-close.
+- area: tcp proxy
+  change: |
+    added :ref:`idle timeout <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`.
+- area: tcp proxy
+  change: |
+    access logs now bring an IP address without a port when using DOWNSTREAM_ADDRESS. Use :ref:`DOWNSTREAM_REMOTE_ADDRESS
+    <config_access_log_format>` instead.
+- area: tracing
+  change: |
+    added support for dynamically loading an :ref:`OpenTracing tracer <envoy_api_msg_config.trace.v2.DynamicOtConfig>`.
+- area: tracing
+  change: |
+    when using the Zipkin tracer, it is now possible for clients to specify the sampling decision (using the
+    :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header) and have the decision propagated through to
+    subsequently invoked services.
+- area: tracing
+  change: |
+    when using the Zipkin tracer, it is no longer necessary to propagate the :ref:`x-ot-span-context
+    <config_http_conn_man_headers_x-ot-span-context>` header. See more on trace context propagation :ref:`here
+    <arch_overview_tracing>`.
+- area: transport sockets
+  change: |
+    added transport socket interface to allow custom implementations of transport sockets. A transport socket provides read
+    and write logic with buffer encryption and decryption (if applicable). The existing TLS implementation has been
+    refactored with the interface.
+- area: upstream
+  change: |
+    added support for specifying an :ref:`alternate stats name <envoy_api_field_Cluster.alt_stat_name>` while emitting stats
+    for clusters.
+- area: envoy
+  change: |
+    Many small bug fixes and performance improvements not listed.
+
+deprecated:
+- area: logging
+  change: |
+    ``DOWNSTREAM_ADDRESS`` log formatter is deprecated. Use ``DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT`` instead.
+- area: headers
+  change: |
+    ``CLIENT_IP`` header formatter is deprecated. Use ``DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT`` instead.
+- area: lds
+  change: |
+    'use_original_dst' field in the v2 LDS API is deprecated. Use listener filters and filter chain matching instead.
+- area: matching
+  change: |
+    ``value`` and ``regex`` fields in the ``HeaderMatcher`` message is deprecated. Use the ``exact_match`` or
+    ``regex_match`` oneof instead.

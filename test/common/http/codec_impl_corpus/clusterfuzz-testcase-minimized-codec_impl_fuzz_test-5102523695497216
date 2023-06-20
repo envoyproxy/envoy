@@ -1,0 +1,35 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+      end_stream: true
+    }
+  }
+}

@@ -1,0 +1,27 @@
+health_check_config {
+    timeout {
+        seconds: 1
+    }
+    interval {
+        seconds: 1
+    }
+    unhealthy_threshold {
+        value: 2
+    }
+    healthy_threshold: {
+        value: 2
+    }
+    tcp_health_check {
+        send {
+            text: "01"
+        }
+        receive [{
+            text: "02"
+        }]
+    }
+}
+actions {
+    trigger_interval_timer {
+
+    }
+}

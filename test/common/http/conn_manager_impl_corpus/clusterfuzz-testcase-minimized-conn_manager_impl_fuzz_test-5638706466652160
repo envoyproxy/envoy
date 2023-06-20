@@ -1,0 +1,43 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+      }
+      headers {
+        key: "foo"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+      }
+      headers {
+        key: "/"
+        value: "foo.com"
+      }
+      headers {
+        key: "/"
+        value: "GT"
+      }
+      headers {
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+    }
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}

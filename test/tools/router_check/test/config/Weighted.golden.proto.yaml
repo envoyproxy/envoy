@@ -1,0 +1,35 @@
+tests:
+- test_name: Test_1
+  input:
+    authority: www1.lyft.com
+    path: "/foo"
+    ssl: true
+    method: GET
+    internal: true
+  validate:
+    path_redirect: ''
+- test_name: Test_2
+  input:
+    authority: www1.lyft.com
+    path: "/test/123"
+    method: GET
+    random_value: 115
+  validate:
+    cluster_name: cluster1
+    virtual_cluster_name: test_virtual_cluster
+- test_name: Test_3
+  input:
+    authority: www1.lyft.com
+    path: "/foo"
+    method: GET
+    random_value: 445
+  validate:
+    cluster_name: cluster2
+- test_name: Test_4
+  input:
+    authority: www1.lyft.com
+    path: "/foo"
+    method: GET
+    random_value: 560
+  validate:
+    cluster_name: cluster3

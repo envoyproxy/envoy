@@ -1,0 +1,9 @@
+fatal_actions:
+- config:
+    name: envoy_test.fatal_action.safe
+    typed_config:
+      '@type': type.googleapis.com/google.protobuf.Empty
+- config:
+    name: envoy_test.fatal_action.unsafe
+    typed_config:
+      '@type': type.googleapis.com/google.protobuf.Empty

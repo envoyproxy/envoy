@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package test.common.buffer;
+
+import "google/protobuf/empty.proto";
+
+message ReserveCommit {
+  uint32 reserve_length = 1;
+  uint32 commit_length = 2;
+}
+
+message CopyOut {
+  uint32 start = 1;
+  uint32 length = 2;
+}
+
+message Move {
+  uint32 source_index = 1;
+  uint32 length = 2;
+}
+
+message Search {
+  string content = 1;
+  uint32 offset = 2;
+}
+
+message Action {
+  uint32 target_index = 1;
+  oneof action_selector {
+    uint32 add_buffer_fragment = 2;
+    uint32 add_string = 3;
+    uint32 add_buffer = 4;
+    uint32 prepend_string = 5;
+    uint32 prepend_buffer = 6;
+    ReserveCommit reserve_commit = 7;
+    CopyOut copy_out = 8;
+    uint32 drain = 9;
+    uint32 linearize = 10;
+    Move move = 11;
+    uint32 read = 12;
+    google.protobuf.Empty write = 13;
+    uint32 get_raw_slices = 14;
+    Search search = 15;
+    string starts_with = 16;
+    uint32 copy_out_to_slices = 17;
+  }
+}
+
+message BufferFuzzTestCase {
+  repeated Action actions = 1;
+}

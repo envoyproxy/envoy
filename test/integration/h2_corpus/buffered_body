@@ -1,0 +1,61 @@
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+      }
+    }
+    h2_frames {
+      request {
+        stream_index: 1
+        host: "host"
+        path: "/p?th/to/longo"
+      }
+    }
+  }
+}
+events {
+  downstream_send_event {
+    h2_frames {
+      metadata {
+        flags: END_HEADERS
+        stream_index: 1
+        metadata {
+          metadata {
+            key: ""
+            value: "@"
+          }
+          metadata {
+            key: "("
+            value: ""
+          }
+          metadata {
+            key: "Timeout Seconds"
+            value: "10"
+          }
+          metadata {
+            key: "tincoes"
+            value: "15"
+          }
+        }
+      }
+    }
+  }
+}
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+        flags: ACK
+      }
+    }
+  }
+}
+events {
+  upstream_send_event {
+    h2_frames {
+      window_update {
+        stream_index: 2147483648
+      }
+    }
+  }
+}
