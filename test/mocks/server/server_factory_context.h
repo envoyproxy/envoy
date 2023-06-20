@@ -47,6 +47,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
+  MOCK_METHOD(bool, enableDeferredCreationStats, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
