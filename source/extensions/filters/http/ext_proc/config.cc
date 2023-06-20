@@ -36,7 +36,8 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
-Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterServerFactoryFromProtoTyped(
+Http::FilterFactoryCb
+ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   const uint32_t message_timeout_ms =
