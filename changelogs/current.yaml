@@ -15,6 +15,10 @@ behavior_changes:
     When ``append_x_forwarded_host`` is enabled for a given route action it is now only appended iff it is different from the last
     value in the list. This resolves issues where a retry caused the same value to be appended multiple times. This
     behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
+- area: ext_proc
+  change: |
+    Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
+    reverted by setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -240,7 +244,9 @@ new_features:
     that sets the maximum number of new connections to be accepted per socket
     event on a listener. If there are more connections to be accepted beyond
     the maximum, the remaining connections would be processed in later
-    dispatcher loop iterations.
+    dispatcher loop iterations. Added listener histogram
+    ``connections_accepted_per_socket_event`` to allow users to empirically
+    determine an appropriate configuration for their deployment.
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
@@ -266,6 +272,11 @@ new_features:
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
+- area: stats
+  change: |
+    added config :ref:`enable_deferred_creation_stats
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
+    When set to true, enables deferred instantiation on supported stats structures.
 - area: ratelimit
   change: |
     added new configuration field :ref:`domain

@@ -57,10 +57,25 @@ ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
+// Shared expression builder instance.
+class BuilderInstance : public Singleton::Instance {
+public:
+  explicit BuilderInstance(BuilderPtr builder) : builder_(std::move(builder)) {}
+  Builder& builder() { return *builder_; }
+
+private:
+  BuilderPtr builder_;
+};
+
+using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
+
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
 BuilderPtr createBuilder(Protobuf::Arena* arena);
+
+// Gets the singleton expression builder. Must be called on the main thread.
+BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.
