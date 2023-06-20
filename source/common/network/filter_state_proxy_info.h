@@ -15,7 +15,7 @@ namespace Network {
 class Http11ProxyInfoFilterState : public StreamInfo::FilterState::Object {
 public:
   // Returns the key for looking up the Http11ProxyInfoFilterState in the FilterState.
-  static const std::string& key();
+  static const StreamInfo::InlineKey key();
 
   Http11ProxyInfoFilterState(absl::string_view hostname,
                              Network::Address::InstanceConstSharedPtr address)

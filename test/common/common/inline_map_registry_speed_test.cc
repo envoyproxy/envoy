@@ -1,38 +1,35 @@
 #include <cstddef>
 
-#include "envoy/common/inline_map_registry.h"
-
-#include "test/common/common/inline_map_registry_test_scope.h"
+#include "source/common/common/inline_map_registry.h"
 
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace {
 
-template <size_t N> static const std::vector<std::string>& getNormalKeys() {
-  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, []() {
-    std::vector<std::string> keys;
-    for (size_t i = 0; i < N; ++i) {
-      keys.push_back("key_" + std::to_string(i));
-    }
-    return keys;
-  }());
-}
-
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_InlineMapFind(benchmark::State& state) {
   size_t map_type = state.range(0);
   size_t used_inline_handles = state.range(1);
 
-  auto normal_keys = getNormalKeys<200>();
-  auto inline_handles_200 = InlineMapRegistryTestScope<200>::inlineHandles();
-  auto inline_hanldes_0 = InlineMapRegistryTestScope<0>::inlineHandles();
+  std::vector<std::string> normal_keys;
+
+  InlineMapRegistry registry_200;
+  // Create 200 inline keys.
+  std::vector<InlineMapRegistry::InlineKey> inline_handles_200;
+  for (size_t i = 0; i < 200; ++i) {
+    const std::string key = "key_" + std::to_string(i);
+    inline_handles_200.push_back(registry_200.registerInlineKey(key));
+    normal_keys.push_back(key);
+  }
+  InlineMapRegistry registry_0;
+
+  registry_200.finalize();
+  registry_0.finalize();
 
   absl::flat_hash_map<std::string, std::unique_ptr<std::string>> normal_map;
-  auto inline_map_200 =
-      InlineMapRegistry<InlineMapRegistryTestScope<200>>::InlineMap<std::string>::createInlineMap();
-  auto inline_map_0 =
-      InlineMapRegistry<InlineMapRegistryTestScope<0>>::InlineMap<std::string>::createInlineMap();
+  auto inline_map_200 = registry_200.createInlineMap<std::string>();
+  auto inline_map_0 = registry_0.createInlineMap<std::string>();
 
   for (size_t i = 0; i < 200; ++i) {
     normal_map[normal_keys[i]] = std::make_unique<std::string>("value_" + std::to_string(i));

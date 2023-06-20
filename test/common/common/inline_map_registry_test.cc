@@ -1,4 +1,4 @@
-#include "test/common/common/inline_map_registry_test_scope.h"
+#include "source/common/common/inline_map_registry.h"
 
 #include "gtest/gtest.h"
 
@@ -6,12 +6,10 @@ namespace Envoy {
 namespace {
 
 TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
-  auto map =
-      InlineMapRegistry<InlineMapRegistryTestScope<0>>::InlineMap<std::string>::createInlineMap();
+  InlineMapRegistry registry;
+  registry.finalize();
 
-  EXPECT_EQ(InlineMapRegistryManager::registriesInfo().size(), 1);
-  EXPECT_EQ(InlineMapRegistryManager::registriesInfo()[0].registry_scope_name,
-            InlineMapRegistryTestScope<0>::name());
+  auto map = registry.createInlineMap<std::string>();
 
   // Insert keys.
   for (size_t i = 0; i < 200; ++i) {
@@ -34,11 +32,18 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 }
 
 TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
+  InlineMapRegistry registry;
 
-  auto inline_hanldes = InlineMapRegistryTestScope<20>::inlineHandles();
+  std::vector<InlineMapRegistry::InlineKey> inline_keys;
 
-  auto map =
-      InlineMapRegistry<InlineMapRegistryTestScope<20>>::InlineMap<std::string>::createInlineMap();
+  // Create 20 inline keys.
+  for (size_t i = 0; i < 20; ++i) {
+    inline_keys.push_back(registry.registerInlineKey("key_" + std::to_string(i)));
+  }
+
+  registry.finalize();
+
+  auto map = registry.createInlineMap<std::string>();
 
   // Insert keys.
   for (size_t i = 0; i < 200; ++i) {
@@ -52,11 +57,11 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   // Lookup by typed inline handle.
-  for (size_t i = 0; i < inline_hanldes.size(); ++i) {
+  for (size_t i = 0; i < inline_keys.size(); ++i) {
     const std::string key = "key_" + std::to_string(i);
-    auto handle = inline_hanldes[i];
-    EXPECT_EQ(handle.inlineEntryKey(), key);
-    EXPECT_EQ(handle.inlineEntryId(), i);
+    auto handle = inline_keys[i];
+    EXPECT_EQ(handle.inlineKey(), key);
+    EXPECT_EQ(handle.inlineId(), i);
     EXPECT_EQ(*map->lookup(handle), "value_" + std::to_string(i));
   }
 
@@ -66,7 +71,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   // Remove keys by typed inline handle.
   for (size_t i = 0; i < 10; ++i) {
     const std::string key = "key_" + std::to_string(i);
-    auto handle = inline_hanldes[i];
+    auto handle = inline_keys[i];
     map->remove(handle);
   }
 

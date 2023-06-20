@@ -14,7 +14,7 @@ public:
   explicit ApplicationProtocols(const std::vector<std::string>& application_protocols)
       : application_protocols_(application_protocols) {}
   const std::vector<std::string>& value() const { return application_protocols_; }
-  static const std::string& key();
+  static const StreamInfo::InlineKey key();
 
 private:
   const std::vector<std::string> application_protocols_;

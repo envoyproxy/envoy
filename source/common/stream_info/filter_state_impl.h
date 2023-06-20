@@ -14,7 +14,10 @@ namespace StreamInfo {
 
 class FilterStateImpl : public FilterState {
 public:
-  FilterStateImpl(FilterState::LifeSpan life_span) : life_span_(life_span) {
+  FilterStateImpl(FilterState::LifeSpan life_span)
+      : life_span_(life_span),
+        data_storage_(
+            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
@@ -23,7 +26,9 @@ public:
    * @param life_span the life span this is handling.
    */
   FilterStateImpl(FilterStateSharedPtr ancestor, FilterState::LifeSpan life_span)
-      : ancestor_(ancestor), life_span_(life_span) {
+      : ancestor_(ancestor), life_span_(life_span),
+        data_storage_(
+            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
@@ -35,7 +40,9 @@ public:
    * @param life_span the life span this is handling.
    */
   FilterStateImpl(LazyCreateAncestor lazy_create_ancestor, FilterState::LifeSpan life_span)
-      : ancestor_(lazy_create_ancestor), life_span_(life_span) {
+      : ancestor_(lazy_create_ancestor), life_span_(life_span),
+        data_storage_(
+            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
@@ -44,10 +51,23 @@ public:
       absl::string_view data_name, std::shared_ptr<Object> data, FilterState::StateType state_type,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
+  void setData(
+      InlineKey data_key, std::shared_ptr<Object> data, StateType state_type,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
+
   bool hasDataWithName(absl::string_view) const override;
+  bool hasDataWithHandle(InlineKey data_key) const override;
+
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
+  const Object* getDataReadOnlyGeneric(InlineKey data_key) const override;
+
   Object* getDataMutableGeneric(absl::string_view data_name) override;
+  Object* getDataMutableGeneric(InlineKey data_key) override;
+
   std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) override;
+  std::shared_ptr<Object> getDataSharedMutableGeneric(InlineKey data_key) override;
+
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
@@ -55,15 +75,98 @@ public:
   FilterStateSharedPtr parent() const override { return parent_; }
 
 private:
+  template <class DataKeyType>
+  void setDataInternal(DataKeyType data_key, std::shared_ptr<Object> data, StateType state_type,
+                       LifeSpan life_span, StreamSharingMayImpactPooling stream_sharing) {
+
+    if (life_span > life_span_) {
+      if (hasDataWithNameInternally(data_key)) {
+        IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                     "conflicting life_span on the same data_name.");
+        return;
+      }
+      maybeCreateParent(ParentAccessMode::ReadWrite);
+      parent_->setData(data_key, data, state_type, life_span, stream_sharing);
+      return;
+    }
+    if (parent_ && parent_->hasDataWithName(data_key)) {
+      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                   "conflicting life_span on the same data_name.");
+      return;
+    }
+    const auto* current = data_storage_->lookup(data_key);
+    if (current != nullptr) {
+      // We have another object with same data_name. Check for mutability
+      // violations namely: readonly data cannot be overwritten, mutable data
+      // cannot be overwritten by readonly data.
+      if (current->state_type_ == FilterState::StateType::ReadOnly) {
+        IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice on same "
+                     "ReadOnly state.");
+        return;
+      }
+
+      if (current->state_type_ != state_type) {
+        IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                     "different state types.");
+        return;
+      }
+    }
+
+    std::unique_ptr<FilterStateImpl::FilterObject> filter_object(
+        new FilterStateImpl::FilterObject());
+    filter_object->data_ = data;
+    filter_object->state_type_ = state_type;
+    filter_object->stream_sharing_ = stream_sharing;
+    data_storage_->insert(data_key, std::move(filter_object));
+  }
+
   // This only checks the local data_storage_ for data_name existence.
-  bool hasDataWithNameInternally(absl::string_view data_name) const;
+  template <class DataKeyType> bool hasDataInternal(DataKeyType data_key) const {
+    return data_storage_->lookup(data_key) != nullptr;
+  }
+
+  template <class DataKeyType>
+  const FilterState::Object* getDataReadOnlyGenericInternal(DataKeyType data_key) const {
+    const auto* current = data_storage_->lookup(data_key);
+
+    if (current == nullptr) {
+      if (parent_) {
+        return parent_->getDataReadOnlyGeneric(data_key);
+      }
+      return nullptr;
+    }
+
+    return current->data_.get();
+  }
+
+  template <class DataKeyType>
+  std::shared_ptr<FilterState::Object> getDataSharedMutableGenericInternal(DataKeyType data_key) {
+    const auto* current = data_storage_->lookup(data_key);
+
+    if (current == nullptr) {
+      if (parent_) {
+        return parent_->getDataSharedMutableGeneric(data_key);
+      }
+      return nullptr;
+    }
+
+    if (current->state_type_ == FilterState::StateType::ReadOnly) {
+      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState accessed immutable data as mutable.");
+      // To reduce the chances of a crash, allow the mutation in this case instead of returning a
+      // nullptr.
+    }
+
+    return current->data_;
+  }
+
   enum class ParentAccessMode { ReadOnly, ReadWrite };
   void maybeCreateParent(ParentAccessMode parent_access_mode);
 
   absl::variant<FilterStateSharedPtr, LazyCreateAncestor> ancestor_;
   FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
-  absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
+
+  InlineMapRegistry::InlineMapPtr<FilterObject> data_storage_;
 };
 
 } // namespace StreamInfo

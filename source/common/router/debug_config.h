@@ -35,7 +35,7 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
   /**
    * @return the string key for finding DebugConfig, if present, in FilterState.
    */
-  static const std::string& key();
+  static const StreamInfo::InlineKey key();
 
   /**
    * Append cluster information as a response header if `append_cluster_` is true. The router will

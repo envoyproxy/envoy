@@ -45,7 +45,10 @@
 namespace Envoy {
 namespace Router {
 namespace {
-constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
+
+static StreamInfo::InlineKey NumInternalRedirectsFilterStateName =
+    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
+        "num_internal_redirects");
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 

@@ -13,7 +13,7 @@ class ProxyProtocolFilterState : public StreamInfo::FilterState::Object {
 public:
   ProxyProtocolFilterState(Network::ProxyProtocolData options) : options_(options) {}
   const Network::ProxyProtocolData& value() const { return options_; }
-  static const std::string& key();
+  static const StreamInfo::InlineKey key();
 
 private:
   const Network::ProxyProtocolData options_;

@@ -5,8 +5,11 @@
 namespace Envoy {
 namespace Network {
 
-const std::string& UpstreamServerName::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.upstream_server_name");
-}
+auto upstream_server_name_inline_key =
+    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
+        "envoy.network.upstream_server_name");
+
+const StreamInfo::InlineKey UpstreamServerName::key() { return upstream_server_name_inline_key; }
+
 } // namespace Network
 } // namespace Envoy
