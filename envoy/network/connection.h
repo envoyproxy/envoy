@@ -86,6 +86,7 @@ public:
 
   enum class ReadDisableStatus {
     NoTransition,
+    StillReadDisabled,
     TransitionedToReadEnabled,
     TransitionedToReadDisabled
   };

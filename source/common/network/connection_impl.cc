@@ -375,9 +375,10 @@ Connection::ReadDisableStatus ConnectionImpl::readDisable(bool disable) {
       // If readDisable is called on a closed connection, do not crash.
       return ReadDisableStatus::NoTransition;
     }
+
     if (read_disable_count_ > 1) {
       // The socket has already been read disabled.
-      return ReadDisableStatus::NoTransition;
+      return ReadDisableStatus::StillReadDisabled;
     }
 
     // If half-close semantics are enabled, we never want early close notifications; we
@@ -397,7 +398,7 @@ Connection::ReadDisableStatus ConnectionImpl::readDisable(bool disable) {
       return ReadDisableStatus::NoTransition;
     }
 
-    auto read_disable_status = ReadDisableStatus::NoTransition;
+    auto read_disable_status = ReadDisableStatus::StillReadDisabled;
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.

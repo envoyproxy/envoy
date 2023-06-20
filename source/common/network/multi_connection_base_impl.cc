@@ -128,7 +128,7 @@ Connection::ReadDisableStatus MultiConnectionBaseImpl::readDisable(bool disable)
     post_connect_state_.read_disable_count_ = 0;
   }
 
-  auto read_disable_state = ReadDisableStatus::NoTransition;
+  auto read_disable_state = ReadDisableStatus::StillReadDisabled;
 
   if (disable) {
     if (post_connect_state_.read_disable_count_ == 0) {
