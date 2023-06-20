@@ -131,7 +131,7 @@ message Bootstrap {
     // memory overhead for these objects, and a small increase of CPU usage when a at least one of the stats
     // is updated for the first time.
     // Groups of stats that will be lazily initialized:
-    //  * Cluster traffic stats: a subgroup of the :ref:`cluster statistics <config_cluster_manager_cluster_stats>`
+    // - Cluster traffic stats: a subgroup of the :ref:`cluster statistics <config_cluster_manager_cluster_stats>`
     // that are used when requests are routed to the cluster.
     bool enable_deferred_creation_stats = 1;
   }
