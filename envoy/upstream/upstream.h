@@ -35,10 +35,6 @@
 
 namespace Envoy {
 
-namespace Stats {
-template <typename StatsStructType> class DeferredCreationCompatibleStats;
-}
-
 namespace Http {
 class FilterChainManager;
 }

@@ -235,7 +235,8 @@ public:
     use_real_stats_ = true;
     config_helper_.addConfigModifier(
         [enable_deferred_creation_stats](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          bootstrap.set_enable_deferred_creation_stats(enable_deferred_creation_stats);
+          bootstrap.mutable_deferred_stat_options()->set_enable_deferred_creation_stats(
+              enable_deferred_creation_stats);
         });
     CdsIntegrationTest::initialize();
     test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
