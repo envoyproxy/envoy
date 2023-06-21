@@ -34,7 +34,6 @@
 #include "fmt/format.h"
 
 namespace Envoy {
-
 namespace Http {
 class FilterChainManager;
 }
