@@ -292,7 +292,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
-      absl::nullopt, absl::nullopt);
+      absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
