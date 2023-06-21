@@ -626,6 +626,41 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "client_codec_diff_fuzz_test",
+    srcs = ["client_codec_diff_fuzz_test.cc"],
+    corpus = "server_codec_diff_fuzz_corpus",
+    deps = [
+        ":common_lib",
+        ":server_codec_diff_fuzz_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:exception_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/config:utility_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "filter_chain_helper_test",
     srcs = ["filter_chain_helper_test.cc"],
