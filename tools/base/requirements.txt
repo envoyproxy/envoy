@@ -1403,9 +1403,9 @@ yamllint==1.32.0 \
     --hash=sha256:d01dde008c65de5b235188ab3110bebc59d18e5c65fc8a58267cd211cd9df34a \
     --hash=sha256:d97a66e48da820829d96077d76b8dfbe6c6140f106e558dae87e81ac4e6b30b7
     # via envoy-code-check
-yapf==0.40.0 \
-    --hash=sha256:63386557876c2686cb29d8c422b2d1e484f29f7a278821f91515b5c5adf569a7 \
-    --hash=sha256:7eeb8c404e386f16e24cbd785103dbc573f51cbb68e65a35f4392e0233f3d7bc
+yapf==0.40.1 \
+    --hash=sha256:958587eb5c8ec6c860119a9c25d02addf30a44f75aa152a4220d30e56a98037c \
+    --hash=sha256:b8bfc1f280949153e795181768ca14ef43d7312629a06c43e7abd279323af313
     # via
     #   -r requirements.in
     #   envoy-code-check
