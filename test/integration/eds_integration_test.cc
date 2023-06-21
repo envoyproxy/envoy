@@ -61,6 +61,7 @@ public:
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
+    absl::optional<bool> weighted_priority_health = absl::nullopt;
     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
   };
 
@@ -76,6 +77,10 @@ public:
     if (endpoint_setting.overprovisioning_factor.has_value()) {
       cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
           endpoint_setting.overprovisioning_factor.value());
+    }
+    if (endpoint_setting.weighted_priority_health.has_value()) {
+      cluster_load_assignment.mutable_policy()->set_weighted_priority_health(
+          endpoint_setting.weighted_priority_health.value());
     }
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
 
@@ -438,6 +443,31 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   options.overprovisioning_factor = 200;
   setEndpoints(options);
   get_and_compare(200);
+}
+
+// Validate that weighted_priority_health update are picked up by Envoy.
+TEST_P(EdsIntegrationTest, WeightedPriorityHealthUpdate) {
+  initializeTest(false);
+  // Default overprovisioning factor.
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  setEndpoints(options);
+  auto get_and_compare = [this](bool expected) {
+    const auto& cluster_map = test_server_->server().clusterManager().clusters();
+    EXPECT_EQ(1, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
+    const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
+    EXPECT_EQ(1, hostset_per_priority.size());
+    const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
+    EXPECT_EQ(expected, host_set->weightedPriorityHealth());
+  };
+  get_and_compare(false);
+
+  options.weighted_priority_health = true;
+  setEndpoints(options);
+  get_and_compare(true);
 }
 
 // Verifies that EDS update only triggers member update callbacks once per update.

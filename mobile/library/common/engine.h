@@ -34,10 +34,8 @@ public:
    * Run the engine with the provided configuration.
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
-   * @param admin_address_path to set --admin-address-path, or an empty string if not needed.
    */
-  envoy_status_t run(std::string config, std::string log_level,
-                     const std::string admin_address_path);
+  envoy_status_t run(std::string config, std::string log_level);
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImpl>&& options);
 
   /**
@@ -71,16 +69,6 @@ public:
    */
   envoy_status_t recordCounterInc(const std::string& elements, envoy_stats_tags tags,
                                   uint64_t count);
-
-  /**
-   * Issue a call against the admin handler, populating the `out` parameter with the response if
-   * the call was successful.
-   * @param path the admin path to query.
-   * @param method the HTTP method to use (GET or POST).
-   * @param out the response body, populated if the call is successful.
-   * @returns ENVOY_SUCCESS if the call was successful and `out` was populated.
-   */
-  envoy_status_t makeAdminCall(absl::string_view path, absl::string_view method, envoy_data& out);
 
   /**
    * Dump Envoy stats into the returned buffer

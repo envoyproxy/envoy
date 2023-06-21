@@ -19,9 +19,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ConnectionBalancer& connection_balancer)
     : OwnedActiveStreamListenerBase(
           parent, parent.dispatcher(),
-          parent.dispatcher().createListener(std::move(socket), *this, runtime, config.bindToPort(),
-                                             config.ignoreGlobalConnLimit()),
-          config),
+          parent.dispatcher().createListener(std::move(socket), *this, runtime, config), config),
       tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
       listen_address_(listen_address) {
   connection_balancer_.registerHandler(*this);
@@ -98,6 +96,10 @@ void ActiveTcpListener::onReject(RejectCause cause) {
     stats_.downstream_cx_overload_reject_.inc();
     break;
   }
+}
+
+void ActiveTcpListener::recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) {
+  stats_.connections_accepted_per_socket_event_.recordValue(connections_accepted);
 }
 
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,

@@ -170,6 +170,7 @@ public:
 
   MOCK_METHOD(void, onAccept_, (ConnectionSocketPtr & socket));
   MOCK_METHOD(void, onReject, (RejectCause), (override));
+  MOCK_METHOD(void, recordConnectionsAcceptedOnSocketEvent, (uint32_t), (override));
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
@@ -445,6 +446,7 @@ public:
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, (const Network::Address::Instance&));
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
+  MOCK_METHOD(uint32_t, maxConnectionsToAcceptPerSocketEvent, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
 
