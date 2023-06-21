@@ -19,14 +19,10 @@ namespace CEL {
 class CELAccessLogExtensionFilterFactory : public Envoy::AccessLog::ExtensionFilterFactory {
 public:
   Envoy::AccessLog::FilterPtr
-  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
-               Random::RandomGenerator&) override;
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::CommonFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override { return "envoy.access_loggers.extension_filters.cel"; }
-
-private:
-  Extensions::Filters::Common::Expr::Builder& getOrCreateBuilder();
-  Extensions::Filters::Common::Expr::BuilderPtr expr_builder_;
 };
 
 } // namespace CEL

@@ -357,22 +357,24 @@ final class EngineBuilderTests: XCTestCase {
   }
 
 #if ENVOY_GOOGLE_GRPC
-  func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
+  func testAddingRtdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRTDSLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
-    XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("some_rtds_resource"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 14325 }"))
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
-  func testAddingCdsAndAdsConfigurationWhenRunningEnvoy() {
+  func testAddingCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService(cdsResourcesLocator: "FAKE_CDS_LOCATOR", timeoutInSeconds: 2543)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer(resourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_CDS_LOCATOR"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 2543 }"))
@@ -380,14 +382,16 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testAddingDefaultCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService()
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer()
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("cds_config {"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 5 }"))
   }
+#endif
 
   func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
@@ -417,7 +421,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
-#endif
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")

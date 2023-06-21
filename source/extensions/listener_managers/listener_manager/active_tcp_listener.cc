@@ -98,6 +98,10 @@ void ActiveTcpListener::onReject(RejectCause cause) {
   }
 }
 
+void ActiveTcpListener::recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) {
+  stats_.connections_accepted_per_socket_event_.recordValue(connections_accepted);
+}
+
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool hand_off_restored_destination_connections,
                                        bool rebalanced) {

@@ -118,6 +118,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener_callbacks2, onAccept_(_)).Times(0);
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        EXPECT_CALL(listener_callbacks1, recordConnectionsAcceptedOnSocketEvent(_));
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
         EXPECT_EQ(*conn->connectionInfoProvider().localAddress(),
@@ -165,6 +166,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   initiate_connections(5);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(3);
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(5));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // We expect any server-side connections that get created to populate 'server_connections'.
@@ -175,6 +177,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   initiate_connections(5);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(4);
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(5));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(3, server_connections.size());
@@ -182,6 +185,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   // Clear the limit and verify there's no longer a limit.
   scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", ""}});
   initiate_connections(10);
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(10));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(13, server_connections.size());
@@ -232,6 +236,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   initiate_connections(2);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(0);
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   for (const auto& conn : client_connections) {
@@ -274,6 +279,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
         dispatcher_->exit();
       }));
 
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -326,6 +332,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
         dispatcher_->exit();
       }));
 
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -370,6 +377,7 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
         dispatcher_->exit();
       }));
 
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -398,6 +406,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Now that we've seen that the connection hasn't been closed by the listener, make sure to close
@@ -438,6 +447,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
     client_connection->addConnectionCallbacks(connection_callbacks);
     client_connection->connect();
+    EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -461,6 +471,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
     client_connection->addConnectionCallbacks(connection_callbacks);
     client_connection->connect();
+    EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
@@ -500,6 +511,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -534,6 +546,7 @@ TEST_P(TcpListenerImplTest, LoadShedPointCanRejectConnection) {
     });
   }
 
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
@@ -596,6 +609,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   client_connection2->addConnectionCallbacks(connection_callbacks2);
   client_connection2->connect();
 
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Now that we've seen that the connection hasn't been closed by the listener, make sure to
@@ -647,6 +661,7 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
             }
           }));
   //  Check the logs that they are accepted at different socket events
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(1)).Times(2);
   EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 1 new connections", 2,
                               { dispatcher_->run(Event::Dispatcher::RunType::Block); });
 
