@@ -293,7 +293,7 @@ TEST_F(EdsResourcesCacheImplTest, ExpiredCacheResource) {
 }
 
 // Validate that adding a timer with an expiration timer, and disabling the timer
-// prevebts invoking a notification.
+// prevents invoking a notification.
 TEST_F(EdsResourcesCacheImplTest, DisableExpiredCacheResource) {
   ResourceRemovalCallbackCounter callback;
 
