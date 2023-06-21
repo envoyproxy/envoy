@@ -326,9 +326,9 @@ typed_config:
 
     EXPECT_EQ("302", response->headers().getStatusValue());
     std::string hmac =
-            Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+        Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
     std::string oauth_expires = Http::Utility::parseSetCookieValue(
-            response->headers(), default_cookie_names_.oauth_expires_);
+        response->headers(), default_cookie_names_.oauth_expires_);
 
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     cleanup();
