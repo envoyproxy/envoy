@@ -205,18 +205,15 @@ Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelec
 
 } // namespace
 
-class UpstreamLocalAddressSelectorImplFactory : public UpstreamLocalAddressSelectorFactory {
-public:
-  std::string name() const override { return std::string(kDefaultLocalAddressSelectorName); }
+std::string UpstreamLocalAddressSelectorImplFactory::name() const {
+  return std::string(kDefaultLocalAddressSelectorName);
+}
 
-  UpstreamLocalAddressSelectorPtr
-  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
-                             const absl::optional<envoy::config::core::v3::BindConfig>&
-                                 bootstrap_bind_config) const override {
-    return std::make_shared<UpstreamLocalAddressSelectorImpl>(cluster_config,
-                                                              bootstrap_bind_config);
-  }
-};
+UpstreamLocalAddressSelectorPtr UpstreamLocalAddressSelectorImplFactory::createLocalAddressSelector(
+    const envoy::config::cluster::v3::Cluster& cluster_config,
+    const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) const {
+  return std::make_shared<UpstreamLocalAddressSelectorImpl>(cluster_config, bootstrap_bind_config);
+}
 
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
@@ -2306,6 +2303,7 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   }
   return health_check_address;
 }
+
 /**
  * Static registration for the default local address selector. @see RegisterFactory.
  */

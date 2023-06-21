@@ -78,7 +78,7 @@ public:
       const envoy::config::cluster::v3::Cluster& cluster_config,
       const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) const PURE;
 
-  std::string category() const override { return "envoy.local_address_selector"; }
+  std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };
 
 /**

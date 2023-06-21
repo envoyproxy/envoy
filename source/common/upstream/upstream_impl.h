@@ -1292,6 +1292,17 @@ protected:
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 
+class UpstreamLocalAddressSelectorImplFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  std::string name() const override;
+  UpstreamLocalAddressSelectorPtr
+  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
+                             const absl::optional<envoy::config::core::v3::BindConfig>&
+                                 bootstrap_bind_config) const override;
+};
+
+DECLARE_FACTORY(UpstreamLocalAddressSelectorImplFactory);
+
 /**
  * Utility function to get Dns from cluster/enum.
  */
