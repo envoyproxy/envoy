@@ -114,6 +114,9 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	fs := f.callbacks.StreamInfo().FilterState()
 	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
 
+	val := fs.GetString("go_state_test_key")
+	header.Add("go-state-test-header-key", val)
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}

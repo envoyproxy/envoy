@@ -169,12 +169,6 @@ public:
 
   /**
    * @return LoadBalancerPtr a new worker local load balancer.
-   * TODO(wbpcode): remove this method in the future and used the new method below.
-   */
-  virtual LoadBalancerPtr create() PURE;
-
-  /**
-   * @return LoadBalancerPtr a new worker local load balancer.
    */
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
 };
@@ -228,6 +222,15 @@ public:
 
 using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
+/*
+ * Parsed load balancer configuration that will be used to create load balancer.
+ */
+class LoadBalancerConfig {
+public:
+  virtual ~LoadBalancerConfig() = default;
+};
+using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
+
 /**
  * Factory config for load balancers. To support a load balancing policy of
  * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
@@ -241,15 +244,30 @@ public:
   /**
    * @return ThreadAwareLoadBalancerPtr a new thread-aware load balancer.
    *
+   * @param lb_config supplies the parsed config of the load balancer.
    * @param cluster_info supplies the cluster info.
-   * @param priority_set supplies the priority set.
+   * @param priority_set supplies the priority set on the main thread.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param time_source supplies the time source.
    */
   virtual ThreadAwareLoadBalancerPtr
-  create(const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
-         Random::RandomGenerator& random, TimeSource& time_source) PURE;
+  create(OptRef<const LoadBalancerConfig> lb_config, const ClusterInfo& cluster_info,
+         const PrioritySet& priority_set, Runtime::Loader& runtime, Random::RandomGenerator& random,
+         TimeSource& time_source) PURE;
+
+  /**
+   * This method is used to validate and create load balancer config from typed proto config.
+   *
+   * @return LoadBalancerConfigPtr a new load balancer config.
+   *
+   * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
+   *        be performed on the config to the expected proto type.
+   * @param visitor supplies the validation visitor that will be used to validate the embedded
+   *        Any proto message.
+   */
+  virtual LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                           ProtobufMessage::ValidationVisitor& visitor) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };

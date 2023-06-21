@@ -7,7 +7,7 @@
 # It can be used to test TCP tunneling as described in
 # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
 # and running `curl -x 127.0.0.1:10000 https://www.google.com`,
-# or running `curl -H "Host: the-hosted-domain-on-port-10003"  http://127.0.0.1:10002
+# or running `curl -H 'Host: www.google.com' --resolve www.google.com:10000:127.0.0.1 https://www.google.com:10000`
 
 admin:
   address:

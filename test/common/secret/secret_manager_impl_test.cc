@@ -134,12 +134,15 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
-  Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+  auto cvc_config =
+      Ssl::CertificateValidationContextConfigImpl::create(
+          *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
+          *api_)
+          .value();
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            cvc_config.caCert());
+            cvc_config->caCert());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static certificate
@@ -526,9 +529,10 @@ validation_context:
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources_2.refvec_, "validation-context-v1");
-  Ssl::CertificateValidationContextConfigImpl cert_validation_context(
-      *context_secret_provider->secret(), *api_);
-  EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
+  auto cert_validation_context =
+      Ssl::CertificateValidationContextConfigImpl::create(*context_secret_provider->secret(), *api_)
+          .value();
+  EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context->caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
 - name: "abc.com"
@@ -1140,21 +1144,24 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
-  Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
-  EXPECT_EQ(cvc_config.subjectAltNameMatchers().size(), 4);
-  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  auto cvc_config =
+      Ssl::CertificateValidationContextConfigImpl::create(
+          *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
+          *api_)
+          .value();
+  EXPECT_EQ(cvc_config->subjectAltNameMatchers().size(), 4);
+  EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[0].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
-            cvc_config.subjectAltNameMatchers()[0].san_type());
-  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+            cvc_config->subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[1].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
-            cvc_config.subjectAltNameMatchers()[1].san_type());
-  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[2].matcher().exact());
+            cvc_config->subjectAltNameMatchers()[1].san_type());
+  EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[2].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
-            cvc_config.subjectAltNameMatchers()[2].san_type());
-  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[3].matcher().exact());
+            cvc_config->subjectAltNameMatchers()[2].san_type());
+  EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[3].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
-            cvc_config.subjectAltNameMatchers()[3].san_type());
+            cvc_config->subjectAltNameMatchers()[3].san_type());
 }
 
 } // namespace

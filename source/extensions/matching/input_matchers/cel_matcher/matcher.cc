@@ -9,17 +9,18 @@ namespace CelMatcher {
 using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
 using ::xds::type::v3::CelExpression;
 
-CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher, Builder& builder)
-    : cel_matcher_(std::move(cel_matcher)) {
+CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
+                                 Filters::Common::Expr::BuilderInstanceSharedPtr builder)
+    : builder_(builder), cel_matcher_(std::move(cel_matcher)) {
   const CelExpression& input_expr = cel_matcher_->expr_match();
   switch (input_expr.expr_specifier_case()) {
   case CelExpression::ExprSpecifierCase::kParsedExpr:
-    compiled_expr_ =
-        Filters::Common::Expr::createExpression(builder, input_expr.parsed_expr().expr());
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
+                                                             input_expr.parsed_expr().expr());
     return;
   case CelExpression::ExprSpecifierCase::kCheckedExpr:
-    compiled_expr_ =
-        Filters::Common::Expr::createExpression(builder, input_expr.checked_expr().expr());
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
+                                                             input_expr.checked_expr().expr());
     return;
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;

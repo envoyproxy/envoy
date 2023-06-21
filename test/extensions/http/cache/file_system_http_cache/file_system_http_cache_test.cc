@@ -568,6 +568,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
   // unlink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  waitForEvictionThreadIdle();
   // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
   // this should make the value 12345.
   EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);

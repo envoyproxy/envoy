@@ -122,6 +122,7 @@ public:
       - filters:
         - name: envoy.test.router
           typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
       )EOF");
   }
 

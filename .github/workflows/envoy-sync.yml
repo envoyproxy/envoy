@@ -12,6 +12,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-20.04
+    if: github.repository == 'envoyproxy/envoy'
     strategy:
       fail-fast: false
       matrix:
@@ -20,7 +21,7 @@ jobs:
         - envoy-filter-example
         - data-plane-api
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@1f1feae1e372dde41ecc6830028989bb6037c480
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.2
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

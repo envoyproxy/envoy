@@ -137,10 +137,9 @@ class Gauge : public Metric {
 public:
   // TODO(diazalan): Rename ImportMode to more generic name
   enum class ImportMode {
-    Uninitialized, // Gauge was discovered during hot-restart transfer.
-    NeverImport,   // On hot-restart, each process starts with gauge at 0.
-    Accumulate,    // Transfers gauge state on hot-restart.
-    // TODO(Diazalan): Add functionality for Hidden to be ignored by admin/stats-sink
+    Uninitialized,    // Gauge was discovered during hot-restart transfer.
+    NeverImport,      // On hot-restart, each process starts with gauge at 0.
+    Accumulate,       // Transfers gauge state on hot-restart.
     HiddenAccumulate, // Will be transferred on hot-restart and ignored by admin/stats-sink
   };
 
@@ -220,39 +219,35 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 /**
  * Interface for stats lazy initialization.
- * To save memory and CPU consumption from unused stats, Envoy can enable the bootstrap config
- * :ref:`enable_deferred_creation_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
- * A 'StatsStructType' is only created when any of its field is referenced.
- * See more context: https://github.com/envoyproxy/envoy/issues/23575
+ * To save memory and CPU consumption on blocks of stats that are never referenced throughout the
+ * process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then the
+Envoy
+ * bootstrap configuration can be set to defer the instantiation of those block. Note that when the
+ * blocks of stats are created, they carry an extra 60~100 byte overhead (depending on worker thread
+ * count) due to internal bookkeeping data structures. The overhead when deferred stats are disabled
+ * is just 8 bytes.
+* See more context: https://github.com/envoyproxy/envoy/issues/23575
  */
 template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
   // Helper function to get-or-create and return the StatsStructType object.
-  virtual StatsStructType& instantiate() PURE;
+  virtual StatsStructType& getOrCreate() PURE;
 
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
 
-// Template that lazily initializes a StatsStruct.
-// The bootstrap config :ref:`enable_deferred_creation_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` decides if
-// stats lazy initialzation is enabled or not.
-template <typename StatsStructType> class DeferredCreation;
-template <typename StatsStructType> class DirectStats;
-
 // A helper class for a lazy compatible stats struct type.
 template <typename StatsStructType> class DeferredCreationCompatibleStats {
 public:
-  DeferredCreationCompatibleStats(
+  explicit DeferredCreationCompatibleStats(
       std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
       : data_(std::move(d)) {}
   // Allows move construct and assign.
-  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) = default;
-  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) = default;
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) noexcept = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) noexcept = default;
 
-  inline StatsStructType* operator->() { return &data_->instantiate(); };
-  inline StatsStructType& operator*() { return data_->instantiate(); };
+  inline StatsStructType* operator->() { return &data_->getOrCreate(); };
+  inline StatsStructType& operator*() { return data_->getOrCreate(); };
 
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;

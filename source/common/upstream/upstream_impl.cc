@@ -1278,10 +1278,12 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
-      load_balancing_policy_ = factory->createEmptyConfigProto();
+      auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(),
-                                             *load_balancing_policy_);
+                                             context.messageValidationVisitor(), *proto_message);
+
+      load_balancer_config_ =
+          factory->loadConfig(std::move(proto_message), context.messageValidationVisitor());
 
       load_balancer_factory_ = factory;
       break;
@@ -1473,10 +1475,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
   auto excluded_list = std::make_shared<ExcludedHostVector>();
 
   for (const auto& host : hosts) {
-    if (host->coarseHealth() == Host::Health::Healthy) {
+    const Host::Health health_status = host->coarseHealth();
+    if (health_status == Host::Health::Healthy) {
       healthy_list->get().emplace_back(host);
-    }
-    if (host->coarseHealth() == Host::Health::Degraded) {
+    } else if (health_status == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
     if (excludeBasedOnHealthFlag(*host)) {
@@ -1529,6 +1531,7 @@ void ClusterImplBase::onPreInitComplete() {
 }
 
 void ClusterImplBase::onInitDone() {
+  info()->configUpdateStats().warming_state_.set(0);
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
@@ -1627,7 +1630,7 @@ const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
   END_TRY
-  catch (EnvoyException& e) {
+  CATCH(EnvoyException & e, {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
@@ -1635,7 +1638,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
                                        e.what()));
     }
     throw e;
-  }
+  });
 }
 
 void ClusterImplBase::validateEndpointsForZoneAwareRouting(
@@ -1855,6 +1858,7 @@ void PriorityStateManager::initializePriorityFor(
 
 void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
   auto metadata = lb_endpoint.has_metadata()
@@ -1864,6 +1868,9 @@ void PriorityStateManager::registerHostForPriority(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
+  if (!address_list.empty()) {
+    host->setAddressList(address_list);
+  }
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

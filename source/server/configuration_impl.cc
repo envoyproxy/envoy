@@ -61,7 +61,7 @@ void FilterChainUtility::buildUdpFilterChain(
 }
 
 StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
-    : enable_deferred_creation_stats_(bootstrap.enable_deferred_creation_stats()) {
+    : deferred_stat_options_(bootstrap.deferred_stat_options()) {
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
@@ -107,7 +107,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    absl::StatusOr<bool> update_or_error =
+        server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    if (!update_or_error.status().ok()) {
+      throw EnvoyException(std::string(update_or_error.status().message()));
+    }
   }
   initializeWatchdogs(bootstrap, server);
   // This has to happen after ClusterManager initialization, as it depends on config from
@@ -117,7 +121,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
-  ENVOY_LOG(info, "loading stats sinks configuration");
+  ENVOY_LOG(info, "loading stats configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.

@@ -285,6 +285,7 @@ public:
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
+    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
 protected:
@@ -311,6 +312,7 @@ private:
   const std::string hostname_;
   const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
+  // The first entry in the address_list_ should match the value in address_.
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
@@ -791,8 +793,8 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  const ProtobufTypes::MessagePtr& loadBalancingPolicy() const override {
-    return load_balancing_policy_;
+  OptRef<const LoadBalancerConfig> loadBalancerConfig() const override {
+    return makeOptRefFromPtr<const LoadBalancerConfig>(load_balancer_config_.get());
   }
   TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
@@ -977,12 +979,13 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         bool only_create_if_configured) const override {
+  bool createFilterChain(Http::FilterChainManager& manager, bool only_create_if_configured,
+                         const Http::FilterChainOptions&) const override {
     if (!has_configured_http_filters_ && only_create_if_configured) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+    Http::FilterChainUtility::createFilterChainForFactories(
+        manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
@@ -1060,7 +1063,7 @@ private:
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
-  ProtobufTypes::MessagePtr load_balancing_policy_;
+  LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
@@ -1237,6 +1240,7 @@ public:
   // lb_endpoint health status is unhealthy, draining or timeout.
   void registerHostForPriority(
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
 

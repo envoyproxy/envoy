@@ -34,8 +34,13 @@ void assertExclusiveLogFormatMethod(
 
 void maybeSetApplicationLogFormat(
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config) {
-  if (application_log_config.has_log_format() &&
-      application_log_config.log_format().has_json_format()) {
+  if (!application_log_config.has_log_format()) {
+    return;
+  }
+
+  if (application_log_config.log_format().has_text_format()) {
+    Logger::Registry::setLogFormat(application_log_config.log_format().text_format());
+  } else if (application_log_config.log_format().has_json_format()) {
     const auto status =
         Logger::Registry::setJsonLogFormat(application_log_config.log_format().json_format());
 

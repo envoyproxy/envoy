@@ -190,6 +190,11 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamTransportFailureReason())
       .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
+  ON_CALL(*this, setUpstreamClusterInfo(_))
+      .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+        upstream_cluster_info_ = std::move(cluster_info);
+      }));
+  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;
