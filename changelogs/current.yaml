@@ -173,6 +173,14 @@ bug_fixes:
     Fixes a bug where route properties such as key_formatter,
     prefix and remove_prefix do not take effect when configured for :ref:`catch_all_route
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`.
+- area: upstream
+  change: |
+    Fixes a bug where the healthStatus() method of host return incorrect health status
+    when the host status is updated by the EDS.
+- area: upstream
+  change: |
+    Fixes a bug where the healthStatus() method of host return unmatched health status
+    with the coarseHealth() method.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
