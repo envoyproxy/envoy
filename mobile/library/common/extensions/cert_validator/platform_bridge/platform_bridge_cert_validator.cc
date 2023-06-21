@@ -176,9 +176,11 @@ void PlatformBridgeCertValidator::onVerificationComplete(std::thread::id thread_
   case ValidationFailureType::FAIL_VERIFY_ERROR:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_error_.inc();
+    break;
   case ValidationFailureType::FAIL_VERIFY_SAN:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_san_.inc();
+    break;
   }
 
   job.result_callback_->onCertValidationResult(allow_untrusted_certificate_ || success,
