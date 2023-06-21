@@ -506,10 +506,12 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
+  HostSetImpl(uint32_t priority, absl::optional<bool> weighted_priority_health,
+              absl::optional<uint32_t> overprovisioning_factor)
       : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
                                                           ? overprovisioning_factor.value()
                                                           : kDefaultOverProvisioningFactor),
+        weighted_priority_health_(weighted_priority_health.value_or(false)),
         hosts_(new HostVector()), healthy_hosts_(new HealthyHostVector()),
         degraded_hosts_(new DegradedHostVector()), excluded_hosts_(new ExcludedHostVector()) {}
 
@@ -559,6 +561,7 @@ public:
   absl::optional<uint32_t> chooseDegradedLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+  bool weightedPriorityHealth() const override { return weighted_priority_health_; }
 
   static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
@@ -576,6 +579,7 @@ public:
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
+                   absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
@@ -595,6 +599,7 @@ private:
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
+  bool weighted_priority_health_;
   HostVectorConstSharedPtr hosts_;
   HealthyHostVectorConstSharedPtr healthy_hosts_;
   DegradedHostVectorConstSharedPtr degraded_hosts_;
@@ -668,11 +673,13 @@ public:
   // Get the host set for this priority level, creating it if necessary.
   const HostSet&
   getOrCreateHostSet(uint32_t priority,
+                     absl::optional<bool> weighted_priority_health = absl::nullopt,
                      absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
+                   absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
@@ -685,8 +692,10 @@ public:
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
+                                       absl::optional<bool> weighted_priority_health,
                                        absl::optional<uint32_t> overprovisioning_factor) {
-    return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
+    return std::make_unique<HostSetImpl>(priority, weighted_priority_health,
+                                         overprovisioning_factor);
   }
 
 protected:
@@ -728,7 +737,7 @@ private:
 
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                     const HostVector& hosts_removed,
+                     const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
@@ -750,6 +759,7 @@ public:
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
+                   absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
   HostMapConstSharedPtr crossPriorityHostMap() const override;
@@ -1250,6 +1260,7 @@ public:
                            const absl::optional<HostVector>& hosts_added,
                            const absl::optional<HostVector>& hosts_removed,
                            const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
+                           absl::optional<bool> weighted_priority_health = absl::nullopt,
                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   // Returns the saved priority state.

@@ -238,7 +238,9 @@ new_features:
     that sets the maximum number of new connections to be accepted per socket
     event on a listener. If there are more connections to be accepted beyond
     the maximum, the remaining connections would be processed in later
-    dispatcher loop iterations.
+    dispatcher loop iterations. Added listener histogram
+    ``connections_accepted_per_socket_event`` to allow users to empirically
+    determine an appropriate configuration for their deployment.
 - area: load shed point
   change: |
     added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
@@ -264,6 +266,11 @@ new_features:
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
+- area: stats
+  change: |
+    added config :ref:`enable_deferred_creation_stats
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
+    When set to true, enables deferred instantiation on supported stats structures.
 - area: ratelimit
   change: |
     added new configuration field :ref:`domain
@@ -347,6 +354,13 @@ new_features:
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: load_balancing
+  change: |
+    added new option
+    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
+    to compute the health of a :ref:`priority level <arch_overview_load_balancing_priority_levels>` by using
+    :ref:`load balancing weight <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>`
+    instead of the count of healthy hosts.
 - area: application_logs
   change: |
     Added bootstrap option

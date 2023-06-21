@@ -22,6 +22,7 @@ with the following statistics:
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
    downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_global_cx_overflow, Counter, Total connections rejected due to enforcement of global connection limit
+   connections_accepted_per_socket_event, Histogram, Number of connections accepted per listener socket event
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    extension_config_missing, Counter, Total connections closed due to missing listener filter extension configuration
