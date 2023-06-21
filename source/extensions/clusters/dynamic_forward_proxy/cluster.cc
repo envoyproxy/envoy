@@ -368,9 +368,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
     if (host_it == cluster_.host_map_.end()) {
+      ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {
       if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
+        ENVOY_LOG(debug, "host {} is unhealthy", host);
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();
