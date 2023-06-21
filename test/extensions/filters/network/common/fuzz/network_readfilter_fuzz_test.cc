@@ -7,7 +7,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 #include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {

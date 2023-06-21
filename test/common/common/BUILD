@@ -108,7 +108,6 @@ envoy_cc_test(
     srcs = ["dns_utils_test.cc"],
     deps = [
         "//source/common/common:dns_utils_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

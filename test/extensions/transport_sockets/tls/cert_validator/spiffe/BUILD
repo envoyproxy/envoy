@@ -26,7 +26,6 @@ envoy_extension_cc_test(
         "//test/extensions/transport_sockets/tls/cert_validator:test_common",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

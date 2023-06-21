@@ -70,7 +70,6 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

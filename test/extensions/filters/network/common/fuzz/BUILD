@@ -94,7 +94,6 @@ envoy_cc_fuzz_test(
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
-        "//test/test_common:test_runtime_lib",
     ] + envoy_filters_from_selected(READFILTER_FUZZ_FILTERS),
 )
 
