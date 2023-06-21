@@ -3762,7 +3762,7 @@ TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
 
   startRequest(false);
 
-  EXPECT_FALSE(decoder_->streamInfo().filterState()->hasDataWithName(
+  EXPECT_FALSE(decoder_->streamInfo().filterState()->hasDataGeneric(
       Network::ProxyProtocolFilterState::key()));
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
