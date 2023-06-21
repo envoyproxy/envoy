@@ -245,10 +245,13 @@ func (c *httpCApiImpl) HttpGetDynamicMetadata(r *httpRequest, filterName string)
 	var buf []byte
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
-	handleCApiStatus(res)
-	atomic.AddInt32(&r.waitingOnEnvoy, 1)
-	r.sema.Wait()
-	atomic.AddInt32(&r.waitingOnEnvoy, -11)
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
 	// copy the memory from c to Go.
 	var meta structpb.Struct
 	proto.Unmarshal(buf, &meta)

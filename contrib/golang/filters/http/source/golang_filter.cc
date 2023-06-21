@@ -1031,26 +1031,22 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
     return CAPIStatus::CAPINotInGo;
   }
 
-  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(config_->soId());
-  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
   if (!state.isThreadSafe()) {
     auto weak_ptr = weak_from_this();
     ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
-    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_slice, dlib] {
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_slice] {
       ENVOY_LOG(debug, "golang filter getDynamicMetadata request in worker thread");
-      Thread::ReleasableLockGuard lock(mutex_);
-      if (!weak_ptr.expired() && !has_destroyed_) {
-        ASSERT(state.isThreadSafe());
+      if (!weak_ptr.expired() && !hasDestroyed()) {
         populateSliceWithMetadata(state, filter_name, buf_slice);
-        dlib->envoyGoRequestSemaDec(req_);
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in getDynamicMetadata");
       }
     });
+    return CAPIStatus::CAPIYield;
   } else {
     ENVOY_LOG(debug, "golang filter getDynamicMetadata replying directly");
     populateSliceWithMetadata(state, filter_name, buf_slice);
-    dlib->envoyGoRequestSemaDec(req_);
   }
 
   return CAPIStatus::CAPIOK;
