@@ -70,6 +70,16 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 }
 
 /**
+* Requests should have their host header altered, resulting in a host header of "lambda"
+*/
+TEST_F(AWSLambdaFilterTest, HostHeaderAlterationShouldBeLambda) {
+  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
+  Http::TestRequestHeaderMapImpl headers;
+  const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
+  EXPECT_EQ(headers.getHostValue(), "lambda");
+}
+
+/**
  * Header only pass-through requests should be signed and Continue iteration.
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
