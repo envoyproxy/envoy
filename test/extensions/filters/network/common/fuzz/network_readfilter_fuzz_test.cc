@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 
-void ensuredValidFilter(unsigned int seed, envoy::config::listener::v3::Filter* config) {
+void ensuredValidFilter(unsigned int random_number, envoy::config::listener::v3::Filter* config) {
   // TODO(jianwendong): After extending to cover all the filters, we can use
   // `Registry::FactoryRegistry<
   // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
@@ -28,7 +28,7 @@ void ensuredValidFilter(unsigned int seed, envoy::config::listener::v3::Filter* 
   // Choose a valid filter name.
   if (std::find(filter_names.begin(), filter_names.end(), config->name()) ==
       std::end(filter_names)) {
-    absl::string_view filter_name = filter_names[seed % filter_names.size()];
+    absl::string_view filter_name = filter_names[random_number % filter_names.size()];
     if (filter_name != config->name()) {
       // Clear old config, or unpacking non-suitable value may crash.
       config->clear_typed_config();
@@ -54,8 +54,6 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
     mutator.Seed(seed);
     return mutator;
   }();
-  static ProtobufMessage::ValidatedInputGenerator generator(
-      seed, ProtobufMessage::composeFiltersAnyMap(), 20);
   static Random::PsuedoRandomGenerator64 random;
   ABSL_ATTRIBUTE_UNUSED static bool _random_inited = [seed] {
     random.initializeSeed(seed);
@@ -66,14 +64,13 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
   protobuf_mutator::ParseTextMessage(data, size, &input);
   if (random.random() % 100 < config_mutation_probability) {
     test::extensions::filters::network::FuzzHelperForActions actions;
-    *actions.mutable_actions() = *input.mutable_actions();
+    *actions.mutable_actions() = std::move(*input.mutable_actions());
     mutator.Mutate(&actions, max_size);
-    *input.mutable_actions() = *actions.mutable_actions();
+    *input.mutable_actions() = std::move(*actions.mutable_actions());
   } else {
     mutator.Mutate(input.mutable_config(), max_size);
-    ensuredValidFilter(seed, input.mutable_config());
+    ensuredValidFilter(random.random(), input.mutable_config());
   }
-  ProtobufMessage::traverseMessage(generator, input, true);
 
   return protobuf_mutator::SaveMessageAsText(input, data, max_size);
 }

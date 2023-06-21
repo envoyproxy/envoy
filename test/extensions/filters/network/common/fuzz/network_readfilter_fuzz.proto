@@ -27,6 +27,7 @@ message Action {
   }
 }
 
+// Helper to mutate actions in FilterFuzzTestCase, because mutate() does not apply to repreated members.
 message FuzzHelperForActions {
   repeated Action actions = 1;
 }
