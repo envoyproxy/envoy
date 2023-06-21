@@ -64,15 +64,24 @@ public:
     }
   }
 
+  void onStreamComplete() override {
+    if (delegated_filter_) {
+      // We need to explicitly specify which base class to the conversion via due
+      // to the diamond inheritance between StreamFilter and StreamFilterBase.
+      static_cast<Http::StreamDecoderFilter&>(*delegated_filter_).onStreamComplete();
+    }
+  }
+
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override {
+           const StreamInfo::StreamInfo& stream_info,
+           AccessLog::AccessLogType access_log_type) override {
     for (const auto& log : access_loggers_) {
-      log->log(request_headers, response_headers, response_trailers, stream_info);
+      log->log(request_headers, response_headers, response_trailers, stream_info, access_log_type);
     }
   }
 
@@ -117,6 +126,7 @@ private:
 
     // Http::StreamFilterBase
     void onDestroy() override;
+    void onStreamComplete() override;
 
   private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;

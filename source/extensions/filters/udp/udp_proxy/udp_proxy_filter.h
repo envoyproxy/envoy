@@ -82,7 +82,9 @@ public:
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true),
         random_(context.api().randomGenerator()) {
-    if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+    if (use_original_src_ip_ &&
+        !Api::OsSysCallsSingleton::get().supportsIpTransparent(
+            context.getServerFactoryContext().options().localAddressIpVersion())) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
           "is not running with the CAP_NET_ADMIN capability.");
@@ -247,10 +249,8 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
-    // The socket should be connected to avoid port exhaustion unless runtime guard
-    // envoy.reloadable_features.udp_proxy_connect is unset or use_original_src_ip_ is set. If it
-    // is true, there will be no calling `connect()` on the socket.
-    bool skip_connect_{};
+    // The socket has been connected to avoid port exhaustion.
+    bool connected_{};
 
     UdpProxySessionStats session_stats_{};
     absl::optional<StreamInfo::StreamInfoImpl> udp_session_stats_;

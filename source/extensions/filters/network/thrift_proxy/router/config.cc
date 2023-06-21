@@ -16,8 +16,6 @@ namespace Router {
 ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  UNREFERENCED_PARAMETER(proto_config);
-
   auto stats =
       std::make_shared<const RouterStats>(stat_prefix, context.scope(), context.localInfo());
   auto shadow_writer = std::make_shared<ShadowWriterImpl>(

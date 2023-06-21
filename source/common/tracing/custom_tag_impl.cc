@@ -9,8 +9,13 @@ namespace Tracing {
 namespace {
 
 absl::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
+#ifdef ENVOY_ENABLE_YAML
   auto json_or_error = MessageUtil::getJsonStringFromMessage(message);
   return json_or_error.ok() ? absl::optional<std::string>(json_or_error.value()) : absl::nullopt;
+#else
+  UNREFERENCED_PARAMETER(message);
+  return absl::nullopt;
+#endif
 }
 
 } // namespace

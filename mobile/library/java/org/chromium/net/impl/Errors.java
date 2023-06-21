@@ -114,7 +114,7 @@ public class Errors {
     case ERR_QUIC_PROTOCOL_ERROR:
       return NetworkException.ERROR_QUIC_PROTOCOL_FAILED;
     }
-    Log.e(CronetUrlRequestContext.LOG_TAG, "Unknown error code: " + netError);
+    Log.e(CronvoyUrlRequestContext.LOG_TAG, "Unknown error code: " + netError);
     return NetworkException.ERROR_OTHER;
   }
 

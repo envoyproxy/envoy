@@ -41,6 +41,7 @@ const NodeContextRenderers& nodeParamCbs() {
 
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
+#ifdef ENVOY_ENABLE_YAML
   for (const auto& it : metadata.fields()) {
     ProtobufUtil::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(it.second);
@@ -49,6 +50,12 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
       params[prefix + it.first] = json_or_error.value();
     }
   }
+#else
+  UNREFERENCED_PARAMETER(params);
+  UNREFERENCED_PARAMETER(metadata);
+  UNREFERENCED_PARAMETER(prefix);
+  throw EnvoyException("JSON/YAML support compiled out");
+#endif
 }
 
 } // namespace

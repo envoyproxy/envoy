@@ -180,9 +180,6 @@ TEST_F(DiskLoaderImplTest, All) {
   // Lower-case boolean specification.
   EXPECT_EQ(true, snapshot->getBoolean("file11", false));
   EXPECT_EQ(true, snapshot->getBoolean("file11", true));
-  // Mixed-case boolean specification.
-  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
-  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
   // Lower-case boolean specification with leading whitespace.
   EXPECT_EQ(true, snapshot->getBoolean("file13", true));
   EXPECT_EQ(true, snapshot->getBoolean("file13", false));
@@ -262,7 +259,7 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(25, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(24, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -578,6 +575,11 @@ TEST_F(StaticLoaderImplTest, RemovedFlags) {
   EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
 }
 
+TEST_F(StaticLoaderImplTest, ProtoParsingInvalidField) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>("file0:");
+  EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "Invalid runtime entry value for file0");
+}
+
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
@@ -588,12 +590,17 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
     file8:
       numerator: 52
       denominator: HUNDRED
+    file80:
+      numerator: 52
+      denominator: TEN_THOUSAND
+    file800:
+      numerator: 52
+      denominator: MILLION
     file9:
       numerator: 100
       denominator: NONSENSE
     file10: 52
     file11: true
-    file12: FaLSe
     file13: false
     subdir:
       file: "hello"
@@ -637,9 +644,6 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(true, snapshot->getBoolean("file11", true));
   EXPECT_EQ(true, snapshot->getBoolean("file11", false));
 
-  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
-  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
-
   EXPECT_EQ(false, snapshot->getBoolean("file13", true));
   EXPECT_EQ(false, snapshot->getBoolean("file13", false));
 
@@ -666,10 +670,14 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Fractional percent feature enablement
   envoy::type::v3::FractionalPercent fractional_percent;
   fractional_percent.set_numerator(5);
-  fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::MILLION);
 
   EXPECT_CALL(generator_, random()).WillOnce(Return(50));
   EXPECT_TRUE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file80", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file800", fractional_percent)); // valid data
   EXPECT_CALL(generator_, random()).WillOnce(Return(60));
   EXPECT_FALSE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
 
@@ -718,8 +726,56 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(21, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(22, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  const char* error = nullptr;
+  // While null values are generally filtered out by walkProtoValue, test manually.
+  ProtobufWkt::Value empty_value;
+  const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+      .createEntry(empty_value, "", error);
+
+  // Make sure the hacky fractional percent function works.
+  ProtobufWkt::Value fractional_value;
+  fractional_value.set_string_value(" numerator:  11 ");
+  auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                   .createEntry(fractional_value, "", error);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::HUNDRED);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 11);
+
+  // Make sure the hacky percent function works with numerator and denominator
+  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value, "", error);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+
+  // Make sure the hacky fractional percent function works with million
+  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value, "", error);
+  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+            envoy::type::v3::FractionalPercent::MILLION);
+  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+
+  // Test atoi failure for the hacky fractional percent value function.
+  fractional_value.set_string_value(" numerator:  1.1 ");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(fractional_value, "", error);
+  ASSERT_FALSE(entry.fractional_percent_value_.has_value());
+
+  // Test legacy malformed boolean support
+  ProtobufWkt::Value boolean_value;
+  boolean_value.set_string_value("FaLsE");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(boolean_value, "", error);
+  ASSERT_TRUE(entry.bool_value_.has_value());
+  ASSERT_FALSE(entry.bool_value_.value());
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {

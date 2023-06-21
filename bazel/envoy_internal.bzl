@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Targets from this file should be considered private
 # and not used outside of the @envoy//bazel package.
-load(":envoy_select.bzl", "envoy_select_admin_html", "envoy_select_disable_logging", "envoy_select_google_grpc", "envoy_select_hot_restart", "envoy_select_static_extension_registration")
+load(":envoy_select.bzl", "envoy_select_admin_html", "envoy_select_disable_exceptions", "envoy_select_disable_logging", "envoy_select_google_grpc", "envoy_select_hot_restart", "envoy_select_signal_trace", "envoy_select_static_extension_registration")
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
@@ -97,9 +97,6 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:linux_aarch64": ["-DTCMALLOC"],
                "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
-               repository + "//bazel:disable_signal_trace": [],
-               "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
-           }) + select({
                repository + "//bazel:disable_object_dump_on_signal_trace": [],
                "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
            }) + select({
@@ -122,12 +119,14 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
+           envoy_select_disable_exceptions(["-fno-unwind-tables", "-fno-exceptions"], repository) + \
            envoy_select_admin_html(["-DENVOY_ADMIN_HTML"], repository) + \
            envoy_select_static_extension_registration(["-DENVOY_STATIC_EXTENSION_REGISTRATION"], repository) + \
            envoy_select_disable_logging(["-DENVOY_DISABLE_LOGGING"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           envoy_select_signal_trace(["-DENVOY_HANDLE_SIGNALS"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 # References to Envoy external dependencies should be wrapped with this function.

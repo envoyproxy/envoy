@@ -15,7 +15,7 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
 }
 
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);

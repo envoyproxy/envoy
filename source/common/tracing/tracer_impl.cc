@@ -149,8 +149,8 @@ SpanPtr TracerImpl::startSpan(const Config& config, TraceContext& trace_context,
     span_name.append(std::string(trace_context.host()));
   }
 
-  SpanPtr active_span = driver_->startSpan(config, trace_context, span_name,
-                                           stream_info.startTime(), tracing_decision);
+  SpanPtr active_span =
+      driver_->startSpan(config, trace_context, stream_info, span_name, tracing_decision);
 
   // Set tags related to the local environment
   if (active_span) {

@@ -416,6 +416,62 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
 }
 
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHiddenGauges) {
+  // Test that hidden=include shows all hidden and non hidden values.
+  const std::string url_hidden_include = "/stats?gauges&format=json&hidden=include";
+
+  Stats::Gauge& g1 =
+      store_->gaugeFromString("hiddenG1", Stats::Gauge::ImportMode::HiddenAccumulate);
+  g1.inc();
+
+  Stats::Gauge& g2 = store_->gaugeFromString("nonHiddenG2", Stats::Gauge::ImportMode::Accumulate);
+  g2.add(2);
+
+  CodeResponse code_response = handlerStats(url_hidden_include);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_include = R"EOF({
+    "stats": [
+        {"name":"hiddenG1", "value":1},
+        {"name":"nonHiddenG2", "value":2},
+    ]
+})EOF";
+  EXPECT_THAT(expected_json_hidden_include, JsonStringEq(code_response.second));
+
+  // Test that hidden-only will not show non-hidden gauges.
+  const std::string url_hidden_show_only = "/stats?gauges&format=json&hidden=only";
+
+  code_response = handlerStats(url_hidden_show_only);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_show_only = R"EOF({
+    "stats": [
+        {"name":"hiddenG1", "value":1},
+    ]
+})EOF";
+  EXPECT_THAT(expected_json_hidden_show_only, JsonStringEq(code_response.second));
+
+  // Test that hidden=exclude will not show hidden gauges.
+  const std::string url_hidden_exclude = "/stats?gauges&format=json&hidden=exclude";
+
+  code_response = handlerStats(url_hidden_exclude);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_exclude = R"EOF({
+    "stats": [
+        {"name":"nonHiddenG2", "value":2},
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_hidden_exclude, JsonStringEq(code_response.second));
+}
+
+TEST_F(AdminStatsFilterTest, HandlerStatsHiddenInvalid) {
+  // Test that hidden=(bad inputs) returns error.
+  const std::string url_hidden_bad_input = "/stats?gauges&format=json&hidden=foo";
+
+  CodeResponse code_response = handlerStats(url_hidden_bad_input);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("usage: /stats?hidden=(include|only|exclude)\n\n", code_response.second);
+}
+
 TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint&format=json";
   // Set h as prefix to match both histograms.

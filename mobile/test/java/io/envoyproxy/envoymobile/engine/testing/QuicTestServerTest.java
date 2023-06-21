@@ -111,7 +111,7 @@ public class QuicTestServerTest {
 
   @Before
   public void setUpEngine() throws Exception {
-    TestJni.startQuicTestServer();
+    TestJni.startHttp3TestServer();
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
                                       new Custom(String.format(CONFIG, TestJni.getServerPort())))
@@ -127,7 +127,7 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    TestJni.shutdownQuicTestServer();
+    TestJni.shutdownTestServer();
   }
 
   @Test

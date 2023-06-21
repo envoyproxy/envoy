@@ -46,9 +46,8 @@ using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
  */
 class OriginalDstCluster : public ClusterImplBase {
 public:
-  OriginalDstCluster(Server::Configuration::ServerFactoryContext& server_context,
-                     const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context, Runtime::Loader& runtime, bool added_via_api);
+  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
+                     ClusterFactoryContext& context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -105,8 +104,9 @@ private:
     LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LoadBalancer>(cluster_);
+    }
 
     const std::shared_ptr<OriginalDstCluster> cluster_;
   };
@@ -159,8 +159,7 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                    const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
 

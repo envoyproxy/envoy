@@ -21,15 +21,15 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 class HttpCommonValidationTest : public HeaderValidatorTest,
                                  public testing::TestWithParam<Protocol> {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr createUhv(absl::string_view config_yaml) {
+  ::Envoy::Http::ServerHeaderValidatorPtr createUhv(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
     if (GetParam() == Protocol::Http11) {
-      return std::make_unique<Http1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
     }
-    return std::make_unique<Http2HeaderValidator>(typed_config, GetParam(), stats_);
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_);
   }
 
   TestScopedRuntime scoped_runtime_;

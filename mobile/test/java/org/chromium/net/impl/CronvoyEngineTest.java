@@ -45,7 +45,7 @@ public class CronvoyEngineTest {
 
   private static final String TEST_URL_PATH = "get/flowers";
 
-  private static org.chromium.net.impl.CronetUrlRequestContext cronvoyEngine;
+  private static org.chromium.net.impl.CronvoyUrlRequestContext cronvoyEngine;
 
   private final MockWebServer mockWebServer = new MockWebServer();
 
@@ -64,10 +64,10 @@ public class CronvoyEngineTest {
   @Before
   public void setUp() {
     if (cronvoyEngine == null) {
-      NativeCronetEngineBuilderImpl nativeCronetEngineBuilder =
-          new NativeCronetEngineBuilderImpl(ApplicationProvider.getApplicationContext());
+      NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
+          new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
       nativeCronetEngineBuilder.setUserAgent("Cronvoy");
-      cronvoyEngine = new CronetUrlRequestContext(nativeCronetEngineBuilder);
+      cronvoyEngine = new CronvoyUrlRequestContext(nativeCronetEngineBuilder);
     }
   }
 

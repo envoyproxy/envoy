@@ -186,6 +186,8 @@ An example with the Lambda metadata applied to a weighted-cluster:
         sni: "*.amazonaws.com"
 
 
+.. include:: _include/aws_credentials.rst
+
 Statistics
 ----------
 

@@ -293,6 +293,7 @@ protected:
   }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
+                      const std::string& crl_path, const std::string& crl_value,
                       const std::string& watch_path) {
     const std::string yaml = fmt::format(
         R"EOF(
@@ -300,17 +301,24 @@ protected:
   validation_context:
     trusted_ca:
       filename: "{}"
+    crl:
+      filename: "{}"
     allow_expired_certificate: true
     )EOF",
-        trusted_ca_path);
+        trusted_ca_path, crl_path);
     envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
     TestUtility::loadFromYaml(yaml, typed_secret);
     const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
     auto* watcher = new Filesystem::MockWatcher();
     EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
+    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
     EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
+        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          watch_cbs_.push_back(cb);
+        }));
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
         .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
           watch_cbs_.push_back(cb);
@@ -417,15 +425,19 @@ TEST_P(TlsCertificateSdsRotationApiTest, FailedRotation) {
 // Basic rotation of CertificateValidationContext.
 TEST_P(CertificateValidationContextSdsRotationApiTest, CertificateValidationContext) {
   InSequence s;
-  onConfigUpdate("/foo/bar/ca.pem", "a", "/foo/bar/");
+  onConfigUpdate("/foo/bar/ca.pem", "a", "/foo/bar/crl.pem", "b", "/foo/bar/");
 
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
+
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   watch_cbs_[0](Filesystem::Watcher::Events::MovedTo);
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("c", secret.trusted_ca().inline_bytes());
+  EXPECT_EQ("d", secret.crl().inline_bytes());
 }
 
 // Hash consistency verification prevents races.
@@ -617,11 +629,12 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   initialize();
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_);
+  auto cvc_config =
+      Ssl::CertificateValidationContextConfigImpl::create(*sds_api.secret(), *api_).value();
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            cvc_config.caCert());
+            cvc_config->caCert());
 }
 
 class CvcValidationCallback {
@@ -693,31 +706,31 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext merged_cvc =
       default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_);
+  auto cvc_config = Ssl::CertificateValidationContextConfigImpl::create(merged_cvc, *api_).value();
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
-  EXPECT_TRUE(cvc_config.allowExpiredCertificate());
+  EXPECT_TRUE(cvc_config->allowExpiredCertificate());
   // Verify that singular fields are overwritten.
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            cvc_config.caCert());
+            cvc_config->caCert());
   // Verify that repeated fields are concatenated.
-  EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
-  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(2, cvc_config->subjectAltNameMatchers().size());
+  EXPECT_EQ("first san", cvc_config->subjectAltNameMatchers()[0].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
-            cvc_config.subjectAltNameMatchers()[0].san_type());
-  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+            cvc_config->subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("second san", cvc_config->subjectAltNameMatchers()[1].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
-            cvc_config.subjectAltNameMatchers()[1].san_type());
+            cvc_config->subjectAltNameMatchers()[1].san_type());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
-  EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());
-  EXPECT_EQ(default_verify_certificate_hash, cvc_config.verifyCertificateHashList()[0]);
+  EXPECT_EQ(1, cvc_config->verifyCertificateHashList().size());
+  EXPECT_EQ(default_verify_certificate_hash, cvc_config->verifyCertificateHashList()[0]);
   // Verify that if default CertificateValidationContext does not set certificate SPKI list, the new
   // secret contains SPKI list from dynamic CertificateValidationContext.
-  EXPECT_EQ(1, cvc_config.verifyCertificateSpkiList().size());
-  EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config.verifyCertificateSpkiList()[0]);
+  EXPECT_EQ(1, cvc_config->verifyCertificateSpkiList().size());
+  EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config->verifyCertificateSpkiList()[0]);
 }
 
 class GenericSecretValidationCallback {

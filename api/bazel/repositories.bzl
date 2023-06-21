@@ -47,7 +47,10 @@ def api_dependencies():
     external_http_archive(
         name = "com_github_bufbuild_buf",
         build_file_content = BUF_BUILD_CONTENT,
-        tags = ["manual"],
+    )
+
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -160,6 +163,26 @@ go_proto_library(
     name = "logs_go_proto",
     importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
     proto = ":logs",
+    visibility = ["//visibility:public"],
+)
+
+api_cc_py_proto_library(
+    name = "metrics",
+    srcs = [
+        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+        "opentelemetry/proto/metrics/v1/metrics.proto",
+    ],
+    deps = [
+        "//:common",
+        "//:resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "metrics_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
+    proto = ":metrics",
     visibility = ["//visibility:public"],
 )
 

@@ -26,11 +26,10 @@ ReqWithoutQuery::ReqWithoutQuery(const std::string& main_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-absl::optional<std::string> ReqWithoutQuery::format(const Http::RequestHeaderMap& request,
-                                                    const Http::ResponseHeaderMap&,
-                                                    const Http::ResponseTrailerMap&,
-                                                    const StreamInfo::StreamInfo&,
-                                                    absl::string_view) const {
+absl::optional<std::string>
+ReqWithoutQuery::format(const Http::RequestHeaderMap& request, const Http::ResponseHeaderMap&,
+                        const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                        absl::string_view, AccessLog::AccessLogType) const {
   const Http::HeaderEntry* header = findHeader(request);
   if (!header) {
     return absl::nullopt;
@@ -45,8 +44,8 @@ absl::optional<std::string> ReqWithoutQuery::format(const Http::RequestHeaderMap
 ProtobufWkt::Value ReqWithoutQuery::formatValue(const Http::RequestHeaderMap& request,
                                                 const Http::ResponseHeaderMap&,
                                                 const Http::ResponseTrailerMap&,
-                                                const StreamInfo::StreamInfo&,
-                                                absl::string_view) const {
+                                                const StreamInfo::StreamInfo&, absl::string_view,
+                                                AccessLog::AccessLogType) const {
   const Http::HeaderEntry* header = findHeader(request);
   if (!header) {
     return ValueUtil::nullValue();

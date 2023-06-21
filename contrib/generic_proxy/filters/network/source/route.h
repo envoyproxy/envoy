@@ -28,6 +28,7 @@ using ProtoRouteAction =
     envoy::extensions::filters::network::generic_proxy::action::v3::RouteAction;
 using ProtoRouteConfiguration =
     envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration;
+using ProtoVirtualHost = envoy::extensions::filters::network::generic_proxy::v3::VirtualHost;
 
 class RouteEntryImpl : public RouteEntry {
 public:
@@ -35,6 +36,7 @@ public:
                  Envoy::Server::Configuration::ServerFactoryContext& context);
 
   // RouteEntry
+  absl::string_view name() const override { return name_; }
   const std::string& clusterName() const override { return cluster_name_; }
   const RouteSpecificFilterConfig* perFilterConfig(absl::string_view name) const override {
     auto iter = per_filter_configs_.find(name);
@@ -42,12 +44,16 @@ public:
   }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
 
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
+
 private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
+  std::string name_;
   std::string cluster_name_;
 
   const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };
@@ -94,6 +100,21 @@ public:
   RouteEntryConstSharedPtr routeEntry(const Request&) const override { return nullptr; }
 };
 
+class VirtualHostImpl : Logger::Loggable<Envoy::Logger::Id::filter> {
+public:
+  VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
+                  Envoy::Server::Configuration::ServerFactoryContext& context,
+                  bool validate_clusters_default = false);
+
+  RouteEntryConstSharedPtr routeEntry(const Request& request) const;
+  absl::string_view name() const { return name_; }
+
+private:
+  std::string name_;
+  Matcher::MatchTreeSharedPtr<Request> matcher_;
+};
+using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
+
 class RouteMatcherImpl : public RouteMatcher, Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
@@ -102,11 +123,34 @@ public:
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
 
-  absl::string_view name() { return name_; }
+  absl::string_view name() const { return name_; }
 
 private:
+  using WildcardVirtualHosts =
+      std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+  using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
+  const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
+                                                 const WildcardVirtualHosts& wildcard_virtual_hosts,
+                                                 SubstringFunction substring_function) const;
+
+  const VirtualHostImpl* findVirtualHost(const Request& request) const;
+
   std::string name_;
-  Matcher::MatchTreeSharedPtr<Request> matcher_;
+
+  absl::flat_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  // std::greater as a minor optimization to iterate from more to less specific
+  //
+  // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
+  //
+  // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
+  // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
+  // and climbs to about 110ns once there are any entries.
+  //
+  // The break-even is 4 entries.
+  WildcardVirtualHosts wildcard_virtual_host_suffixes_;
+  WildcardVirtualHosts wildcard_virtual_host_prefixes_;
+
+  VirtualHostSharedPtr default_virtual_host_;
 };
 
 } // namespace GenericProxy

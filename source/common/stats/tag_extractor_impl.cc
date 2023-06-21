@@ -17,6 +17,14 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
+std::regex parseStdRegex(const std::string& regex) {
+  TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
+  END_TRY
+  CATCH(const std::regex_error& e,
+        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
+}
+} // namespace
 
 const std::vector<absl::string_view>& TagExtractionContext::tokens() {
   if (tokens_.empty()) {
@@ -87,8 +95,7 @@ bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
 
 TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                                                    absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr),
-      regex_(Regex::Utility::parseStdRegex(std::string(regex))) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(parseStdRegex(std::string(regex))) {}
 
 std::string& TagExtractorImplBase::addTagReturningValueRef(std::vector<Tag>& tags) const {
   tags.emplace_back();

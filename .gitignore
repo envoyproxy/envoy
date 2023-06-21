@@ -54,3 +54,4 @@ bazel.output.txt
 **/*.iml
 tools/dev/src
 distribution/custom
+examples/websocket/certs

@@ -68,7 +68,6 @@ protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess(bool degraded = false);
-    void handleDegraded();
     void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false);
 
     HostSharedPtr host_;
@@ -146,8 +145,6 @@ private:
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
   static MetadataConstSharedPtr
   initTransportSocketMatchMetadata(const envoy::config::core::v3::HealthCheck& config);
-
-  static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;

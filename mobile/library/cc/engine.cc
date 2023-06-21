@@ -1,5 +1,6 @@
 #include "engine.h"
 
+#include "library/common/data/utility.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/c_types.h"
 
@@ -24,12 +25,24 @@ StreamClientSharedPtr Engine::streamClient() {
 
 PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient>(); }
 
-void Engine::terminate() {
+std::string Engine::dumpStats() {
+  envoy_data data;
+  if (dump_stats(engine_, &data) == ENVOY_FAILURE) {
+    return "";
+  }
+  const std::string to_return = Data::Utility::copyToString(data);
+  release_envoy_data(data);
+
+  return to_return;
+}
+
+envoy_status_t Engine::terminate() {
   if (terminated_) {
     throw std::runtime_error("attempting to double terminate Engine");
   }
-  terminate_engine(engine_, /* release */ false);
+  envoy_status_t ret = terminate_engine(engine_, /* release */ false);
   terminated_ = true;
+  return ret;
 }
 
 } // namespace Platform

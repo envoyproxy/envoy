@@ -47,7 +47,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, SystemTime start_time,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
                                    const Tracing::Decision tracing_decision) {
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
@@ -55,14 +56,15 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
     Tracing::SpanPtr new_open_telemetry_span =
-        tracer.startSpan(config, operation_name, start_time, tracing_decision);
+        tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
     new_open_telemetry_span->setSampled(tracing_decision.traced);
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
     absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
     if (span_context.ok()) {
-      return tracer.startSpan(config, operation_name, start_time, span_context.value());
+      return tracer.startSpan(config, operation_name, stream_info.startTime(),
+                              span_context.value());
     } else {
       ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();

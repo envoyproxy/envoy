@@ -20,7 +20,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/http/rest_api_fetcher.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
@@ -261,6 +260,7 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
+  std::string expires_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;

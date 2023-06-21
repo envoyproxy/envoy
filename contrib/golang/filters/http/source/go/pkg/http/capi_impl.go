@@ -44,18 +44,22 @@ import (
 )
 
 const (
-	ValueRouteName           = 1
-	ValueFilterChainName     = 2
-	ValueProtocol            = 3
-	ValueResponseCode        = 4
-	ValueResponseCodeDetails = 5
-	ValueAttemptCount        = 6
+	ValueRouteName               = 1
+	ValueFilterChainName         = 2
+	ValueProtocol                = 3
+	ValueResponseCode            = 4
+	ValueResponseCodeDetails     = 5
+	ValueAttemptCount            = 6
+	ValueDownstreamLocalAddress  = 7
+	ValueDownstreamRemoteAddress = 8
+	ValueUpstreamHostAddress     = 9
+	ValueUpstreamClusterName     = 10
 )
 
 type httpCApiImpl struct{}
 
 // Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
-// panic here and it will be recover in the Go entry function (TODO).
+// panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
 	case C.CAPIOK:
@@ -196,16 +200,29 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
+func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
+	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(key))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringValue(r *httpRequest, id int) (string, bool) {
 	var value string
-	// TODO: add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
 	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	res := C.envoyGoFilterHttpGetStringValue(r, C.int(id), unsafe.Pointer(&value))
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	res := C.envoyGoFilterHttpGetStringValue(unsafe.Pointer(r.req), C.int(id), unsafe.Pointer(&value))
 	if res == C.CAPIValueNotFound {
 		return "", false
 	}
@@ -255,6 +272,10 @@ func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.LogType(C.envoyGoFilterHttpLogLevel())
+}
+
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
@@ -264,4 +285,24 @@ var cAPI HttpCAPI = &httpCApiImpl{}
 // SetHttpCAPI for mock cAPI
 func SetHttpCAPI(api HttpCAPI) {
 	cAPI = api
+}
+
+func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+	var value string
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	return strings.Clone(value)
 }

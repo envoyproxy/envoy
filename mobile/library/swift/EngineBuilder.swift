@@ -6,6 +6,120 @@ import Foundation
 
 // swiftlint:disable file_length
 
+#if ENVOY_GOOGLE_GRPC
+/// Builder for generating the xDS configuration for the Envoy Mobile engine.
+/// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
+/// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
+///
+/// This class is typically used as input to the EngineBuilder's setXds() method.
+@objcMembers
+open class XdsBuilder: NSObject {
+  public static let defaultJwtTokenLifetimeInSeconds: UInt32 = 60 * 60 * 24 * 90 // 90 days
+  public static let defaultXdsTimeoutInSeconds: UInt32 = 5
+
+  let xdsServerAddress: String
+  let xdsServerPort: UInt32
+  var jwtToken: String?
+  var jwtTokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds
+  var sslRootCerts: String?
+  var rtdsResourceName: String?
+  var rtdsTimeoutInSeconds: UInt32 = 0
+  var enableCds: Bool = false
+  var cdsResourcesLocator: String?
+  var cdsTimeoutInSeconds: UInt32 = 0
+
+  /// Initialize a new builder for xDS configuration.
+  ///
+  /// - parameter xdsServerAddress: The host name or IP address of the xDS management server.
+  /// - parameter xdsServerPort:    The port on which the server listens for client connections.
+  public init(xdsServerAddress: String, xdsServerPort: UInt32) {
+    self.xdsServerAddress = xdsServerAddress
+    self.xdsServerPort = xdsServerPort
+  }
+
+  /// Sets JWT as the authentication method to the xDS management server, using the given token.
+  ///
+  /// - parameter token:                  The JWT token used to authenticate the client to the xDS
+  ///                                     management server.
+  /// - parameter tokenLifetimeInSeconds: <optional> the lifetime of the JWT token, in seconds. If
+  ///                                     none (or 0) is specified, then
+  ///                                     defaultJwtTokenLifetimeSeconds is used.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setJwtAuthenticationToken(
+    token: String,
+    tokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds) -> Self {
+    self.jwtToken = token
+    self.jwtTokenLifetimeInSeconds = (tokenLifetimeInSeconds > 0) ?
+        tokenLifetimeInSeconds : XdsBuilder.defaultJwtTokenLifetimeInSeconds
+    return self
+  }
+
+  /// Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
+  /// connection. If no root certs are specified, the operating system defaults are used.
+  ///
+  /// - parameter rootCerts: The PEM-encoded server root certificates.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setSslRootCerts(rootCerts: String) -> Self {
+    self.sslRootCerts = rootCerts
+    return self
+  }
+
+  /// Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
+  /// to retrieve dynamic runtime configuration via the xDS management server.
+  ///
+  /// - parameter resourceName:     The runtime config resource to subscribe to.
+  /// - parameter timeoutInSeconds: <optional> specifies the `initial_fetch_timeout` field on the
+  ///                               api.v3.core.ConfigSource. Unlike the ConfigSource default of
+  ///                               15s, we set a default fetch timeout value of 5s, to prevent
+  ///                               mobile app initialization from stalling. The default parameter
+  ///                               value may change through the course of experimentation and no
+  ///                               assumptions should be made of its exact value.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRuntimeDiscoveryService(
+    resourceName: String,
+    timeoutInSeconds: UInt32 = XdsBuilder.defaultXdsTimeoutInSeconds) -> Self {
+    self.rtdsResourceName = resourceName
+    self.rtdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
+    return self
+  }
+
+  /// Adds the Cluster Discovery Service (CDS) configuration for retrieving dynamic cluster
+  /// resources via the xDS management server.
+  ///
+  /// - parameter cdsResourcesLocator: <optional> the xdstp:// URI for subscribing to the cluster
+  ///                                  resources. If not using xdstp, then `cds_resources_locator`
+  ///                                  should be set to the empty string.
+  /// - parameter timeoutInSeconds:    <optional> specifies the `initial_fetch_timeout` field on the
+  ///                                  api.v3.core.ConfigSource. Unlike the ConfigSource default of
+  ///                                  15s, we set a default fetch timeout value of 5s, to prevent
+  ///                                  mobile app initialization from stalling. The default
+  ///                                  parameter value may change through the course of
+  ///                                  experimentation and no assumptions should be made of its
+  ///                                  exact value.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addClusterDiscoveryService(
+    cdsResourcesLocator: String? = nil,
+    timeoutInSeconds: UInt32 = XdsBuilder.defaultXdsTimeoutInSeconds) -> Self {
+    self.enableCds = true
+    self.cdsResourcesLocator = cdsResourcesLocator
+    self.cdsTimeoutInSeconds = timeoutOrXdsDefault(timeoutInSeconds)
+    return self
+  }
+
+  private func timeoutOrXdsDefault(_ timeout: UInt32) -> UInt32 {
+    return timeout > 0 ? timeout : XdsBuilder.defaultXdsTimeoutInSeconds
+  }
+}
+#endif
+
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
@@ -19,7 +133,6 @@ open class EngineBuilder: NSObject {
     case custom(String)
   }
 
-  private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
@@ -30,7 +143,6 @@ open class EngineBuilder: NSObject {
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
-  private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
 #if ENVOY_ENABLE_QUIC
@@ -51,7 +163,6 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -61,22 +172,14 @@ open class EngineBuilder: NSObject {
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var runtimeGuards: [String: Bool] = [:]
-  private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var rtdsLayerName: String?
-  private var rtdsTimeoutSeconds: UInt32 = 0
-  private var adsAddress: String?
-  private var adsPort: UInt32 = 0
-  private var adsJwtToken: String?
-  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
-  private var adsSslRootCerts: String?
   private var nodeID: String?
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
-  private var cdsResourcesLocator: String = ""
-  private var cdsTimeoutSeconds: UInt32 = 0
-  private var enableCds: Bool = false
+#if ENVOY_GOOGLE_GRPC
+  private var xdsBuilder: XdsBuilder?
+#endif
   private var enableSwiftBootstrap = false
 
   // MARK: - Public
@@ -216,18 +319,6 @@ open class EngineBuilder: NSObject {
   public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
     self.enableDNSCache = enableDNSCache
     self.dnsCacheSaveIntervalSeconds = saveInterval
-    return self
-  }
-
-  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-  /// true.
-  ///
-  /// - parameter enableHappyEyeballs: whether to enable RFC 6555 handling for IPv4/IPv6.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableHappyEyeballs(_ enableHappyEyeballs: Bool) -> Self {
-    self.enableHappyEyeballs = enableHappyEyeballs
     return self
   }
 
@@ -546,29 +637,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add virtual cluster configuration.
-  ///
-  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualCluster(_ virtualCluster: String) -> Self {
-    self.virtualClusters.append(virtualCluster)
-    return self
-  }
-
-  /// Add virtual cluster configurations.
-  ///
-  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
-    self.virtualClusters.append(contentsOf: virtualClusters)
-    return self
-  }
-#if ENVOY_GOOGLE_GRPC
-
   /// Sets the node.id field in the Bootstrap configuration.
   ///
   /// - parameter nodeID: The node ID.
@@ -599,75 +667,16 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Adds an aggregated discovery service layer to the configuration.
+#if ENVOY_GOOGLE_GRPC
+  /// Sets the xDS configuration for the Envoy Mobile engine.
   ///
-  /// - parameter address:                 The network address of the server.
-  /// - parameter port:                    The port of the server.
-  /// - parameter jwtToken:                The JWT token.
-  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds. If zero, a
-  ///                                      default value is set in engine_builder.h.
-  /// - parameter sslRootCerts:            The SSL root certificates.
+  /// - parameter xdsBuilder: The XdsBuilder instance which specifies the xDS config options.
+  ///                         The EngineBuilder takes ownership over the xds_builder.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setAggregatedDiscoveryService(
-    address: String,
-    port: UInt32,
-    jwtToken: String = "",
-    jwtTokenLifetimeSeconds: UInt32 = 0,
-    sslRootCerts: String = ""
-  ) -> Self {
-    self.adsAddress = address
-    self.adsPort = port
-    self.adsJwtToken = jwtToken
-    self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
-    self.adsSslRootCerts = sslRootCerts
-    return self
-  }
-
-  /// Adds an RTDS layer to the configuration.
-  ///
-  /// - parameter layerName:      The layer name.
-  /// - parameter timeoutSeconds: The timeout in seconds. If zero, a default value is set in
-  ///                             engine_builder.h.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
-    self.rtdsLayerName = layerName
-    self.rtdsTimeoutSeconds = timeoutSeconds
-    return self
-  }
-
-  /// Adds a CDS layer to the configuration.
-  ///
-  /// - parameter resourcesLocator: The xdstp resource URI for fetching clusters.
-  ///                               If empty, xdstp is not used and a wildcard is inferred.
-  /// - parameter timeoutSeconds:   The timeout in seconds. If zero, a default value is set in
-  ///                               engine_builder.h.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addCDSLayer(resourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
-    self.cdsResourcesLocator = resourcesLocator
-    self.cdsTimeoutSeconds = timeoutSeconds
-    self.enableCds = true
-    return self
-  }
-#endif
-
-#if ENVOY_ADMIN_FUNCTIONALITY
-  /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-  /// used for development/debugging purposes only. Enabling it in production may open
-  /// your app to security vulnerabilities.
-  ///
-  /// Note this will not work with the default production build, as it builds with admin
-  /// functionality disabled via --define=admin_functionality=disabled
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableAdminInterface() -> Self {
-    self.adminInterfaceEnabled = true
+  public func setXds(_ xdsBuilder: XdsBuilder) -> Self {
+    self.xdsBuilder = xdsBuilder
     return self
   }
 #endif
@@ -728,18 +737,32 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add a direct response to be used when configuring the engine.
-  /// This function is internal so it is not publicly exposed to production builders,
-  /// but is available for use by the `TestEngineBuilder`.
-  ///
-  /// - parameter directResponse: The response configuration to add.
-  func addDirectResponseInternal(_ directResponse: DirectResponse) {
-    self.directResponses.append(directResponse)
-  }
-
   func makeConfig() -> EnvoyConfiguration {
-    EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
+    var xdsServerAddress: String?
+    var xdsServerPort: UInt32 = 0
+    var xdsJwtToken: String?
+    var xdsJwtTokenLifetimeSeconds: UInt32 = 0
+    var xdsSslRootCerts: String?
+    var rtdsResourceName: String?
+    var rtdsTimeoutSeconds: UInt32 = 0
+    var enableCds: Bool = false
+    var cdsResourcesLocator: String?
+    var cdsTimeoutSeconds: UInt32 = 0
+
+#if ENVOY_GOOGLE_GRPC
+    xdsServerAddress = self.xdsBuilder?.xdsServerAddress
+    xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
+    xdsJwtToken = self.xdsBuilder?.jwtToken
+    xdsJwtTokenLifetimeSeconds = self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0
+    xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
+    rtdsResourceName = self.xdsBuilder?.rtdsResourceName
+    rtdsTimeoutSeconds = self.xdsBuilder?.rtdsTimeoutInSeconds ?? 0
+    enableCds = self.xdsBuilder?.enableCds ?? false
+    cdsResourcesLocator = self.xdsBuilder?.cdsResourcesLocator
+    cdsTimeoutSeconds = self.xdsBuilder?.cdsTimeoutInSeconds ?? 0
+#endif
+
+    return EnvoyConfiguration(
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,
@@ -750,7 +773,6 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
@@ -768,28 +790,26 @@ open class EngineBuilder: NSObject {
       perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
       appVersion: self.appVersion,
       appId: self.appId,
-      virtualClusters: self.virtualClusters,
       runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
-      rtdsLayerName: self.rtdsLayerName,
-      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
-      adsAddress: self.adsAddress,
-      adsPort: self.adsPort,
-      adsJwtToken: self.adsJwtToken,
-      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
-      adsSslRootCerts: self.adsSslRootCerts,
       nodeId: self.nodeID,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
-      cdsResourcesLocator: self.cdsResourcesLocator,
-      cdsTimeoutSeconds: self.cdsTimeoutSeconds,
-      enableCds: self.enableCds
+      xdsServerAddress: xdsServerAddress,
+      xdsServerPort: xdsServerPort,
+      xdsJwtToken: xdsJwtToken,
+      xdsJwtTokenLifetimeSeconds: xdsJwtTokenLifetimeSeconds,
+      xdsSslRootCerts: xdsSslRootCerts,
+      rtdsResourceName: rtdsResourceName,
+      rtdsTimeoutSeconds: rtdsTimeoutSeconds,
+      enableCds: enableCds,
+      cdsResourcesLocator: cdsResourcesLocator,
+      cdsTimeoutSeconds: cdsTimeoutSeconds
     )
   }
 
@@ -805,15 +825,11 @@ open class EngineBuilder: NSObject {
   }
 }
 
-// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
     var cxxBuilder = Envoy.Platform.EngineBuilder()
     cxxBuilder.addLogLevel(self.logLevel.toCXX())
-#if ENVOY_ADMIN_FUNCTIONALITY
-    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
-#endif
     if let grpcStatsDomain = self.grpcStatsDomain {
       cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
     }
@@ -826,7 +842,6 @@ private extension EngineBuilder {
     cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
     cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
     cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
-    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
 #endif
@@ -850,16 +865,9 @@ private extension EngineBuilder {
     cxxBuilder.setAppVersion(self.appVersion.toCXX())
     cxxBuilder.setAppId(self.appId.toCXX())
     cxxBuilder.setDeviceOs("iOS".toCXX())
-    for cluster in self.virtualClusters {
-      cxxBuilder.addVirtualCluster(cluster.toCXX())
-    }
 
     for (runtimeGuard, value) in self.runtimeGuards {
       cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for directResponse in self.directResponses {
-      cxxBuilder.addDirectResponse(directResponse.toCXX())
     }
 
     for filter in self.nativeFilterChain.reversed() {
@@ -872,7 +880,6 @@ private extension EngineBuilder {
 
     cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
 
-#if ENVOY_GOOGLE_GRPC
     if
       let nodeRegion = self.nodeRegion,
       let nodeZone = self.nodeZone,
@@ -885,29 +892,35 @@ private extension EngineBuilder {
       cxxBuilder.setNodeId(nodeID.toCXX())
     }
 
-    if let rtdsLayerName = self.rtdsLayerName {
-      cxxBuilder.addRtdsLayer(rtdsLayerName.toCXX(), Int32(self.rtdsTimeoutSeconds))
-    }
+    generateXds(&cxxBuilder)
 
-    if
-      let adsAddress = self.adsAddress,
-      let adsJwtToken = self.adsJwtToken,
-      let adsSslRootCerts = self.adsSslRootCerts
-    {
-      cxxBuilder.setAggregatedDiscoveryService(
-        adsAddress.toCXX(),
-        Int32(self.adsPort),
-        adsJwtToken.toCXX(),
-        Int32(self.adsJwtTokenLifetimeSeconds),
-        adsSslRootCerts.toCXX()
-      )
-    }
-    if self.enableCds {
-      cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
-    }
-#endif
     return cxxBuilder.generateBootstrap()
   }
-  // swiftlint:enable cyclomatic_complexity
+
+  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
+#if ENVOY_GOOGLE_GRPC
+    if let xdsBuilder = self.xdsBuilder {
+      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
+                                                    Int32(xdsBuilder.xdsServerPort))
+      if let xdsJwtToken = xdsBuilder.jwtToken {
+        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
+                                                Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
+      }
+      if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
+        cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
+      }
+      if let rtdsResourceName = xdsBuilder.rtdsResourceName {
+        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
+                                                 Int32(xdsBuilder.rtdsTimeoutInSeconds))
+      }
+      if xdsBuilder.enableCds {
+        cxxXdsBuilder.addClusterDiscoveryService(
+          xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
+          Int32(xdsBuilder.cdsTimeoutInSeconds))
+      }
+      cxxBuilder.setXds(cxxXdsBuilder)
+    }
+#endif
+  }
 }
 #endif

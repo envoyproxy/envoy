@@ -7,19 +7,17 @@
 namespace Envoy {
 namespace Upstream {
 
-StaticClusterImpl::StaticClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                                     const envoy::config::cluster::v3::Cluster& cluster,
-                                     ClusterFactoryContext& context, Runtime::Loader& runtime,
-                                     bool added_via_api)
-    : ClusterImplBase(server_context, cluster, context, runtime, added_via_api,
-                      context.mainThreadDispatcher().timeSource()),
-      priority_state_manager_(new PriorityStateManager(*this, context.localInfo(), nullptr)) {
+StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                                     ClusterFactoryContext& context)
+    : ClusterImplBase(cluster, context),
+      priority_state_manager_(
+          new PriorityStateManager(*this, context.serverFactoryContext().localInfo(), nullptr)) {
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
-  Event::Dispatcher& dispatcher = context.mainThreadDispatcher();
+  Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
@@ -33,7 +31,7 @@ StaticClusterImpl::StaticClusterImpl(Server::Configuration::ServerFactoryContext
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }
@@ -61,13 +59,9 @@ void StaticClusterImpl::startPreInit() {
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-StaticClusterFactory::createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                                        const envoy::config::cluster::v3::Cluster& cluster,
+StaticClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                         ClusterFactoryContext& context) {
-  return std::make_pair(std::make_shared<StaticClusterImpl>(server_context, cluster, context,
-                                                            context.runtime(),
-                                                            context.addedViaApi()),
-                        nullptr);
+  return std::make_pair(std::make_shared<StaticClusterImpl>(cluster, context), nullptr);
 }
 
 /**

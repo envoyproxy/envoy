@@ -27,6 +27,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/dynamic_ot:dynamic_opentracing_driver_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/test_common:environment_lib",
     ],

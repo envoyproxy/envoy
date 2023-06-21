@@ -133,9 +133,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
@@ -198,8 +198,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
               - string_value: "HTTP/1.1"
   )EOF",
                             expected);
-  const KeyValueList output =
-      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  const KeyValueList output = formatter.format(request_header, response_header, response_trailer,
+                                               stream_info, body, AccessLog::AccessLogType::NotSet);
   EXPECT_TRUE(TestUtility::protoEqual(output, expected));
 }
 
@@ -411,8 +411,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
                           - string_value: "HTTP/1.1"
   )EOF",
                             expected);
-  const KeyValueList output =
-      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  const KeyValueList output = formatter.format(request_header, response_header, response_trailer,
+                                               stream_info, body, AccessLog::AccessLogType::NotSet);
   EXPECT_TRUE(TestUtility::protoEqual(output, expected));
 }
 
@@ -438,9 +438,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
@@ -465,9 +465,9 @@ TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
@@ -504,9 +504,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
@@ -546,9 +546,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
@@ -583,9 +583,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
@@ -629,9 +629,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterInfoTest) {
@@ -656,16 +656,16 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
   // Empty optional (absl::nullopt)
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
-    verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
-        expected);
+    verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                               stream_info, body, AccessLog::AccessLogType::NotSet),
+                              expected);
   }
   // Empty cluster info (nullptr)
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
-    verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
-        expected);
+    verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                               stream_info, body, AccessLog::AccessLogType::NotSet),
+                              expected);
   }
 }
 
@@ -699,9 +699,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
@@ -744,9 +744,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
@@ -780,9 +780,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
@@ -822,9 +822,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 // Error specifier will cause an exception to be thrown.
@@ -924,9 +924,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterStartTimeTest) {
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping);
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                             stream_info, body, AccessLog::AccessLogType::NotSet),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
@@ -954,9 +954,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
-        expected);
+    verifyOpenTelemetryOutput(formatter.format(request_header, response_header, response_trailer,
+                                               stream_info, body, AccessLog::AccessLogType::NotSet),
+                              expected);
   }
 }
 

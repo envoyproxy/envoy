@@ -12,7 +12,6 @@ cc_library(
     # @io_opentracing_cpp//:generate_version_h failed - needs porting
     tags = ["skip_on_windows"],
     deps = [
-        "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
         "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
         "@com_google_googletest//:gtest",
         "@io_opentracing_cpp//:opentracing",

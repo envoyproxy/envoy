@@ -60,7 +60,8 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+    : deferred_stat_options_(bootstrap.deferred_stat_options()) {
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
@@ -79,13 +80,18 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   // In order to support dynamic configuration of tracing providers,
-  // a former server-wide HttpTracer singleton has been replaced by
-  // an HttpTracer instance per "envoy.filters.network.http_connection_manager" filter.
+  // a former server-wide Tracer singleton has been replaced by
+  // an Tracer instance per "envoy.filters.network.http_connection_manager" filter.
   // Tracing configuration as part of bootstrap config is still supported,
   // however, it's become mandatory to process it prior to static Listeners.
   // Otherwise, static Listeners will be configured in assumption that
   // tracing configuration is missing from the bootstrap config.
   initializeTracers(bootstrap.tracing(), server);
+
+  // stats_config_ should be set before creating the ClusterManagers so that it is available
+  // from the ServerFactoryContext when creating the static clusters and stats sinks, where
+  // stats deferred instantiation setting is read.
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
 
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
@@ -101,20 +107,21 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    absl::StatusOr<bool> update_or_error =
+        server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    if (!update_or_error.status().ok()) {
+      throw EnvoyException(std::string(update_or_error.status().message()));
+    }
   }
-
   initializeWatchdogs(bootstrap, server);
+  // This has to happen after ClusterManager initialization, as it depends on config from
+  // ClusterManager.
   initializeStatsConfig(bootstrap, server);
 }
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
   ENVOY_LOG(info, "loading stats configuration");
-
-  // stats_config_ should be set before populating the sinks so that it is available
-  // from the ServerFactoryContext when creating the stats sinks.
-  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.
@@ -146,7 +153,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
 
-  // Notice that the actual HttpTracer instance will be created on demand
+  // Notice that the actual Tracer instance will be created on demand
   // in the context of "envoy.filters.network.http_connection_manager" filter.
   // The side effect of this is that provider-specific configuration
   // is no longer validated in this step.

@@ -26,14 +26,22 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
+using testing::DoAll;
+using testing::Return;
+using testing::WithArg;
+
 struct InitializedMockClusterManager {
   InitializedMockClusterManager() {
+    EXPECT_CALL(instance_, addThreadLocalClusterUpdateCallbacks_(_))
+        .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_), Return(nullptr)));
+
     instance_.initializeClusters({"fake_cluster"}, {});
     instance_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     instance_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   NiceMock<Upstream::MockClusterManager> instance_;
+  Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_;
 };
 
 class DatadogAgentHttpClientTest : public testing::Test {
@@ -458,6 +466,112 @@ TEST_F(DatadogAgentHttpClientTest, OnBeforeFinalizeUpstreamSpanIsANoOp) {
   // This test is for the sake of coverage.
   Tracing::NullSpan null_span;
   client_.onBeforeFinalizeUpstreamSpan(null_span, nullptr);
+}
+
+TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  // Verify the effect of onClusterAddOrUpdate()/onClusterRemoval() on reporting logic,
+  // keeping in mind that they will be called both for relevant and irrelevant clusters.
+  NiceMock<Upstream::MockClusterManager>& cm = cluster_manager_.instance_;
+  Upstream::ClusterUpdateCallbacks* cluster_update_callbacks =
+      cluster_manager_.cluster_update_callbacks_;
+
+  {
+    // Simulate removal of the relevant cluster.
+    cluster_update_callbacks->onClusterRemoval("fake_cluster");
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+
+    // Attempt to send a request.
+    const auto ignore = [](auto&&...) {};
+    datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
+    EXPECT_TRUE(result);
+
+    // Verify observability.
+    EXPECT_EQ(1U, stats_.reports_skipped_no_cluster_.value());
+    EXPECT_EQ(0U, stats_.reports_sent_.value());
+    EXPECT_EQ(0U, stats_.reports_dropped_.value());
+    EXPECT_EQ(0U, stats_.reports_failed_.value());
+  }
+
+  {
+    // Simulate addition of an irrelevant cluster.
+    NiceMock<Upstream::MockThreadLocalCluster> unrelated_cluster;
+    unrelated_cluster.cluster_.info_->name_ = "unrelated_cluster";
+    cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+
+    // Attempt to send a request.
+    const auto ignore = [](auto&&...) {};
+    datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
+    EXPECT_TRUE(result);
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.reports_skipped_no_cluster_.value());
+    EXPECT_EQ(0U, stats_.reports_sent_.value());
+    EXPECT_EQ(0U, stats_.reports_dropped_.value());
+    EXPECT_EQ(0U, stats_.reports_failed_.value());
+  }
+
+  {
+    // Simulate addition of the relevant cluster.
+    cluster_update_callbacks->onClusterAddOrUpdate(cm.thread_local_cluster_);
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Attempt to send a request.
+    const auto ignore = [](auto&&...) {};
+    datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
+    EXPECT_TRUE(result);
+
+    // Complete in-flight request.
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.reports_skipped_no_cluster_.value());
+    EXPECT_EQ(0U, stats_.reports_sent_.value());
+    EXPECT_EQ(0U, stats_.reports_dropped_.value());
+    EXPECT_EQ(1U, stats_.reports_failed_.value());
+  }
+
+  {
+    // Simulate removal of an irrelevant cluster.
+    cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Attempt to send a request.
+    const auto ignore = [](auto&&...) {};
+    datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
+    EXPECT_TRUE(result);
+
+    // Complete in-flight request.
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
+    callback->onSuccess(request, std::move(msg));
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.reports_skipped_no_cluster_.value());
+    EXPECT_EQ(0U, stats_.reports_sent_.value());
+    EXPECT_EQ(1U, stats_.reports_dropped_.value());
+    EXPECT_EQ(1U, stats_.reports_failed_.value());
+  }
 }
 
 } // namespace

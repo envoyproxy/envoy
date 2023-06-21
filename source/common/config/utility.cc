@@ -284,7 +284,11 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
+#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+#else
+        throw EnvoyException("Attempting to use JSON typed structs with JSON compiled out");
+#endif
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
@@ -295,15 +299,24 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
+#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+#else
+        UNREFERENCED_PARAMETER(validation_visitor);
+        throw EnvoyException("Attempting to use legacy JSON structs with JSON compiled out");
+#endif
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
       MessageUtil::unpackTo(typed_config, out_proto);
     } else {
+#ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
+#else
+      throw EnvoyException("Attempting to use JSON structs with JSON compiled out");
+#endif
     }
   }
 }

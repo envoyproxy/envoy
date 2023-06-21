@@ -3,9 +3,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
@@ -32,7 +34,8 @@ public:
                              const Http::ResponseHeaderMap& response_headers,
                              const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body) const PURE;
+                             absl::string_view local_reply_body,
+                             AccessLog::AccessLogType access_log_type) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -60,7 +63,8 @@ public:
                                              const Http::ResponseHeaderMap& response_headers,
                                              const Http::ResponseTrailerMap& response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view local_reply_body) const PURE;
+                                             absl::string_view local_reply_body,
+                                             AccessLog::AccessLogType access_log_type) const PURE;
   /**
    * Extract a value from the provided headers/trailers/stream, preserving the value's type.
    * @param request_headers supplies the request headers.
@@ -75,7 +79,8 @@ public:
                                          const Http::ResponseHeaderMap& response_headers,
                                          const Http::ResponseTrailerMap& response_trailers,
                                          const StreamInfo::StreamInfo& stream_info,
-                                         absl::string_view local_reply_body) const PURE;
+                                         absl::string_view local_reply_body,
+                                         AccessLog::AccessLogType access_log_type) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
@@ -118,10 +123,13 @@ public:
    * Creates a particular CommandParser implementation.
    *
    * @param config supplies the configuration for the command parser.
+   * @param context supplies the factory context.
    * @return CommandParserPtr the CommandParser which will be used in
    * SubstitutionFormatParser::parse() when evaluating an access log format string.
    */
-  virtual CommandParserPtr createCommandParserFromProto(const Protobuf::Message& config) PURE;
+  virtual CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message& config,
+                               Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.formatter"; }
 };

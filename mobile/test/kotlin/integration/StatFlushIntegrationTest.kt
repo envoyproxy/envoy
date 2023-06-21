@@ -12,9 +12,6 @@ import org.junit.After
 import org.junit.Ignore
 import org.junit.Test
 
-// TODO(abeyad): Fix the test and re-enable.
-// See https://github.com/envoyproxy/envoy/issues/24657.
-@Ignore
 class StatFlushIntegrationTest {
   private var engine: Engine? = null
 
@@ -56,18 +53,20 @@ class StatFlushIntegrationTest {
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
 
-    engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
-
     val statsdServer1 = TestStatsdServer()
     statsdServer1.runAsync(8125)
 
     val statsdServer2 = TestStatsdServer()
     statsdServer2.runAsync(5000)
 
+    statsdServer1.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer2.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+
+    engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
     engine!!.flushStats()
 
-    statsdServer1.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
-    statsdServer2.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer1.awaitStatMatching()
+    statsdServer2.awaitStatMatching()
   }
 
   private fun statsdSinkConfig(port: Int): String {

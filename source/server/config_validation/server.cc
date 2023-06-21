@@ -15,6 +15,7 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -85,6 +86,11 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
+  if (bootstrap_.has_application_log_config()) {
+    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
+    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+  }
+
   // Inject regex engine to singleton.
   Regex::EnginePtr regex_engine = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
@@ -119,11 +125,9 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(),
+      server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), dispatcher(), localInfo(), *secret_manager_, messageValidationContext(),
-      *api_, http_context_, grpc_context_, router_context_, accessLogManager(), singletonManager(),
-      options, quic_stat_names_, *this);
+      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

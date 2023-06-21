@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/router/router.h"
 
@@ -209,12 +210,17 @@ public:
   MOCK_METHOD(void, deleteTrafficRoutingAssistant,
               (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
-  MOCK_METHOD(void, complete,
-              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
-              ());
   MOCK_METHOD(void, doSubscribe,
               (const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity),
               ());
+
+  // TODO(wbpcode): mock this method will cause the clang-tidy error. To avoid this error and
+  // updating the source code, we will not mock this method for now. It is OK because this method is
+  // not used in the unit test. If someone wants to mock this method, please update the source code
+  // to avoid using the absl::any.
+  void complete(const TrafficRoutingAssistant::ResponseType&, const std::string&,
+                const absl::any&) override {}
+
   ~MockTrafficRoutingAssistantHandler() override;
 };
 
@@ -243,9 +249,12 @@ public:
 
 class MockRequestCallbacks : public TrafficRoutingAssistant::RequestCallbacks {
 public:
-  MOCK_METHOD(void, complete,
-              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
-              ());
+  // TODO(wbpcode): mock this method will cause the clang-tidy error. To avoid this error and
+  // updating the source code, we will not mock this method for now. It is OK because this method is
+  // not used in the unit test. If someone wants to mock this method, please update the source code
+  // to avoid using the absl::any.
+  void complete(const TrafficRoutingAssistant::ResponseType&, const std::string&,
+                const absl::any&) override {}
 };
 
 } // namespace SipProxy

@@ -142,6 +142,10 @@ public:
 
   std::list<UpstreamRequestPtr>& upstreamRequestsForTest() { return upstream_requests_; }
 
+  // Upstream::LoadBalancerContextBase
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
+  const Network::Connection* downstreamConnection() const override;
+
 private:
   friend class UpstreamRequest;
   friend class UpstreamManagerImpl;
@@ -158,6 +162,8 @@ private:
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Request* request_{};
+
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
   RequestEncoderPtr request_encoder_;
 

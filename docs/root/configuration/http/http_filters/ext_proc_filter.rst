@@ -50,3 +50,5 @@ The following statistics are supported:
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
   message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
   rejected_header_mutations, Counter, The number of rejected header mutations
+  clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
+  clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled

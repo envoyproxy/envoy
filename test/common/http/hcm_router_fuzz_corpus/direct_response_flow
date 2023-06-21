@@ -1,0 +1,28 @@
+actions {
+  request_header {
+    cluster: 2
+    headers {
+      headers {
+        key: ":method"
+        value: "get"
+      }
+      headers {
+        key: ":path"
+        value: "/default2"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+    end_stream: false
+  }
+}
+actions {
+  request_data {
+    cluster: 0
+    stream: 0
+    data: "foo"
+    end_stream: true
+  }
+}

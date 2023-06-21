@@ -75,12 +75,8 @@ for how to update or override dependencies.
     ```console
     sudo apt-get install \
        autoconf \
-       automake \
-       cmake \
        curl \
        libtool \
-       make \
-       ninja-build \
        patch \
        python3-pip \
        unzip \
@@ -92,13 +88,11 @@ for how to update or override dependencies.
     ```console
     dnf install \
         aspell-en \
-        cmake \
         libatomic \
         libstdc++ \
         libstdc++-static \
         libtool \
         lld \
-        ninja-build \
         patch \
         python3-pip
     ```
@@ -128,7 +122,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
+    brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
@@ -226,15 +220,6 @@ for how to update or override dependencies.
     ```
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
-
-    Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
-    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
-    projects are used instead.
-    ```cmd
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%PATH%
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
-    ```
 
     [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 

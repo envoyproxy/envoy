@@ -23,7 +23,7 @@
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
@@ -1198,6 +1198,14 @@ public:
    * @return the tracing config or nullptr if not defined for the request.
    */
   virtual const RouteTracing* tracingConfig() const PURE;
+
+  /**
+   * Check if the filter is disabled for this route.
+   * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
+   * may be different from the filter extension qualified name.
+   * @return true if the filter is disabled for this route, false otherwise.
+   */
+  virtual bool filterDisabled(absl::string_view config_name) const PURE;
 
   /**
    * This is a helper to get the route's per-filter config if it exists, up along the config

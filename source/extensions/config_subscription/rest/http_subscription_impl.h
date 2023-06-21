@@ -8,7 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/rest_api_fetcher.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 
 namespace Envoy {
 namespace Config {
@@ -67,23 +67,15 @@ private:
 class HttpSubscriptionFactory : public ConfigSubscriptionFactory {
 public:
   std::string name() const override { return "envoy.config_subscription.rest"; }
-  SubscriptionPtr create(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
-                         Event::Dispatcher& dispatcher, Api::Api& api,
-                         const envoy::config::core::v3::ConfigSource& config,
-                         absl::string_view type_url, SubscriptionCallbacks& callbacks,
-                         OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
-                         ProtobufMessage::ValidationVisitor& validation_visitor) override {
-
-    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
+  SubscriptionPtr create(SubscriptionData& data) override {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source =
+        data.config_.api_config_source();
     return std::make_unique<HttpSubscriptionImpl>(
-        local_info, cm, api_config_source.cluster_names()[0], dispatcher, api.randomGenerator(),
-        Utility::apiConfigSourceRefreshDelay(api_config_source),
-        Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
-        callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
-        validation_visitor);
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::core::v3::RestSubscription>();
+        data.local_info_, data.cm_, api_config_source.cluster_names()[0], data.dispatcher_,
+        data.api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
+        Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(data.type_url_),
+        data.type_url_, data.callbacks_, data.resource_decoder_, data.stats_,
+        Utility::configSourceInitialFetchTimeout(data.config_), data.validation_visitor_);
   }
 };
 

@@ -171,8 +171,8 @@ cc_library(
         "android_jni_utility.h",
     ],
     deps = [
-        "@envoy//source/common/common:assert_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//source/common/common:assert_lib",
     ] + select({
         "@envoy//bazel:android": [
             ":jni_support_lib",

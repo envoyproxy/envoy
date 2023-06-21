@@ -16,7 +16,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -432,10 +432,15 @@ public:
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 
   /**
-￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
-    * for upstream filters.
-    */
+   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
+   * for upstream filters.
+   */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
+
+  /**
+   * @return absl::string_view the name of the filter as configured in the filter chain.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
 };
 
 class DecoderFilterWatermarkCallbacks {

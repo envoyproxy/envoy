@@ -166,6 +166,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
+
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
 }

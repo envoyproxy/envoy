@@ -294,6 +294,7 @@ OCSP
 OD
 ODCDS
 middlewildcard
+monostate
 mpd
 oghttp
 OID
@@ -479,6 +480,7 @@ acks
 acls
 addr
 agg
+AggregationTemporality
 alice
 alignas
 alignof
@@ -813,6 +815,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -922,6 +925,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
@@ -1158,10 +1162,12 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable
 retriggers
+retryable
 revalidated
 revalidation
 reverify

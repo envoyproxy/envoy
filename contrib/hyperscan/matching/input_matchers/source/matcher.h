@@ -42,7 +42,7 @@ public:
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override;
 
   // Envoy::Matcher::InputMatcher
-  bool match(absl::optional<absl::string_view> input) override;
+  bool match(const ::Envoy::Matcher::MatchingDataType& input) override;
 
 private:
   hs_database_t* database_{};

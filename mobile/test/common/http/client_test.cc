@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -111,6 +112,9 @@ public:
       cc->on_trailers_calls++;
       return nullptr;
     };
+    helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
+        .WillRepeatedly(Return(true));
   }
 
   envoy_headers defaultRequestHeaders() {
@@ -127,12 +131,12 @@ public:
     // Grab the response encoder in order to dispatch responses on the stream.
     // Return the request decoder to make sure calls are dispatched to the decoder via the
     // dispatcher API.
-    EXPECT_CALL(api_listener_, newStream(_, _))
+    EXPECT_CALL(*api_listener_, newStream(_, _))
         .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           return *request_decoder_;
         }));
-    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_);
+    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_, 0);
   }
 
   void resumeDataIfExplicitFlowControl(int32_t bytes) {
@@ -142,7 +146,8 @@ public:
     }
   }
 
-  MockApiListener api_listener_;
+  std::unique_ptr<MockApiListener> owned_api_listener_ = std::make_unique<MockApiListener>();
+  MockApiListener* api_listener_ = owned_api_listener_.get();
   std::unique_ptr<NiceMock<MockRequestDecoder>> request_decoder_{
       std::make_unique<NiceMock<MockRequestDecoder>>()};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -153,8 +158,12 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
-  Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
+  Client http_client_{std::move(owned_api_listener_), dispatcher_, *stats_store_.rootScope(),
+                      random_};
   envoy_stream_t stream_ = 1;
+
+protected:
+  std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
@@ -416,12 +425,12 @@ TEST_P(ClientTest, MultipleStreams) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(api_listener_, newStream(_, _))
+  EXPECT_CALL(*api_listener_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         return request_decoder2;
       }));
-  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_);
+  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_, 0);
 
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -677,12 +686,12 @@ TEST_P(ClientTest, NullAccessors) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(api_listener_, newStream(_, _))
+  EXPECT_CALL(*api_listener_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return *request_decoder_;
       }));
-  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_);
+  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_, 0);
 
   EXPECT_FALSE(response_encoder_->http1StreamEncoderOptions().has_value());
   EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());

@@ -282,15 +282,15 @@ public abstract class CronetEngine {
 
     /**
      * Creates an implementation of {@link ICronetEngineBuilder} that can be used to delegate the
-     * builder calls to. The method uses {@link CronetProvider} to obtain the list of available
+     * builder calls to. The method uses {@link CronvoyProvider} to obtain the list of available
      * providers.
      *
      * @param context Android Context to use.
      * @return the created {@code ICronetEngineBuilder}.
      */
     private static ICronetEngineBuilder createBuilderDelegate(Context context) {
-      List<CronetProvider> providers = new ArrayList<>(CronetProvider.getAllProviders(context));
-      CronetProvider provider = getEnabledCronetProviders(context, providers).get(0);
+      List<CronvoyProvider> providers = new ArrayList<>(CronvoyProvider.getAllProviders(context));
+      CronvoyProvider provider = getEnabledCronvoyProviders(context, providers).get(0);
       if (Log.isLoggable(TAG, Log.DEBUG)) {
         Log.d(TAG,
               String.format("Using '%s' provider for creating CronetEngine.Builder.", provider));
@@ -299,8 +299,8 @@ public abstract class CronetEngine {
     }
 
     /**
-     * Returns the list of available and enabled {@link CronetProvider}. The returned list is sorted
-     * based on the provider versions and types.
+     * Returns the list of available and enabled {@link CronvoyProvider}. The returned list is
+     * sorted based on the provider versions and types.
      *
      * @param context Android Context to use.
      * @param providers the list of enabled and disabled providers to filter out and sort.
@@ -309,8 +309,8 @@ public abstract class CronetEngine {
      *     disabled.
      */
     @VisibleForTesting
-    static List<CronetProvider> getEnabledCronetProviders(Context context,
-                                                          List<CronetProvider> providers) {
+    static List<CronvoyProvider> getEnabledCronvoyProviders(Context context,
+                                                            List<CronvoyProvider> providers) {
       // Check that there is at least one available provider.
       if (providers.size() == 0) {
         throw new RuntimeException("Unable to find any Cronet provider."
@@ -318,8 +318,8 @@ public abstract class CronetEngine {
       }
 
       // Exclude disabled providers from the list.
-      for (Iterator<CronetProvider> i = providers.iterator(); i.hasNext();) {
-        CronetProvider provider = i.next();
+      for (Iterator<CronvoyProvider> i = providers.iterator(); i.hasNext();) {
+        CronvoyProvider provider = i.next();
         if (!provider.isEnabled()) {
           i.remove();
         }
@@ -332,14 +332,14 @@ public abstract class CronetEngine {
       }
 
       // Sort providers based on version and type.
-      Collections.sort(providers, new Comparator<CronetProvider>() {
+      Collections.sort(providers, new Comparator<CronvoyProvider>() {
         @Override
-        public int compare(CronetProvider p1, CronetProvider p2) {
+        public int compare(CronvoyProvider p1, CronvoyProvider p2) {
           // The fallback provider should always be at the end of the list.
-          if (CronetProvider.PROVIDER_NAME_FALLBACK.equals(p1.getName())) {
+          if (CronvoyProvider.PROVIDER_NAME_FALLBACK.equals(p1.getName())) {
             return 1;
           }
-          if (CronetProvider.PROVIDER_NAME_FALLBACK.equals(p2.getName())) {
+          if (CronvoyProvider.PROVIDER_NAME_FALLBACK.equals(p2.getName())) {
             return -1;
           }
           // A provider with higher version should go first.

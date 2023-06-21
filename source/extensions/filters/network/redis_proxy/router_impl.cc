@@ -87,17 +87,18 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     value = prefix_lookup_table_.findLongestPrefix(key.c_str());
   }
 
-  if (value != nullptr) {
-    if (value->removePrefix()) {
-      key.erase(0, value->prefix().length());
-    }
-    if (!value->keyFormatter().empty()) {
-      formatKey(key, value->keyFormatter());
-    }
-    return value;
+  if (value == nullptr) {
+    // prefix route not found, default to catch all route.
+    value = catch_all_route_;
   }
 
-  return catch_all_route_;
+  if (value->removePrefix()) {
+    key.erase(0, value->prefix().length());
+  }
+  if (!value->keyFormatter().empty()) {
+    formatKey(key, value->keyFormatter());
+  }
+  return value;
 }
 
 void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) {
@@ -110,11 +111,11 @@ void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) 
   auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
   std::string formatted_key;
   for (Formatter::FormatterProviderPtr& provider : providers) {
-    auto provider_formatted_key =
-        provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
-                              *Http::StaticEmptyHeaders::get().response_headers,
-                              *Http::StaticEmptyHeaders::get().response_trailers,
-                              callbacks_->connection().streamInfo(), absl::string_view());
+    auto provider_formatted_key = provider->formatValue(
+        *Http::StaticEmptyHeaders::get().request_headers,
+        *Http::StaticEmptyHeaders::get().response_headers,
+        *Http::StaticEmptyHeaders::get().response_trailers, callbacks_->connection().streamInfo(),
+        absl::string_view(), AccessLog::AccessLogType::NotSet);
 
     if (provider_formatted_key.has_string_value()) {
       formatted_key = formatted_key + provider_formatted_key.string_value();

@@ -67,49 +67,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAdminInterfaceIsDisabledByDefault() {
-    let expectation = self.expectation(description: "Run called with disabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-#if ENVOY_ADMIN_FUNCTIONALITY
-  func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableAdminInterface()
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-#endif
-
-  func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.enableHappyEyeballs)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableHappyEyeballs(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testEnablingInterfaceBindingAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled interface binding")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -363,28 +320,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ], config.virtualClusters)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters([
-        """
-        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
-        """,
-      ])
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingNativeFiltersToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -422,22 +357,24 @@ final class EngineBuilderTests: XCTestCase {
   }
 
 #if ENVOY_GOOGLE_GRPC
-  func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
+  func testAddingRtdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRTDSLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
-    XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("some_rtds_resource"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 14325 }"))
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
-  func testAddingCdsAndAdsConfigurationWhenRunningEnvoy() {
+  func testAddingCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService(cdsResourcesLocator: "FAKE_CDS_LOCATOR", timeoutInSeconds: 2543)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer(resourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_CDS_LOCATOR"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 2543 }"))
@@ -445,14 +382,16 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testAddingDefaultCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService()
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer()
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("cds_config {"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 5 }"))
   }
+#endif
 
   func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
@@ -482,7 +421,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
-#endif
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")

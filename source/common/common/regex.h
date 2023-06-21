@@ -28,15 +28,12 @@ public:
   explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config);
 
   // CompiledMatcher
-  bool match(absl::string_view value) const override {
-    return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
-  }
+  bool match(absl::string_view value) const override { return re2::RE2::FullMatch(value, regex_); }
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
     std::string result = std::string(value);
-    re2::RE2::GlobalReplace(&result, regex_,
-                            re2::StringPiece(substitution.data(), substitution.size()));
+    re2::RE2::GlobalReplace(&result, regex_, substitution);
     return result;
   }
 
@@ -70,16 +67,6 @@ enum class Type { Re2, StdRegex };
  */
 class Utility {
 public:
-  /**
-   * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
-   * @param regex std::string containing the regular expression to parse.
-   * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags.
-   * @throw EnvoyException if the regex string is invalid.
-   */
-  static std::regex parseStdRegex(const std::string& regex,
-                                  std::regex::flag_type flags = std::regex::optimize);
-
   /**
    * Construct a compiled regex matcher from a match config.
    */

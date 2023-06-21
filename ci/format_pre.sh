@@ -12,7 +12,8 @@ BASH_ERR_PREFIX="##[error]: "
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format.diff}"
 
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
 
 
 trap_errors () {
@@ -47,10 +48,10 @@ CURRENT=check
 # This test runs code check with:
 #   bazel run //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
 # see: /tools/code/BUILD
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
 
 CURRENT=configs
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=spelling
 "${ENVOY_SRCDIR}/tools/spelling/check_spelling_pedantic.py" --mark check

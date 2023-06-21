@@ -10,6 +10,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
@@ -30,10 +31,8 @@ class EdsClusterImpl
     : public BaseDynamicClusterImpl,
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                 const envoy::config::cluster::v3::Cluster& cluster,
-                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                 bool added_via_api);
+  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                 ClusterFactoryContext& cluster_context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -116,10 +115,11 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                    const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(EdsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

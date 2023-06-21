@@ -27,10 +27,7 @@ public:
   }
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_hash_key")) {
-      return transport_socket_factory_->hashKey(key, options);
-    }
-    return Network::CommonUpstreamTransportSocketFactory::hashKey(key, options);
+    return transport_socket_factory_->hashKey(key, options);
   }
   Envoy::Ssl::ClientContextSharedPtr sslCtx() override {
     return transport_socket_factory_->sslCtx();

@@ -84,7 +84,7 @@ OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& st
     const std::vector<Formatter::FormatterProviderPtr>& providers,
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
+    absl::string_view local_reply_body, AccessLog::AccessLogType access_log_type) const {
   ASSERT(!providers.empty());
   ::opentelemetry::proto::common::v1::AnyValue output;
   std::vector<std::string> bits(providers.size());
@@ -92,7 +92,7 @@ OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& st
                  [&](const Formatter::FormatterProviderPtr& provider) {
                    return provider
                        ->format(request_headers, response_headers, response_trailers, stream_info,
-                                local_reply_body)
+                                local_reply_body, access_log_type)
                        .value_or(DefaultUnspecifiedValueString);
                  });
   output.set_string_value(absl::StrJoin(bits, ""));
@@ -129,11 +129,11 @@ OpenTelemetryFormatter::openTelemetryFormatListCallback(
 ::opentelemetry::proto::common::v1::KeyValueList OpenTelemetryFormatter::format(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
+    absl::string_view local_reply_body, AccessLog::AccessLogType access_log_type) const {
   OpenTelemetryFormatMapVisitor visitor{
       [&](const std::vector<Formatter::FormatterProviderPtr>& providers) {
         return providersCallback(providers, request_headers, response_headers, response_trailers,
-                                 stream_info, local_reply_body);
+                                 stream_info, local_reply_body, access_log_type);
       },
       [&, this](const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map) {
         return openTelemetryFormatMapCallback(format_map, visitor);

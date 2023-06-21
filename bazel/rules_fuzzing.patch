@@ -11,3 +11,19 @@ index e5e9dc4..a3bb1b8 100644
          """.format(
              base_name = ctx.attr.base_name,
              binary_path = binary_info.binary_file.path,
+diff --git a/fuzzing/tools/validate_dict.py b/fuzzing/tools/validate_dict.py
+index d561e68..24e3adc 100644
+--- a/fuzzing/tools/validate_dict.py
++++ b/fuzzing/tools/validate_dict.py
+@@ -19,6 +19,11 @@ Validates and merges a set of fuzzing dictionary files into a single output.
+ 
+ from absl import app
+ from absl import flags
++
++import os
++import sys
++sys.path += [os.path.dirname(__file__)]
++
+ from dict_validation import validate_line
+ from sys import stderr
+ 

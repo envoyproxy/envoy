@@ -6,6 +6,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -19,18 +20,53 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 Cluster::Cluster(
-    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-    Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    const LocalInfo::LocalInfo& local_info, bool added_via_api)
-    : Upstream::BaseDynamicClusterImpl(server_context, cluster, context, runtime, added_via_api,
-                                       context.mainThreadDispatcher().timeSource()),
+    Upstream::ClusterFactoryContext& context,
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    : Upstream::BaseDynamicClusterImpl(cluster, context),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      allow_coalesced_connections_(config.allow_coalesced_connections()) {}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
+      local_info_(context.serverFactoryContext().localInfo()),
+      main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      orig_cluster_config_(cluster),
+      allow_coalesced_connections_(config.allow_coalesced_connections()),
+      cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                         config.sub_clusters_config(), max_sub_clusters, 1024)),
+      sub_cluster_ttl_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
+      sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
+      enable_sub_cluster_(config.has_sub_clusters_config()) {
+
+  if (enable_sub_cluster_) {
+    if (sub_cluster_lb_policy_ ==
+        envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+      throw EnvoyException("unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
+    }
+    idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
+    idle_timer_->enableTimer(sub_cluster_ttl_);
+  }
+}
+
+Cluster::~Cluster() {
+  if (enable_sub_cluster_) {
+    idle_timer_->disableTimer();
+    idle_timer_.reset();
+  }
+  if (cm_.isShutdown()) {
+    return;
+  }
+  // Should remove all sub clusters, otherwise, might be memory leaking.
+  // This lock is useless, just make compiler happy.
+  absl::WriterMutexLock lock{&cluster_map_lock_};
+  for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
+    auto cluster_name = it->first;
+    ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
+    cluster_map_.erase(it++);
+    cm_.removeCluster(cluster_name);
+  }
+}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
@@ -45,6 +81,132 @@ void Cluster::startPreInit() {
   onPreInitComplete();
 }
 
+bool Cluster::touch(const std::string& cluster_name) {
+  absl::ReaderMutexLock lock{&cluster_map_lock_};
+  const auto cluster_it = cluster_map_.find(cluster_name);
+  if (cluster_it != cluster_map_.end()) {
+    cluster_it->second->touch();
+    return true;
+  }
+  ENVOY_LOG(debug, "cluster='{}' has been removed while touching", cluster_name);
+  return false;
+}
+
+void Cluster::checkIdleSubCluster() {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+  {
+    // TODO: try read lock first.
+    absl::WriterMutexLock lock{&cluster_map_lock_};
+    for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
+      if (it->second->checkIdle()) {
+        auto cluster_name = it->first;
+        ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
+        cluster_map_.erase(it++);
+        cm_.removeCluster(cluster_name);
+      } else {
+        ++it;
+      }
+    }
+  }
+  idle_timer_->enableTimer(sub_cluster_ttl_);
+}
+
+std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
+Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
+                                const int port) {
+  {
+    absl::WriterMutexLock lock{&cluster_map_lock_};
+    const auto cluster_it = cluster_map_.find(cluster_name);
+    if (cluster_it != cluster_map_.end()) {
+      cluster_it->second->touch();
+      return std::make_pair(true, absl::nullopt);
+    }
+    if (cluster_map_.size() >= max_sub_clusters_) {
+      ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation",
+                cluster_name);
+      return std::make_pair(false, absl::nullopt);
+    }
+    cluster_map_.emplace(cluster_name, std::make_shared<ClusterInfo>(cluster_name, *this));
+  }
+
+  // Inherit configuration from the parent DFP cluster.
+  envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
+
+  // Overwrite the type.
+  config.set_name(cluster_name);
+  config.clear_cluster_type();
+  config.set_lb_policy(sub_cluster_lb_policy_);
+  config.set_type(
+      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+
+  // Set endpoint.
+  auto load_assignments = config.mutable_load_assignment();
+  load_assignments->set_cluster_name(cluster_name);
+  load_assignments->clear_endpoints();
+
+  auto socket_address = load_assignments->add_endpoints()
+                            ->add_lb_endpoints()
+                            ->mutable_endpoint()
+                            ->mutable_address()
+                            ->mutable_socket_address();
+  socket_address->set_address(host);
+  socket_address->set_port_value(port);
+
+  return std::make_pair(true, absl::make_optional(config));
+}
+
+Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
+                                                 Upstream::LoadBalancerContext* context) const {
+  uint16_t default_port = 80;
+  if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
+    default_port = 443;
+  }
+
+  const auto host_attributes = Http::Utility::parseAuthority(host);
+  auto dynamic_host = std::string(host_attributes.host_);
+  auto port = host_attributes.port_.value_or(default_port);
+
+  // cluster name is prefix + host + port
+  auto cluster_name = "DFPCluster:" + dynamic_host + ":" + std::to_string(port);
+
+  // try again to get the sub cluster.
+  auto cluster = cm_.getThreadLocalCluster(cluster_name);
+  if (cluster == nullptr) {
+    ENVOY_LOG(debug, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
+    return nullptr;
+  }
+
+  return cluster->loadBalancer().chooseHost(context);
+}
+
+Cluster::ClusterInfo::ClusterInfo(std::string cluster_name, Cluster& parent)
+    : cluster_name_(cluster_name), parent_(parent) {
+  ENVOY_LOG(debug, "cluster='{}' ClusterInfo created", cluster_name_);
+  touch();
+}
+
+void Cluster::ClusterInfo::touch() {
+  ENVOY_LOG(debug, "cluster='{}' updating last used time", cluster_name_);
+  last_used_time_ = parent_.time_source_.monotonicTime().time_since_epoch();
+}
+
+// checkIdle run in the main thread.
+bool Cluster::ClusterInfo::checkIdle() {
+  ASSERT(parent_.main_thread_dispatcher_.isThreadSafe());
+
+  const std::chrono::steady_clock::duration now_duration =
+      parent_.main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
+  auto last_used_time = last_used_time_.load();
+  ENVOY_LOG(debug, "cluster='{}' TTL check: now={} last_used={} TTL {}", cluster_name_,
+            now_duration.count(), last_used_time.count(), parent_.sub_cluster_ttl_.count());
+
+  if ((now_duration - last_used_time) > parent_.sub_cluster_ttl_) {
+    ENVOY_LOG(debug, "cluster='{}' TTL expired", cluster_name_);
+    return true;
+  }
+  return false;
+}
+
 void Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
@@ -55,9 +217,10 @@ void Cluster::addOrUpdateHost(
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
-    // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is a
-    // marginal memory cost above that already used by connections and requests, so relying on
-    // connection/request circuit breakers is sufficient. We may have to revisit this in the future.
+    // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is
+    // a marginal memory cost above that already used by connections and requests, so relying on
+    // connection/request circuit breakers is sufficient. We may have to revisit this in the
+    // future.
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
       // If we only have an address change, we can do that swap inline without any other updates.
@@ -160,18 +323,47 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
             .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
   }
 
-  absl::string_view host;
+  absl::string_view raw_host;
   if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->asString();
+    raw_host = dynamic_host_filter_state->asString();
   } else if (context->downstreamHeaders()) {
-    host = context->downstreamHeaders()->getHostValue();
+    raw_host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
-    host = context->downstreamConnection()->requestedServerName();
+    raw_host = context->downstreamConnection()->requestedServerName();
   }
+
+  // For host lookup, we need to make sure to match the host of any DNS cache
+  // insert. Two code points currently do DNS cache insert: the http DFP filter,
+  // which inserts for HTTP traffic, and sets port based on the cluster's
+  // security level, and the SNI DFP network filter which sets port based on
+  // stream metadata, or configuration (which is then added as stream metadata).
+  const bool is_secure = cluster_.info()
+                             ->transportSocketMatcher()
+                             .resolve(nullptr)
+                             .factory_.implementsSecureTransport();
+  uint32_t port = is_secure ? 443 : 80;
+  if (context->downstreamConnection()) {
+    const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+    if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
+        dynamic_port_filter_state->value() <= 65535) {
+      port = dynamic_port_filter_state->value();
+    }
+  }
+
+  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (host.empty()) {
     return nullptr;
   }
+
+  if (cluster_.enableSubCluster()) {
+    return cluster_.chooseHost(host, context);
+  }
+
   {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
@@ -255,12 +447,22 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
-    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
+
+  auto& server_context = context.serverFactoryContext();
+
+  // The message validation visitor of Upstream::ClusterFactoryContext should be used for
+  // validating the cluster config.
+  Server::FactoryContextBaseImpl factory_context_base(
+      server_context.options(), server_context.mainThreadDispatcher(), server_context.api(),
+      server_context.localInfo(), server_context.admin(), server_context.runtime(),
+      server_context.singletonManager(), context.messageValidationVisitor(),
+      server_context.serverScope().store(), server_context.threadLocal());
+
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context);
+      factory_context_base);
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
     // This sets defaults which will only apply if using old style http config.
@@ -270,9 +472,12 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster = std::make_shared<Cluster>(server_context, cluster_config, proto_config,
-                                               context, context.runtime(), cache_manager_factory,
-                                               context.localInfo(), context.addedViaApi());
+  auto new_cluster =
+      std::make_shared<Cluster>(cluster_config, proto_config, context, cache_manager_factory);
+
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+      factory_context_base);
+  cluster_store_factory.get()->save(new_cluster->info()->name(), new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
 

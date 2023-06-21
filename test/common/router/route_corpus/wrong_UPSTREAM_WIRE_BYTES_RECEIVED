@@ -1,0 +1,27 @@
+config {
+  virtual_hosts {
+    name: "eMn"
+    domains: "*"
+    matcher {
+      on_no_match {
+        action {
+          name: "%"
+          typed_config {
+            type_url: "/envoy.config.route.v3.Route"
+            value: "\n\002\n\000\022\003\n\001~J\217\007\n\214\007\n\001~\022\206\007`%START_TIME()%\00184\177\177\177%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%UPSTREAM_WIRE_BYTES_RECEIVED%%%%UPSTREAM_TLS_SESSION_ID%%%%%%%%%%%%%%%%%%%%%%%%REQUEST_TX_DURATION%%%%%%UPSTREAM_WIRE_BYTES_RECEIVED%%%%UPSTREAM_TLS_SESSION_ID%%%%%%UPSTREAM_TLS_SESSION_ID%%%%%%%%%%%%%%%%%%%%%%%%%%%%%VTSTNAME%START_TIME(/TIME%_%%%%%%%%%%%%%%%%%%%%%%%%%%_)%TA\177\177?\017%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%REQUEST_TX_DURATION%%%%%%UPSTREAM_WIRE_BYTES_RECEIVED%%%%UPSTREAM_TLS_SESSION_ID%%%%%%UPSTREAM_TLS_SESSION_ID%%%%%%%%%%%%%%%%%%%%%%%%%%%%%VTSTNAM%%%%%%%%%%%%%%%%%%%%%%%%%UPSTREAM_WIRE_BYTES_RECEIVED%%%%UPSTREAM_TLS_SESSION_ID%%%%%%%%%%%%%%%%%%%%%%%%REQUEST_TX_DURATION%%%%%%UPSTREAM_WIRE_BYTES_RECEIVED%%%%UPSTREAM_TLS_SESSION_ID%%%%%%UPSTREAM_TLS_SESSION_ID%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%E%START_TIME(/TIME%_%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%SSION_ID(%%%%%%%%%SSION_ID(%%%%_)%TA"
+          }
+        }
+      }
+    }
+  }
+  ignore_port_in_host_matching: true
+}
+headers {
+  headers {
+    key: ":path"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "2"
+  }
+}

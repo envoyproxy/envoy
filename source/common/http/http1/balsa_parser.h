@@ -17,7 +17,7 @@ namespace Http1 {
 class BalsaParser : public Parser, public quiche::BalsaVisitorInterface {
 public:
   BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-              bool enable_trailers);
+              bool enable_trailers, bool allow_custom_methods);
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
@@ -72,6 +72,7 @@ private:
 
   const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
+  const bool allow_custom_methods_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
