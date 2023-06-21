@@ -357,6 +357,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (host.empty()) {
+    ENVOY_LOG(debug, "host empty");
     return nullptr;
   }
 
