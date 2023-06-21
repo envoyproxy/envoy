@@ -51,6 +51,7 @@ public:
   // Network::TcpListenerCallbacks
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
   void onReject(RejectCause) override;
+  void recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) override;
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }

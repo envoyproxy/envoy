@@ -253,7 +253,7 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), true);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(100));
-  EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 26);
+  EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 27);
 
   for (int i = 0; i < opcode_descriptor->value_count(); i++) {
     LatencyThresholdOverride threshold_override = proto_config_.latency_threshold_overrides().at(i);

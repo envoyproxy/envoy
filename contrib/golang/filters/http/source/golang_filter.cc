@@ -1106,6 +1106,50 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_str) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    auto go_filter_state =
+        state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key);
+    if (go_filter_state) {
+      req_->strValue = go_filter_state->value();
+      value_str->p = req_->strValue.data();
+      value_str->n = req_->strValue.length();
+    }
+  } else {
+    auto key_str = std::string(key);
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        auto go_filter_state =
+            state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key_str);
+        if (go_filter_state) {
+          req_->strValue = go_filter_state->value();
+          value_str->p = req_->strValue.data();
+          value_str->n = req_->strValue.length();
+        }
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -1153,6 +1197,12 @@ FilterConfig::FilterConfig(
   }
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 };
+
+FilterConfig::~FilterConfig() {
+  if (config_id_ > 0) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+  }
+}
 
 uint64_t FilterConfig::getConfigId() { return config_id_; }
 
@@ -1207,10 +1257,17 @@ RoutePluginConfig::RoutePluginConfig(
             config_id_);
 };
 
-uint64_t RoutePluginConfig::getConfigId() {
+RoutePluginConfig::~RoutePluginConfig() {
+  absl::WriterMutexLock lock(&mutex_);
   if (config_id_ > 0) {
-    return config_id_;
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+  if (merged_config_id_ > 0) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+  }
+}
+
+uint64_t RoutePluginConfig::getConfigId() {
   if (dso_lib_ == nullptr) {
     dso_lib_ = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name_);
     ASSERT(dso_lib_ != nullptr, "load at the request time, so it should not be null");
@@ -1226,12 +1283,26 @@ uint64_t RoutePluginConfig::getConfigId() {
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
+  {
+    // this is the fast path for most cases.
+    absl::ReaderMutexLock lock(&mutex_);
+    if (merged_config_id_ > 0 && cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+  }
+  absl::WriterMutexLock lock(&mutex_);
   if (merged_config_id_ > 0) {
-    return merged_config_id_;
+    if (cached_parent_id_ == parent_id) {
+      return merged_config_id_;
+    }
+    // upper level config changed, merged_config_id_ is outdated.
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
   }
 
-  config_id_ = getConfigId();
-  RELEASE_ASSERT(config_id_, "TODO: terminate request or passthrough");
+  if (config_id_ == 0) {
+    config_id_ = getConfigId();
+    RELEASE_ASSERT(config_id_, "TODO: terminate request or passthrough");
+  }
 
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
   merged_config_id_ = dso_lib_->envoyGoFilterMergeHttpPluginConfig(name_ptr, plugin_name_.length(),
@@ -1239,6 +1310,8 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   ASSERT(merged_config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter merge '{}' plugin config, from {} + {} to {}", plugin_name_,
             parent_id, config_id_, merged_config_id_);
+
+  cached_parent_id_ = parent_id;
   return merged_config_id_;
 };
 

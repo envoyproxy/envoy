@@ -57,7 +57,6 @@ jobs:
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --define=signal_trace=disabled \
-            --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
             --define=envoy_mobile_swift_cxx_interop=disabled \
@@ -91,7 +90,6 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --fat_apk_cpu=x86_64 \
             --define=signal_trace=disabled \
-            --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \

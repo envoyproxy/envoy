@@ -217,5 +217,40 @@ using SizeFn = std::function<void(std::size_t)>;
  */
 template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
+/**
+ * Interface for stats lazy initialization.
+ * To save memory and CPU consumption on blocks of stats that are never referenced throughout the
+ * process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then the
+Envoy
+ * bootstrap configuration can be set to defer the instantiation of those block. Note that when the
+ * blocks of stats are created, they carry an extra 60~100 byte overhead (depending on worker thread
+ * count) due to internal bookkeeping data structures. The overhead when deferred stats are disabled
+ * is just 8 bytes.
+* See more context: https://github.com/envoyproxy/envoy/issues/23575
+ */
+template <typename StatsStructType> class DeferredCreationCompatibleInterface {
+public:
+  // Helper function to get-or-create and return the StatsStructType object.
+  virtual StatsStructType& getOrCreate() PURE;
+
+  virtual ~DeferredCreationCompatibleInterface() = default;
+};
+
+// A helper class for a lazy compatible stats struct type.
+template <typename StatsStructType> class DeferredCreationCompatibleStats {
+public:
+  explicit DeferredCreationCompatibleStats(
+      std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
+      : data_(std::move(d)) {}
+  // Allows move construct and assign.
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) noexcept = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) noexcept = default;
+
+  inline StatsStructType* operator->() { return &data_->getOrCreate(); };
+  inline StatsStructType& operator*() { return data_->getOrCreate(); };
+
+private:
+  std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
+};
 } // namespace Stats
 } // namespace Envoy

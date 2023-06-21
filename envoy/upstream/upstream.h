@@ -224,7 +224,7 @@ public:
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
-   * active healchecking.
+   * active health checking.
    */
   virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
@@ -452,6 +452,11 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
+
+  /**
+   * @return true to use host weights to calculate the health of a priority.
+   */
+  virtual bool weightedPriorityHealth() const PURE;
 };
 
 using HostSetPtr = std::unique_ptr<HostSet>;
@@ -526,13 +531,15 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+   * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
    * thread and shared by all the worker threads.
    */
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -550,11 +557,13 @@ public:
      * @param locality_weights supplies a map from locality to associated weight.
      * @param hosts_added supplies the hosts added since the last update.
      * @param hosts_removed supplies the hosts removed since the last update.
-     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+     * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -596,7 +605,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  GAUGE(warming_state, NeverImport)
 
 /**
  * All cluster endpoints related stats.
@@ -610,7 +620,7 @@ public:
   GAUGE(membership_total, NeverImport)
 
 /**
- * All cluster loadbalancing related stats.
+ * All cluster load balancing related stats.
  */
 #define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \

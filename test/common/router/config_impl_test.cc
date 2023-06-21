@@ -10745,6 +10745,84 @@ virtual_hosts:
   checkEach(yaml, 123, expected_traveled_config, "filter.unknown");
 }
 
+TEST_F(PerFilterConfigsTest, RouteFilterDisabledTest) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type":  type.googleapis.com/envoy.config.route.v3.FilterConfig
+    disabled: true
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/route1" }
+        route: { cluster: baz }
+        # test.filter will be enabled for this route because this config
+        # will override virtual host level config.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+      - match: { prefix: "/route2" }
+        route: { cluster: baz }
+        # test.filter will be disabled for this route.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        disabled: true
+  - name: bar
+    domains: ["host2"]
+    routes:
+      # test.filter will be disabled for this route because the virtual host
+      # level config.
+      - match: { prefix: "/route3" }
+        route: { cluster: baz }
+      - match: { prefix: "/route4" }
+        route: { cluster: baz }
+        # test.filter will be enabled for this route but no valid route level config
+        # is provided in this route.
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            # Provide an empty config to enable the filter.
+            config: {}
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        disabled: true
+  - name: bar
+    domains: ["host3"]
+    routes:
+      # test.filter will be disabled for this route because the global route config.
+      - match: { prefix: "/route5" }
+        route: { cluster: baz }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
+  const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
+  EXPECT_FALSE(route1->filterDisabled("test.filter"));
+
+  const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
+  EXPECT_TRUE(route2->filterDisabled("test.filter"));
+
+  const auto route3 = config.route(genHeaders("host2", "/route3", "GET"), 0);
+  EXPECT_TRUE(route3->filterDisabled("test.filter"));
+
+  const auto route4 = config.route(genHeaders("host2", "/route4", "GET"), 0);
+  EXPECT_FALSE(route4->filterDisabled("test.filter"));
+
+  const auto route5 = config.route(genHeaders("host3", "/route5", "GET"), 0);
+  EXPECT_TRUE(route5->filterDisabled("test.filter"));
+}
+
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatchOverrideTest, VerifyAllMatchableRoutes) {

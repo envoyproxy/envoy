@@ -48,8 +48,9 @@ private:
                             const EnvoyException* e) override;
   using LocalityWeightsMap = absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t,
                                                  LocalityHash, LocalityEqualTo>;
-  bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
-                              const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
+  bool updateHostsPerLocality(const uint32_t priority, bool weighted_priority_health,
+                              const uint32_t overprovisioning_factor, const HostVector& new_hosts,
+                              LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
                               const HostMap& all_hosts,

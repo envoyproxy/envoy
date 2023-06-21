@@ -49,6 +49,7 @@ public:
   CelMatcherTest()
       : inject_action_(action_factory_),
         cluster_info_(std::make_shared<testing::NiceMock<Upstream::MockClusterInfo>>()),
+        route_(std::make_shared<NiceMock<Router::MockRoute>>()),
         data_(Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_)) {}
 
   void buildCustomHeader(const absl::flat_hash_map<std::string, std::string>& custom_value_pairs,
@@ -125,9 +126,18 @@ public:
     stream_info_.setUpstreamClusterInfo(cluster_info_);
   }
 
+  void setUpstreamRouteMetadata(const std::string& namespace_str, const std::string& metadata_key,
+                                const std::string& metadata_value) {
+    Envoy::Config::Metadata::mutableMetadataValue(metadata_, namespace_str, metadata_key)
+        .set_string_value(metadata_value);
+    EXPECT_CALL(*route_, metadata()).WillRepeatedly(testing::ReturnPointee(&metadata_));
+    EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::ReturnPointee(&route_));
+  }
+
   Matcher::StringActionFactory action_factory_;
   Registry::InjectFactory<Matcher::ActionFactory<absl::string_view>> inject_action_;
   std::shared_ptr<testing::NiceMock<Upstream::MockClusterInfo>> cluster_info_;
+  std::shared_ptr<NiceMock<Router::MockRoute>> route_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::string_view context_ = "";
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -195,6 +205,34 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              "wrong_service");
+  Envoy::Http::Matching::HttpMatchingDataImpl data =
+      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
+  auto matcher_tree = buildMatcherTree(absl::StrFormat(
+      UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
+
+  const auto result = matcher_tree->match(data_);
+  // The match was completed, no match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
+  setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
+                           std::string(kMetadataValue));
+  Envoy::Http::Matching::HttpMatchingDataImpl data =
+      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
+  auto matcher_tree = buildMatcherTree(absl::StrFormat(
+      UpstreamRouteMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
+  setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
+                           "wrong_service");
   Envoy::Http::Matching::HttpMatchingDataImpl data =
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
