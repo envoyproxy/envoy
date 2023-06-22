@@ -27,6 +27,36 @@ parameters:
 
 
 jobs:
+- job: bazel_slow
+  displayName: "Linux x64"
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runChecks }}, 'true'))
+  variables:
+    PUBLISH_TEST_RESULTS: true
+    PUBLISH_ENVOY: true
+  strategy:
+    matrix:
+      compile_time_options:
+        CI_TARGET: "bazel.compile_time_options"
+        ENVOY_FILTER_EXAMPLE: true
+      tsan:
+        CI_TARGET: "bazel.tsan"
+  timeoutInMinutes: 180
+  pool: envoy-x64-small
+  steps:
+  - template: ../bazel.yml
+    parameters:
+      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      ciTarget: $(CI_TARGET)
+      envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
+      managedAgent: false
+      mntTmpfs: false
+      publishTestResults: variables.PUBLISH_TEST_RESULTS
+      publishEnvoy: variables.PUBLISH_ENVOY
+
 - job: bazel
   displayName: "Linux x64"
   dependsOn: []
@@ -41,12 +71,6 @@ jobs:
   strategy:
     maxParallel: ${{ parameters.concurrencyChecks }}
     matrix:
-      # These are ordered by most time-consuming first.
-      compile_time_options:
-        CI_TARGET: "bazel.compile_time_options"
-        ENVOY_FILTER_EXAMPLE: true
-      tsan:
-        CI_TARGET: "bazel.tsan"
       asan:
         CI_TARGET: "bazel.asan"
         ENVOY_FILTER_EXAMPLE: true
@@ -130,7 +154,7 @@ jobs:
 
 - job: complete
   displayName: "Checks complete"
-  dependsOn: ["bazel", "coverage"]
+  dependsOn: ["bazel_slow", "bazel", "coverage"]
   pool: x64-nano
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
@@ -139,6 +163,7 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
+      in(dependencies.bazel_slow.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:

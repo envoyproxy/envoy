@@ -7,7 +7,6 @@ trigger:
     include:
     - "v*"
 
-
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
@@ -62,6 +61,9 @@ stages:
 # Presubmit/default
 - ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
+    parameters:
+      checkStageDeps:
+      - env
 
 # Scheduled run anywhere
 - ${{ if eq(variables.pipelineScheduled, true) }}:

@@ -51,6 +51,9 @@ parameters:
   displayName: "Cache test results"
   type: boolean
   default: true
+- name: mntTmpfs
+  type: boolean
+  default: true
 # Unfortunately, AZP is an unmittigated and undocumented disaster.
 # The definition of primitive types is close to pointless, as depending
 # on where things are set, azp just turns them into strings anyway.
@@ -119,7 +122,7 @@ steps:
     done
     sudo chown -R azure-pipelines:azure-pipelines $(Build.StagingDirectory)/bazel_root/
   displayName: "Mount/tmpfs bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false), eq('${{ parameters.mntTmpfs }}', true))
 
 - bash: |
     set -e
