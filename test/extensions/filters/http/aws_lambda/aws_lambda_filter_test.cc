@@ -72,7 +72,6 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 TEST_F(AwsLambdaFilterTest, HostHeaderLambda) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
-  const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(headers.getHostValue(), "lambda");
 }
 
