@@ -70,8 +70,8 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 }
 
 /**
-* Requests should have their host header altered, resulting in a host header of "lambda"
-*/
+  * Requests should have their host header altered, resulting in a host header of "lambda"
+  */
 TEST_F(AWSLambdaFilterTest, HostHeaderAlterationShouldBeLambda) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
