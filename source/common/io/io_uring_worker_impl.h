@@ -204,7 +204,7 @@ protected:
   uint32_t injected_completions_{0};
   IoUringSocketStatus status_{Initialized};
   bool enable_close_event_{false};
-  IoUringSocketOnClosedCb on_closed_cb_;
+  IoUringSocketOnClosedCb on_closed_cb_{nullptr};
 
   OptRef<ReadParam> read_param_;
   OptRef<AcceptedSocketParam> accepted_socket_param_;
