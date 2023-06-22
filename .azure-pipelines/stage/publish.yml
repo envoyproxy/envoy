@@ -104,7 +104,7 @@ jobs:
         eq(${{ parameters.runDocker }}, 'true'))
   timeoutInMinutes: 120
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -201,7 +201,7 @@ jobs:
         eq(${{ parameters.runPackaging }}, 'true'))
   timeoutInMinutes: 120
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -268,7 +268,7 @@ jobs:
     and(not(canceled()),
         eq(${{ parameters.publishDocs }}, 'true'))
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../bazel.yml
     parameters:
@@ -348,7 +348,7 @@ jobs:
         eq(${{ parameters.runPackaging }}, 'true'))
   timeoutInMinutes: 120
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -377,7 +377,7 @@ jobs:
   dependsOn: ["docker", "docs", "signed_release"]
   displayName: Success (linux artefacts)
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
@@ -400,7 +400,7 @@ jobs:
         in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
         eq(${{ parameters.publishGithubRelease }}, 'true'))
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:

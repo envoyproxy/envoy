@@ -39,7 +39,7 @@ jobs:
   displayName: Precheck
   timeoutInMinutes: 20
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   variables:
     CI_TARGET: ""
   strategy:
@@ -165,7 +165,7 @@ jobs:
   displayName: Precheck dependencies
   timeoutInMinutes: 20
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   condition: |
     and(not(canceled()),
         eq(${{ parameters.checkDeps }}, 'true'))
@@ -183,7 +183,7 @@ jobs:
   displayName: Prechecked
   dependsOn: ["prechecks", "dependencies"]
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:

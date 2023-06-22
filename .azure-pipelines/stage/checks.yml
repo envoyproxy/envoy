@@ -68,7 +68,7 @@ jobs:
         CI_TARGET: "bazel.api"
   timeoutInMinutes: 180
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../bazel.yml
     parameters:
@@ -132,7 +132,7 @@ jobs:
   displayName: "Checks complete"
   dependsOn: ["bazel", "coverage"]
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
