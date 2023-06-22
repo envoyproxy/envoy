@@ -1126,7 +1126,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
     if (add_or_update_cluster) {
-      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+      if (cluster_manager->thread_local_clusters_.contains(info->name())) {
         ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
       } else {
         ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
