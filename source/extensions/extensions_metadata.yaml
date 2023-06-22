@@ -317,7 +317,7 @@ envoy.filters.http.ext_proc:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: stable
+  status: alpha
   type_urls:
   - envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
   - envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
