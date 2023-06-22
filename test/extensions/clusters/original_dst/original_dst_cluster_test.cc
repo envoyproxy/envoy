@@ -82,6 +82,8 @@ public:
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
+  void TearDown() override { EXPECT_CALL(*cleanup_timer_, disableTimer()); }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Ssl::MockContextManager ssl_context_manager_;
