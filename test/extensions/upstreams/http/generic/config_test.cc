@@ -14,7 +14,6 @@ namespace Http {
 namespace Generic {
 
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class GenericGenericConnPoolFactoryTest : public ::testing::Test {
 public:
