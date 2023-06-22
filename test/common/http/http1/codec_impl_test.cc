@@ -770,12 +770,11 @@ TEST_P(Http1ServerConnectionImplTest, InvalidChunkHeader) {
 
 TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO(#27377): http-parser will not be used together with UHV and triggers an internal
-  // transfer-encoding check preventing UHV to be called.
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    return;
-  }
+  const bool strict = false;
+#else
+  const bool strict = true;
 #endif
+
   initialize();
 
   InSequence sequence;
@@ -786,16 +785,27 @@ TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                            "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
 
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+  if (strict) {
     EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
                                         "http1.invalid_transfer_encoding"));
   } else {
-    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, "http1.codec_error"));
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    } else {
+      EXPECT_CALL(decoder, decodeHeaders_(_, false));
+      EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
+      EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+    }
   }
+
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
+
+  if (strict) {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_P(Http1ServerConnectionImplTest, HostWithLWS) {
@@ -4362,8 +4372,8 @@ TEST_P(Http1ClientConnectionImplTest, EOFDuringContentLengthBody) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_EOF_STATE");
 }
 
-// A request method requiring a body but without a Content-Length (or Transfer-Encoding: chunked)
-// header is an error.
+// Do not signal an error upon receiving a request with a method requiring a
+// body but without a Content-Length (or Transfer-Encoding: chunked) header.
 TEST_P(Http1ServerConnectionImplTest, NoContentLengthRequest) {
   initialize();
   InSequence s;
@@ -4376,27 +4386,15 @@ TEST_P(Http1ServerConnectionImplTest, NoContentLengthRequest) {
         return decoder;
       }));
 
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  } else {
-    EXPECT_CALL(decoder, decodeHeaders_(_, true));
-  }
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
   constexpr absl::string_view kFirstLine = "POST / HTTP/1.1\r\n\r\n";
   constexpr absl::string_view kBody = "foo";
+
   Buffer::OwnedImpl buffer(absl::StrCat(kFirstLine, kBody));
   auto status = codec_->dispatch(buffer);
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: REQUIRED_BODY_BUT_NO_CONTENT_LENGTH");
-    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
-    EXPECT_EQ(kFirstLine.length() + kBody.length(), buffer.length());
-  } else {
-    // http-parser actually does not signal an error, but ignores the fraction of the body received.
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(kBody.length(), buffer.length());
-  }
+  EXPECT_TRUE(status.ok());
+  // The received body is ignored.
+  EXPECT_EQ(kBody.length(), buffer.length());
 }
 
 // Regression test for #24557: A read of zero bytes can signal the end of response body if there is

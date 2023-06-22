@@ -187,6 +187,7 @@ protected:
             dispatcher_->exit();
           }
         }));
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           expected_callbacks--;
@@ -384,6 +385,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
         server_connection_->addReadFilter(add_and_remove_filter);
         server_connection_->removeReadFilter(add_and_remove_filter);
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -414,6 +416,7 @@ TEST_P(ConnectionImplTest, UnregisterRegisterDuringConnectCallback) {
           dispatcher_->exit();
         }
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         expected_callbacks--;
@@ -572,6 +575,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
             socket_->connectionInfoProvider().localAddress(), source_address_,
             Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -622,6 +626,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
             Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
@@ -717,6 +722,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   Sequence s2;
   EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
@@ -2937,6 +2943,7 @@ public:
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     uint32_t filter_seen = 0;
 

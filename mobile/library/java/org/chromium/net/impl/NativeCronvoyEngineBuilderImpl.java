@@ -61,20 +61,10 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private boolean mEnablePlatformCertificatesValidation = true;
-  private String mRtdsLayerName = "";
-  private int mRtdsTimeoutSeconds = 0;
-  private String mAdsAddress = "";
-  private int mAdsPort = 0;
-  private String mAdsToken = "";
-  private int mAdsTokenLifetime = 0;
-  private String mAdsRootCerts = "";
   private String mNodeId = "";
   private String mNodeRegion = "";
   private String mNodeZone = "";
   private String mNodeSubZone = "";
-  private String mCdsResourcesLocator = "";
-  private int mCdsTimeoutSeconds = 0;
-  private boolean mEnableCds = false;
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -141,8 +131,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
         mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
-        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
-        mCdsTimeoutSeconds, mEnableCds);
+        /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
+        /*xdsPort=*/0, /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
+        mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
+        /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
   }
 }
