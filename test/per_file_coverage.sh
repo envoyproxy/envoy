@@ -63,6 +63,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/transport_sockets/tls/cert_validator:95.2"
 "source/extensions/transport_sockets/tls/private_key:88.9"
+"source/extensions/upstreams/http/generic:85.0" # Braces in switch statements are considered uncovered
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build

@@ -117,13 +117,13 @@ TEST_F(UdpUpstreamTest, HeaderOnlyRequest) {
 TEST_F(UdpUpstreamTest, SwallowMetadata) {
   Envoy::Http::MetadataMapVector metadata_map_vector;
   udp_upstream_->encodeMetadata(metadata_map_vector);
-  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg).Times(0);
 }
 
 TEST_F(UdpUpstreamTest, SwallowTrailers) {
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
   udp_upstream_->encodeTrailers(trailers);
-  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg).Times(0);
 }
 
 TEST_F(UdpUpstreamTest, DatagramsDropped) {
@@ -131,6 +131,32 @@ TEST_F(UdpUpstreamTest, DatagramsDropped) {
   EXPECT_EQ(udp_upstream_->numOfDroppedDatagrams(), 1);
   udp_upstream_->onDatagramsDropped(3);
   EXPECT_EQ(udp_upstream_->numOfDroppedDatagrams(), 4);
+}
+
+TEST_F(UdpUpstreamTest, InvalidCapsule) {
+  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  // Sends an invalid capsule.
+  const std::string invalid_capsule_fragment =
+      absl::HexStringToBytes("0x1eca6a00" // DATAGRAM Capsule Type
+                             "01"         // Capsule Length
+                             "c0"         // Invalid VarInt62
+      );
+  Buffer::OwnedImpl invalid_capsule(invalid_capsule_fragment);
+  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream);
+  udp_upstream_->encodeData(invalid_capsule, true);
+}
+
+TEST_F(UdpUpstreamTest, MalformedContextIdDatagram) {
+  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  // Sends a capsule with an invalid variable length integer.
+  const std::string invalid_context_id_fragment =
+      absl::HexStringToBytes("00" // DATAGRAM Capsule Type
+                             "01" // Capsule Length
+                             "c0" // Context ID (Invalid VarInt62)
+      );
+  Buffer::OwnedImpl invalid_context_id_capsule(invalid_context_id_fragment);
+  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream);
+  udp_upstream_->encodeData(invalid_context_id_capsule, true);
 }
 
 TEST_F(UdpUpstreamTest, RemainingDataWhenStreamEnded) {
