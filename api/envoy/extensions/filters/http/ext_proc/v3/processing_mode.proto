@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_proc.v3;
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
