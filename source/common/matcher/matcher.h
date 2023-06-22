@@ -166,7 +166,7 @@ public:
     case MatcherType::MATCHER_TYPE_NOT_SET:
       return createAnyMatcher(config);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException("Corrupted Enum");
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>
