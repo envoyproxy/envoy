@@ -81,7 +81,9 @@ void MaglevTable::constructMaglevTableInternal(
     return;
   }
 
-  // Prepare stable (sorted) vector of host_weight
+  // Prepare stable (sorted) vector of host_weight.
+  // Maglev requires stable order of table_build_entries because the hash table will be filled in
+  // the order. Unstable table_build_entries results the change of backend assignment.
   std::vector<std::tuple<absl::string_view, HostConstSharedPtr, double>> sorted_host_weights;
   sorted_host_weights.reserve(normalized_host_weights.size());
   for (const auto& host_weight : normalized_host_weights) {
