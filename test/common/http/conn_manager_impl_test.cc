@@ -408,7 +408,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
-  EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataWithName(
+  EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataGeneric(
       Network::ProxyProtocolFilterState::key()));
 
   // Clean up.

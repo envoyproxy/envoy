@@ -313,8 +313,7 @@ public:
   }
 
 private:
-  static std::atomic<uint64_t> global_registry_id_;
-  static uint64_t generateRegistryId() { return global_registry_id_++; }
+  static uint64_t generateRegistryId();
 
   const uint64_t registry_id_{};
 

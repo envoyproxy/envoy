@@ -2,7 +2,10 @@
 
 namespace Envoy {
 
-std::atomic<uint64_t> InlineMapRegistry::global_registry_id_{0};
+uint64_t InlineMapRegistry::generateRegistryId() {
+  static std::atomic<uint64_t> next_id{0};
+  return next_id++;
+}
 
 InlineMapRegistry::InlineKey InlineMapRegistry::registerInlineKey(absl::string_view key) {
   RELEASE_ASSERT(!finalized_, "Cannot register inline key after finalized()");
