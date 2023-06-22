@@ -56,12 +56,15 @@ public:
           *message, context.stat_prefix_, context.server_factory_context_.value());
     }
 
-    RELEASE_ASSERT(callback != nullptr, "Failed to get filter factory creation function.");
+    if (callback == nullptr) {
+      throw EnvoyException("Failed to get filter factory creation function");
+    }
 
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterAction>(cb);
     };
   }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
