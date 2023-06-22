@@ -9,6 +9,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -67,6 +68,12 @@ protected:
   }
 
   void initializeConfig() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.send_header_value_in_bytes", header_value_bytes_}});
+    scoped_runtime_.mergeValues(
+        {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
+          filter_mutation_rule_}});
+
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
@@ -381,6 +388,9 @@ protected:
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
+  TestScopedRuntime scoped_runtime_;
+  std::string header_value_bytes_{"false"};
+  std::string filter_mutation_rule_{"false"};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -555,7 +565,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -577,6 +587,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
             {"x-bad-utf8", "valid_prefix!(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
+          EXPECT_TRUE(!header.value().empty());
+          EXPECT_TRUE(header.value_bytes().empty());
           ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -603,6 +615,83 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
       });
 
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // Set up runtime flag to have header value encoded in value_bytes.
+  header_value_bytes_ = "true";
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+    std::string invalid_unicode("valid_prefix");
+    invalid_unicode.append(1, char(0xc3));
+    invalid_unicode.append(1, char(0x28));
+    invalid_unicode.append("valid_suffix");
+
+    headers.addCopy(LowerCaseString("x-bad-utf8"), invalid_unicode);
+  });
+
+  // Verify the encoded non-utf8 character is received by the server as it is. Then send back a
+  // response with non-utf8 character in the header value, and verify it is received by Envoy as it
+  // is.
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"},
+            {":method", "GET"},
+            {"host", "host"},
+            {":path", "/"},
+            {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
+            {"x-forwarded-proto", "http"}};
+        for (const auto& header : headers.headers().headers()) {
+          EXPECT_TRUE(header.value().empty());
+          EXPECT_TRUE(!header.value_bytes().empty());
+          ENVOY_LOG_MISC(critical, "{}", header.value_bytes());
+        }
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("x-bad-utf8");
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-utf8");
+        // Construct a non-utf8 header value and send back to Envoy.
+        std::string invalid_unicode("valid_prefix");
+        invalid_unicode.append(1, char(0xc3));
+        invalid_unicode.append(1, char(0x28));
+        invalid_unicode.append("valid_suffix");
+        mut1->mutable_header()->set_value_bytes(invalid_unicode);
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
+  EXPECT_THAT(upstream_request_->headers(),
+              SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // Set up runtime flag to have header value encoded in value_bytes.
+  header_value_bytes_ = "true";
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_value("foo");
+        mut1->mutable_header()->set_value_bytes("bar");
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter with body buffering turned on, but sending a GET
@@ -1253,6 +1342,48 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
   // The attempt to set the status code to 100 should have been ignored.
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ("{\"reason\": \"Because\"}", response->body());
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with system header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
+  filter_mutation_rule_ = "true";
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  // Disallow system header in the mutation rule config.
+  proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding system header in the ext_proc response.
+    hdr->mutable_header()->set_key(":foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  // The added system header is not sent to the client.
+  EXPECT_THAT(response->headers(), HasNoHeader(":foo"));
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
+  filter_mutation_rule_ = "true";
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is not allowed.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
 }
 
 // Test the filter with request body buffering enabled using

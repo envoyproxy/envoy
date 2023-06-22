@@ -63,10 +63,10 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   if (matcher_ == nullptr) {
     return absl::InternalError("Matcher tree has not been initialized yet.");
   } else {
-    data_ptr_->onRequestHeaders(headers);
-    // TODO(tyxia) This function should trigger the CEL expression matching. Here, we need to
-    // implement the custom_matcher and factory, also statically register it so that CEL matching
-    // will be triggered with its own match() method.
+    // TODO(tyxia) Update the logic with the CEL matcher and other attributes besides header.
+    if (!headers.empty()) {
+      data_ptr_->onRequestHeaders(headers);
+    }
     auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
 
     if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {
@@ -78,12 +78,10 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
       }
     } else {
       // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
-      return absl::InternalError("Unable to match the request.");
+      return absl::InternalError("Unable to match due to the required data not being available.");
     }
   }
 }
-
-void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus) {}
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters

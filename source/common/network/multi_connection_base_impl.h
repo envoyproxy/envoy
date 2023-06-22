@@ -124,7 +124,7 @@ public:
 
   // Methods implemented largely by this class itself.
   uint64_t id() const override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& dispatcher() const override;
   void close(ConnectionCloseType type) override { close(type, ""); }
   void close(ConnectionCloseType type, absl::string_view details) override;
   bool readEnabled() const override;

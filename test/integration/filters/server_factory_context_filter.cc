@@ -133,7 +133,7 @@ private:
     return nullptr;
   }
 
-  Http::FilterFactoryCb createFilterServerFactoryFromProtoTyped(
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
     FilterConfigSharedPtr filter_config =

@@ -436,10 +436,8 @@ absl::Status HdsCluster::updateHealthchecks(
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
-      auto checker_or_error = Upstream::HealthCheckerFactory::create(
-          health_check, *this, server_context_.runtime(), server_context_.mainThreadDispatcher(),
-          server_context_.accessLogManager(), server_context_.messageValidationVisitor(),
-          server_context_.api());
+      auto checker_or_error =
+          Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
       RETURN_IF_STATUS_NOT_OK(checker_or_error);
       auto new_health_checker = checker_or_error.value();
       health_checkers_map.insert({health_check, new_health_checker});
@@ -523,7 +521,7 @@ void HdsCluster::updateHosts(
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt);
+                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -551,10 +549,8 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
 void HdsCluster::initHealthchecks() {
   for (auto& health_check : cluster_.health_checks()) {
-    auto health_checker_or_error = Upstream::HealthCheckerFactory::create(
-        health_check, *this, server_context_.runtime(), server_context_.mainThreadDispatcher(),
-        server_context_.accessLogManager(), server_context_.messageValidationVisitor(),
-        server_context_.api());
+    auto health_checker_or_error =
+        Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
     THROW_IF_STATUS_NOT_OK(health_checker_or_error, throw);
 
     auto health_checker = health_checker_or_error.value();
@@ -575,7 +571,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, absl::nullopt);
+                              *hosts_, {}, absl::nullopt, absl::nullopt);
 
     initialized_ = true;
   }

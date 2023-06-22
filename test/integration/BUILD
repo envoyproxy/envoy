@@ -1740,6 +1740,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "udp_tunneling_integration_test",
+    size = "large",
+    srcs = [
+        "udp_tunneling_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    shard_count = 16,
+    deps = [
+        ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//source/extensions/upstreams/http/udp:config",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/udp/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_conn_pool_integration_test",
     size = "large",
     srcs = [
