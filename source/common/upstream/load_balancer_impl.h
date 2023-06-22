@@ -82,7 +82,7 @@ public:
 /**
  * Base class for all LB implementations.
  */
-class LoadBalancerBase : public LoadBalancer {
+class LoadBalancerBase : public LoadBalancer, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   enum class HostAvailability { Healthy, Degraded };
 
@@ -457,8 +457,7 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
-                            Logger::Loggable<Logger::Id::upstream> {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   using SlowStartConfig = envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig;
 
@@ -706,8 +705,7 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
-                           Logger::Loggable<Logger::Id::upstream> {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterLbStats& stats, Runtime::Loader& runtime,

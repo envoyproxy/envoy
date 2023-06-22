@@ -88,32 +88,6 @@ TEST(TestConfig, MultiFlag) {
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_true\" value { bool_value: false }"));
 }
 
-TEST(TestConfig, CopyConstructor) {
-  EngineBuilder engine_builder;
-  engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  std::string bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
-  EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
-
-  EngineBuilder engine_builder_copy(engine_builder);
-  engine_builder_copy.enableGzipDecompression(true);
-  XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
-  xdsBuilder.addClusterDiscoveryService();
-  engine_builder_copy.setXds(xdsBuilder);
-  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
-  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
-  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
-
-  EngineBuilder engine_builder_copy2(engine_builder_copy);
-  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
-  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
-  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
-}
-
 TEST(TestConfig, ConfigIsValid) {
   EngineBuilder engine_builder;
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -339,6 +313,32 @@ TEST(TestConfig, XdsConfig) {
                 .service_account_jwt_access()
                 .token_lifetime_seconds(),
             500);
+}
+
+TEST(TestConfig, CopyConstructor) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
+
+  EngineBuilder engine_builder_copy(engine_builder);
+  engine_builder_copy.enableGzipDecompression(true);
+  XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
+  xdsBuilder.addClusterDiscoveryService();
+  engine_builder_copy.setXds(xdsBuilder);
+  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
+
+  EngineBuilder engine_builder_copy2(engine_builder_copy);
+  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 }
 #endif
 
