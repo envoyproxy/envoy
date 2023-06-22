@@ -270,6 +270,11 @@ private:
   // TODO (soulxu): using queue for completion.
   absl::optional<int32_t> read_error_;
 
+  // TODO (soulxu): We need water mark for write buffer.
+  // The upper layer will think the buffer released when the data copy into this write buffer.
+  // This leads to the `IntegrationTest.TestFloodUpstreamErrors` timeout, since the http layer
+  // always think the response is write successful, so flood protection is never kicked.
+  //
   // For write. io_uring socket will write sequentially in the order of write_buf_ and shutdown_
   // Unless the write_buf_ is empty, the shutdown operation will not be performed.
   Buffer::OwnedImpl write_buf_;
