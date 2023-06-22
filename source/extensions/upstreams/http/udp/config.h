@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
+#include "envoy/extensions/upstreams/http/udp/v3/udp_connection_pool.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
@@ -8,14 +8,14 @@ namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
 namespace Http {
-namespace Generic {
+namespace Udp {
 
 /**
- * Config registration for the GenericConnPool. * @see Router::GenericConnPoolFactory
+ * Config registration for the UdpConnPool. @see Router::GenericConnPoolFactory
  */
-class GenericGenericConnPoolFactory : public Router::GenericConnPoolFactory {
+class UdpGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  std::string name() const override { return "envoy.filters.connection_pools.http.generic"; }
+  std::string name() const override { return "envoy.filters.connection_pools.http.udp"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -23,16 +23,14 @@ public:
                         const Router::RouteEntry& route_entry,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const override;
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto>();
+    return std::make_unique<envoy::extensions::upstreams::http::udp::v3::UdpConnectionPoolProto>();
   }
 };
 
-DECLARE_FACTORY(GenericGenericConnPoolFactory);
+DECLARE_FACTORY(UdpGenericConnPoolFactory);
 
-} // namespace Generic
+} // namespace Udp
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions
