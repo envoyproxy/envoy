@@ -13,7 +13,7 @@ jobs:
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -61,7 +61,7 @@ jobs:
   displayName: Verification complete
   dependsOn: ["packages_x64", "packages_arm64"]
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
