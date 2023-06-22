@@ -573,6 +573,28 @@ public:
     }                                                                                              \
   } while (0)
 
+#define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      TAGS.emplace("ConnectionId", std::to_string((CONNECTION).id()));                             \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      TAGS.emplace("ConnectionId",                                                                 \
+                   (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0");     \
+      TAGS.emplace("StreamId", std::to_string((STREAM).streamId()));                               \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
 /**
  * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
  * are serialized and prepended to the log message.
@@ -582,6 +604,12 @@ public:
  */
 #define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
   ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
+
+#define ENVOY_TAGGED_CONN_LOG(LEVEL, TAGS, CONNECTION, FORMAT, ...)                                \
+  ENVOY_TAGGED_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, CONNECTION, FORMAT, ##__VA_ARGS__)
+
+#define ENVOY_TAGGED_STREAM_LOG(LEVEL, TAGS, STREAM, FORMAT, ...)                                  \
+  ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, STREAM, FORMAT, ##__VA_ARGS__)
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to
