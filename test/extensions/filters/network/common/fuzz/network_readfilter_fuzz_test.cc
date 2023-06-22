@@ -10,6 +10,9 @@
 #include "test/test_common/test_runtime.h"
 
 #include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
+
+// TODO: Needed for protobuf_mutator::ParseTextMessage() and ::SaveMessageAsText(). Replace by
+// envoy-style input parsing methods.
 #include "src/text_format.h" // from libprotobuf_mutator/
 
 namespace Envoy {
