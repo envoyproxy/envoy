@@ -172,10 +172,21 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
+   */
+  static bool isConnectUdp(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
+
+  /**
+   * @brief Rewrites the authority header field by parsing the path using the default CONNECT-UDP
+   * URI template. Returns true if the parsing was successful, otherwise returns false.
+   */
+  static bool rewriteAuthorityForConnectUdp(RequestHeaderMap& headers);
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   /**

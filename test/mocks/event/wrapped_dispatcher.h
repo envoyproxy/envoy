@@ -62,9 +62,8 @@ public:
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      bool bind_to_port, bool ignore_global_conn_limit) override {
-    return impl_.createListener(std::move(socket), cb, runtime, bind_to_port,
-                                ignore_global_conn_limit);
+                                      const Network::ListenerConfig& listener_config) override {
+    return impl_.createListener(std::move(socket), cb, runtime, listener_config);
   }
 
   Network::UdpListenerPtr

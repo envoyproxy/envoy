@@ -375,7 +375,7 @@ void ActiveMessage::startUpstreamResponse() {
 DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instance& buffer) {
   ASSERT(response_decoder_ != nullptr);
 
-  try {
+  TRY_NEEDS_AUDIT {
     auto status = response_decoder_->onData(buffer);
     if (status == DubboFilters::UpstreamResponseStatus::Complete) {
       if (requestId() != response_decoder_->requestId()) {
@@ -390,12 +390,14 @@ DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instanc
     }
 
     return status;
-  } catch (const DownstreamConnectionCloseException& ex) {
+  }
+  END_TRY catch (const DownstreamConnectionCloseException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     onReset();
     parent_.stats().response_error_caused_connection_close_.inc();
     return DubboFilters::UpstreamResponseStatus::Reset;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     parent_.stats().response_decoding_error_.inc();
 

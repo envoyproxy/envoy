@@ -39,7 +39,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.9"
-"source/extensions/filters/http/rate_limit_quota:94.8" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.2"
@@ -63,6 +62,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/transport_sockets/tls/cert_validator:95.2"
 "source/extensions/transport_sockets/tls/private_key:88.9"
+"source/extensions/upstreams/http/generic:85.0" # Braces in switch statements are considered uncovered
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
