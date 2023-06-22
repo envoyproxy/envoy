@@ -22,9 +22,8 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool,
-              const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
-              Upstream::LoadBalancerContext* ctx) {
+  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+              const Router::RouteEntry& route_entry, Upstream::LoadBalancerContext* ctx) {
     conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {

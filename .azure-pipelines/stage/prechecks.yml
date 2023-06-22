@@ -39,7 +39,7 @@ jobs:
   displayName: Precheck
   timeoutInMinutes: 30
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   variables:
     CI_TARGET: ""
   strategy:
@@ -165,7 +165,7 @@ jobs:
   displayName: Precheck dependencies
   timeoutInMinutes: 20
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   condition: |
     and(not(canceled()),
         eq(${{ parameters.checkDeps }}, 'true'))

@@ -68,7 +68,7 @@ jobs:
         CI_TARGET: "bazel.api"
   timeoutInMinutes: 180
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../bazel.yml
     parameters:
