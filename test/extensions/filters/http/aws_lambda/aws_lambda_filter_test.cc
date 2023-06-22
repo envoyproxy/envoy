@@ -70,9 +70,9 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 }
 
 /**
-  * Requests should have their host header altered, resulting in a host header of "lambda"
-  */
-TEST_F(AWSLambdaFilterTest, HostHeaderAlterationShouldBeLambda) {
+ * Requests to the Lambda API Endpoints should have the host header altered to receive a valid response from AWS
+ */
+TEST_F(AwsLambdaFilterTest, HostHeaderLambda) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
