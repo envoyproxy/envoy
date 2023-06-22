@@ -21,7 +21,7 @@ namespace Tls {
   COUNTER(ocsp_staple_omitted)                                                                     \
   COUNTER(ocsp_staple_responses)                                                                   \
   COUNTER(ocsp_staple_requests)                                                                    \
-  GAUGE(was_key_usage_invalid, NeverImport)
+  COUNTER(was_key_usage_invalid)
 
 /**
  * Wrapper struct for SSL stats. @see stats_macros.h

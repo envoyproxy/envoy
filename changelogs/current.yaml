@@ -401,7 +401,7 @@ new_features:
     :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`.
     This can be used to override its configuration in BoringSSL. It is currently default to false but expected to be changed
     to true by default in a future release. ssl.was_key_usage_invalid is added to :ref:`listener metrics <config_listener_stats>`
-    and it will be true for certificate configurations that would fail if this option were set to true.
+    and will be incremented for certificate configurations that would fail if this option were set to true.
 
 deprecated:
 - area: access_log
