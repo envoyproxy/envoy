@@ -396,11 +396,13 @@ public:
       : cluster_manager_(cluster_manager) {}
   std::string name() const override { return "envoy.filters.connection_pools.http.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
-  Router::GenericConnPoolPtr createGenericConnPool(Upstream::ThreadLocalCluster&, bool is_connect,
-                                                   const Router::RouteEntry& route_entry,
-                                                   absl::optional<Envoy::Http::Protocol> protocol,
-                                                   Upstream::LoadBalancerContext*) const override {
-    if (is_connect) {
+  Router::GenericConnPoolPtr
+  createGenericConnPool(Upstream::ThreadLocalCluster&,
+                        Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+                        const Router::RouteEntry& route_entry,
+                        absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::LoadBalancerContext*) const override {
+    if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
     }
     FuzzCluster* cluster = cluster_manager_.selectClusterByName(route_entry.clusterName());
