@@ -294,7 +294,7 @@ void Filter::readDisableDownstream(bool disable) {
     return;
   }
 
-  Network::Connection::ReadDisableStatus read_disable_status =
+  const Network::Connection::ReadDisableStatus read_disable_status =
       read_callbacks_->connection().readDisable(disable);
 
   if (read_disable_status == Network::Connection::ReadDisableStatus::TransitionedToReadDisabled) {

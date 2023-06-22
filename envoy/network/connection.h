@@ -186,6 +186,7 @@ public:
    * enabled again if there is data still in the input buffer it will be re-dispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   * @return status enum indicating the outcome of calling readDisable on the underlying socket.
    *
    * Note that this function reference counts calls. For example
    * readDisable(true);  // Disables data
