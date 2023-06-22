@@ -48,7 +48,7 @@ jobs:
   displayName: Complete
   dependsOn: ["release"]
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
