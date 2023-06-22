@@ -19,7 +19,7 @@ jobs:
   cc_test:
     needs: env
     name: cc_test
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
       image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
