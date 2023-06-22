@@ -856,9 +856,9 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 
 DeferredCreationCompatibleClusterTrafficStats
 ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
-                               const ClusterTrafficStatNames& stat_names, bool deferred_creation) {
+                               const ClusterTrafficStatNames& stat_names, bool defer_creation) {
   return Stats::createDeferredCompatibleStats<ClusterTrafficStats>(scope, stat_names,
-                                                                   deferred_creation);
+                                                                   defer_creation);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
