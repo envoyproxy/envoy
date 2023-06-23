@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: original_dst
+  change: |
+    Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
+    can occur if the cluster is removed while the timer is armed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
