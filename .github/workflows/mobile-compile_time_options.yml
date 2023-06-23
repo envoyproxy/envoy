@@ -57,13 +57,13 @@ jobs:
         cd mobile
         ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
-            --config=ci
+            --config=ci \
             --define=signal_trace=disabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/common/... --test_output=all
+            //test/cc/... //test/common/...
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
