@@ -41,8 +41,11 @@ COPY --from=binary --chown=0:0 --chmod=755 \
 COPY --from=binary --chown=0:0 --chmod=755 \
     /usr/local/bin/utils/su-exec /usr/local/bin/
 ARG ENVOY_BINARY=envoy
+ARG ENVOY_BINARY_PREFIX=
 COPY --from=binary --chown=0:0 --chmod=755 \
-    "/usr/local/bin/${ENVOY_BINARY}" /usr/local/bin/envoy
+    "/usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}" /usr/local/bin/envoy
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}\.* /usr/local/bin/
 
 
 # STAGE: envoy-tools
