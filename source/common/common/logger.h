@@ -605,9 +605,19 @@ public:
 #define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
   ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
 
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection ID to the tags, if the provided
+ * tags do not already have a ConnectionId key existing.
+ */
 #define ENVOY_TAGGED_CONN_LOG(LEVEL, TAGS, CONNECTION, FORMAT, ...)                                \
   ENVOY_TAGGED_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, CONNECTION, FORMAT, ##__VA_ARGS__)
 
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection and stream ID to the tags,
+ * if the provided tags do not already have a ConnectionId or StreamId keys existing.
+ */
 #define ENVOY_TAGGED_STREAM_LOG(LEVEL, TAGS, STREAM, FORMAT, ...)                                  \
   ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, STREAM, FORMAT, ##__VA_ARGS__)
 

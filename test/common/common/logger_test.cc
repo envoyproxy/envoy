@@ -523,14 +523,20 @@ TEST(TaggedLogTest, TestTaggedConnLog) {
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_THAT(msg,
                     HasSubstr("[Tags: \"ConnectionId\":\"200\",\"key\":\"val\"] fake message"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg,
+                    HasSubstr("[Tags: \"ConnectionId\":\"105\"] fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
+  std::map<std::string, std::string> tags_with_conn_id{{"ConnectionId", "105"}};
 
   ClassForTaggedLog object;
   object.logMessageWithConnection(empty_tags);
   object.logMessageWithConnection(tags);
+  object.logMessageWithConnection(tags_with_conn_id);
 }
 
 TEST(TaggedLogTest, TestTaggedStreamLog) {
@@ -549,14 +555,20 @@ TEST(TaggedLogTest, TestTaggedStreamLog) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\",\"key\":\"val\"] "
                            "fake message"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(
+            msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"405\"] fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
+  std::map<std::string, std::string> tags_with_stream_id{{"StreamId", "405"}};
 
   ClassForTaggedLog object;
   object.logMessageWithStream(empty_tags);
   object.logMessageWithStream(tags);
+  object.logMessageWithStream(tags_with_stream_id);
 }
 
 TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
