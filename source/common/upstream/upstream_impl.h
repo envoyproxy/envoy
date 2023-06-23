@@ -400,10 +400,10 @@ public:
     }
 
     // Eds unhealthy.
-    if (health_status_ == envoy::config::core::v3::UNHEALTHY ||
-        health_status_ == envoy::config::core::v3::DRAINING ||
-        health_status_ == envoy::config::core::v3::TIMEOUT) {
-      return health_status_;
+    if (eds_health_status_ == envoy::config::core::v3::UNHEALTHY ||
+        eds_health_status_ == envoy::config::core::v3::DRAINING ||
+        eds_health_status_ == envoy::config::core::v3::TIMEOUT) {
+      return eds_health_status_;
     }
 
     // Active degraded.
@@ -412,7 +412,7 @@ public:
     }
 
     // Eds degraded or healthy.
-    return health_status_;
+    return eds_health_status_;
   }
 
   Host::Health coarseHealth() const override {
@@ -434,12 +434,12 @@ public:
     return Host::Health::Healthy;
   }
 
-  void setEdsHealthStatus(envoy::config::core::v3::HealthStatus health_status) override {
-    health_status_ = health_status;
-    setEdsHealthFlag(health_status);
+  void setEdsHealthStatus(envoy::config::core::v3::HealthStatus eds_health_status) override {
+    eds_health_status_ = eds_health_status;
+    setEdsHealthFlag(eds_health_status);
   }
   Host::HealthStatus edsHealthStatus() const override {
-    return Host::HealthStatus(health_status_.load());
+    return Host::HealthStatus(eds_health_status_.load());
   }
 
   uint32_t weight() const override { return weight_; }
@@ -471,7 +471,7 @@ private:
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
-  std::atomic<Host::HealthStatus> health_status_{};
+  std::atomic<Host::HealthStatus> eds_health_status_{};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
