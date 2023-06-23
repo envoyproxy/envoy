@@ -50,6 +50,8 @@ public:
                      const envoy::config::cluster::v3::Cluster& config,
                      ClusterFactoryContext& context, Runtime::Loader& runtime, bool added_via_api);
 
+  ~OriginalDstCluster() override { cleanup_timer_->disableTimer(); }
+
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
