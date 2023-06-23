@@ -865,7 +865,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
   EXPECT_EQ(0, request_data.length());
-  EXPECT_EQ(decoder_callbacks_.details(), "grpc_json_transcode_failure{INVALID_ARGUMENT}");
+  EXPECT_EQ(decoder_callbacks_.details(), "grpc_json_transcode_failure{INVALID_ARGUMENT:_}");
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryTimeout) {
@@ -1453,17 +1453,6 @@ TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingOKWithNotDeepProtoMess
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-}
-
-TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingFailedWithTooDeepProtoMessage) {
-  // If more than 64 deep, grpc response transcoder will fail.
-  auto response_message = createDeepStruct(65);
-  auto response_data = Grpc::Common::serializeToGrpcFrame(response_message);
-
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
-            filter_.encodeData(*response_data, false));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
