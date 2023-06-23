@@ -80,9 +80,19 @@ public:
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
+    ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
+      init_complete_ = true;
+    }));
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
   NiceMock<MockClusterManager> cm_;
+
+  void TearDown() override {
+    if (init_complete_) {
+      EXPECT_CALL(*cleanup_timer_, disableTimer());
+    }
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -95,6 +105,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Server::MockOptions options_;
   Common::CallbackHandlePtr priority_update_cb_;
+  bool init_complete_{false};
 };
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
