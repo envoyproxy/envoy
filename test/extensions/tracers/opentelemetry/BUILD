@@ -79,3 +79,15 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "http_trace_exporter_test",
+    srcs = ["http_trace_exporter_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    deps = [
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
