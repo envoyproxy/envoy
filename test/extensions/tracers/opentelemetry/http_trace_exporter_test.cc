@@ -1,4 +1,3 @@
-
 #include <sys/types.h>
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
@@ -24,7 +23,6 @@ using testing::ReturnRef;
 
 class OpenTelemetryHttpTraceExporterTest : public testing::Test {
 public:
-
   OpenTelemetryHttpTraceExporterTest() {}
 
   void setup(envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config) {
@@ -35,7 +33,8 @@ public:
 
     cluster_manager_.initializeClusters({"fake_collector"}, {});
 
-    trace_exporter_ = std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_config);
+    trace_exporter_ =
+        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_config);
   }
 
 protected:
@@ -61,18 +60,18 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
 
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
-              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(
-                std::chrono::milliseconds(250)
-              )))
+  EXPECT_CALL(
+      cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(250))))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_EQ("/v1/traces", message->headers().getPathValue());
             EXPECT_EQ("example.com", message->headers().getHostValue());
-            EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf, message->headers().getContentTypeValue());
+            EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
+                      message->headers().getContentTypeValue());
 
             return &request;
           }));
@@ -83,7 +82,8 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
         - spans:
           - name: "test"
   )EOF";
-  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest export_trace_service_request;
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
+      export_trace_service_request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
   *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
@@ -110,14 +110,14 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   ON_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view("fake_collector")))
       .WillByDefault(Return(nullptr));
 
-
   std::string request_yaml = R"EOF(
     resource_spans:
       scope_spans:
         - spans:
           - name: "test"
   )EOF";
-  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest export_trace_service_request;
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
+      export_trace_service_request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
   *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
