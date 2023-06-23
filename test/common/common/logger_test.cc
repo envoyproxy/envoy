@@ -454,6 +454,8 @@ public:
   ClassForTaggedLog() {
     EXPECT_CALL(connection_, id()).WillRepeatedly(Return(200));
     EXPECT_CALL(stream_, streamId()).WillRepeatedly(Return(300));
+    EXPECT_CALL(stream_, connection())
+        .WillRepeatedly(Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection_))));
   }
 
   void logMessageWithPreCreatedTags() { ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val"); }
@@ -540,13 +542,13 @@ TEST(TaggedLogTest, TestTaggedStreamLog) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_THAT(msg,
-                    HasSubstr("[Tags: \"ConnectionId\":\"0\",\"StreamId\":\"300\"] fake message"));
+        EXPECT_THAT(
+            msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\"] fake message"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_THAT(msg,
-                    HasSubstr("[Tags: \"ConnectionId\":\"0\",\"StreamId\":\"300\",\"key\":\"val\"] "
-                              "fake message"));
+        EXPECT_THAT(
+            msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\",\"key\":\"val\"] "
+                           "fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
@@ -645,7 +647,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
-        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"0\""));
+        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
@@ -653,7 +655,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
-        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"0\""));
+        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }));
 
   std::map<std::string, std::string> empty_tags;

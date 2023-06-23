@@ -38,7 +38,6 @@ public:
     ENVOY_TAGGED_CONN_LOG(info, tags_, connection_, "fake message {}", "val");
     ENVOY_TAGGED_CONN_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), connection_,
                           "fake message {}", "val");
-
     ENVOY_TAGGED_STREAM_LOG(info, tags_, stream_, "fake message {}", "val");
     ENVOY_TAGGED_STREAM_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), stream_,
                             "fake message {}", "val");
