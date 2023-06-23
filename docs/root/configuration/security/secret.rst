@@ -192,7 +192,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
                     api_type: GRPC
                     transport_api_version: V3
                     grpc_services:
-                      google_grpc:
+                    - google_grpc:
                         target_uri: unix:/tmp/uds_path
     listeners:
       ....
@@ -210,7 +210,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
                     api_type: GRPC
                     transport_api_version: V3
                     grpc_services:
-                      envoy_grpc:
+                    - envoy_grpc:
                         cluster_name: sds_server_mtls
               validation_context_sds_secret_config:
                 name: validation_context
@@ -220,7 +220,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
                     api_type: GRPC
                     transport_api_version: V3
                     grpc_services:
-                      envoy_grpc:
+                    - envoy_grpc:
                         cluster_name: sds_server_uds
 
 

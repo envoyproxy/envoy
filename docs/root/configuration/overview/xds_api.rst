@@ -29,7 +29,7 @@ as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
@@ -50,7 +50,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`eds_cluster_config
@@ -71,7 +71,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
@@ -93,7 +93,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
@@ -117,7 +117,7 @@ for the service definition. This is used by Envoy as a client when
           api_type: GRPC
           transport_api_version: V3
           grpc_services:
-            envoy_grpc:
+          - envoy_grpc:
               cluster_name: some_xds_cluster
 
 is set in the :ref:`scoped_routes
@@ -140,7 +140,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
@@ -161,7 +161,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set inside the :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
@@ -297,7 +297,7 @@ for the service definition. This is used by Envoy as a client when
       api_type: GRPC
       transport_api_version: V3
       grpc_services:
-        envoy_grpc:
+      - envoy_grpc:
           cluster_name: some_ads_cluster
 
 is set in the :ref:`dynamic_resources

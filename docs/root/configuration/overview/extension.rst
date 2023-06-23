@@ -25,7 +25,7 @@ filter configuration snippet is permitted:
           api_type: GRPC
           transport_api_version: V3
           grpc_services:
-            envoy_grpc:
+          - envoy_grpc:
               cluster_name: xds_cluster
     http_filters:
     - name: front-router
@@ -56,7 +56,7 @@ follows:
             api_type: GRPC
             transport_api_version: V3
             grpc_services:
-              envoy_grpc:
+            - envoy_grpc:
                 cluster_name: xds_cluster
       http_filters:
       - name: front-router
