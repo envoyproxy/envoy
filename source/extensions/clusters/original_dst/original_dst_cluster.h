@@ -49,6 +49,8 @@ public:
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
                      ClusterFactoryContext& context);
 
+  ~OriginalDstCluster() override { cleanup_timer_->disableTimer(); }
+
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 

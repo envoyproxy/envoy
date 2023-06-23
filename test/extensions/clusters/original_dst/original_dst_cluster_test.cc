@@ -79,7 +79,16 @@ public:
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
+    ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
+      init_complete_ = true;
+    }));
     cluster_->initialize([&]() -> void { initialized_.ready(); });
+  }
+
+  void TearDown() override {
+    if (init_complete_) {
+      EXPECT_CALL(*cleanup_timer_, disableTimer());
+    }
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -91,6 +100,7 @@ public:
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
   Common::CallbackHandlePtr priority_update_cb_;
+  bool init_complete_{false};
 };
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
