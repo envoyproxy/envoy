@@ -28,13 +28,13 @@ public:
 // the EDS subscription to decide whether to use the cache or not.
 //
 // This cache will be instantiated once and owned by the ADS Mux, and passed to
-// the EDS susbcriptions.
+// the EDS subscriptions.
 //
 // Resources lifetime in the cache is determined by the gRPC mux that adds/updates a
 // resource when it receives its contents, and removes a resource when there is
 // no longer interest in that resource.
 // An EDS subscription may fetch a resource from the cache, and optionally
-// install a callback to be triggered if the resource is removes from the cache.
+// install a callback to be triggered if the resource is removed from the cache.
 // In addition, a resource in the cache may have an expiration timer if
 // "endpoint_stale_after" (TTL) is set for that resource. Once the timer
 // expires, the callbacks will be triggered to remove the resource.

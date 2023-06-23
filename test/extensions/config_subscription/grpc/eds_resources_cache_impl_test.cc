@@ -13,7 +13,7 @@ namespace Config {
 
 class EdsResourcesCacheImplTest : public testing::Test {
 public:
-  using ResourceType = envoy::config::endpoint::v3::ClusterLoadAssignment;
+  using ClusterLoadAssignment = envoy::config::endpoint::v3::ClusterLoadAssignment;
 
   EdsResourcesCacheImplTest()
       : api_(Api::createApiForTest(time_system_)),
@@ -41,7 +41,7 @@ TEST_F(EdsResourcesCacheImplTest, AddSuccess) {
   EXPECT_EQ(0, resources_cache_.cacheSizeForTest());
 
   // Add a resource.
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -52,19 +52,19 @@ TEST_F(EdsResourcesCacheImplTest, AddAndSetSuccess) {
   EXPECT_EQ(0, resources_cache_.cacheSizeForTest());
 
   // Add a resource.
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
 
   // Add a new resource.
-  ResourceType new_resource;
+  ClusterLoadAssignment new_resource;
   new_resource.set_cluster_name("new_foo");
   resources_cache_.setResource("new_foo_cla", new_resource);
   EXPECT_EQ(2, resources_cache_.cacheSizeForTest());
 
   // Update the first resource.
-  ResourceType resource_update;
+  ClusterLoadAssignment resource_update;
   resource_update.set_cluster_name("foo_update");
   resources_cache_.setResource("foo_cla", resource_update);
   EXPECT_EQ(2, resources_cache_.cacheSizeForTest());
@@ -72,7 +72,7 @@ TEST_F(EdsResourcesCacheImplTest, AddAndSetSuccess) {
 
 // Validates simple addition and fetching works.
 TEST_F(EdsResourcesCacheImplTest, AddAndFetchSuccess) {
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
 
@@ -83,7 +83,7 @@ TEST_F(EdsResourcesCacheImplTest, AddAndFetchSuccess) {
 
 // Validates simple addition, update and fetching works.
 TEST_F(EdsResourcesCacheImplTest, AddUpdateAndFetchSuccess) {
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
 
@@ -92,7 +92,7 @@ TEST_F(EdsResourcesCacheImplTest, AddUpdateAndFetchSuccess) {
   EXPECT_EQ("foo", fetched_resource->cluster_name());
 
   // Update the resource.
-  ResourceType resource_update;
+  ClusterLoadAssignment resource_update;
   resource_update.set_cluster_name("foo_update");
   resources_cache_.setResource("foo_cla", resource_update);
 
@@ -103,7 +103,7 @@ TEST_F(EdsResourcesCacheImplTest, AddUpdateAndFetchSuccess) {
 
 // Validates that adding and fetching a different resource returns nullopt.
 TEST_F(EdsResourcesCacheImplTest, AddAndFetchNonExistent) {
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -122,7 +122,7 @@ TEST_F(EdsResourcesCacheImplTest, FetchEmpty) {
 
 // Validates that adding and removing works.
 TEST_F(EdsResourcesCacheImplTest, AddRemoveThenFetchEmpty) {
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -138,7 +138,7 @@ TEST_F(EdsResourcesCacheImplTest, AddRemoveThenFetchEmpty) {
 
 // Validates that adding and removing a non-existent resource works.
 TEST_F(EdsResourcesCacheImplTest, AddAndRemoveNonExistent) {
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -159,7 +159,7 @@ TEST_F(EdsResourcesCacheImplTest, RemoveEmpty) {
 TEST_F(EdsResourcesCacheImplTest, RemoveCallbackCalled) {
   ResourceRemovalCallbackCounter callback;
 
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -180,7 +180,7 @@ TEST_F(EdsResourcesCacheImplTest, RemoveCallbackCalled) {
 TEST_F(EdsResourcesCacheImplTest, RemoveCallbackNotCalledAfterUpdate) {
   ResourceRemovalCallbackCounter callback;
 
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -192,7 +192,7 @@ TEST_F(EdsResourcesCacheImplTest, RemoveCallbackNotCalledAfterUpdate) {
   EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
 
   // Update the resource.
-  ResourceType resource_update;
+  ClusterLoadAssignment resource_update;
   resource_update.set_cluster_name("foo_update");
   resources_cache_.setResource("foo_cla", resource_update);
 
@@ -206,7 +206,7 @@ TEST_F(EdsResourcesCacheImplTest, RemoveCallbackNotCalledAfterUpdate) {
 TEST_F(EdsResourcesCacheImplTest, ExplicitRemoveCallback) {
   ResourceRemovalCallbackCounter callback;
 
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -231,7 +231,7 @@ TEST_F(EdsResourcesCacheImplTest, MultipleResourcesRemoveCallbackCalled) {
   ResourceRemovalCallbackCounter callback;
 
   // Add first resource.
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -243,7 +243,7 @@ TEST_F(EdsResourcesCacheImplTest, MultipleResourcesRemoveCallbackCalled) {
   EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
 
   // Add second resource.
-  ResourceType resource2;
+  ClusterLoadAssignment resource2;
   resource2.set_cluster_name("foo2");
   resources_cache_.setResource("foo2_cla", resource2);
   EXPECT_EQ(2, resources_cache_.cacheSizeForTest());
@@ -271,7 +271,7 @@ TEST_F(EdsResourcesCacheImplTest, MultipleResourcesRemoveCallbackCalled) {
 TEST_F(EdsResourcesCacheImplTest, ExpiredCacheResource) {
   ResourceRemovalCallbackCounter callback;
 
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
@@ -297,7 +297,7 @@ TEST_F(EdsResourcesCacheImplTest, ExpiredCacheResource) {
 TEST_F(EdsResourcesCacheImplTest, DisableExpiredCacheResource) {
   ResourceRemovalCallbackCounter callback;
 
-  ResourceType resource;
+  ClusterLoadAssignment resource;
   resource.set_cluster_name("foo");
   resources_cache_.setResource("foo_cla", resource);
   EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
