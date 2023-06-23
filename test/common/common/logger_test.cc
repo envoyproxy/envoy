@@ -525,8 +525,7 @@ TEST(TaggedLogTest, TestTaggedConnLog) {
                     HasSubstr("[Tags: \"ConnectionId\":\"200\",\"key\":\"val\"] fake message"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_THAT(msg,
-                    HasSubstr("[Tags: \"ConnectionId\":\"105\"] fake message"));
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"105\"] fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
