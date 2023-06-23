@@ -171,9 +171,9 @@ pycparser==2.20 \
     --hash=sha256:2d475327684562c3a96cc71adf7dc8c4f0565175cf86b6d7a404ff4c771f15f0 \
     --hash=sha256:7582ad22678f0fcd81102833f60ef8d0e57288b6b5fb00323d101be910e35705
     # via cffi
-pygithub==1.58.2 \
-    --hash=sha256:1e6b1b7afe31f75151fb81f7ab6b984a7188a852bdb123dbb9ae90023c3ce60f \
-    --hash=sha256:f435884af617c6debaa76cbc355372d1027445a56fbc39972a3b9ed4968badc8
+pygithub==1.59.0 \
+    --hash=sha256:126bdbae72087d8d038b113aab6b059b4553cb59348e3024bb1a1cae406ace9e \
+    --hash=sha256:6e05ff49bac3caa7d1d6177a10c6e55a3e20c85b92424cc198571fd0cf786690
     # via -r requirements.in
 pyjwt[crypto]==2.4.0 \
     --hash=sha256:72d1d253f32dbd4f5c88eaf1fdc62f3a19f676ccbadb9dbc5d07e951b2b26daf \
