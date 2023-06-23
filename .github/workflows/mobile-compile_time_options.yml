@@ -63,7 +63,7 @@ jobs:
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //test/cc/... //test/common/...
+            $(bazel query //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
