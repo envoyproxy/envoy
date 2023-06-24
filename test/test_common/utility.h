@@ -1030,6 +1030,14 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
+  uint32_t maxHeadersKb() const override { return header_map_->maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return header_map_->maxHeadersCount(); }
+  void setMaxHeadersKb(const uint32_t max_headers_kb) override {
+    header_map_->setMaxHeadersKb(max_headers_kb);
+  }
+  void setMaxHeadersCount(const uint32_t max_headers_count) override {
+    header_map_->setMaxHeadersCount(max_headers_count);
+  }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }

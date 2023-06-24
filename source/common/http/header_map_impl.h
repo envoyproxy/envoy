@@ -91,6 +91,12 @@ public:
   void setReferenceKey(const LowerCaseString& key, absl::string_view value);
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
+  uint32_t maxHeadersKb() const { return max_headers_kb_; }
+  uint32_t maxHeadersCount() const { return max_headers_count_; }
+  void setMaxHeadersKb(const uint32_t max_headers_kb) { max_headers_kb_ = max_headers_kb; }
+  void setMaxHeadersCount(const uint32_t max_headers_count) {
+    max_headers_count_ = max_headers_count;
+  }
   HeaderMap::GetResult get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
@@ -335,6 +341,10 @@ protected:
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
+  // This holds the max size of the headers in kbytes in the HeaderMap.
+  uint32_t max_headers_kb_ = 0;
+  // This holds the max count of the headers in the HeaderMap.
+  uint32_t max_headers_count_ = 0;
 };
 
 /**
@@ -382,6 +392,14 @@ public:
     HeaderMapImpl::setCopy(key, value);
   }
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
+  uint32_t maxHeadersKb() const override { return HeaderMapImpl::maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return HeaderMapImpl::maxHeadersCount(); }
+  void setMaxHeadersKb(const uint32_t max_headers_kb) override {
+    HeaderMapImpl::setMaxHeadersKb(max_headers_kb);
+  }
+  void setMaxHeadersCount(const uint32_t max_headers_count) override {
+    HeaderMapImpl::setMaxHeadersCount(max_headers_count);
+  }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
   }
