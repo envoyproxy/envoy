@@ -567,9 +567,8 @@ void Filter::logGrpcStreamInfo() {
   if (stream_ && grpc_service_.has_envoy_grpc()) {
     logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
     logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
-    // Only set upstream host in logging info once when it is available.
-    if (logging_info_->upstreamHost() == nullptr &&
-        stream_->streamInfo().upstreamInfo()->upstreamHost() != nullptr) {
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
       logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
