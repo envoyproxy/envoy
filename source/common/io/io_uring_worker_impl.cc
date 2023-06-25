@@ -497,7 +497,7 @@ void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
 
   if (read_req_ != nullptr) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
-    parent_.submitCancelRequest(*this, read_req_);
+    cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
 
   if (write_or_shutdown_req_ != nullptr) {
@@ -506,7 +506,8 @@ void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
       write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
         if (write_or_shutdown_req_ != nullptr) {
           ENVOY_LOG(trace, "cancel the write or shutdown request, fd = {}", fd_);
-          parent_.submitCancelRequest(*this, write_or_shutdown_req_);
+          write_or_shutdown_cancel_req_ =
+              parent_.submitCancelRequest(*this, write_or_shutdown_req_);
         }
       });
       write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
@@ -579,6 +580,21 @@ void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
   cleanup();
 }
 
+void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onCancel(req, result, injected);
+  ASSERT(!injected);
+  if (cancel_req_ == req) {
+    cancel_req_ = nullptr;
+  }
+  if (write_or_shutdown_cancel_req_ == req) {
+    write_or_shutdown_cancel_req_ = nullptr;
+  }
+  if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_req_ == nullptr &&
+      write_or_shutdown_cancel_req_ == nullptr) {
+    closeInternal();
+  }
+}
+
 // TODO(zhxie): concern submit multiple read requests or submit read request in advance to improve
 // performance in the next iteration.
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
@@ -590,7 +606,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   if (!injected) {
     read_req_ = nullptr;
     // If the socket is going to close, discard all results.
-    if (status_ == Closed && write_or_shutdown_req_ == nullptr) {
+    if (status_ == Closed && write_or_shutdown_req_ == nullptr && cancel_req_ == nullptr &&
+        write_or_shutdown_cancel_req_ == nullptr) {
       if (result > 0 && keep_fd_open_) {
         ReadRequest* read_req = static_cast<ReadRequest*>(req);
         // TODO (soulxu): Maybe add new interface for get account.
@@ -772,7 +789,8 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
     } else if (shutdown_.has_value() && !shutdown_.value()) {
       // Only SHUT_WR is supported now.
       write_or_shutdown_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
-    } else if (status_ == Closed && read_req_ == nullptr) {
+    } else if (status_ == Closed && read_req_ == nullptr && cancel_req_ == nullptr &&
+               write_or_shutdown_cancel_req_ == nullptr) {
       closeInternal();
     }
   }

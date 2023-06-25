@@ -255,6 +255,7 @@ public:
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(Request* req, int32_t result, bool injected) override;
   void onShutdown(Request* req, int32_t result, bool injected) override;
+  void onCancel(Request* req, int32_t result, bool injected) override;
 
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
@@ -290,6 +291,9 @@ private:
   Event::TimerPtr write_timeout_timer_{nullptr};
 
   bool keep_fd_open_{false};
+
+  Request* cancel_req_{nullptr};
+  Request* write_or_shutdown_cancel_req_{nullptr};
 
   void closeInternal();
   void submitReadRequest();
