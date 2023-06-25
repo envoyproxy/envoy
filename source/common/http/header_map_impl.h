@@ -341,7 +341,7 @@ protected:
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
-  // This holds the max size of the headers in kbytes in the HeaderMap.
+  // This holds the max size of the headers in kilobyte in the HeaderMap.
   uint32_t max_headers_kb_ = 0;
   // This holds the max count of the headers in the HeaderMap.
   uint32_t max_headers_count_ = 0;
