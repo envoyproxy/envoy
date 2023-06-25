@@ -1177,6 +1177,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+  // Rewrites the host of CONNECT-UDP requests.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      HeaderUtility::isConnectUdp(*request_headers_) &&
+      !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
+    sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().InvalidPath);
+    return;
+  }
+
   // Currently we only support relative paths at the application layer.
   if (!request_headers_->getPathValue().empty() && request_headers_->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();

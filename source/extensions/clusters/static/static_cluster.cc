@@ -16,6 +16,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+  weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
 
   Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
@@ -51,7 +52,7 @@ void StaticClusterImpl::startPreInit() {
     }
     priority_state_manager_->updateClusterPrioritySet(
         i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
-        overprovisioning_factor_);
+        weighted_priority_health_, overprovisioning_factor_);
   }
   priority_state_manager_.reset();
 
