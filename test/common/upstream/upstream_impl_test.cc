@@ -762,6 +762,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
     load_assignment:
       policy:
+        weighted_priority_health: true
         overprovisioning_factor: 100
       endpoints:
       - lb_endpoints:
@@ -840,6 +841,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_EQ(Host::Health::Degraded,
             cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
@@ -857,6 +859,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
@@ -870,6 +873,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
@@ -1633,6 +1637,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
     lb_policy: ROUND_ROBIN
     load_assignment:
       policy:
+        weighted_priority_health: true
         overprovisioning_factor: 100
       endpoints:
       - lb_endpoints:
@@ -1656,6 +1661,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
@@ -3215,7 +3221,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -3228,7 +3234,7 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
   }
 
@@ -3285,7 +3291,7 @@ TEST(PrioritySet, Extend) {
         1,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, hosts_added, hosts_removed, absl::nullopt, fake_cross_priority_host_map);
+        {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -4885,7 +4891,7 @@ TEST_F(HostsWithLocalityImpl, Filter) {
 class HostSetImplLocalityTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
-  HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};
+  HostSetImpl host_set_{0, false, kDefaultOverProvisioningFactor};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   HostVector hosts_{makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
@@ -5072,7 +5078,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
 TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
-    HostSetImpl host_set(0, overprovisioning_factor);
+    HostSetImpl host_set(0, false, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
     auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
     HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source),

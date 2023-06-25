@@ -749,8 +749,8 @@ googleapis-common-protos==1.59.0 \
     --hash=sha256:4168fcb568a826a52f23510412da405abd93f4d23ba544bb68d943b14ba3cb44 \
     --hash=sha256:b287dc48449d1d41af0c69f4ea26242b5ae4c3d7249a38b0984c86a4caffff1f
     # via google-api-core
-gsutil==5.24 \
-    --hash=sha256:1f841645cda40fcc817e9ca84d285cdf541cc015fd38a5862017b085756729a0
+gsutil==5.25 \
+    --hash=sha256:7e4cb7fa9a332c401e4b7f5fef1da3e9ef21e3e4885de6d007b07a11b5d0524a
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
@@ -1056,9 +1056,9 @@ pyflakes==3.0.1 \
     --hash=sha256:ec55bf7fe21fff7f1ad2f7da62363d749e2a470500eab1b555334b67aa1ef8cf \
     --hash=sha256:ec8b276a6b60bd80defed25add7e439881c19e64850afd9b346283d4165fd0fd
     # via flake8
-pygithub==1.58.2 \
-    --hash=sha256:1e6b1b7afe31f75151fb81f7ab6b984a7188a852bdb123dbb9ae90023c3ce60f \
-    --hash=sha256:f435884af617c6debaa76cbc355372d1027445a56fbc39972a3b9ed4968badc8
+pygithub==1.59.0 \
+    --hash=sha256:126bdbae72087d8d038b113aab6b059b4553cb59348e3024bb1a1cae406ace9e \
+    --hash=sha256:6e05ff49bac3caa7d1d6177a10c6e55a3e20c85b92424cc198571fd0cf786690
     # via -r requirements.in
 pygments==2.15.1 \
     --hash=sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c \
@@ -1403,9 +1403,9 @@ yamllint==1.32.0 \
     --hash=sha256:d01dde008c65de5b235188ab3110bebc59d18e5c65fc8a58267cd211cd9df34a \
     --hash=sha256:d97a66e48da820829d96077d76b8dfbe6c6140f106e558dae87e81ac4e6b30b7
     # via envoy-code-check
-yapf==0.40.0 \
-    --hash=sha256:63386557876c2686cb29d8c422b2d1e484f29f7a278821f91515b5c5adf569a7 \
-    --hash=sha256:7eeb8c404e386f16e24cbd785103dbc573f51cbb68e65a35f4392e0233f3d7bc
+yapf==0.40.1 \
+    --hash=sha256:958587eb5c8ec6c860119a9c25d02addf30a44f75aa152a4220d30e56a98037c \
+    --hash=sha256:b8bfc1f280949153e795181768ca14ef43d7312629a06c43e7abd279323af313
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -1538,9 +1538,9 @@ zstandard==0.21.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==67.8.0 \
-    --hash=sha256:5df61bf30bb10c6f756eb19e7c9f3b473051f48db77fddbe06ff2ca307df9a6f \
-    --hash=sha256:62642358adc77ffa87233bc4d2354c4b2682d214048f500964dbe760ccedf102
+setuptools==68.0.0 \
+    --hash=sha256:11e52c67415a381d10d6b462ced9cfb97066179f0e871399e006c4ab101fc85f \
+    --hash=sha256:baf1fdb41c6da4cd2eae722e135500da913332ab3f2f5c7d33af9b492acb5235
     # via
     #   -r requirements.in
     #   sphinxcontrib-jquery
