@@ -144,11 +144,7 @@ Filter::StreamOpenState Filter::openStream() {
 
 void Filter::closeStream() {
   if (stream_) {
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
-      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-    }
+    logGrpcStreamInfo();
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -565,6 +561,18 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::logGrpcStreamInfo() {
+  if (stream_ && grpc_service_.has_envoy_grpc()) {
+    logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+    logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    // Only set upstream host in logging info once when it is available.
+    if (logging_info_->upstreamHost() == nullptr &&
+        stream_->streamInfo().upstreamInfo()->upstreamHost() != nullptr) {
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
+  }
 }
 
 void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {

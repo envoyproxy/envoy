@@ -34,6 +34,8 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
+  filter_.logGrpcStreamInfo();
+
   stopMessageTimer();
 
   if (call_start_time_.has_value()) {

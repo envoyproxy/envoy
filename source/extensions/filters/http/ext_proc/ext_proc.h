@@ -256,6 +256,8 @@ public:
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
+  void logGrpcStreamInfo();
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();

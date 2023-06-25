@@ -84,13 +84,13 @@ protected:
 
     EXPECT_CALL(async_client_stream_info_, bytesSent()).WillRepeatedly(Return(100));
     EXPECT_CALL(async_client_stream_info_, bytesReceived()).WillRepeatedly(Return(200));
-    EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo());
-    EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo());
+    EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo()).Times(AnyNumber());
+    EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo()).Times(AnyNumber());
     // Get pointer to MockUpstreamInfo.
     std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
         std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(
             async_client_stream_info_.upstreamInfo());
-    EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
+    EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost()).Times(AnyNumber());
 
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
