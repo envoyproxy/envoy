@@ -171,6 +171,11 @@ public:
    * @return LoadBalancerPtr a new worker local load balancer.
    */
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
+
+  /**
+   * @return bool whether the load balancer should be recreated when the host set changes.
+   */
+  virtual bool recreateOnHostChange() const { return true; }
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;

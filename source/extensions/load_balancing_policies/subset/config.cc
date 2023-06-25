@@ -116,6 +116,7 @@ public:
         params.local_priority_set, cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_,
         random_, time_source_);
   }
+  bool recreateOnHostChange() const override { return false; }
 
 private:
   const SubsetLoadBalancerConfig& subset_config_;
