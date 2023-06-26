@@ -21,4 +21,6 @@ require (
 )
 
 // NOTICE: it's just for testing, please remove it.
+// And check the "API compatibility" section in doc:
+// https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/golang_filter#developing-a-go-plugin
 replace github.com/envoyproxy/envoy => ../../..
