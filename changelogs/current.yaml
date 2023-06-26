@@ -229,6 +229,9 @@ removed_config_or_runtime:
     removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
+- area: golang
+  change: |
+    added new :ref:`l4 golang network filter <config_network_filters_golang>`.
 - area: access_log
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being

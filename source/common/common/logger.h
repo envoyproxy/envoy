@@ -91,7 +91,8 @@ const static bool should_log = true;
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)                                                                                   \
-  FUNCTION(websocket)
+  FUNCTION(websocket)                                                                              \
+  FUNCTION(golang)
 
 // clang-format off
 enum class Id {
