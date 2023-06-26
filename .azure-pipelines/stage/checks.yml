@@ -131,8 +131,7 @@ jobs:
 - job: complete
   displayName: "Checks complete"
   dependsOn: ["bazel", "coverage"]
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: x64-nano
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
