@@ -14,15 +14,15 @@ static void BM_InlineMapFind(benchmark::State& state) {
 
   std::vector<std::string> normal_keys;
 
-  InlineMapRegistry registry_200;
+  InlineMapRegistry<std::string> registry_200;
   // Create 200 inline keys.
-  std::vector<InlineMapRegistry::InlineKey> inline_handles_200;
+  std::vector<InlineMapRegistry<std::string>::InlineKey> inline_handles_200;
   for (size_t i = 0; i < 200; ++i) {
     const std::string key = "key_" + std::to_string(i);
     inline_handles_200.push_back(registry_200.registerInlineKey(key));
     normal_keys.push_back(key);
   }
-  InlineMapRegistry registry_0;
+  InlineMapRegistry<std::string> registry_0;
 
   registry_200.finalize();
   registry_0.finalize();

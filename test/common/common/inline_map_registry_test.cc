@@ -6,7 +6,7 @@ namespace Envoy {
 namespace {
 
 TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
-  InlineMapRegistry registry;
+  InlineMapRegistry<std::string> registry;
   registry.finalize();
 
   auto map = registry.createInlineMap<std::string>();
@@ -32,9 +32,9 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 }
 
 TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
-  InlineMapRegistry registry;
+  InlineMapRegistry<std::string> registry;
 
-  std::vector<InlineMapRegistry::InlineKey> inline_keys;
+  std::vector<InlineMapRegistry<std::string>::InlineKey> inline_keys;
 
   // Create 20 inline keys.
   for (size_t i = 0; i < 20; ++i) {
@@ -60,7 +60,6 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   for (size_t i = 0; i < inline_keys.size(); ++i) {
     const std::string key = "key_" + std::to_string(i);
     auto handle = inline_keys[i];
-    EXPECT_EQ(handle.inlineKey(), key);
     EXPECT_EQ(handle.inlineId(), i);
     EXPECT_EQ(*map->lookup(handle), "value_" + std::to_string(i));
   }

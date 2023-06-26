@@ -167,7 +167,7 @@ private:
   FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
 
-  InlineMapRegistry::InlineMapPtr<FilterObject> data_storage_;
+  InlineMapRegistry<std::string>::InlineMapPtr<FilterObject> data_storage_;
 };
 
 } // namespace StreamInfo
