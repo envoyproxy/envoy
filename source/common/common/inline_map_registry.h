@@ -59,7 +59,7 @@ public:
   public:
     /**
      * Get the id of the inline entry in the inline array. This could be used to access the
-     * key/value pair in the inline map.
+     * key/value pair in the inline map without hash searching.
      */
     uint64_t inlineId() const { return inline_id_; }
 
