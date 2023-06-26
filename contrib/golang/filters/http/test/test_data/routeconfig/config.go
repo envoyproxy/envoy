@@ -4,9 +4,10 @@ import (
 	"errors"
 
 	xds "github.com/cncf/xds/go/xds/type/v3"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 )
 
 const Name = "routeconfig"
