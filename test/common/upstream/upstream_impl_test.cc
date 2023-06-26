@@ -762,6 +762,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
     load_assignment:
       policy:
+        weighted_priority_health: true
         overprovisioning_factor: 100
       endpoints:
       - lb_endpoints:
@@ -840,6 +841,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_EQ(Host::Health::Degraded,
             cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
@@ -857,6 +859,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
@@ -870,6 +873,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
@@ -1422,8 +1426,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   Network::MockTransportSocketFactory socket_factory;
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
       address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
@@ -1472,8 +1476,8 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   Network::MockTransportSocketFactory socket_factory;
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
       address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
@@ -1633,6 +1637,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
     lb_policy: ROUND_ROBIN
     load_assignment:
       policy:
+        weighted_priority_health: true
         overprovisioning_factor: 100
       endpoints:
       - lb_endpoints:
@@ -1656,6 +1661,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
@@ -2348,9 +2354,6 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2360,6 +2363,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2386,15 +2391,12 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
-  EXPECT_NE(nullptr, cluster.info()->loadBalancingPolicy());
+  EXPECT_TRUE(cluster.info()->loadBalancerConfig().has_value());
   EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
 }
 
 // lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2426,9 +2428,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
 
 // load_balancing_policy is set and common_lb_config is set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2437,6 +2436,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     common_lb_config:
       update_merge_window: 1s
     load_assignment:
@@ -2464,9 +2465,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
 
 // load_balancing_policy is set and some fields in common_lb_config are set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFields) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2475,6 +2473,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     common_lb_config:
       locality_weighted_lb_config: {}
     load_assignment:
@@ -2506,9 +2506,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
 
 // load_balancing_policy is set and lb_subset_config is set.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2517,6 +2514,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
@@ -2590,9 +2589,6 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
 // load_balancing_policy should also be used when lb_policy is set to something else besides
 // LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2602,6 +2598,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2632,9 +2630,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 
 // load_balancing_policy should also be used when lb_policy is omitted.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2643,6 +2638,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -3224,7 +3221,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -3237,7 +3234,7 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
   }
 
@@ -3294,7 +3291,7 @@ TEST(PrioritySet, Extend) {
         1,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, hosts_added, hosts_removed, absl::nullopt, fake_cross_priority_host_map);
+        {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -4894,7 +4891,7 @@ TEST_F(HostsWithLocalityImpl, Filter) {
 class HostSetImplLocalityTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
-  HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};
+  HostSetImpl host_set_{0, false, kDefaultOverProvisioningFactor};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   HostVector hosts_{makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
@@ -5081,7 +5078,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
 TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
-    HostSetImpl host_set(0, overprovisioning_factor);
+    HostSetImpl host_set(0, false, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
     auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
     HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source),

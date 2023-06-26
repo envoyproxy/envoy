@@ -93,8 +93,13 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   // server initialization.
   ASSERT(state_ != State::AllClustersInitialized);
 
-  const auto initialize_cb = [&cm_cluster, this] { onClusterInit(cm_cluster); };
+  const auto initialize_cb = [&cm_cluster, this] {
+    onClusterInit(cm_cluster);
+    cm_cluster.cluster().info()->configUpdateStats().warming_state_.set(0);
+  };
   Cluster& cluster = cm_cluster.cluster();
+
+  cluster.info()->configUpdateStats().warming_state_.set(1);
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
     primary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
@@ -749,6 +754,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto previous_cluster =
       loadCluster(cluster, new_hash, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
+  cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
     init_helper_.addCluster(*cluster_entry);
@@ -757,6 +763,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     cluster_entry->cluster_->initialize([this, cluster_name] {
       ENVOY_LOG(debug, "warming cluster {} complete", cluster_name);
       auto state_changed_cluster_entry = warming_clusters_.find(cluster_name);
+      state_changed_cluster_entry->second->cluster_->info()->configUpdateStats().warming_state_.set(
+          0);
       onClusterInit(*state_changed_cluster_entry->second);
     });
   }
@@ -909,22 +917,23 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.ring_hash");
       cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
   } else if (cluster_info->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_info->lbSubsetInfo().isEnabled()) {
       auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.maglev");
       cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
     }
   } else if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
-    cluster_entry_it->second->thread_aware_lb_ = typed_lb_factory->create(
-        *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
+    cluster_entry_it->second->thread_aware_lb_ =
+        typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
+                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1105,6 +1114,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         cm_cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
     per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
     per_priority.locality_weights_ = host_set->localityWeights();
+    per_priority.weighted_priority_health_ = host_set->weightedPriorityHealth();
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
@@ -1116,7 +1126,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
     if (add_or_update_cluster) {
-      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+      if (cluster_manager->thread_local_clusters_.contains(info->name())) {
         ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
       } else {
         ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
@@ -1131,7 +1141,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       cluster_manager->updateClusterMembership(
           info->name(), per_priority.priority_, per_priority.update_hosts_params_,
           per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
-          per_priority.overprovisioning_factor_, map);
+          per_priority.weighted_priority_health_, per_priority.overprovisioning_factor_, map);
     }
 
     if (new_cluster != nullptr) {
@@ -1206,13 +1216,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor,
+    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
+    absl::optional<uint32_t> overprovisioning_factor,
     HostMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
-                            hosts_added, hosts_removed, overprovisioning_factor,
-                            std::move(cross_priority_host_map));
+                            hosts_added, hosts_removed, weighted_priority_health,
+                            overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
@@ -1476,13 +1487,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t overprovisioning_factor,
-    HostMapConstSharedPtr cross_priority_host_map) {
+    const HostVector& hosts_removed, bool weighted_priority_health,
+    uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
-                             overprovisioning_factor, std::move(cross_priority_host_map));
+                             weighted_priority_health, overprovisioning_factor,
+                             std::move(cross_priority_host_map));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
@@ -1543,7 +1555,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+    : parent_(parent), cluster_info_(cluster), lb_factory_(lb_factory),
       override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 

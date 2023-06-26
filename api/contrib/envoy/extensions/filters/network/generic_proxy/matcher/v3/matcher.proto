@@ -52,7 +52,6 @@ message PropertyMatchInput {
 message RequestMatchInput {
 }
 
-// [#not-implemented-hide:]
 // Used to match an arbitrary key-value pair for headers, trailers or properties.
 message KeyValueMatchEntry {
   // The key name to match on.
@@ -62,7 +61,6 @@ message KeyValueMatchEntry {
   type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#not-implemented-hide:]
 // Custom matcher to match on the generic downstream request. This is used to match
 // multiple fields of the downstream request and avoid complex combinations of
 // HostMatchInput, PathMatchInput, MethodMatchInput and PropertyMatchInput.

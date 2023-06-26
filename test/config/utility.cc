@@ -207,7 +207,7 @@ std::string ConfigHelper::testInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.test"
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
 )EOF";
 }
 
@@ -852,6 +852,28 @@ void ConfigHelper::setConnectConfig(
   }
 }
 
+void ConfigHelper::setConnectUdpConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect, bool http3) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  if (terminate_connect) {
+    auto* upgrade = route->mutable_route()->add_upgrade_configs();
+    upgrade->set_upgrade_type("connect-udp");
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("connect-udp");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+  if (http3) {
+    hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+  }
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
@@ -928,7 +950,15 @@ void ConfigHelper::configureUpstreamTls(
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
-  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+
+  if (value == "true") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(true);
+  } else if (value == "false") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
+  } else {
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
+  }
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,

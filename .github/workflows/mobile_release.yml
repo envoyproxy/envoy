@@ -15,7 +15,7 @@ jobs:
               || !contains(github.actor, '[bot]'))
       }}
     name: android_release_artifacts
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}

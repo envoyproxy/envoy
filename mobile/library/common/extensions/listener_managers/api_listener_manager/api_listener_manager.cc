@@ -12,8 +12,10 @@ namespace Envoy {
 namespace Server {
 
 ApiListenerManagerImpl::ApiListenerManagerImpl(Instance& server) : server_(server) {}
-bool ApiListenerManagerImpl::addOrUpdateListener(
-    const envoy::config::listener::v3::Listener& config, const std::string&, bool added_via_api) {
+
+absl::StatusOr<bool>
+ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                            const std::string&, bool added_via_api) {
   ENVOY_LOG(debug, "Creating API listener manager");
   std::string name;
   if (!config.name().empty()) {
@@ -29,7 +31,7 @@ bool ApiListenerManagerImpl::addOrUpdateListener(
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
     if (config.has_internal_listener()) {
-      throw EnvoyException(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "error adding listener named '{}': api_listener and internal_listener cannot be both set",
           name));
     }

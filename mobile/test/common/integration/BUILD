@@ -73,9 +73,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_integration_test",
-    srcs = [
-        "sds_integration_test.cc",
-    ],
+    # The test relies on the Google gRPC library.
+    srcs = envoy_select_google_grpc(
+        ["sds_integration_test.cc"],
+        "@envoy",
+    ),
     data = [
         "@envoy//test/config/integration/certs",
     ],

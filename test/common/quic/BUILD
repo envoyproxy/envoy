@@ -1,8 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_select_enable_http_datagrams",
 )
 
@@ -378,4 +380,38 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ]),
+)
+
+envoy_proto_library(
+    name = "envoy_quic_h3_fuzz_proto",
+    srcs = ["envoy_quic_h3_fuzz.proto"],
+    deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_test_library(
+    name = "envoy_quic_h3_fuzz_helper_lib",
+    srcs = ["envoy_quic_h3_fuzz_helper.cc"],
+    hdrs = ["envoy_quic_h3_fuzz_helper.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_h3_fuzz_proto_cc_proto",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "envoy_quic_h3_fuzz_test",
+    srcs = ["envoy_quic_h3_fuzz_test.cc"],
+    corpus = "envoy_quic_h3_fuzz_test_corpus",
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_h3_fuzz_helper_lib",
+        ":test_proof_source_lib",
+        ":test_utils_lib",
+        "//source/common/quic:envoy_quic_alarm_factory_lib",
+        "//source/common/quic:envoy_quic_connection_helper_lib",
+        "//source/common/quic:envoy_quic_dispatcher_lib",
+        "//source/common/quic:server_codec_lib",
+        "//test/mocks/http:http_mocks",
+    ],
 )

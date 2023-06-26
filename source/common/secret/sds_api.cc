@@ -73,10 +73,10 @@ void SdsApi::onWatchUpdate() {
     }
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG_MISC(warn, fmt::format("Failed to reload certificates: {}", e.what()));
     sds_api_stats_.key_rotation_failed_.inc();
-  }
+  });
 }
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

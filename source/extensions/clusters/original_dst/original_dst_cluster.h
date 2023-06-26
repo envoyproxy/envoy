@@ -49,6 +49,8 @@ public:
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
                      ClusterFactoryContext& context);
 
+  ~OriginalDstCluster() override { cleanup_timer_->disableTimer(); }
+
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
@@ -104,8 +106,9 @@ private:
     LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LoadBalancer>(cluster_);
+    }
 
     const std::shared_ptr<OriginalDstCluster> cluster_;
   };

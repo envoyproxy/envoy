@@ -87,7 +87,10 @@ public:
 
   const EntryMap& values() const;
 
-  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string = "");
+  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string,
+                           const char*& error_message);
+  static void addEntry(Snapshot::EntryMap& values, const std::string& key,
+                       const ProtobufWkt::Value& value, absl::string_view raw_string = "");
 
 private:
   const std::vector<OverrideLayerConstPtr> layers_;
