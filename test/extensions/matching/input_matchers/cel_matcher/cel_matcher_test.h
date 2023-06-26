@@ -607,6 +607,64 @@ inline constexpr absl::string_view UpstreamClusterMetadataCelString = R"pb(
   }
 )pb";
 
+// xds.route_metadata.filter_metadata['cel_matcher']['service_name'] == 'test_service'
+inline constexpr absl::string_view UpstreamRouteMetadataCelString = R"pb(
+  expr {
+    id: 8
+    call_expr {
+      function: "_==_"
+      args {
+        id: 6
+        call_expr {
+          function: "_[_]"
+          args {
+            id: 4
+            call_expr {
+              function: "_[_]"
+              args {
+                id: 3
+                select_expr {
+                  operand {
+                    id: 2
+                    select_expr {
+                      operand {
+                        id: 1
+                        ident_expr {
+                          name: "xds"
+                        }
+                      }
+                      field: "route_metadata"
+                    }
+                  }
+                  field: "filter_metadata"
+                }
+              }
+              args {
+                id: 5
+                const_expr {
+                  string_value: "%s"
+                }
+              }
+            }
+          }
+          args {
+            id: 7
+            const_expr {
+              string_value: "%s"
+            }
+          }
+        }
+      }
+      args {
+        id: 9
+        const_expr {
+          string_value: "%s"
+        }
+      }
+    }
+  }
+)pb";
+
 } // namespace CelMatcher
 } // namespace InputMatchers
 } // namespace Matching
