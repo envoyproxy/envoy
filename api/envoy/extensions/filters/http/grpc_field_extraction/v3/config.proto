@@ -76,8 +76,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   ],
 //   "name_bar":[
 //      "val_bar"
-//   ],
-//
+//   ]
+// }
 // rpc-field-extraction-output2-bin: {
 //   "name_baz":[
 //      "123"
@@ -85,7 +85,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   "name_baz":[
 //      "456"
 //   ]
-//
+// }
 
 message GrpcFieldExtractionConfig {
   // DescriptorSet is in local data source. It could be either in a local file or embedded in the
