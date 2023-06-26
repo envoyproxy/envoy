@@ -15,8 +15,8 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/hash_policy.h"
-#include "source/common/network/utility.h"
 #include "source/common/http/null_route_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/router.h"
@@ -332,7 +332,7 @@ public:
   void setRouterUpstreamRequest(UpstreamRequestPtr) override {}
 };
 
-// This class interface with Router::UpstreamRequest instance which is intialized
+// This class interface with Router::UpstreamRequest instance which is initialized
 // through the base class HttpUpstream::newStream() method. This class handles both
 // HTTP/1.1 and HTTP/2 upstream requests transparently and delegates the actual work to
 // Router::UpstreamRequest instance.
