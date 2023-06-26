@@ -45,6 +45,19 @@ For example, to build the ``.so`` for a ``foo`` plugin, you might run:
 
    $ bazel run @go_sdk//:bin/go build -- --buildmode=c-shared  -v -o path/to/output/libfoo.so path/to/src/foo
 
+API compatibility
+~~~~~~~~~~~~~~~~~
+
+.. attention::
+  The Go plugin API is not yet stable, you are **strong** recommended to use the same version of Go plugin SDK and Envoy.
+
+When you are using a release version of Envoy, i.e. 1.26.x,
+you should use `github.com/envoyproxy/envoy v1.26.x` in the go.mod file.
+
+When you are not using a release, i.e. the latest main branch of Envoy,
+you could use `go get -u github.com/envoyproxy/envoy@SHA` to get the same version of Go plugin SDK,
+the `SHA` is the latest commit sha.
+
 Configuration
 -------------
 
