@@ -57,7 +57,7 @@ fi
 echo "testing bad config output"
 BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml" 2>&1) ||
   echo "${BAD_CONFIG_OUTPUT:-no-output}"
-if [[ "${BAD_CONFIG_OUTPUT}" != *"Protobuf message (type envoy.config.route.v3.RouteConfiguration reason INVALID_ARGUMENT:tests: Cannot find field.) has unknown fields"* ]]; then
+if [[ "${BAD_CONFIG_OUTPUT}" != *"Protobuf message (type envoy.config.route.v3.RouteConfiguration reason INVALID_ARGUMENT: invalid JSON in envoy.config.route.v3.RouteConfiguration, near 2:11 (offset 12):   no  such  field: 'tests') has unknown fields"* ]]; then
   exit 1
 fi
 
