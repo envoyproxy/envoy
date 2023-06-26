@@ -21,6 +21,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",
