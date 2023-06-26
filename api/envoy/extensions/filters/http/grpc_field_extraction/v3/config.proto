@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.grpc_field_extraction.v3;
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
+import "envoy/config/core/v3/base.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_field_extraction.v3";
 option java_outer_classname = "ConfigProto";
@@ -86,17 +87,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 message GrpcFieldExtractionConfig {
-  oneof descriptor_set {
-    option (validate.required) = true;
-
-    // Supplies the filename of
-    // :ref:`the proto descriptor set
-    string proto_descriptor = 1;
-
-    // Supplies the binary content of
-    // :ref:`the proto descriptor set
-    bytes proto_descriptor_bin = 2;
-  }
+  // DescriptorSet is in local data source. It could be either in a local file or embedded in the
+    // inline_bytes.
+  config.core.v3.DataSource descriptor_set = 1 [(validate.rules).message = {required: true}];
 
   // Specify the extraction info.
   // The key is the fully qualified gRPC method name.
@@ -104,7 +97,7 @@ message GrpcFieldExtractionConfig {
   // `/endpoints.examples.bookstore.BookStore/GetShelf`
   //
   // The value is the field extractions for individual gRPC method.
-  map<string, FieldExtractions> extractions_by_method = 4;
+  map<string, FieldExtractions> extractions_by_method = 2;
 }
 
 // This message can be used to support per route config approach later even
