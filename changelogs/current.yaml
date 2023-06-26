@@ -222,6 +222,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
+- area: grpc_stats
+  change: |
+    removed runtime key ``envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`` and legacy code paths.
 
 new_features:
 - area: access_log
