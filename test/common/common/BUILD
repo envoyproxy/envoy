@@ -212,6 +212,8 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
