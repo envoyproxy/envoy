@@ -645,18 +645,28 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       onReadCompleted();
       read_param_ = absl::nullopt;
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
-    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
+    } else if (read_error_.has_value() && read_error_ < 0) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{read_buf_, read_error_.value()};
       read_param_ = param;
       onReadCompleted();
       read_param_ = absl::nullopt;
-      // Needn't to submit new read request if remote is closed.
-      if (read_error_ == 0) {
-        read_error_.reset();
-        return;
-      }
       read_error_.reset();
+    }
+    // Handle remote closed at last.
+    // Depending on the event listened to, calling different event back to handle remote closed.
+    // * events & (Read | Closed): Callback Closed,
+    // * events & (Read)         : Callback Read,
+    // * events & (Closed)       : Callback Closed,
+    // * ...else                 : Callback Write.
+    if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
+      ENVOY_LOG(trace, "read remote closed from socket, fd = {}", fd_);
+      ReadParam param{read_buf_, read_error_.value()};
+      read_param_ = param;
+      onReadCompleted();
+      read_param_ = absl::nullopt;
+      read_error_.reset();
+      return;
     }
   }
 
