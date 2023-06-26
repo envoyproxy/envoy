@@ -108,6 +108,10 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	_, found := header.Get("x-set-metadata")
 	if found {
 		md := f.callbacks.StreamInfo().DynamicMetadata()
+		empty_metadata := md.Get("filter.go")
+		if len(empty_metadata) != 0 {
+			return f.fail("Metadata should be empty")
+		}
 		md.Set("filter.go", "foo", "bar")
 		metadata := md.Get("filter.go")
 		if len(metadata) == 0 {

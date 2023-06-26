@@ -241,9 +241,14 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
-func (c *httpCApiImpl) HttpGetDynamicMetadata(r *httpRequest, filterName string) map[string]interface{} {
+func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
+	r := (*httpRequest)(rr)
 	var buf []byte
 	r.sema.Add(1)
+	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// since there might be multiple concurrency goroutines invoking this API on the Go side.
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
 	if res == C.CAPIYield {
 		atomic.AddInt32(&r.waitingOnEnvoy, 1)
@@ -298,6 +303,10 @@ func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, va
 func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
 	var value string
 	r.sema.Add(1)
+	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// since there might be multiple concurrency goroutines invoking this API on the Go side.
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
 	if res == C.CAPIYield {
 		atomic.AddInt32(&r.waitingOnEnvoy, 1)

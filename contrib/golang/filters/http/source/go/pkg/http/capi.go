@@ -24,7 +24,6 @@ import (
 )
 
 type HttpCAPI interface {
-	//TODO: we should switch all the request types to be using `r *httpRequest` for consistency.
 	HttpContinue(r unsafe.Pointer, status uint64)
 	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 
@@ -47,7 +46,7 @@ type HttpCAPI interface {
 	HttpGetStringValue(r *httpRequest, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
-	HttpGetDynamicMetadata(r *httpRequest, filterName string) map[string]interface{}
+	HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
 	HttpLog(level api.LogType, message string)
