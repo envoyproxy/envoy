@@ -287,3 +287,121 @@ func (e EnvoyRequestPhase) String() string {
 	}
 	return "unknown phase"
 }
+
+// Status codes returned by filters that can cause future filters to not get iterated to.
+type FilterStatus int
+
+const (
+	// Continue to further filters.
+	NetworkFilterContinue FilterStatus = 0
+	// Stop executing further filters.
+	NetworkFilterStopIteration FilterStatus = 1
+)
+
+func (s FilterStatus) String() string {
+	switch s {
+	case NetworkFilterContinue:
+		return "Continue"
+	case NetworkFilterStopIteration:
+		return "StopIteration"
+	}
+	return "unknown"
+}
+
+// Events that occur on a connection.
+type ConnectionEvent int
+
+const (
+	RemoteClose      ConnectionEvent = 0
+	LocalClose       ConnectionEvent = 1
+	Connected        ConnectionEvent = 2
+	ConnectedZeroRtt ConnectionEvent = 3
+)
+
+func (e ConnectionEvent) String() string {
+	switch e {
+	case RemoteClose:
+		return "RemoteClose"
+	case LocalClose:
+		return "LocalClose"
+	case Connected:
+		return "Connected"
+	case ConnectedZeroRtt:
+		return "ConnectedZeroRtt"
+	}
+	return "unknown"
+}
+
+// Type of connection close to perform.
+type ConnectionCloseType int
+
+const (
+	// Flush pending write data before raising ConnectionEvent::LocalClose
+	FlushWrite ConnectionCloseType = 0
+	// Do not flush any pending data. Write the pending data to buffer and then immediately
+	// raise ConnectionEvent::LocalClose
+	NoFlush ConnectionCloseType = 1
+	// Flush pending write data and delay raising a ConnectionEvent::LocalClose
+	// until the delayed_close_timeout expires
+	FlushWriteAndDelay ConnectionCloseType = 2
+	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+	Abort ConnectionCloseType = 3
+)
+
+func (t ConnectionCloseType) String() string {
+	switch t {
+	case FlushWrite:
+		return "FlushWrite"
+	case NoFlush:
+		return "NoFlush"
+	case FlushWriteAndDelay:
+		return "FlushWriteAndDelay"
+	case Abort:
+		return "Abort"
+	}
+	return "unknown"
+}
+
+type PoolFailureReason int
+
+const (
+	// A resource overflowed and policy prevented a new connection from being created.
+	Overflow PoolFailureReason = 0
+	// A local connection failure took place while creating a new connection.
+	LocalConnectionFailure PoolFailureReason = 1
+	// A remote connection failure took place while creating a new connection.
+	RemoteConnectionFailure PoolFailureReason = 2
+	// A timeout occurred while creating a new connection.
+	Timeout PoolFailureReason = 3
+)
+
+func (r PoolFailureReason) String() string {
+	switch r {
+	case Overflow:
+		return "Overflow"
+	case LocalConnectionFailure:
+		return "LocalConnectionFailure"
+	case RemoteConnectionFailure:
+		return "RemoteConnectionFailure"
+	case Timeout:
+		return "Timeout"
+	}
+	return "unknown"
+}
+
+type ConnectionInfoType int
+
+const (
+	ConnectionInfoLocalAddr  ConnectionInfoType = 0
+	ConnectionInfoRemoteAddr ConnectionInfoType = 1
+)
+
+func (t ConnectionInfoType) String() string {
+	switch t {
+	case ConnectionInfoLocalAddr:
+		return "ConnectionInfoLocalAddr"
+	case ConnectionInfoRemoteAddr:
+		return "ConnectionInfoRemoteAddr"
+	}
+	return "unknown"
+}

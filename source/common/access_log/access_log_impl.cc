@@ -53,8 +53,10 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                   ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                   Server::Configuration::CommonFactoryContext& context) {
+  Runtime::Loader& runtime = context.runtime();
+  Random::RandomGenerator& random = context.api().randomGenerator();
+  ProtobufMessage::ValidationVisitor& validation_visitor = context.messageValidationVisitor();
   switch (config.filter_specifier_case()) {
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:
     return FilterPtr{new StatusCodeFilter(config.status_code_filter(), runtime)};
@@ -67,9 +69,9 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kRuntimeFilter:
     return FilterPtr{new RuntimeFilter(config.runtime_filter(), runtime, random)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kAndFilter:
-    return FilterPtr{new AndFilter(config.and_filter(), runtime, random, validation_visitor)};
+    return FilterPtr{new AndFilter(config.and_filter(), context)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kOrFilter:
-    return FilterPtr{new OrFilter(config.or_filter(), runtime, random, validation_visitor)};
+    return FilterPtr{new OrFilter(config.or_filter(), context)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kHeaderFilter:
     return FilterPtr{new HeaderFilter(config.header_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kResponseFlagFilter:
@@ -87,7 +89,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     {
       auto& factory =
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
-      return factory.createFilter(config.extension_filter(), runtime, random);
+      return factory.createFilter(config.extension_filter(), context);
     }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
@@ -158,25 +160,22 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+    Server::Configuration::CommonFactoryContext& context) {
   for (const auto& config : configs) {
-    auto filter = FilterFactory::fromProto(config, runtime, random, validation_visitor);
+    auto filter = FilterFactory::fromProto(config, context);
     if (filter != nullptr) {
       filters_.emplace_back(std::move(filter));
     }
   }
 }
 
-OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random,
-                   ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
+OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
+                   Server::Configuration::CommonFactoryContext& context)
+    : OperatorFilter(config.filters(), context) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
+                     Server::Configuration::CommonFactoryContext& context)
+    : OperatorFilter(config.filters(), context) {}
 
 bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
@@ -339,9 +338,7 @@ InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::Acce
                                         FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
-    filter = FilterFactory::fromProto(config.filter(), context.runtime(),
-                                      context.api().randomGenerator(),
-                                      context.messageValidationVisitor());
+    filter = FilterFactory::fromProto(config.filter(), context);
   }
 
   auto& factory =
