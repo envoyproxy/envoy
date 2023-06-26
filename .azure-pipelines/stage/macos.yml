@@ -42,8 +42,7 @@ jobs:
 - job: tested
   displayName: Complete
   dependsOn: ["test"]
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: x64-nano
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
