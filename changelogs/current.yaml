@@ -17,6 +17,15 @@ behavior_changes:
     behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
 - area: ext_proc
   change: |
+    The proto field :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` type is string.
+    This make it unable to support enconding non-utf8 characters in the HeaderValue message.
+    To support sending header value with non-utf8 characters, a new proto field is added in the HeaderValue message:
+    :ref:`value_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_bytes>`.
+    The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending
+    and receiving messages from the ext_proc server. This behavioral change can be temporarily
+    reverted by setting the runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
+- area: ext_proc
+  change: |
     Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
     reverted by setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
 
@@ -173,6 +182,10 @@ bug_fixes:
     Fixes a bug where route properties such as key_formatter,
     prefix and remove_prefix do not take effect when configured for :ref:`catch_all_route
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`.
+- area: original_dst
+  change: |
+    Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
+    can occur if the cluster is removed while the timer is armed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -211,6 +224,9 @@ removed_config_or_runtime:
     removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
+- area: golang
+  change: |
+    added new :ref:`l4 golang network filter <config_network_filters_golang>`.
 - area: access_log
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
@@ -231,6 +247,10 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: http
+  change: |
+    added support for CONNECT-UDP (RFC 9298). Can be disabled by setting runtime feature
+    ``envoy.reloadable_features.enable_connect_udp_support`` to false.
 - area: listeners
   change: |
     added :ref:`max_connections_to_accept_per_socket_event

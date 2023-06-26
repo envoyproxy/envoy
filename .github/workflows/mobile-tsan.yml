@@ -20,7 +20,7 @@ jobs:
     if: ${{ needs.env.outputs.mobile_tsan == 'true' }}
     needs: env
     name: tsan
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
