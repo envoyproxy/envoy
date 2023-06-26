@@ -441,6 +441,10 @@ new_features:
 - area: lds
   change: |
     pause SRDS when LDS is updated.
+- area: http
+  change: |
+    added :ref:`outbound_control_frames_active <statistics>` and :ref:`outbound_frames_active <statistics>`
+    statistic.
 
 deprecated:
 - area: access_log
