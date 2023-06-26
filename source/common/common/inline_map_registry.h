@@ -277,16 +277,19 @@ public:
   template <class ArgK> absl::optional<InlineKey> getInlineKey(const ArgK& key) const {
     ASSERT(finalized_, "Cannot get inline handle before finalized()");
 
-    if (auto it = registration_map_.find(key); it != registration_map_.end()) {
-      // It is safe to reference the key here because the key is stored in the node hash set.
-#ifndef NDEBUG
-      return InlineKey{it->second, registry_id_};
-#else
-      return InlineKey{it->second};
-#endif
+    uint64_t inline_id = 0;
+
+    if (auto it = registration_map_.find(key); it == registration_map_.end()) {
+      return absl::nullopt;
+    } else {
+      inline_id = it->second;
     }
 
-    return absl::nullopt;
+#ifndef NDEBUG
+    return InlineKey{inline_id, registry_id_};
+#else
+    return InlineKey{it->second};
+#endif
   }
 
   /**
