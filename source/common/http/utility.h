@@ -663,7 +663,7 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
       [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
         const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
         if (typed_cfg == nullptr) {
-          ENVOY_LOG(error, "Failed to retrieve the correct type of route specific config");
+          ENVOY_LOG_MISC(error, "Failed to retrieve the correct type of route specific config");
           return;
         }
         if (!merged) {
