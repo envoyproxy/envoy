@@ -6,8 +6,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
-
 namespace Envoy {
 namespace Config {
 
