@@ -206,6 +206,7 @@ protected:
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
+  // Router::UpstreamRequest instances which are owned by this HttpUpstream.
   std::list<UpstreamRequestPtr> upstream_requests_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
   HttpConnPool& parent_;
@@ -331,6 +332,10 @@ public:
   void setRouterUpstreamRequest(UpstreamRequestPtr) override {}
 };
 
+// This class interface with Router::UpstreamRequest instance which is intialized
+// through the base class HttpUpstream::newStream() method. This class handles both
+// HTTP/1.1 and HTTP/2 upstream requests transparently and delegates the actual work to
+// Router::UpstreamRequest instance.
 class CombinedUpstream : public HttpUpstream {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
