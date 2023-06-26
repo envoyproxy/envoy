@@ -288,7 +288,7 @@ public:
 #ifndef NDEBUG
     return InlineKey{inline_id, registry_id_};
 #else
-    return InlineKey{it->second};
+    return InlineKey{inline_id};
 #endif
   }
 
