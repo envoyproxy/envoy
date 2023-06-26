@@ -173,6 +173,9 @@ public:
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
   uint64_t streamId() const override { return stream_id_; }
+  Server::Configuration::FactoryContext& serverFactoryContext() const override {
+    return server_factory_context_;
+  }
 
 private:
   const bool use_post_;
@@ -184,6 +187,7 @@ private:
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   uint64_t stream_id_;
+  Server::Configuration::FactoryContext& server_factory_context_;
 };
 
 /**

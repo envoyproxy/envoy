@@ -55,6 +55,7 @@ public:
   virtual const Envoy::Router::FilterConfig& routerFilterConfig() const PURE;
   // Returns the stream Id.
   virtual uint64_t streamId() const PURE;
+  virtual Server::Configuration::FactoryContext& serverFactoryContext() const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

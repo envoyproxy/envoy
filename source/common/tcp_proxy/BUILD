@@ -23,6 +23,7 @@ envoy_cc_library(
         "//envoy/tcp:upstream_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/http:async_client_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:hash_policy_lib",
         "//source/common/http:header_map_lib",

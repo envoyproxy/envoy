@@ -37,7 +37,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/http/null_route_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -71,15 +71,15 @@ public:
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                                const AsyncClient::RequestOptions& options) override;
+  Singleton::Manager& singleton_manager_;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Upstream::ClusterInfoConstSharedPtr cluster_;
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
-  Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
-  Singleton::Manager& singleton_manager_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestSharedImpl;
@@ -496,7 +496,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
-  std::shared_ptr<RouteImpl> route_;
+  std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
