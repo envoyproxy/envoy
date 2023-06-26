@@ -32,7 +32,7 @@ private:
   // The value of the map, holds the resource and the removal callbacks.
   struct ResourceData {
     envoy::config::endpoint::v3::ClusterLoadAssignment resource_;
-    std::list<EdsResourceRemovalCallback*> removal_cbs_;
+    std::vector<EdsResourceRemovalCallback*> removal_cbs_;
 
     ResourceData(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource)
         : resource_(resource) {}

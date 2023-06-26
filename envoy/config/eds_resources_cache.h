@@ -21,7 +21,8 @@ public:
 // Represents an xDS resources cache for EDS resources, and currently supports
 // a single config-source (ADS). The motivation is that clusters that are
 // updated (not added) during a CDS response will be able to use the current EDS
-// configuration, thus avoiding an additional EDS response.
+// configuration, thus avoiding the need of the xDS server to send an additional
+// EDS response that is identical to what was already sent.
 // However, using the cached EDS config is not always desired, for example when
 // the cluster changes from non-TLS to TLS (see discussion in
 // https://github.com/envoyproxy/envoy/issues/5168). Thus, this cache allows
@@ -67,8 +68,10 @@ public:
    * for that resource will be invoked.
    * @param resource_name the name of the resource to fetch.
    * @param removal_cb an optional callback that will be invoked if the resource is removed
-   *        in the future. Note that updating the resource (setResource) will also
-   *        remove the callback.
+   *        in the future. Note that updating the resource (`setResource()`) will also
+   *        remove the callback. The caller of this function can also call
+   *        `removeCallback()` to explicitly remove the callback. The callback
+   *        is owned by the caller as it is part of the EDS subscription.
    * @return A reference to the cluster load assignment resource, or nullopt if the
    *         resource doesn't exist.
    */

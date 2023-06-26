@@ -49,7 +49,9 @@ void EdsResourcesCacheImpl::removeCallback(absl::string_view resource_name,
       resource_it != resources_map_.end()) {
     ENVOY_LOG_MISC(trace, "Removing callback for resource {} from the xDS resource cache",
                    resource_name);
-    resource_it->second.removal_cbs_.remove(removal_cb);
+    resource_it->second.removal_cbs_.erase(std::remove(resource_it->second.removal_cbs_.begin(),
+                                                       resource_it->second.removal_cbs_.end(),
+                                                       removal_cb));
   }
 }
 
