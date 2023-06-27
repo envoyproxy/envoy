@@ -236,14 +236,10 @@ public:
 };
 
 // A struct representing a Redis transaction.
+
 struct Transaction {
   Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
-  ~Transaction() {
-    if (connection_established_) {
-      client_->close();
-      connection_established_ = false;
-    }
-  }
+  ~Transaction() { close(); }
 
   void start() { active_ = true; }
 
@@ -251,7 +247,9 @@ struct Transaction {
     active_ = false;
     key_.clear();
     if (connection_established_) {
-      client_->close();
+      for (auto& client : clients_) {
+        client->close();
+      }
       connection_established_ = false;
     }
     should_close_ = false;
@@ -260,9 +258,12 @@ struct Transaction {
   bool active_{false};
   bool connection_established_{false};
   bool should_close_{false};
-  std::string key_;
-  ClientPtr client_;
+
+  std::string key_; /* The key which represents the transaction hash slot */
+  std::vector<ClientPtr>
+      clients_; /* One client for the main connection, and one for each mirror connection */
   Network::ConnectionCallbacks* connection_cb_;
+  uint32_t current_client_idx{0};
 };
 
 class NoOpTransaction : public Transaction {
