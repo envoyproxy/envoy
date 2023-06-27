@@ -2,6 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <list>
+
+#include "envoy/common/optref.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
@@ -13,10 +16,10 @@
 namespace Envoy {
 
 /**
- * This class could be used as an alternative of normal hash map to store the key/value pairs.
- * But by this class, you can register some frequently used keys as inline keys and get the
- * handle for the key. Then you can use the handle to access the key/value pair in the map without
- * even one time hash searching.
+ * This library provide inline map templates which could be used as an alternative of normal hash
+ * map to store the key/value pairs. But by these templates, you can register some frequently used
+ * keys as inline keys and get the handle for the key. Then you can use the handle to access the
+ * key/value pair in the map without even one time hash searching.
  *
  * This is useful when some keys are frequently used and the keys are known at compile time or
  * bootstrap time. You can get superior performance by using the inline handle. For example, the
@@ -31,7 +34,9 @@ namespace Envoy {
  * These is usage example:
  *
  *   // Define registry to store the inline keys. The registry should have lifetime that no shorter
- *   // than all inline maps created by the registry.
+ *   // than all inline maps created by the registry. You can create static and global registry by
+ *   // ``MUTABLE_CONSTRUCT_ON_FIRST_USE`` for cross-modules usage, but it is not required. A local
+ *   // registry is also fine if the inline map is only used in the local scope.
  *   InlineMapRegistry registry;
  *
  *   // Register the inline key. We should never do this after bootstrapping. Typically, we can
@@ -48,6 +53,11 @@ namespace Envoy {
  *   // Get value by inline handle.
  *   inline_map->insert(inline_handle, std::make_unique<std::string>("value"));
  *   EXPECT_EQ(*inline_map->lookup(inline_handle), "value");
+ */
+
+/**
+ * Inline map registry to store the inline keys and mapping of the inline keys to the inline
+ * id.
  */
 template <class Key> class InlineMapRegistry {
 public:
@@ -85,169 +95,15 @@ public:
   };
 
   using RegistrationMap = absl::flat_hash_map<Key, uint64_t>;
-  using RegistrationSet = std::vector<Key>;
-
-  template <class T> class InlineMap : public InlineStorage {
-  public:
-    using TPtr = std::unique_ptr<T>;
-    using UnderlayHashMap = absl::flat_hash_map<Key, TPtr>;
-
-    // Get the entry for the given key. If the key is not found, return nullptr.
-    template <class ArgK> const T* lookup(const ArgK& key) const { return lookupImpl(key); }
-    template <class ArgK> T* lookup(const ArgK& key) { return lookupImpl(key); }
-
-    // Get the entry for the given inline key. If the handle is not valid, return nullptr.
-    const T* lookup(InlineKey key) const { return lookupImpl(key); }
-    T* lookup(InlineKey key) { return lookupImpl(key); }
-
-    // Set the entry for the given key. If the key is already present, overwrite it.
-    template <class ArgK> void insert(const ArgK& key, TPtr value) {
-      if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
-        resetInlineMapEntry(*entry_id, std::move(value));
-      } else {
-        dynamic_entries_[key] = std::move(value);
-      }
-    }
-
-    // Set the entry for the given handle. If the handle is not valid, do nothing.
-    void insert(InlineKey key, TPtr value) {
-#ifndef NDEBUG
-      ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
-#endif
-      resetInlineMapEntry(key.inlineId(), std::move(value));
-    }
-
-    // Remove the entry for the given key. If the key is not found, do nothing.
-    template <class ArgK> void remove(const ArgK& key) {
-      if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
-        resetInlineMapEntry(*entry_id);
-      } else {
-        dynamic_entries_.erase(key);
-      }
-    }
-
-    // Remove the entry for the given handle. If the handle is not valid, do nothing.
-    void remove(InlineKey key) {
-#ifndef NDEBUG
-      ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
-#endif
-      resetInlineMapEntry(key.inlineId());
-    }
-
-    void iterate(std::function<bool(const Key&, T*)> callback) const {
-      for (const auto& entry : dynamic_entries_) {
-        if (!callback(entry.first, entry.second.get())) {
-          return;
-        }
-      }
-
-      for (const auto& id : registry_.registrationMap()) {
-        ASSERT(id.second < registry_.registrationNum());
-
-        auto entry = inline_entries_[id.second];
-        if (entry == nullptr) {
-          continue;
-        }
-
-        if (!callback(id.first, entry)) {
-          return;
-        }
-      }
-    }
-
-    uint64_t size() const { return dynamic_entries_.size() + inline_entries_size_; }
-
-    bool empty() const { return size() == 0; }
-
-    ~InlineMap() {
-      for (uint64_t i = 0; i < registry_.registrationNum(); ++i) {
-        auto entry = inline_entries_[i];
-        if (entry != nullptr) {
-          delete entry;
-        }
-      }
-      memset(inline_entries_, 0, registry_.registrationNum() * sizeof(TPtr));
-    }
-
-  private:
-    friend class InlineMapRegistry;
-
-    static std::unique_ptr<InlineMap> create(InlineMapRegistry& registry) {
-      return std::unique_ptr<InlineMap<T>>(new (
-          (registry.registrationMap().size() * sizeof(InlineMap<T>::TPtr))) InlineMap(registry));
-    }
-
-    InlineMap(InlineMapRegistry& registry) : registry_(registry) {
-      // Initialize the inline entries to nullptr.
-      memset(inline_entries_, 0, registry_.registrationNum() * sizeof(TPtr));
-    }
-
-    template <class ArgK> T* lookupImpl(const ArgK& key) const {
-      // Because the normal string view key is used here, try the normal map entry first.
-      if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
-        return it->second.get();
-      }
-
-      if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
-        return inline_entries_[*entry_id];
-      }
-
-      return nullptr;
-    }
-
-    T* lookupImpl(InlineKey key) const {
-#ifndef NDEBUG
-      ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
-#endif
-      return inline_entries_[key.inlineId()];
-    }
-
-    void resetInlineMapEntry(uint64_t inline_entry_id, TPtr new_entry = nullptr) {
-      ASSERT(inline_entry_id < registry_.registrationNum());
-      if (auto entry = inline_entries_[inline_entry_id]; entry != nullptr) {
-        // Remove and delete the old valid entry.
-        ASSERT(inline_entries_size_ > 0);
-        --inline_entries_size_;
-        delete entry;
-      }
-
-      if (new_entry != nullptr) {
-        // Append the new valid entry.
-        ++inline_entries_size_;
-      }
-
-      inline_entries_[inline_entry_id] = new_entry.release();
-    }
-
-    template <class ArgK> absl::optional<uint64_t> inlineLookup(const ArgK& key) const {
-      const auto& map_ref = registry_.registrationMap();
-      if (auto iter = map_ref.find(key); iter != map_ref.end()) {
-        return iter->second;
-      }
-      return absl::nullopt;
-    }
-
-    // This is the reference of the registry that the inline map created by. This is used to
-    // validate the inline handle validity and get the inline key set.
-    const InlineMapRegistry& registry_;
-
-    // This is the underlay hash map for the normal entries.
-    UnderlayHashMap dynamic_entries_;
-
-    uint64_t inline_entries_size_{};
-    // This should be the last member of the class and no member should be added after this.
-    T* inline_entries_[];
-  };
-
-  template <class T> using InlineMapPtr = std::unique_ptr<InlineMap<T>>;
+  using RegistrationVector = std::vector<Key>;
 
   InlineMapRegistry() = default;
 
   /**
-   * Register a custom inline key. May only be called before finalized().
+   * Register a custom inline key. May only be called before finalize().
    */
   template <class ArgK> InlineKey registerInlineKey(const ArgK& key) {
-    RELEASE_ASSERT(!finalized_, "Cannot register inline key after finalized()");
+    RELEASE_ASSERT(!finalized_, "Cannot register inline key after finalize()");
 
     uint64_t inline_id = 0;
 
@@ -257,7 +113,7 @@ public:
     } else {
       // If the key is not registered yet, then create a new inline key.
       inline_id = registration_map_.size();
-      registration_set_.push_back(Key(key));
+      registration_vector_.push_back(Key(key));
       registration_map_[key] = inline_id;
     }
 
@@ -269,13 +125,13 @@ public:
   }
 
   /**
-   * Fetch the inline handle for the given key. May only be called after finalized(). This should
+   * Fetch the inline handle for the given key. May only be called after finalize(). This should
    * be used to get the inline handle for the key registered by registerInlineKey(). This function
    * could used to determine if the key is registered or not at runtime or xDS config loading time
    * and decide if the key should be used as inline key or normal key.
    */
   template <class ArgK> absl::optional<InlineKey> getInlineKey(const ArgK& key) const {
-    ASSERT(finalized_, "Cannot get inline handle before finalized()");
+    ASSERT(finalized_, "Cannot get inline handle before finalize()");
 
     uint64_t inline_id = 0;
 
@@ -294,27 +150,27 @@ public:
 
   /**
    * Get the registration map that contains all registered inline keys. May only be called after
-   * finalized().
+   * finalize().
    */
   const RegistrationMap& registrationMap() const {
-    ASSERT(finalized_, "Cannot fetch registration map before finalized()");
+    ASSERT(finalized_, "Cannot fetch registration map before finalize()");
     return registration_map_;
   }
 
   /**
-   * Get the registration set that contains all registered inline keys. May only be called after
-   * finalized().
+   * Get the registration vector that contains all registered inline keys. May only be called after
+   * finalize().
    */
-  const RegistrationSet& registrationSet() const {
-    ASSERT(finalized_, "Cannot fetch registration set before finalized()");
-    return registration_set_;
+  const RegistrationVector& registrationVector() const {
+    ASSERT(finalized_, "Cannot fetch registration set before finalize()");
+    return registration_vector_;
   }
 
   /**
-   * Get the number of the registrations. May only be called after finalized().
+   * Get the number of the registrations. May only be called after finalize().
    */
   uint64_t registrationNum() const {
-    ASSERT(finalized_, "Cannot fetch registration map before finalized()");
+    ASSERT(finalized_, "Cannot fetch registration map before finalize()");
     return registration_map_.size();
   }
 
@@ -322,15 +178,6 @@ public:
   // all map created by the process have the same variable size and custom registrations. This
   // function could be called multiple times safely and only the first call will have effect.
   void finalize() { finalized_ = true; }
-
-  template <class T> InlineMapPtr<T> createInlineMap() {
-    ASSERT(finalized_, "Cannot create inline map before finalized()");
-
-    // Call finalize() anyway to make sure that the registry is finalized and no any new inline
-    // keys could be registered.
-    finalize();
-    return InlineMap<T>::create(*this);
-  }
 
 #ifndef NDEBUG
 public:
@@ -349,75 +196,244 @@ private:
 
 private:
   bool finalized_{};
-  RegistrationSet registration_set_;
+  RegistrationVector registration_vector_;
   RegistrationMap registration_map_;
 };
 
 /**
- * Helper class to get inline map registry singleton based on the scope. If cross-modules inline map
- * registry is necessary, this class should be used.
+ * This is the inline map that could be used as an alternative of normal hash map to store the
+ * key/value pairs.
  */
-class InlineMapRegistryHelper {
+template <class Key, class Value> class InlineMap : public InlineStorage {
 public:
-  using InlineKey = InlineMapRegistry<std::string>::InlineKey;
-  using ManagedRegistries = absl::flat_hash_map<std::string, InlineMapRegistry<std::string>*>;
+  using TypedInlineMapRegistry = InlineMapRegistry<Key>;
+  using InlineKey = typename TypedInlineMapRegistry::InlineKey;
 
-  /**
-   * Get the inline map registry singleton based on the scope.
-   */
-  template <class Scope>
-  static InlineMapRegistry<std::string>::InlineKey registerInlinKey(absl::string_view key) {
-    return mutableRegistry<Scope>().registerInlineKey(key);
+  using UnderlayHashMap = absl::flat_hash_map<Key, Value>;
+  struct InlineEntry {
+    InlineEntry(Value&& value) : value_(std::move(value)) {}
+    InlineEntry(const Value& value) : value_(value) {}
+
+    Value value_;
+    typename std::list<InlineEntry>::iterator entry_;
+  };
+  using UnderlayInlineEntryStorage = std::list<InlineEntry>;
+
+  // Get the entry for the given key. If the key is not found, return nullptr.
+  template <class ArgK> OptRef<const Value> lookup(const ArgK& key) const {
+    // Because the normal string view key is used here, try the normal map entry first.
+    if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
+      return it->second;
+    }
+
+    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+      if (auto entry = inline_entries_[*entry_id]; entry != nullptr) {
+        return entry->value_;
+      }
+    }
+
+    return {};
   }
 
-  /**
-   * Get registered inline key by the key name.
-   */
-  template <class Scope>
-  static absl::optional<InlineMapRegistry<std::string>::InlineKey>
-  getInlineKey(absl::string_view key) {
-    return mutableRegistry<Scope>().getInlineKey(key);
+  template <class ArgK> OptRef<Value> lookup(const ArgK& key) {
+    // Because the normal string view key is used here, try the normal map entry first.
+    if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
+      return it->second;
+    }
+
+    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+      if (auto entry = inline_entries_[*entry_id]; entry != nullptr) {
+        return entry->value_;
+      }
+    }
+
+    return {};
   }
 
-  /**
-   * Create inline map based on the scope.
-   */
-  template <class Scope, class T>
-  static InlineMapRegistry<std::string>::InlineMapPtr<T> createInlineMap() {
-    return mutableRegistry<Scope>().template createInlineMap<T>();
+  // Get the entry for the given inline key. If the handle is not valid, return nullptr.
+  OptRef<const Value> lookup(InlineKey key) const {
+#ifndef NDEBUG
+    ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
+#endif
+    if (auto entry = inline_entries_[key.inlineId()]; entry != nullptr) {
+      return entry->value_;
+    }
+    return {};
   }
 
-  /**
-   * Get all registries managed by this helper. This this helpful to finalize all registries and
-   * print the debug info of inline map registry.
-   */
-  static const ManagedRegistries& registries() { return mutableRegistries(); }
+  OptRef<Value> lookup(InlineKey key) {
+#ifndef NDEBUG
+    ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
+#endif
+    if (auto entry = inline_entries_[key.inlineId()]; entry != nullptr) {
+      return entry->value_;
+    }
+    return {};
+  }
 
-  /**
-   * Finalize all registries managed by this helper. This should be called after all inline keys
-   * are registered.
-   */
-  static void finalize() {
-    for (auto& registry : mutableRegistries()) {
-      registry.second->finalize();
+  // Set the entry for the given key. If the key is already present, insert will fail and
+  // return false. Otherwise, insert will succeed and return true.
+  template <class ArgK, class ArgV> bool insert(ArgK&& key, ArgV&& value) {
+    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+      // This key is registered as inline key and try to insert the value to the inline array.
+
+      // If the entry is already valid, insert will fail and return false.
+      if (inline_entries_[*entry_id] != nullptr) {
+        return false;
+      }
+
+      resetInlineMapEntry(*entry_id, std::move(value));
+      return true;
+    } else {
+      // This key is not registered as inline key and try to insert the value to the normal map.
+      return dynamic_entries_.emplace(std::forward<ArgK>(key), std::forward<ArgV>(value)).second;
     }
   }
 
-private:
-  template <class Scope> static InlineMapRegistry<std::string>& mutableRegistry() {
-    static InlineMapRegistry<std::string>* registry = []() {
-      auto* registry = new InlineMapRegistry<std::string>();
-      auto result = InlineMapRegistryHelper::mutableRegistries().emplace(Scope::name(), registry);
-      RELEASE_ASSERT(result.second,
-                     absl::StrCat("Duplicate inline map registry for scope: ", Scope::name()));
-      return registry;
-    }();
-    return *registry;
+  // Set the entry for the given handle. If the handle is not valid, do nothing.
+  template <class ArgV> void insert(InlineKey key, ArgV&& value) {
+#ifndef NDEBUG
+    ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
+#endif
+    resetInlineMapEntry(key.inlineId(), std::forward<ArgV>(value));
   }
 
-  static ManagedRegistries& mutableRegistries() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(ManagedRegistries);
+  // Remove the entry for the given key. If the key is not found, do nothing.
+  template <class ArgK> void remove(const ArgK& key) {
+    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+      clearInlineMapEntry(*entry_id);
+    } else {
+      dynamic_entries_.erase(key);
+    }
   }
+
+  // Remove the entry for the given handle. If the handle is not valid, do nothing.
+  void remove(InlineKey key) {
+#ifndef NDEBUG
+    ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
+#endif
+    clearInlineMapEntry(key.inlineId());
+  }
+
+  void iterate(std::function<bool(const Key&, const Value&)> callback) const {
+    for (const auto& entry : dynamic_entries_) {
+      if (!callback(entry.first, entry.second)) {
+        return;
+      }
+    }
+
+    for (const auto& id : registry_.registrationMap()) {
+      ASSERT(id.second < registry_.registrationNum());
+
+      auto entry = inline_entries_[id.second];
+      if (entry == nullptr) {
+        continue;
+      }
+
+      if (!callback(id.first, entry->value_)) {
+        return;
+      }
+    }
+  }
+
+  uint64_t size() const { return dynamic_entries_.size() + inline_entries_storage_.size(); }
+
+  bool empty() const { return size() == 0; }
+
+  ~InlineMap() {
+    for (uint64_t i = 0; i < registry_.registrationNum(); ++i) {
+      clearInlineMapEntry(i);
+    }
+    memset(inline_entries_, 0, registry_.registrationNum() * sizeof(Value));
+  }
+
+  // Override operator [] to support the normal key assignment.
+  template <class ArgK> Value& operator[](const ArgK& key) {
+    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+      // This key is registered as inline key and try to insert the value to the inline array.
+      if (inline_entries_[*entry_id] != nullptr) {
+        resetInlineMapEntry(*entry_id, Value());
+      }
+      return inline_entries_[*entry_id]->value_;
+    } else {
+      // This key is not registered as inline key and try to insert the value to the normal map.
+      return dynamic_entries_[key];
+    }
+  }
+
+  // Override operator [] to support the inline key assignment.
+  Value& operator[](InlineKey key) {
+#ifndef NDEBUG
+    ASSERT(key.registryId() == registry_.registryId(), "Invalid inline key");
+#endif
+
+    if (inline_entries_[key.inlineId()] == nullptr) {
+      resetInlineMapEntry(key.inlineId(), Value());
+    }
+    return inline_entries_[key.inlineId()]->value_;
+  }
+
+  static std::unique_ptr<InlineMap> create(TypedInlineMapRegistry& registry) {
+    // Call finalize() anyway to make sure that the registry is finalized and no any new inline
+    // keys could be registered.
+    registry.finalize();
+
+    return std::unique_ptr<InlineMap>(
+        new ((registry.registrationMap().size() * sizeof(InlineEntry*))) InlineMap(registry));
+  }
+
+private:
+  friend class InlineMapRegistry<Key>;
+
+  InlineMap(TypedInlineMapRegistry& registry) : registry_(registry) {
+    // Initialize the inline entries to nullptr.
+    memset(inline_entries_, 0, registry_.registrationNum() * sizeof(InlineEntry*));
+  }
+
+  template <class ArgV> void resetInlineMapEntry(uint64_t inline_entry_id, ArgV&& value) {
+    ASSERT(inline_entry_id < registry_.registrationNum());
+
+    clearInlineMapEntry(inline_entry_id);
+
+    auto iter =
+        inline_entries_storage_.emplace(inline_entries_storage_.end(), std::forward<ArgV>(value));
+
+    iter->entry_ = iter;
+    inline_entries_[inline_entry_id] = &(*iter);
+  }
+
+  void clearInlineMapEntry(uint64_t inline_entry_id) {
+    ASSERT(inline_entry_id < registry_.registrationNum());
+
+    // Destruct the old entry if it is valid.
+    if (auto entry = inline_entries_[inline_entry_id]; entry != nullptr) {
+      inline_entries_storage_.erase(entry->entry_);
+      inline_entries_[inline_entry_id] = nullptr;
+    }
+  }
+
+  template <class ArgK> absl::optional<uint64_t> inlineLookup(const ArgK& key) const {
+    const auto& map_ref = registry_.registrationMap();
+    if (auto iter = map_ref.find(key); iter != map_ref.end()) {
+      return iter->second;
+    }
+    return absl::nullopt;
+  }
+
+  // This is the reference of the registry that the inline map created by. This is used to
+  // validate the inline handle validity and get the inline key set.
+  const TypedInlineMapRegistry& registry_;
+
+  // This is the underlay hash map for the normal entries.
+  UnderlayHashMap dynamic_entries_;
+
+  // This is the inline entries storage. The inline entries are stored in the list.
+  UnderlayInlineEntryStorage inline_entries_storage_;
+
+  // This should be the last member of the class and no member should be added after this.
+  InlineEntry* inline_entries_[];
 };
+
+template <class Key, class Value> using InlineMapPtr = std::unique_ptr<InlineMap<Key, Value>>;
 
 } // namespace Envoy

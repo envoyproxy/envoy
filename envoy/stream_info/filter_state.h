@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 
 #include "source/common/common/fmt.h"
-#include "source/common/common/inline_map_registry.h"
+#include "source/common/common/inline_map_registry_helper.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
 

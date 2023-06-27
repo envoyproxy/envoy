@@ -595,3 +595,13 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "inline_map_registry_helper",
+    hdrs = [
+        "inline_map_registry_helper.h",
+    ],
+    deps = [
+        ":inline_map_registry",
+    ],
+)

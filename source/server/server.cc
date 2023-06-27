@@ -479,7 +479,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   ENVOY_LOG(info, "Inline map registry info:");
   for (const auto& registry : InlineMapRegistryHelper::registries()) {
     ENVOY_LOG(info, "  {}: {}", registry.first,
-              absl::StrJoin(registry.second->registrationSet(), ","));
+              absl::StrJoin(registry.second->registrationVector(), ","));
   };
 
   // Initialize the regex engine and inject to singleton.

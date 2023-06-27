@@ -9,12 +9,11 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   InlineMapRegistry<std::string> registry;
   registry.finalize();
 
-  auto map = registry.createInlineMap<std::string>();
+  auto map = InlineMap<std::string, std::string>::create(registry);
 
   // Insert keys.
   for (size_t i = 0; i < 200; ++i) {
-    map->insert("key_" + std::to_string(i),
-                std::make_unique<std::string>("value_" + std::to_string(i)));
+    map->insert("key_" + std::to_string(i), "value_" + std::to_string(i));
   }
 
   // Lookup keys.
@@ -23,7 +22,7 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   }
 
   // Lookup non-existing keys.
-  EXPECT_EQ(map->lookup("non_existing_key"), nullptr);
+  EXPECT_EQ(map->lookup("non_existing_key"), OptRef<std::string>{});
 
   // Remove keys.
   for (size_t i = 0; i < 200; ++i) {
@@ -43,12 +42,11 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   registry.finalize();
 
-  auto map = registry.createInlineMap<std::string>();
+  auto map = InlineMap<std::string, std::string>::create(registry);
 
   // Insert keys.
   for (size_t i = 0; i < 200; ++i) {
-    map->insert("key_" + std::to_string(i),
-                std::make_unique<std::string>("value_" + std::to_string(i)));
+    map->insert("key_" + std::to_string(i), "value_" + std::to_string(i));
   }
 
   // Lookup keys.
@@ -65,7 +63,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   // Lookup non-existing keys.
-  EXPECT_EQ(map->lookup("non_existing_key"), nullptr);
+  EXPECT_EQ(map->lookup("non_existing_key"), OptRef<std::string>{});
 
   // Remove keys by typed inline handle.
   for (size_t i = 0; i < 10; ++i) {

@@ -34,7 +34,7 @@ envoy_cc_library(
     hdrs = ["filter_state.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//source/common/common:inline_map_registry",
+        "//source/common/common:inline_map_registry_helper",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
     ],

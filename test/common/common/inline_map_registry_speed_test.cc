@@ -27,16 +27,14 @@ static void BM_InlineMapFind(benchmark::State& state) {
   registry_200.finalize();
   registry_0.finalize();
 
-  absl::flat_hash_map<std::string, std::unique_ptr<std::string>> normal_map;
-  auto inline_map_200 = registry_200.createInlineMap<std::string>();
-  auto inline_map_0 = registry_0.createInlineMap<std::string>();
+  absl::flat_hash_map<std::string, std::string> normal_map;
+  auto inline_map_200 = InlineMap<std::string, std::string>::create(registry_200);
+  auto inline_map_0 = InlineMap<std::string, std::string>::create(registry_0);
 
   for (size_t i = 0; i < 200; ++i) {
-    normal_map[normal_keys[i]] = std::make_unique<std::string>("value_" + std::to_string(i));
-    inline_map_200->insert(normal_keys[i],
-                           std::make_unique<std::string>("value_" + std::to_string(i)));
-    inline_map_0->insert(normal_keys[i],
-                         std::make_unique<std::string>("value_" + std::to_string(i)));
+    normal_map[normal_keys[i]] = "value_" + std::to_string(i);
+    inline_map_200->insert(normal_keys[i], "value_" + std::to_string(i));
+    inline_map_0->insert(normal_keys[i], "value_" + std::to_string(i));
   }
 
   if (map_type == 0) {

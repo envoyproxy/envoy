@@ -95,8 +95,8 @@ private:
                    "conflicting life_span on the same data_name.");
       return;
     }
-    const auto* current = data_storage_->lookup(data_key);
-    if (current != nullptr) {
+    const auto current = data_storage_->lookup(data_key);
+    if (current.has_value()) {
       // We have another object with same data_name. Check for mutability
       // violations namely: readonly data cannot be overwritten, mutable data
       // cannot be overwritten by readonly data.
@@ -113,24 +113,23 @@ private:
       }
     }
 
-    std::unique_ptr<FilterStateImpl::FilterObject> filter_object(
-        new FilterStateImpl::FilterObject());
-    filter_object->data_ = data;
-    filter_object->state_type_ = state_type;
-    filter_object->stream_sharing_ = stream_sharing;
+    FilterStateImpl::FilterObject filter_object;
+    filter_object.data_ = data;
+    filter_object.state_type_ = state_type;
+    filter_object.stream_sharing_ = stream_sharing;
     data_storage_->insert(data_key, std::move(filter_object));
   }
 
   // This only checks the local data_storage_ for data_name existence.
   template <class DataKeyType> bool hasDataInternal(DataKeyType data_key) const {
-    return data_storage_->lookup(data_key) != nullptr;
+    return data_storage_->lookup(data_key).has_value();
   }
 
   template <class DataKeyType>
   const FilterState::Object* getDataReadOnlyGenericInternal(DataKeyType data_key) const {
-    const auto* current = data_storage_->lookup(data_key);
+    const auto current = data_storage_->lookup(data_key);
 
-    if (current == nullptr) {
+    if (!current.has_value()) {
       if (parent_) {
         return parent_->getDataReadOnlyGeneric(data_key);
       }
@@ -142,9 +141,9 @@ private:
 
   template <class DataKeyType>
   std::shared_ptr<FilterState::Object> getDataSharedMutableGenericInternal(DataKeyType data_key) {
-    const auto* current = data_storage_->lookup(data_key);
+    const auto current = data_storage_->lookup(data_key);
 
-    if (current == nullptr) {
+    if (!current.has_value()) {
       if (parent_) {
         return parent_->getDataSharedMutableGeneric(data_key);
       }
@@ -167,7 +166,7 @@ private:
   FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
 
-  InlineMapRegistry<std::string>::InlineMapPtr<FilterObject> data_storage_;
+  InlineMapPtr<std::string, FilterObject> data_storage_;
 };
 
 } // namespace StreamInfo

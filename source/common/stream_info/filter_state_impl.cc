@@ -62,14 +62,14 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
 
-  data_storage_->iterate([&objects](absl::string_view name, FilterObject* object) -> bool {
-    switch (object->stream_sharing_) {
+  data_storage_->iterate([&objects](const std::string& name, const FilterObject& object) -> bool {
+    switch (object.stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
       objects->push_back(
-          {object->data_, object->state_type_, object->stream_sharing_, std::string(name)});
+          {object.data_, object.state_type_, object.stream_sharing_, std::string(name)});
       break;
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-      objects->push_back({object->data_, object->state_type_, StreamSharingMayImpactPooling::None,
+      objects->push_back({object.data_, object.state_type_, StreamSharingMayImpactPooling::None,
                           std::string(name)});
       break;
     default:
