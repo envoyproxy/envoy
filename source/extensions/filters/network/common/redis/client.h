@@ -259,9 +259,11 @@ struct Transaction {
   bool connection_established_{false};
   bool should_close_{false};
 
-  std::string key_; /* The key which represents the transaction hash slot */
-  std::vector<ClientPtr>
-      clients_; /* One client for the main connection, and one for each mirror connection */
+  // The key which represents the transaction hash slot.
+  std::string key_;
+  // clients_[0] represents the main connection, clients_[1..n] are for
+  // the mirroring policies.
+  std::vector<ClientPtr> clients_;
   Network::ConnectionCallbacks* connection_cb_;
   uint32_t current_client_idx{0};
 };
