@@ -6,6 +6,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 #include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 #include "gtest/gtest.h"
 
@@ -42,7 +43,8 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeDefaultConfig) {
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(0, dlb.id());
   EXPECT_EQ(0, dlb.max_retries());
-  EXPECT_EQ(false, dlb.is_exact_fallback());
+  EXPECT_EQ(envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb_FallbackPolicy_None,
+            dlb.fallback_policy());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
@@ -51,13 +53,16 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   dlb.set_id(10);
   dlb.set_max_retries(12);
-  dlb.set_is_exact_fallback(true);
+  dlb.set_fallback_policy(envoy::extensions::network::connection_balance::dlb::v3alpha::
+                              Dlb_FallbackPolicy_ExactConnectionBalance);
 
   makeDlbConnectionBalanceConfig(typed_config, dlb);
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(10, dlb.id());
   EXPECT_EQ(12, dlb.max_retries());
-  EXPECT_EQ(true, dlb.is_exact_fallback());
+  EXPECT_EQ(envoy::extensions::network::connection_balance::dlb::v3alpha::
+                Dlb_FallbackPolicy_ExactConnectionBalance,
+            dlb.fallback_policy());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, EmptyProto) {
@@ -86,11 +91,15 @@ TEST_F(DlbConnectionBalanceFactoryTest, Fallback) {
   const std::string& test_message = "this is a test for dlb";
   EXPECT_LOG_CONTAINS("warn",
                       fmt::format("error: {}, fallback to Nop Connection Balance", test_message),
-                      factory.fallback(false, test_message));
+                      factory.fallback(envoy::extensions::network::connection_balance::dlb::
+                                           v3alpha::Dlb_FallbackPolicy_NopConnectionBalance,
+                                       test_message));
 
   EXPECT_LOG_CONTAINS("warn",
                       fmt::format("error: {}, fallback to Exact Connection Balance", test_message),
-                      factory.fallback(true, test_message));
+                      factory.fallback(envoy::extensions::network::connection_balance::dlb::
+                                           v3alpha::Dlb_FallbackPolicy_ExactConnectionBalance,
+                                       test_message));
 }
 
 #ifndef DLB_DISABLED
@@ -119,7 +128,8 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeFromExactFallbackProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
-  dlb.set_is_exact_fallback(true);
+  dlb.set_fallback_policy(envoy::extensions::network::connection_balance::dlb::v3alpha::
+                              Dlb_FallbackPolicy_ExactConnectionBalance);
   makeDlbConnectionBalanceConfig(typed_config, dlb);
 
   EXPECT_LOG_CONTAINS("warn", "fallback to Exact Connection Balance",

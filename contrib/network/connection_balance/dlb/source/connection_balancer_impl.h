@@ -92,8 +92,10 @@ public:
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }
 
-  Envoy::Network::ConnectionBalancerSharedPtr fallback(const bool is_exact_fallback,
-                                                       const std::string& message);
+  Envoy::Network::ConnectionBalancerSharedPtr
+  fallback(const envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::FallbackPolicy
+               fallback_policy,
+           const std::string& message);
 
   // Init those only when Envoy start.
   int domain_id, ldb_pool_id, dir_pool_id, tx_queue_id;
