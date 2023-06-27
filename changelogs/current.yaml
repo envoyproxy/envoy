@@ -459,3 +459,8 @@ deprecated:
   change: |
     deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
     :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
+- area: stats
+  change: |
+    added :ref:`enable_deferred_creation_stats
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
+    support for ClusterTrafficStats.
