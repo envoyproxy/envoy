@@ -828,7 +828,8 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
   // Socket may be closed on connecting like binding error. In this situation we may not callback
   // on connecting completion.
   if (status_ == Closed) {
-    if (write_or_shutdown_req_ == nullptr) {
+    if (write_or_shutdown_req_ == nullptr && cancel_req_ == nullptr &&
+        write_or_shutdown_cancel_req_ == nullptr) {
       closeInternal();
     }
     return;
