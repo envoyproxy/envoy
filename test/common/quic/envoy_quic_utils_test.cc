@@ -59,7 +59,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   auto envoy_headers = http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-      headers_block, 100, validator, details, rst);
+      headers_block, 60, 100, validator, details, rst);
   // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
   EXPECT_EQ(headers_block.size() + 3u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
@@ -95,7 +95,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-      quic_headers, validator, 100, details, rst);
+      quic_headers, validator, 60, 100, details, rst);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
@@ -114,7 +114,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
   EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator,
-                                                                           100, details, rst));
+                                                                           60, 100, details, rst));
   EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }
 
@@ -129,13 +129,13 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
   NiceMock<MockServerHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 6, validator, details, rst));
+                         headers_block, 60, 6, validator, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 5, validator, details, rst));
+                         headers_block, 60, 5, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 4, validator, details, rst));
+                         headers_block, 60, 4, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
@@ -149,12 +149,12 @@ TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
   NiceMock<MockServerHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 6, validator, details, rst));
+                         headers_block, 60, 6, validator, details, rst));
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 2, validator, details, rst));
+                         headers_block, 60, 2, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 2, validator, details, rst));
+                         headers_block, 60, 2, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
@@ -169,7 +169,7 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
       .WillRepeatedly(Return(Http::HeaderUtility::HeaderValidationResult::REJECT));
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 5, validator, details, rst));
+                         headers_block, 60, 5, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }
 
@@ -198,6 +198,50 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
   EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+}
+
+TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
+  NiceMock<MockServerHeaderValidator> validator;
+  absl::string_view details;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  quic::QuicHeaderList quic_headers;
+  quic_headers.OnHeaderBlockStart();
+  quic_headers.OnHeader(":authority", "www.google.com");
+  quic_headers.OnHeader(":path", "/index.hml");
+  quic_headers.OnHeader(":scheme", "https");
+  quic_headers.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, validateHeader(_, _))
+      .WillRepeatedly([](absl::string_view, absl::string_view) {
+        return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
+      });
+  // Request header map test.
+  auto request_header = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
+      quic_headers, validator, 60, 100, details, rst);
+  EXPECT_EQ(request_header->maxHeadersCount(), 100);
+  EXPECT_EQ(request_header->maxHeadersKb(), 60);
+
+  // Response header map test.
+  auto response_header = quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
+      quic_headers, validator, 60, 100, details, rst);
+  EXPECT_EQ(response_header->maxHeadersCount(), 100);
+  EXPECT_EQ(response_header->maxHeadersKb(), 60);
+
+  spdy::Http2HeaderBlock headers_block;
+  headers_block[":authority"] = "www.google.com";
+  headers_block[":path"] = "/index.hml";
+  headers_block[":scheme"] = "https";
+
+  // Request trailer map test.
+  auto request_trailer = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+      headers_block, 60, 100, validator, details, rst);
+  EXPECT_EQ(request_trailer->maxHeadersCount(), 100);
+  EXPECT_EQ(request_trailer->maxHeadersKb(), 60);
+
+  // Response trailer map test.
+  auto response_trailer = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
+      headers_block, 60, 100, validator, details, rst);
+  EXPECT_EQ(response_trailer->maxHeadersCount(), 100);
+  EXPECT_EQ(response_trailer->maxHeadersKb(), 60);
 }
 
 } // namespace Quic
