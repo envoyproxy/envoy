@@ -84,9 +84,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // }
 // rpc-field-extraction-output2-bin: {
 //   "baz":[
-//      "123"
-//   ]
-//   "baz":[
+//      "123",
 //      "456"
 //   ]
 // }
