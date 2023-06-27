@@ -549,6 +549,8 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
   std::vector<std::shared_ptr<HostsPerLocalityImpl>> mutable_clones;
   std::vector<HostsPerLocalityConstSharedPtr> filtered_clones;
 
+  mutable_clones.reserve(predicates.size());
+  filtered_clones.reserve(predicates.size());
   for (size_t i = 0; i < predicates.size(); ++i) {
     mutable_clones.emplace_back(std::make_shared<HostsPerLocalityImpl>());
     filtered_clones.emplace_back(mutable_clones.back());
