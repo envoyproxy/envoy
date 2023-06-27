@@ -57,7 +57,6 @@ public:
   makeRequest(Stats::Store& stats, const StatsParams& params,
               UngroupedStatsRequest::UrlHandlerFn url_handler_fn = nullptr);
 
-private:
   static Admin::RequestPtr
   makePrometheusRequest(Stats::Store& stats, const StatsParams& params,
                         Stats::CustomStatNamespaces& custom_namespaces,

@@ -33,6 +33,15 @@ template <class StatType> Stats::IterateFn<StatType> UngroupedStatsRequest::save
       return true;
     }
 
+    // Check if hidden.
+    bool hidden=stat->hidden();
+    if (params_.hidden_ == HiddenFlag::Exclude && hidden) {
+      return true;
+    }
+    if (params_.hidden_ == HiddenFlag::ShowOnly && !hidden) {
+      return true;
+    }
+
     // Capture the name if we did not early-exit due to used_only -- we'll use
     // the name for both filtering and for capturing the stat in the map.
     // stat->name() takes a symbol table lock and builds a string, so we only

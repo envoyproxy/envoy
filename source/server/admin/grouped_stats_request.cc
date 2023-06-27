@@ -42,6 +42,15 @@ template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMa
       return true;
     }
 
+    // Check if hidden.
+    bool hidden=stat->hidden();
+    if (params_.hidden_ == HiddenFlag::ShowOnly && !hidden) {
+      return true;
+    }
+    if (params_.hidden_ == HiddenFlag::Exclude && hidden) {
+      return true;
+    }
+
     // Check if filtered.
     if (params_.re2_filter_ != nullptr &&
         !re2::RE2::PartialMatch(stat->name(), *params_.re2_filter_)) {
