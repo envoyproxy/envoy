@@ -82,6 +82,27 @@ public:
                                                 downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
                                     *tunnel_config_, downstream_stream_info_);
+    EXPECT_EQ(upstream_->startUpstreamSecureTransport(), false);
+    EXPECT_EQ(upstream_->getUpstreamConnectionSslInfo(), nullptr);
+    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+        *upstream_, std::move(generic_conn_pool));
+    EXPECT_NO_THROW(upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onUpstreamMetadata(nullptr));
+    EXPECT_NO_THROW(upstream_->onPerTryTimeout(*mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onPerTryIdleTimeout(*mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onStreamMaxDurationReached(*mock_upst.get()));
+    EXPECT_EQ(upstream_->dynamicMaxStreamDuration(), absl::nullopt);
+    EXPECT_EQ(upstream_->downstreamTrailers(), nullptr);
+    EXPECT_EQ(upstream_->downstreamResponseStarted(), false);
+    EXPECT_EQ(upstream_->downstreamEndStream(), false);
+    EXPECT_EQ(upstream_->attemptCount(), 0);
+    EXPECT_EQ(upstream_->requestVcluster(), nullptr);
+    EXPECT_EQ(upstream_->routeStatsContext(), Router::RouteStatsContextOptRef());
+    EXPECT_EQ(upstream_->finalUpstreamRequest(), nullptr);
+    EXPECT_NO_THROW(upstream_->upstreamRequests());
+    EXPECT_NO_THROW(upstream_->timeSource());
     if (typeid(T) == typeid(CombinedUpstream)) {
       auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
       std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);

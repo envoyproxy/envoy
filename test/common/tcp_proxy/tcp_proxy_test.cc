@@ -133,6 +133,29 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      auto stream_decoder_callbacks = Filter::HttpStreamDecoderFilterCallbacks(filter_.get());
+      EXPECT_NO_THROW(stream_decoder_callbacks.connection());
+      EXPECT_NO_THROW(stream_decoder_callbacks.streamInfo());
+      EXPECT_NO_THROW(stream_decoder_callbacks.scope());
+      EXPECT_NO_THROW(stream_decoder_callbacks.route());
+      EXPECT_NO_THROW(stream_decoder_callbacks.continueDecoding());
+      EXPECT_NO_THROW(stream_decoder_callbacks.responseHeaders());
+      EXPECT_NO_THROW(stream_decoder_callbacks.responseTrailers());
+      EXPECT_NO_THROW(stream_decoder_callbacks.encodeMetadata(nullptr));
+      EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterAboveWriteBufferHighWatermark());
+      EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterBelowWriteBufferLowWatermark());
+      EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(uint32_t{0}));
+      EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
+      EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
+      EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
+      EXPECT_NO_THROW(stream_decoder_callbacks.account());
+      EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost("foo"));
+      EXPECT_NO_THROW(stream_decoder_callbacks.http1StreamEncoderOptions());
+      EXPECT_NO_THROW(stream_decoder_callbacks.downstreamCallbacks());
+      EXPECT_NO_THROW(stream_decoder_callbacks.upstreamCallbacks());
+      EXPECT_NO_THROW(stream_decoder_callbacks.upstreamOverrideHost());
+      EXPECT_NO_THROW(stream_decoder_callbacks.resetIdleTimer());
+      EXPECT_NO_THROW(stream_decoder_callbacks.filterConfigName());
       filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
           ->setSslConnection(filter_callbacks_.connection_.ssl());
     }

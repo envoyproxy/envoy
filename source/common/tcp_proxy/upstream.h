@@ -181,37 +181,6 @@ public:
   // socket from non-secure to secure mode.
   bool startUpstreamSecureTransport() override { return false; }
 
-  // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override;
-  void onBelowWriteBufferLowWatermark() override;
-
-  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
-    conn_pool_callbacks_ = std::move(callbacks);
-  }
-  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
-
-protected:
-  HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-               Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
-  void virtual resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
-  void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
-
-  // The encoder offered by the upstream http client.
-  Http::RequestEncoder* request_encoder_{};
-  // The config object that is owned by the downstream network filter chain factory.
-  const TunnelingConfigHelper& config_;
-  // The downstream info that is owned by the downstream connection.
-  StreamInfo::StreamInfo& downstream_info_;
-  // Router::UpstreamRequest instances which are owned by this HttpUpstream.
-  std::list<UpstreamRequestPtr> upstream_requests_;
-  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
-  HttpConnPool& parent_;
-
-private:
   // Router::RouterFilterInterface
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
@@ -228,6 +197,18 @@ private:
   void onPerTryTimeout(UpstreamRequest&) override {}
   void onPerTryIdleTimeout(UpstreamRequest&) override {}
   void onStreamMaxDurationReached(UpstreamRequest&) override {}
+
+  // Http::StreamCallbacks
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
+
+  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
+  void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
+    conn_pool_callbacks_ = std::move(callbacks);
+  }
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
   Http::StreamDecoderFilterCallbacks* callbacks() override { return &decoder_filter_callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override {
     return decoder_filter_callbacks_.clusterInfo();
@@ -250,12 +231,30 @@ private:
   }
   const Router::Route* route() const override { return route_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
-    // static const std::list<UpstreamRequestPtr> requests;
     return upstream_requests_;
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
   TimeSource& timeSource() override { return config().timeSource(); }
 
+protected:
+  HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+               Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
+  void virtual resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+  void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+
+  // The encoder offered by the upstream http client.
+  Http::RequestEncoder* request_encoder_{};
+  // The config object that is owned by the downstream network filter chain factory.
+  const TunnelingConfigHelper& config_;
+  // The downstream info that is owned by the downstream connection.
+  StreamInfo::StreamInfo& downstream_info_;
+  // Router::UpstreamRequest instances which are owned by this HttpUpstream.
+  std::list<UpstreamRequestPtr> upstream_requests_;
+  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  HttpConnPool& parent_;
+
+private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
   Router::Route* route_;
