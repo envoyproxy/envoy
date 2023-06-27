@@ -661,6 +661,8 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 
   callbacks->traversePerFilterConfig([&reduce,
                                       &merged](const Router::RouteSpecificFilterConfig& cfg) {
+    static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
     const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
     if (typed_cfg == nullptr) {
       ENVOY_LOG_MISC(error, "Failed to retrieve the correct type of route specific filter config");
