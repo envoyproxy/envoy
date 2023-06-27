@@ -20,8 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // GrpcFieldExtractionConfig supports extracting the fields from first gRPC
 // request message no matter if it is unary or streaming and inject the result
-// as a header. It won't propagate headers until the extraction and the
-// injection done so the following filters can use it. No op if isn't a gRPC
+// in headers. It won't **propagate headers** until the extraction
+// is done, so that the following filters can use the extraction result in headers. No op if isn't a gRPC
 // method or its type cannot be found in the proto descriptor.
 //
 // The target field should be singular primitive type or repeated primitive
@@ -33,10 +33,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // For example, we have the following request definition for the gRPC method `/pkg.svc/Method`.
 //
 // message MethodRequest {
-//   string method_foo = 1;
-//   string method_bar = 2;
+//   string foo = 1;
+//   Nested nested = 2;
 //   repeated int32 method baz = 3;
 //   ...
+// }
+//
+// message Nested {
+//  string bar = 2;
 // }
 //
 // This is the filter config(expressed in JSON format).
@@ -45,13 +49,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   "extractions_by_method": {
 //      "/pkg.svc/Method":{
 //         "request_field_extractions":{
-//            "name_foo":{
+//            "foo":{
 //               "header":"grpc-field-extraction-output1-bin"
 //            },
-//            "name_bar":{
+//            "nested.bar":{
 //               "header":"grpc-field-extraction-output1-bin"
 //            }
-//            "name_baz":{
+//            "baz":{
 //               "header":"grpc-field-extraction-output2-bin"
 //            }
 //         }
@@ -63,26 +67,26 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // During runtime, the filter receives the following `MethodRequest` message(expressed in JSON format).
 // {
-//   name_foo: "val_foo",
-//   name_bar: "val_bar",
-//   name_baz: [123, 456]
+//   foo: "val_foo",
+//   nested: { "bar": ""val_bar"},
+//   baz: [123, 456]
 // }
 //
 // The filter will injects the following 2 request headers(expressed in JSON format).
 //
 // rpc-field-extraction-output1-bin: {
-//   "name_foo":[
+//   "foo":[
 //      "val_foo"
 //   ],
-//   "name_bar":[
+//   "nested.bar":[
 //      "val_bar"
 //   ]
 // }
 // rpc-field-extraction-output2-bin: {
-//   "name_baz":[
+//   "baz":[
 //      "123"
 //   ]
-//   "name_baz":[
+//   "baz":[
 //      "456"
 //   ]
 // }
