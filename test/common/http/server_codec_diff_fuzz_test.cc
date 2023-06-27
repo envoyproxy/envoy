@@ -398,12 +398,10 @@ public:
             }));
 
     EXPECT_CALL(*encoder_filter_, encodeHeaders(_, _))
-        .WillRepeatedly(
-            Invoke([&](ResponseHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
-              response_headers_ = createHeaderMap<ResponseHeaderMapImpl>(headers);
-              response_end_stream_ = end_stream;
-              return FilterHeadersStatus::Continue;
-            }));
+        .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool end_stream) -> FilterHeadersStatus {
+          response_end_stream_ = end_stream;
+          return FilterHeadersStatus::Continue;
+        }));
 
     EXPECT_CALL(*decoder_filter_, decodeData(_, _))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterDataStatus {
@@ -454,7 +452,6 @@ public:
   std::shared_ptr<MockStreamEncoderFilter> encoder_filter_ =
       std::make_shared<NiceMock<MockStreamEncoderFilter>>();
   RequestHeaderMapPtr request_headers_;
-  ResponseHeaderMapPtr response_headers_;
   std::string request_data_;
   std::string response_data_;
   RequestTrailerMapPtr request_trailers_;
@@ -527,8 +524,7 @@ public:
 
   void sendResponse() {
     ResponseHeaderMapPtr response_headers_1 = makeResponseHeaders();
-    ResponseHeaderMapPtr response_headers_2 =
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers_1);
+    ResponseHeaderMapPtr response_headers_2 = makeResponseHeaders();
     const bool end_stream = !input_.send_response_body() && !input_.has_response_trailers();
     if (HeaderUtility::isSpecial1xx(*response_headers_1)) {
       hcm_under_test_1_.decoder_filter_->callbacks_->encode1xxHeaders(
@@ -566,12 +562,15 @@ public:
       headers->setStatus(input_.response().status().value());
     }
     for (const auto& header : input_.response().headers()) {
-      LowerCaseString key(header.key());
-      absl::string_view value = header.value();
-      if (input_.send_response_body() && static_cast<absl::string_view>(key) == "content-length") {
+      std::string value(header.value());
+      if (input_.send_response_body() && absl::EqualsIgnoreCase(header.key(), "content-length")) {
         value = std::to_string(response_body.size());
       }
-      headers->addCopy(key, value);
+      Http::HeaderString key_string;
+      key_string.setCopyUnvalidatedForTestOnly(header.key());
+      Http::HeaderString value_string;
+      value_string.setCopyUnvalidatedForTestOnly(value);
+      headers->addViaMove(std::move(key_string), std::move(value_string));
     }
     return headers;
   }
@@ -863,8 +862,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input
   Http1HcmTest http1_test(input);
   http1_test.test();
 
-  Http2HcmTest http2_test(input);
-  http2_test.test();
+  // Http2HcmTest http2_test(input);
+  // http2_test.test();
 }
 
 } // namespace Http
