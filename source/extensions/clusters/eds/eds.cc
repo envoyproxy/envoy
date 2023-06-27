@@ -139,7 +139,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
 
   // When the configuration contains duplicate hosts, only the first one will be retained.
   const auto address_as_string = address->asString();
-  if (all_new_hosts.count(address_as_string) > 0) {
+  if (all_new_hosts.contains(address_as_string)) {
     return;
   }
 

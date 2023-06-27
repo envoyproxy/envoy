@@ -38,7 +38,12 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
-      new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+      // Setting up value or value_bytes field based on the runtime flag.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
+        new_header->set_value_bytes(std::string(e.value().getStringView()));
+      } else {
+        new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+      }
     }
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -76,8 +81,24 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     if (!sh.has_header()) {
       continue;
     }
+
+    // Only one of value or value_bytes in the HeaderValue message should be set.
+    if (!sh.header().value().empty() && !sh.header().value_bytes().empty()) {
+      ENVOY_LOG(debug, "Only one of value or value_bytes in the HeaderValue message should be set, "
+                       "may not be append.");
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(
+          "Only one of value or value_bytes in the HeaderValue message should be set.");
+    }
+
+    absl::string_view header_value;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
+      header_value = sh.header().value_bytes();
+    } else {
+      header_value = sh.header().value();
+    }
     if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
-        !Http::HeaderUtility::headerValueIsValid(sh.header().value())) {
+        !Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,
                 "set_headers contain invalid character in key or value, may not be appended.");
       rejected_mutations.inc();
@@ -87,7 +108,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                         : CheckOperation::SET;
-    auto check_result = checker.check(check_op, header_name, sh.header().value());
+    auto check_result = checker.check(check_op, header_name, header_value);
     if (replacing_message && header_name == Http::Headers::get().Method) {
       // Special handling to allow changing ":method" when the
       // CONTINUE_AND_REPLACE option is selected, to stay compatible.
@@ -97,9 +118,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     case CheckResult::OK:
       ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
       if (append) {
-        headers.addCopy(header_name, sh.header().value());
+        headers.addCopy(header_name, header_value);
       } else {
-        headers.setCopy(header_name, sh.header().value());
+        headers.setCopy(header_name, header_value);
       }
       break;
     case CheckResult::IGNORE:
