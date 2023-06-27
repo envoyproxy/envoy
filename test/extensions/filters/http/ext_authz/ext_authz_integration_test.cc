@@ -182,6 +182,7 @@ public:
     attributes->clear_source();
     attributes->clear_destination();
     attributes->clear_metadata_context();
+    attributes->clear_connection_metadata_context();
     attributes->mutable_request()->clear_time();
     http_request->clear_id();
     http_request->clear_headers();

@@ -65,8 +65,12 @@ public:
     auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
+    envoy::config::core::v3::Metadata connection_metadata_context;
+    auto connection_metadata_val = MessageUtil::keyValueStruct("foo2", "bar2");
+    (*connection_metadata_context.mutable_filter_metadata())["conn.meta.key"] = metadata_val;
+
     CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), request,
+                                       std::move(metadata_context), std::move(connection_metadata_context), request,
                                        /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
                                        include_peer_certificate, include_tls_session, labels,
                                        nullptr);
@@ -84,6 +88,15 @@ public:
                          .at("meta.key")
                          .fields()
                          .at("foo")
+                         .string_value());
+
+
+    EXPECT_EQ("bar2", request.attributes()
+                         .connection_metadata_context()
+                         .filter_metadata()
+                         .at("conn.meta.key")
+                         .fields()
+                         .at("foo2")
                          .string_value());
 
     if (include_peer_certificate) {

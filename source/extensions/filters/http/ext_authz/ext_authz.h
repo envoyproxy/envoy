@@ -82,6 +82,12 @@ public:
                                      config.metadata_context_namespaces().end()),
         typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
                                            config.typed_metadata_context_namespaces().end()),
+        connection_metadata_context_namespaces_(
+            config.connection_metadata_context_namespaces().begin(),
+            config.connection_metadata_context_namespaces().end()),
+        typed_connection_metadata_context_namespaces_(
+            config.typed_connection_metadata_context_namespaces().begin(),
+            config.typed_connection_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
@@ -159,6 +165,14 @@ public:
     return typed_metadata_context_namespaces_;
   }
 
+  const std::vector<std::string>& connectionMetadataContextNamespaces() {
+    return connection_metadata_context_namespaces_;
+  }
+
+  const std::vector<std::string>& typedConnectionMetadataContextNamespaces() {
+    return typed_connection_metadata_context_namespaces_;
+  }
+
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
@@ -218,6 +232,8 @@ private:
 
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
+  const std::vector<std::string> connection_metadata_context_namespaces_;
+  const std::vector<std::string> typed_connection_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
   const bool include_tls_session_;

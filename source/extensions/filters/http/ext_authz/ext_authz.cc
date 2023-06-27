@@ -65,11 +65,37 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     }
   }
 
+  envoy::config::core::v3::Metadata connection_metadata_context;
+
+  // If connection_metadata_context_namespaces is specified, pass matching filter metadata to the
+  // ext_authz service.
+  const auto& connection_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : config_->connectionMetadataContextNamespaces()) {
+    if (const auto& metadata_it = connection_metadata.find(context_key);
+        metadata_it != connection_metadata.end()) {
+      (*connection_metadata_context.mutable_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    }
+  }
+
+  // If typed_connection_metadata_context_namespaces is specified, pass matching typed filter
+  // metadata to the ext_authz service.
+  const auto& connection_typed_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
+  for (const auto& context_key : config_->typedConnectionMetadataContextNamespaces()) {
+    if (const auto& metadata_it = connection_typed_metadata.find(context_key);
+        metadata_it != connection_typed_metadata.end()) {
+      (*connection_metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    }
+  }
+
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
-      config_->requestHeaderMatchers());
+      std::move(connection_metadata_context), check_request_, config_->maxRequestBytes(),
+      config_->packAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
+      config_->destinationLabels(), config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call

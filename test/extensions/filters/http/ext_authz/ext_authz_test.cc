@@ -1350,6 +1350,104 @@ TEST_F(HttpFilterTest, MetadataContext) {
       0, check_request.attributes().metadata_context().typed_filter_metadata().count("rock.bass"));
 }
 
+// Verifies that specified connection metadata is passed along in the check request
+TEST_F(HttpFilterTest, ConnectionMetadataContext) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  connection_metadata_context_namespaces:
+  - jazz.sax
+  - rock.guitar
+  - hiphop.drums
+  - blues.piano
+  typed_connection_metadata_context_namespaces:
+  - jazz.sax
+  - blues.piano
+  )EOF");
+
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    jazz.sax:
+      coltrane: john
+      parker: charlie
+    jazz.piano:
+      monk: thelonious
+      hancock: herbie
+    rock.guitar:
+      hendrix: jimi
+      richards: keith
+  typed_filter_metadata:
+    blues.piano:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: jack dupree
+    jazz.sax:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: shorter wayne
+    rock.bass:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: geddy lee
+  )EOF";
+
+  prepareCheck();
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  connection_.stream_info_.metadata_ = metadata;
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+
+  filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+
+  EXPECT_EQ("john", check_request.attributes()
+                        .connection_metadata_context()
+                        .filter_metadata()
+                        .at("jazz.sax")
+                        .fields()
+                        .at("coltrane")
+                        .string_value());
+
+  EXPECT_EQ("jimi", check_request.attributes()
+                        .connection_metadata_context()
+                        .filter_metadata()
+                        .at("rock.guitar")
+                        .fields()
+                        .at("hendrix")
+                        .string_value());
+
+  EXPECT_EQ(0, check_request.attributes().connection_metadata_context().filter_metadata().count(
+                   "jazz.piano"));
+
+  EXPECT_EQ(0, check_request.attributes().connection_metadata_context().filter_metadata().count(
+                   "hiphop.drums"));
+
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .connection_metadata_context()
+      .typed_filter_metadata()
+      .at("blues.piano")
+      .UnpackTo(&hello);
+  EXPECT_EQ("jack dupree", hello.name());
+
+  check_request.attributes()
+      .connection_metadata_context()
+      .typed_filter_metadata()
+      .at("jazz.sax")
+      .UnpackTo(&hello);
+  EXPECT_EQ("shorter wayne", hello.name());
+
+  EXPECT_EQ(0,
+            check_request.attributes().connection_metadata_context().typed_filter_metadata().count(
+                "rock.bass"));
+}
+
 // Test that filter can be disabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterDisabled) {
   initialize(R"EOF(
