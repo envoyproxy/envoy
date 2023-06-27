@@ -28,6 +28,7 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   for (size_t i = 0; i < 200; ++i) {
     map->remove("key_" + std::to_string(i));
   }
+  map.release();
 }
 
 TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
@@ -78,6 +79,8 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   EXPECT_EQ(map->size(), 0);
+
+  map.release();
 }
 
 } // namespace

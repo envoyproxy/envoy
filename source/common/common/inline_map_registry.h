@@ -340,12 +340,7 @@ public:
 
   bool empty() const { return size() == 0; }
 
-  ~InlineMap() {
-    for (uint64_t i = 0; i < registry_.registrationNum(); ++i) {
-      clearInlineMapEntry(i);
-    }
-    memset(inline_entries_, 0, registry_.registrationNum() * sizeof(Value));
-  }
+  ~InlineMap() { memset(inline_entries_, 0, registry_.registrationNum() * sizeof(InlineEntry*)); }
 
   // Override operator [] to support the normal key assignment.
   template <class ArgK> Value& operator[](const ArgK& key) {
