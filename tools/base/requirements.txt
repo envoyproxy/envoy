@@ -661,9 +661,9 @@ google-cloud-core==2.3.2 \
     --hash=sha256:8417acf6466be2fa85123441696c4badda48db314c607cf1e5d543fa8bdc22fe \
     --hash=sha256:b9529ee7047fd8d4bf4a2182de619154240df17fbe60ead399078c1ae152af9a
     # via google-cloud-storage
-google-cloud-storage==2.9.0 \
-    --hash=sha256:83a90447f23d5edd045e0037982c270302e3aeb45fc1288d2c2ca713d27bad94 \
-    --hash=sha256:9b6ae7b509fc294bdacb84d0f3ea8e20e2c54a8b4bbe39c5707635fec214eff3
+google-cloud-storage==2.10.0 \
+    --hash=sha256:934b31ead5f3994e5360f9ff5750982c5b6b11604dc072bc452c25965e076dc7 \
+    --hash=sha256:9433cf28801671de1c80434238fb1e7e4a1ba3087470e90f70c928ea77c2b9d7
     # via -r requirements.in
 google-crc32c==1.5.0 \
     --hash=sha256:024894d9d3cfbc5943f8f230e23950cd4906b2fe004c72e29b209420a1e6b05a \
