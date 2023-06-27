@@ -175,6 +175,18 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  /**
+   * Atomically get multiple health flags that are set for a host. Flags are specified
+   * as a bitset of HealthFlags.
+   */
+  virtual uint32_t healthFlagsGetAll() const PURE;
+
+  /**
+   * Atomically set the health flag for a host. Flags are specified as a bitset
+   * of HealthFlags.
+   */
+  virtual void healthFlagsSetAll(uint32_t bits) PURE;
+
   enum class Health {
     /**
      * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
