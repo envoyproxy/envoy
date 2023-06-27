@@ -22,6 +22,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -33,7 +34,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class EdsTest : public testing::Test {
+class EdsTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   EdsTest() { resetCluster(); }
 
@@ -133,6 +134,7 @@ public:
   }
 
   void initialize() {
+    EXPECT_CALL(server_context_, timeSource()).WillRepeatedly(testing::ReturnRef(simTime()));
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
@@ -377,6 +379,55 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
+}
+
+// Verify that host weight changes cause a full rebuild.
+TEST_F(EdsTest, DualStackEndpoint) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  // Add dual stack endpoint
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("::1");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  auto* socket_address = endpoint->mutable_endpoint()
+                             ->mutable_additional_addresses()
+                             ->Add()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+  socket_address->set_address("1.2.3.5");
+  socket_address->set_port_value(80);
+
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(30UL, stats_.findGaugeByString("cluster.name.max_host_weight").value().get().value());
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->weight(), 30);
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(1048576));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  // The underlying connection should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(hosts[0]->address(), _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      hosts[0]->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
+  EXPECT_NE(connection, connection_data.connection_.get());
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -1523,6 +1574,166 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
     EXPECT_EQ(hosts.size(), 1);
 
     EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+}
+
+// Verifies that if an endpoint's locality is updated, the active hc flags are preserved,
+// unless the health checker is updated.
+TEST_F(EdsTest, ActiveHealthCheckFlagsEndpointMovedToNewLocality) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  // Start with an endpoint in locality zone1, it should be marked FAILED_ACTIVE_HC.
+  endpoints->mutable_locality()->set_zone("zone1");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone1");
+
+    // When active-HC is used, the state is initialized to FAILED_ACTIVE_HC.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Verify that the host is added (to a new locality) and removed (from its
+  // current locality) as part of an update.
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(1, added.size());
+        EXPECT_EQ(1, removed.size());
+      });
+
+  // Validate that moving an healthy endpoint to another locality keeps
+  // it as healthy.
+  {
+    // Set the endpoint in healthy status, and update its zone.
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // Mark the host as healthy.
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone2");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone2");
+
+    // The endpoint was healthy in the previous locality, so moving it
+    // to another locality should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving an unhealthy endpoint to another locality keeps
+  // it as unhealthy.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone3");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone3");
+
+    // The endpoint was in failed status in the previous priority, so moving it
+    // to another locality should preserve that.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving a degraded endpoint to another locality keeps
+  // it as degraded.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone4");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone4");
+
+    // The endpoint was in degraded status in the original locality, so moving it
+    // to another locality should preserve that.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  }
+
+  // Validate that moving a endpoint marked as timeout active health check to
+  // another locality keeps that flag.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // The code requires that ACTIVE_HC_TIMEOUT is set only if FAILED_ACTIVE_HC
+    // is also set.
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+  endpoints->mutable_locality()->set_zone("zone5");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone5");
+
+    // The endpoint was in timeout status in the original locality, so moving it
+    // to another locality keeps the flag..
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that moving a endpoint marked as pending active health check to
+  // another locality keeps that flag.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    // The code requires that PENDING_ACTIVE_HC is set only if FAILED_ACTIVE_HC
+    // is also set.
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+  endpoints->mutable_locality()->set_zone("zone6");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone6");
+
+    // The endpoint was in timeout status in the original priority, but its
+    // health checker host changes, so now it is initialized to unhealthy.
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Validate that updating the locality and the health checker of a healthy
+  // endpoint, marks it as failing active HC.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+  endpoints->mutable_locality()->set_zone("zone7");
+  endpoint->mutable_health_check_config()->set_port_value(90);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(hosts[0]->locality().zone(), "zone7");
+
+    // The endpoint was in healthy status in the original priority, but its
+    // health checker host changes, so now it is initialized to unhealthy.
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }

@@ -15,11 +15,11 @@ namespace Formatter {
 
 namespace Expr = Filters::Common::Expr;
 
-CELFormatter::CELFormatter(Expr::Builder& builder,
+CELFormatter::CELFormatter(Expr::BuilderInstanceSharedPtr expr_builder,
                            const google::api::expr::v1alpha1::Expr& input_expr,
                            absl::optional<size_t>& max_length)
-    : parsed_expr_(input_expr), max_length_(max_length) {
-  compiled_expr_ = Expr::createExpression(builder, parsed_expr_);
+    : expr_builder_(expr_builder), parsed_expr_(input_expr), max_length_(max_length) {
+  compiled_expr_ = Expr::createExpression(expr_builder_->builder(), parsed_expr_);
 }
 
 absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& request_headers,
@@ -66,7 +66,7 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
                            parse_status.status().ToString());
     }
 
-    return std::make_unique<CELFormatter>(*expr_builder_, parse_status.value().expr(), max_length);
+    return std::make_unique<CELFormatter>(expr_builder_, parse_status.value().expr(), max_length);
   }
 
   return nullptr;

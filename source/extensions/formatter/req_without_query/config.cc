@@ -9,7 +9,8 @@ namespace Extensions {
 namespace Formatter {
 
 ::Envoy::Formatter::CommandParserPtr
-ReqWithoutQueryFactory::createCommandParserFromProto(const Protobuf::Message&) {
+ReqWithoutQueryFactory::createCommandParserFromProto(const Protobuf::Message&,
+                                                     Server::Configuration::CommonFactoryContext&) {
   return std::make_unique<ReqWithoutQueryCommandParser>();
 }
 
