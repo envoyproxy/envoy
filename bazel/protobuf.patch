@@ -109,7 +109,7 @@ diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.b
 +        "//conditions:default": ["//external:zlib"],
      }),
  )
- 
+
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 --- a/src/google/protobuf/port_def.inc	2023-06-27 01:17:34.917105764 +0000
 +++ b/src/google/protobuf/port_def.inc	2023-06-27 01:18:12.069060142 +0000
