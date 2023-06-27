@@ -101,7 +101,7 @@ public:
   int domain_id, ldb_pool_id, dir_pool_id, tx_queue_id;
 #ifndef DLB_DISABLED
   dlb_domain_hdl_t domain;
-  dlb_hdl_t dlb;
+  dlb_hdl_t dlb{};
   dlb_dev_cap_t cap;
 
   // Share those cross worker threads.
