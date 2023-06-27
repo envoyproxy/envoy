@@ -439,9 +439,8 @@ protected:
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
           headers_or_trailers_([this]() {
-            auto headers = ResponseHeaderMapImpl::create();
-            headers->setMaxHeadersCount(parent_.max_headers_count_);
-            headers->setMaxHeadersKb(parent_.max_headers_kb_);
+            auto headers =
+                ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
             return headers;
           }()) {}
 
@@ -471,14 +470,12 @@ protected:
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (received_noninformational_headers_) {
-        auto trailers = ResponseTrailerMapImpl::create();
-        trailers->setMaxHeadersCount(parent_.max_headers_count_);
-        trailers->setMaxHeadersKb(parent_.max_headers_kb_);
+        auto trailers =
+            ResponseTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
         headers_or_trailers_.emplace<ResponseTrailerMapPtr>(std::move(trailers));
       } else {
-        auto trailers = ResponseHeaderMapImpl::create();
-        trailers->setMaxHeadersCount(parent_.max_headers_count_);
-        trailers->setMaxHeadersKb(parent_.max_headers_kb_);
+        auto trailers =
+            ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
         headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(trailers));
       }
     }
@@ -509,9 +506,8 @@ protected:
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
         : StreamImpl(parent, buffer_limit), headers_or_trailers_([this]() {
-            auto headers = RequestHeaderMapImpl::create();
-            headers->setMaxHeadersCount(parent_.max_headers_count_);
-            headers->setMaxHeadersKb(parent_.max_headers_kb_);
+            auto headers =
+                RequestHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
             return headers;
           }()) {}
 
@@ -533,9 +529,8 @@ protected:
       }
     }
     void allocTrailers() override {
-      auto trailers = RequestTrailerMapImpl::create();
-      trailers->setMaxHeadersCount(parent_.max_headers_count_);
-      trailers->setMaxHeadersKb(parent_.max_headers_kb_);
+      auto trailers =
+          RequestTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::move(trailers));
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {

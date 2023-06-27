@@ -1992,16 +1992,16 @@ TEST_P(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   TestRequestHeaderMapImpl expected_headers{
-      {":path", "/"}, {":method", "POST"}, {"transfer-encoding", "chunked"}};
-  expected_headers.setMaxHeadersCount(max_request_headers_count_);
-  expected_headers.setMaxHeadersKb(max_request_headers_kb_);
+      {{":path", "/"}, {":method", "POST"}, {"transfer-encoding", "chunked"}},
+      max_request_headers_kb_,
+      max_request_headers_count_};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
   Buffer::OwnedImpl expected_data("Hello World");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
 
-  TestRequestTrailerMapImpl expected_trailers{{"hello", "world"}, {"second", "header"}};
-  expected_trailers.setMaxHeadersCount(max_request_headers_count_);
-  expected_trailers.setMaxHeadersKb(max_request_headers_kb_);
+  TestRequestTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                              max_request_headers_kb_,
+                                              max_request_headers_count_};
   EXPECT_CALL(decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
@@ -3831,25 +3831,23 @@ TEST_P(Http1ClientConnectionImplTest, VerifyResponseHeaderTrailerMapMaxLimits) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
-  expected_headers.setMaxHeadersCount(max_response_headers_count_);
-  expected_headers.setMaxHeadersKb(Http1::MAX_RESPONSE_HEADERS_KB);
+  TestResponseHeaderMapImpl expected_headers{{{":status", "200"}, {"transfer-encoding", "chunked"}},
+                                             Http1::MAX_RESPONSE_HEADERS_KB,
+                                             max_response_headers_count_};
   Buffer::OwnedImpl expected_data("Hello World");
 
   EXPECT_CALL(response_decoder,
               decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
-  TestResponseTrailerMapImpl expected_trailers{{"hello", "world"}, {"second", "header"}};
-  expected_trailers.setMaxHeadersCount(max_response_headers_count_);
-  expected_trailers.setMaxHeadersKb(Http1::MAX_RESPONSE_HEADERS_KB);
+  TestResponseTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                               Http1::MAX_RESPONSE_HEADERS_KB,
+                                               max_response_headers_count_};
   EXPECT_CALL(response_decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
 
-  Buffer::OwnedImpl buffer(
-      fmt::format("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
-                  "6\r\nHello \r\n"
-                  "5\r\nWorld\r\n"
-                  "0\r\nhello: world\r\nsecond: header\r\n\r\n",
-                  11));
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
 }

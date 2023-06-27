@@ -449,20 +449,15 @@ public:
    */
   virtual uint64_t byteSize() const PURE;
 
-  // @return uint32_t the max size of the header map in kilobyte.
+  /**
+   * @return uint32_t the max size of the header map in kilobyte.
+   */
   virtual uint32_t maxHeadersKb() const PURE;
 
-  // @return uint32_t the max count of headers in a header map.
+  /**
+   * @return uint32_t the max count of headers in a header map.
+   */
   virtual uint32_t maxHeadersCount() const PURE;
-
-  // Set the max size of the header map in kilobyte.
-  // @param max_headers_kb specifies configured max headers size from the HTTP connection manager.
-  void virtual setMaxHeadersKb(const uint32_t max_headers_kb) PURE;
-
-  // Set the max count of headers in a header map.
-  // @param max_headers_count specifies configured max headers count from the HTTP connection
-  // manager.
-  void virtual setMaxHeadersCount(const uint32_t max_headers_count) PURE;
 
   /**
    * This is a wrapper for the return result from get(). It avoids a copy when translating from

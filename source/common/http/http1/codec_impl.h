@@ -29,7 +29,7 @@ namespace Http {
 namespace Http1 {
 
 // The default limit of 80 KiB is the vanilla http_parser behaviour.
-constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
+inline constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 
 class ConnectionImpl;
 
@@ -543,18 +543,14 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = RequestHeaderMapImpl::create();
+    auto headers = RequestHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
-    headers->setMaxHeadersCount(max_headers_count_);
-    headers->setMaxHeadersKb(max_headers_kb_);
     headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      auto trailers = RequestTrailerMapImpl::create();
-      trailers->setMaxHeadersCount(max_headers_count_);
-      trailers->setMaxHeadersKb(max_headers_kb_);
+      auto trailers = RequestTrailerMapImpl::create(max_headers_kb_, max_headers_count_);
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::move(trailers));
     }
   }
@@ -653,18 +649,14 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = ResponseHeaderMapImpl::create();
+    auto headers = ResponseHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
-    headers->setMaxHeadersCount(max_headers_count_);
-    headers->setMaxHeadersKb(max_headers_kb_);
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      auto trailers = ResponseTrailerMapImpl::create();
-      trailers->setMaxHeadersCount(max_headers_count_);
-      trailers->setMaxHeadersKb(max_headers_kb_);
+      auto trailers = ResponseTrailerMapImpl::create(max_headers_kb_, max_headers_count_);
       headers_or_trailers_.emplace<ResponseTrailerMapPtr>(std::move(trailers));
     }
   }
