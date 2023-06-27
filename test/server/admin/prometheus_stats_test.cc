@@ -300,8 +300,9 @@ envoy_histogram1_count{} 0
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-// Replicate bug https://github.com/envoyproxy/envoy/issues/27173 which fails to
-// coalesce stats in different scopes with the same tag-extracted-name.
+// Test for bug https://github.com/envoyproxy/envoy/issues/27173: ensure that
+// stats from different scopes and with the same tag-extracted-name are
+// rendered correctly.
 TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   Stats::ThreadLocalStoreImpl store(alloc_);
@@ -310,7 +311,7 @@ TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   Stats::StatName name = pool_.add("default.total_match_count");
 
   Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("cluster.a");
-  counters_.push_back(Stats::CounterSharedPtr(&scope1->counterFromStatName(name)));
+  scope1->counterFromStatName(name);
 
   // To reproduce the problem from we will render
   // cluster.a.default.total_match_count before we discover the existence of
@@ -318,7 +319,7 @@ TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   // "default" comes before "x" with
   // https://github.com/envoyproxy/envoy/pull/24998
   Stats::ScopeSharedPtr scope2 = store.rootScope()->createScope("cluster.x");
-  counters_.push_back(Stats::CounterSharedPtr(&scope2->counterFromStatName(name)));
+  scope2->counterFromStatName(name);
 
   constexpr absl::string_view expected_output =
       R"EOF(# TYPE envoy_cluster_default_total_match_count counter
@@ -326,23 +327,11 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="a"} 0
 envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
 )EOF";
 
-  // Note: in the version of prometheus_stats_test.cc that works with the
-  // streaming GroupedStatsRequest, the test code is slightly different;
-  // it's based on the local 'store' object rather than being based on
-  // the counters_ member variable.
-  //    StatsParams params;
-  //    params.type_ = StatsType::Counters;
-  //    params.format_ = StatsFormat::Prometheus;
-  //    auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
-  //    EXPECT_EQ(expected_output, response(*request));
-  // This code is left here so that we can verify the bug is fixed if we decide to
-  // re-try the streaming Prometheus implementation.
-
-  Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, response, StatsParams(), custom_namespaces);
-  EXPECT_EQ(1, size);
-  EXPECT_EQ(expected_output, response.toString());
+  StatsParams params;
+  params.type_ = StatsType::Counters;
+  params.format_ = StatsFormat::Prometheus;
+  auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
+  EXPECT_EQ(expected_output, response(*request));
 }
 
 TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
@@ -786,52 +775,43 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 }
 
 TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-
   addGauge("cluster.test_cluster_2.upstream_cx_total",
            {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
   addGauge("cluster.test_cluster_2.upstream_cx_total",
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
            Stats::Gauge::ImportMode::HiddenAccumulate);
 
-  StatsParams params;
+  ON_CALL(mock_store_, rootScope()).WillByDefault(testing::Return(test_scope_ptr_));
 
+  StatsParams params;
+  params.format_ = StatsFormat::Prometheus;
   {
-    Buffer::OwnedImpl response;
+    Buffer::OwnedImpl res;
     params.hidden_ = HiddenFlag::Exclude;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
 )EOF";
-    EXPECT_EQ(expected_output, response.toString());
-    EXPECT_EQ(1UL, size);
+    EXPECT_EQ(expected_output, response(*makeRequest(params)));
   }
   {
-    Buffer::OwnedImpl response;
+    Buffer::OwnedImpl res;
     params.hidden_ = HiddenFlag::ShowOnly;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
 )EOF";
-    EXPECT_EQ(expected_output, response.toString());
-    EXPECT_EQ(1UL, size);
+    EXPECT_EQ(expected_output, response(*makeRequest(params)));
   }
   {
-    Buffer::OwnedImpl response;
+    Buffer::OwnedImpl res;
     params.hidden_ = HiddenFlag::Include;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
 )EOF";
-    EXPECT_EQ(expected_output, response.toString());
-    EXPECT_EQ(1UL, size);
+    EXPECT_EQ(expected_output, response(*makeRequest(params)));
   }
 }
 

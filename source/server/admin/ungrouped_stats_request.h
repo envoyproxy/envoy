@@ -18,6 +18,8 @@ public:
                         UrlHandlerFn url_handler_fn = nullptr);
 
 protected:
+  void startPhase() override;
+
   Stats::IterateFn<Stats::TextReadout> saveMatchingStatForTextReadout() override;
   Stats::IterateFn<Stats::Gauge> saveMatchingStatForGauge() override;
   Stats::IterateFn<Stats::Counter> saveMatchingStatForCounter() override;
@@ -45,5 +47,6 @@ protected:
 private:
   std::unique_ptr<StatsRender> render_;
 };
+
 } // namespace Server
 } // namespace Envoy

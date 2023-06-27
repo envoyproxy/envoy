@@ -25,6 +25,16 @@ GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams&
   phase_index_ = 0;
 }
 
+// In order to account for stats that have the same tag-extracted-name but are
+// from different scopes (e.g. cluster.my-cluster.upstream_cx_total and
+// cluster.your-cluster.upstream_cx_total), we extract all stats of a given type (e.g. counters)
+// from all the scopes at the beginning of that phase. That way, we are sure to render
+// stats with the same tag-extracted-name in one group.
+void GroupedStatsRequest::startPhase() {
+  ASSERT(stat_map_.empty());
+  populateStatsForCurrentPhase(scopes_);
+}
+
 template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMatchingStat() {
   return [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     // Check if unused.

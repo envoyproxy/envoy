@@ -53,6 +53,21 @@ template <class StatType> Stats::IterateFn<StatType> UngroupedStatsRequest::save
   };
 }
 
+void UngroupedStatsRequest::startPhase() {
+  ASSERT(stat_map_.empty());
+
+  // Insert all the scopes in the alphabetically ordered map. As we iterate
+  // through the map we'll erase the scopes and replace them with the stats held
+  // in the scopes.
+  for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
+    // The operator[] of btree_map runs a try_emplace behind the scenes,
+    // inserting the variant into the map when the lookup key does not exist.
+    StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
+    ASSERT(static_cast<StatOrScopesIndex>(variant.index()) == StatOrScopesIndex::Scopes);
+    absl::get<ScopeVec>(variant).emplace_back(scope);
+  }
+}
+
 Stats::IterateFn<Stats::TextReadout> UngroupedStatsRequest::saveMatchingStatForTextReadout() {
   return saveMatchingStat<Stats::TextReadout>();
 }

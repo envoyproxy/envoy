@@ -6,7 +6,7 @@ namespace Server {
 template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
 StatsRequest<TextReadoutType, CounterType, GaugeType, HistogramType>::StatsRequest(
     Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn)
-    : params_(params), url_handler_fn_(url_handler_fn), stats_(stats) {}
+    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
 
 template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
 Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start(
@@ -31,7 +31,9 @@ Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>:
   return Http::Code::OK;
 }
 
-bool StatsRequest::nextChunk(Buffer::Instance& response) {
+template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
+bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextChunk(
+    Buffer::Instance& response) {
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
     response.move(response_);
@@ -97,22 +99,6 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     }
   }
   return true;
-}
-
-template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
-void StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::startPhase() {
-  ASSERT(stat_map_.empty());
-
-  // Insert all the scopes in the alphabetically ordered map. As we iterate
-  // through the map we'll erase the scopes and replace them with the stats held
-  // in the scopes.
-  for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
-    // The operator[] of btree_map runs a try_emplace behind the scenes,
-    // inserting the variant into the map when the lookup key does not exist.
-    StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
-    ASSERT(static_cast<StatOrScopesIndex>(variant.index()) == StatOrScopesIndex::Scopes);
-    absl::get<ScopeVec>(variant).emplace_back(scope);
-  }
 }
 
 template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>

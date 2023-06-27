@@ -70,7 +70,7 @@ public:
   // result data differently, but in the process of changing from buffering
   // the entire /stats response to streaming the data out in chunks, it's easier
   // to reason about if the tests don't change their expectations.
-  void startPhase();
+  virtual void startPhase() PURE;
 
   // Sets the chunk size.
   void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
@@ -126,6 +126,8 @@ protected:
   virtual StatsRenderBase& render() PURE;
 
   StatsParams params_;
+  Stats::Store& stats_;
+  ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Buffer::OwnedImpl response_;
   UrlHandlerFn url_handler_fn_;
@@ -136,8 +138,6 @@ protected:
   std::vector<Phase> phases_;
 
 private:
-  Stats::Store& stats_;
-  ScopeVec scopes_;
   uint64_t chunk_size_{DefaultChunkSize};
   std::map<Phase, std::string> phase_labels_{{Phase::TextReadouts, "Text Readouts"},
                                              {Phase::CountersAndGauges, "Counters and Gauges"},
