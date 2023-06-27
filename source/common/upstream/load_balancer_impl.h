@@ -19,6 +19,7 @@
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -82,7 +83,7 @@ public:
 /**
  * Base class for all LB implementations.
  */
-class LoadBalancerBase : public LoadBalancer {
+class LoadBalancerBase : public LoadBalancer, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   enum class HostAvailability { Healthy, Degraded };
 
@@ -220,6 +221,8 @@ public:
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
+
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return nullptr; }
 
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
@@ -457,8 +460,7 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
-                            Logger::Loggable<Logger::Id::upstream> {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   using SlowStartConfig = envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig;
 
@@ -706,8 +708,7 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
-                           Logger::Loggable<Logger::Id::upstream> {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterLbStats& stats, Runtime::Loader& runtime,

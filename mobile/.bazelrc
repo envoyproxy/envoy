@@ -153,6 +153,7 @@ build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 build:remote-ci-common --grpc_keepalive_time=30s
 build:remote-ci-common --remote_timeout=3600s
 build:remote-ci-common --bes_timeout=3600s
+build:remote-ci-common --bes_upload_mode=fully_async
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################

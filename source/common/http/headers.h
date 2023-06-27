@@ -142,6 +142,7 @@ public:
 
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
+  const LowerCaseString CapsuleProtocol{"capsule-protocol"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
@@ -246,6 +247,7 @@ public:
   struct {
     const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
+    const std::string ConnectUdp{"connect-udp"};
   } UpgradeValues;
 
   struct {

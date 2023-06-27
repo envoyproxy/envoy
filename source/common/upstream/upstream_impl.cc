@@ -580,7 +580,11 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
 void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                               LocalityWeightsConstSharedPtr locality_weights,
                               const HostVector& hosts_added, const HostVector& hosts_removed,
+                              absl::optional<bool> weighted_priority_health,
                               absl::optional<uint32_t> overprovisioning_factor) {
+  if (weighted_priority_health.has_value()) {
+    weighted_priority_health_ = weighted_priority_health.value();
+  }
   if (overprovisioning_factor.has_value()) {
     ASSERT(overprovisioning_factor.value() > 0);
     overprovisioning_factor_ = overprovisioning_factor.value();
@@ -595,6 +599,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
+  // TODO(ggreenway): implement `weighted_priority_health` support in `rebuildLocalityScheduler`.
   rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_,
                            *healthy_hosts_per_locality_, healthy_hosts_->get(), hosts_per_locality_,
                            excluded_hosts_per_locality_, locality_weights_,
@@ -738,10 +743,11 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index,
 
 const HostSet&
 PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
+                                    absl::optional<bool> weighted_priority_health,
                                     absl::optional<uint32_t> overprovisioning_factor) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
+      HostSetImplPtr host_set = createHostSet(i, weighted_priority_health, overprovisioning_factor);
       host_sets_priority_update_cbs_.push_back(
           host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
@@ -756,6 +762,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
+                                  absl::optional<bool> weighted_priority_health,
                                   absl::optional<uint32_t> overprovisioning_factor,
                                   HostMapConstSharedPtr cross_priority_host_map) {
   // Update cross priority host map first. In this way, when the update callbacks of the priority
@@ -765,10 +772,10 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
   }
 
   // Ensure that we have a HostSet for the given priority.
-  getOrCreateHostSet(priority, overprovisioning_factor);
+  getOrCreateHostSet(priority, weighted_priority_health, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
-                    hosts_removed, overprovisioning_factor);
+                    hosts_removed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -791,7 +798,8 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor) {
+    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
+    absl::optional<uint32_t> overprovisioning_factor) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
   priorities_.insert(priority);
@@ -805,13 +813,14 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, overprovisioning_factor);
+                      hosts_removed, weighted_priority_health, overprovisioning_factor);
 }
 
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                       LocalityWeightsConstSharedPtr locality_weights,
                                       const HostVector& hosts_added,
                                       const HostVector& hosts_removed,
+                                      absl::optional<bool> weighted_priority_health,
                                       absl::optional<uint32_t> overprovisioning_factor,
                                       HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(cross_priority_host_map == nullptr,
@@ -819,7 +828,8 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
   updateCrossPriorityHostMap(hosts_added, hosts_removed);
 
   PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
-                               hosts_added, hosts_removed, overprovisioning_factor);
+                               hosts_added, hosts_removed, weighted_priority_health,
+                               overprovisioning_factor);
 }
 
 HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
@@ -1622,7 +1632,7 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, {}, absl::nullopt);
+                              host_set->localityWeights(), {}, {}, absl::nullopt, absl::nullopt);
   }
 }
 
@@ -1887,6 +1897,7 @@ void PriorityStateManager::updateClusterPrioritySet(
     const uint32_t priority, HostVectorSharedPtr&& current_hosts,
     const absl::optional<HostVector>& hosts_added, const absl::optional<HostVector>& hosts_removed,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
+    absl::optional<bool> weighted_priority_health,
     absl::optional<uint32_t> overprovisioning_factor) {
   // If local locality is not defined then skip populating per locality hosts.
   const auto& local_locality = local_info_node_.locality();
@@ -1962,12 +1973,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   if (update_cb_ != nullptr) {
     update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
                             std::move(locality_weights), hosts_added.value_or(*hosts),
-                            hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+                            hosts_removed.value_or<HostVector>({}), weighted_priority_health,
+                            overprovisioning_factor);
   } else {
     parent_.prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
         std::move(locality_weights), hosts_added.value_or(*hosts),
-        hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+        hosts_removed.value_or<HostVector>({}), weighted_priority_health, overprovisioning_factor);
   }
 }
 
@@ -2103,13 +2115,47 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       // If we are depending on a health checker, we initialize to unhealthy.
+      // If there's an existing host with the same health checker, the
+      // active health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
+          if (existing_host_found && !health_check_address_changed &&
+              !active_health_check_flag_changed) {
+            // If there's an existing host, use the same active health-status.
+            // The existing host can be marked PENDING_ACTIVE_HC or
+            // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-        // If we want to exclude hosts until they have been health checked, mark them with
-        // a flag to indicate that they have not been health checked yet.
-        if (info_->warmHosts()) {
-          host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            constexpr uint32_t active_hc_statuses_mask =
+                enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+
+            const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+            host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
+          } else {
+            // No previous known host, mark it as failed active HC.
+            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+            // If we want to exclude hosts until they have been health checked, mark them with
+            // a flag to indicate that they have not been health checked yet.
+            if (info_->warmHosts()) {
+              host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            }
+          }
+        } else {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+          // If we want to exclude hosts until they have been health checked, mark them with
+          // a flag to indicate that they have not been health checked yet.
+          if (info_->warmHosts()) {
+            host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+          }
         }
       }
 
