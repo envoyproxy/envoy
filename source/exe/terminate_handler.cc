@@ -18,14 +18,14 @@ std::terminate_handler TerminateHandler::logOnTerminate() const {
       try {
         std::rethrow_exception(current_exception);
       } catch (const EnvoyException& e) {
-        ENVOY_LOG(critical,
-                  "std::terminate called! Uncaught EnvoyException '{}', see trace.", e.what());
+        ENVOY_LOG(critical, "std::terminate called! Uncaught EnvoyException '{}', see trace.",
+                  e.what());
       } catch (const std::exception& e) {
-        ENVOY_LOG(critical,
-                  "std::terminate called! Uncaught exception '{}', see trace.", e.what());
+        ENVOY_LOG(critical, "std::terminate called! Uncaught exception '{}', see trace.",
+                  e.what());
       } catch (...) {
         ENVOY_LOG(critical,
-                 "std::terminate called! See trace. Uncaught unknown exception, see trace.");
+                  "std::terminate called! See trace. Uncaught unknown exception, see trace.");
       }
     } else {
       ENVOY_LOG(critical, "std::terminate called! See trace.");
