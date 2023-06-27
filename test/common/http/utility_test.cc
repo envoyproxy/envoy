@@ -1205,6 +1205,12 @@ public:
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
+class BadConfig {
+public:
+  int state_;
+  void merge(const BadConfig& other) { state_ += other.state_; }
+};
+
 // Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -1237,6 +1243,25 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+TEST(HttpUtility, GetMergedPerFilterBadConfig) {
+  TestConfig testConfig;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(testConfig);
+      }));
+
+  EXPECT_LOG_CONTAINS(
+      "error", "Failed to retrieve the correct type of route specific filter config",
+      auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
+          &filter_callbacks,
+          [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
+      // dynamic_cast failed, so merged_cfg is not set.
+      ASSERT_FALSE(merged_cfg.has_value()););
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
