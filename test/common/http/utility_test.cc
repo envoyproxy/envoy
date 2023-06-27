@@ -1260,7 +1260,7 @@ TEST(HttpUtility, GetMergedPerFilterBadConfig) {
       auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
           &filter_callbacks,
           [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
-      // dynamic_cast failed, so merged_cfg is not set.
+      // Dynamic_cast failed, so merged_cfg is not set.
       ASSERT_FALSE(merged_cfg.has_value()););
 }
 
