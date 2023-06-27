@@ -1961,9 +1961,10 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
 #ifdef ENVOY_ENABLE_YAML
     absl::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(value, false, true);
-    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {
       str = json_or_error.value();
+    } else {
+      str = json_or_error.status().message();
     }
 #else
     IS_ENVOY_BUG("Json support compiled out");
