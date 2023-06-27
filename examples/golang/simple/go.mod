@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/cncf/xds/go v0.0.0-20230310173818-32f1caf87195
 	github.com/envoyproxy/envoy v1.24.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
