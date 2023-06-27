@@ -310,7 +310,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::flat_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -512,7 +512,7 @@ private:
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::flat_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;
 
@@ -602,7 +602,7 @@ private:
   }
 
   uint64_t peekahead_index_{};
-  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**
