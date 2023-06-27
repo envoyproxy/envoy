@@ -8,6 +8,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dependency
+  change: |
+    update gRPC -> 1.49.0 to resolve:
+
+    - `CVE-2023-1428 <https://nvd.nist.gov/vuln/detail/CVE-2023-1428>`_.
+    - `CVE-2023-32731 <https://nvd.nist.gov/vuln/detail/CVE-2023-32731>`_.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
