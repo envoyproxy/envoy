@@ -19,6 +19,7 @@
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -220,6 +221,8 @@ public:
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
+
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return nullptr; }
 
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 

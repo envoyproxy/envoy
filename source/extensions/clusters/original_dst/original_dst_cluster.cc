@@ -24,8 +24,13 @@ namespace Upstream {
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
-    // Check if filter state override is present, if yes use it before headers and local address.
+    // Check if filter state override is present, if yes use it before anything else.
     Network::Address::InstanceConstSharedPtr dst_host = filterStateOverrideHost(context);
+
+    // Check if override host metadata is present, if yes use it otherwise check the header.
+    if (dst_host == nullptr) {
+      dst_host = metadataOverrideHost(context);
+    }
 
     // Check if override host header is present, if yes use it otherwise check local address.
     if (dst_host == nullptr) {
@@ -90,17 +95,21 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 
 Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
-  const auto* conn = context->downstreamConnection();
-  if (!conn) {
-    return nullptr;
+  const auto streamInfos = {
+      context->requestStreamInfo(),
+      context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
+  for (const auto streamInfo : streamInfos) {
+    if (streamInfo == nullptr) {
+      continue;
+    }
+    const auto* dst_address =
+        streamInfo->filterState().getDataReadOnly<Network::DestinationAddress>(
+            Network::DestinationAddress::key());
+    if (dst_address) {
+      return dst_address->address();
+    }
   }
-  const auto* dst_address =
-      conn->streamInfo().filterState().getDataReadOnly<Network::DestinationAddress>(
-          Network::DestinationAddress::key());
-  if (!dst_address) {
-    return nullptr;
-  }
-  return dst_address->address();
+  return nullptr;
 }
 
 Network::Address::InstanceConstSharedPtr
@@ -131,6 +140,48 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   return request_host;
 }
 
+Network::Address::InstanceConstSharedPtr
+OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* context) {
+  if (!metadata_key_.has_value()) {
+    return nullptr;
+  }
+  const auto streamInfos = {
+      context->requestStreamInfo(),
+      context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
+  const ProtobufWkt::Value* value = nullptr;
+  for (const auto streamInfo : streamInfos) {
+    if (streamInfo == nullptr) {
+      continue;
+    }
+    const auto& metadata = streamInfo->dynamicMetadata();
+    value = &Config::Metadata::metadataValue(&metadata, metadata_key_.value());
+    // Path can refer to a list, in which case we extract the first element.
+    if (value->kind_case() == ProtobufWkt::Value::kListValue) {
+      const auto& values = value->list_value().values();
+      if (!values.empty()) {
+        value = &(values[0]);
+      }
+    }
+    if (value->kind_case() == ProtobufWkt::Value::kStringValue) {
+      break;
+    }
+  }
+  if (value == nullptr || value->kind_case() != ProtobufWkt::Value::kStringValue) {
+    return nullptr;
+  }
+  const std::string& metadata_override_host = value->string_value();
+  Network::Address::InstanceConstSharedPtr metadata_host =
+      Network::Utility::parseInternetAddressAndPortNoThrow(metadata_override_host, false);
+  if (metadata_host == nullptr) {
+    ENVOY_LOG(debug, "original_dst_load_balancer: invalid override metadata value. {}",
+              metadata_override_host);
+    parent_->info()->trafficStats()->original_dst_host_invalid_.inc();
+    return nullptr;
+  }
+  ENVOY_LOG(debug, "Using metadata override host {}.", metadata_override_host);
+  return metadata_host;
+}
+
 OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
                                        ClusterFactoryContext& context)
     : ClusterImplBase(config, context),
@@ -151,6 +202,9 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
             "false. Set use_http_header to true if http_header_name is desired.",
             config_opt->http_header_name()));
       }
+    }
+    if (config_opt->has_metadata_key()) {
+      metadata_key_ = Config::MetadataKey(config_opt->metadata_key());
     }
     if (config_opt->has_upstream_port_override()) {
       port_override_ = config_opt->upstream_port_override().value();

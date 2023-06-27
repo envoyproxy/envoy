@@ -445,7 +445,11 @@ new_features:
   change: |
     added :ref:`outbound_control_frames_active <statistics>` and :ref:`outbound_frames_active <statistics>`
     statistic.
-
+- area: original_dst
+  change: |
+    Filter state is pulled from request context first (if available), then falls back to connection context. Added ability to pick host
+    from dynamic metadata using :ref:`metadata_key <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.metadata_key>`.
+    Same behavior - looks in request context first (if available), falls back to connection context.
 deprecated:
 - area: access_log
   change: |
