@@ -48,7 +48,7 @@ TEST(IoUringSocketHandleImpl, CreateClientSocket) {
   Event::MockDispatcher dispatcher;
   IoUringSocketHandleTestImpl impl(factory, false);
   EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
-  EXPECT_CALL(worker, addClientSocket(_, _)).WillOnce(testing::ReturnRef(socket));
+  EXPECT_CALL(worker, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket));
   EXPECT_CALL(factory, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
   impl.initializeFileEvent(
