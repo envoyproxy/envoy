@@ -14,7 +14,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: mocktest/repo-debug:v1.73.3
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t mocktest/repo-debug:v1.73.3 .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-debug:v1.73.3 .
 >> TAG: mocktest/repo-debug:v1.73.3 -> mocktest/repo:debug-v1.73.3
 > docker buildx imagetools create docker.io/mocktest/repo-debug:v1.73.3 --tag docker.io/mocktest/repo:debug-v1.73.3
 >> TAG: mocktest/repo-debug:v1.73.3 -> mocktest/repo-debug:v1.73-latest
@@ -36,7 +36,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: mocktest/repo-contrib-debug:v1.73.3
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug:v1.73.3 .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug:v1.73.3 .
 >> TAG: mocktest/repo-contrib-debug:v1.73.3 -> mocktest/repo:contrib-debug-v1.73.3
 > docker buildx imagetools create docker.io/mocktest/repo-contrib-debug:v1.73.3 --tag docker.io/mocktest/repo:contrib-debug-v1.73.3
 >> TAG: mocktest/repo-contrib-debug:v1.73.3 -> mocktest/repo-contrib-debug:v1.73-latest

@@ -281,6 +281,13 @@ public:
    * Called when a new connection is rejected.
    */
   virtual void onReject(RejectCause cause) PURE;
+
+  /**
+   * Called when the listener has finished accepting connections per socket
+   * event.
+   * @param connections_accepted number of connections accepted.
+   */
+  virtual void recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) PURE;
 };
 
 /**

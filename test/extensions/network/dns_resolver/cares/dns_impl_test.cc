@@ -349,6 +349,7 @@ public:
   }
 
   void onReject(RejectCause) override { PANIC("not implemented"); }
+  void recordConnectionsAcceptedOnSocketEvent(uint32_t) override {}
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
