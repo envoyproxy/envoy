@@ -12,6 +12,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -69,7 +70,8 @@ public:
   public:
     LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
         : parent_(parent), http_header_name_(parent->httpHeaderName()),
-          port_override_(parent->portOverride()), host_map_(parent->getCurrentHostMap()) {}
+          metadata_key_(parent->metadataKey()), port_override_(parent->portOverride()),
+          host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -89,16 +91,19 @@ public:
 
     Network::Address::InstanceConstSharedPtr filterStateOverrideHost(LoadBalancerContext* context);
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
+    Network::Address::InstanceConstSharedPtr metadataOverrideHost(LoadBalancerContext* context);
 
   private:
     const std::shared_ptr<OriginalDstCluster> parent_;
     // The optional original host provider that extracts the address from HTTP header map.
     const absl::optional<Http::LowerCaseString>& http_header_name_;
+    const absl::optional<Config::MetadataKey>& metadata_key_;
     const absl::optional<uint32_t> port_override_;
     HostMultiMapConstSharedPtr host_map_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
+  const absl::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
   const absl::optional<uint32_t> portOverride() { return port_override_; }
 
 private:
@@ -149,6 +154,7 @@ private:
   absl::Mutex host_map_lock_;
   HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
+  absl::optional<Config::MetadataKey> metadata_key_;
   absl::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
 };
