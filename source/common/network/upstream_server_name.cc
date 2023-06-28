@@ -5,9 +5,8 @@
 namespace Envoy {
 namespace Network {
 
-auto upstream_server_name_inline_key =
-    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
-        "envoy.network.upstream_server_name");
+REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, upstream_server_name_inline_key,
+                    "envoy.network.upstream_server_name");
 
 const StreamInfo::InlineKey UpstreamServerName::key() { return upstream_server_name_inline_key; }
 

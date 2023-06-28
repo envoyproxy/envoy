@@ -1,6 +1,6 @@
 #include <cstddef>
 
-#include "source/common/common/inline_map_registry.h"
+#include "source/common/common/inline_map.h"
 
 #include "benchmark/benchmark.h"
 
@@ -14,22 +14,22 @@ static void BM_InlineMapFind(benchmark::State& state) {
 
   std::vector<std::string> normal_keys;
 
-  InlineMapRegistry<std::string> registry_200;
+  InlineMapDescriptor<std::string> descriptor_200;
   // Create 200 inline keys.
-  std::vector<InlineMapRegistry<std::string>::InlineKey> inline_handles_200;
+  std::vector<InlineMapDescriptor<std::string>::InlineKey> inline_handles_200;
   for (size_t i = 0; i < 200; ++i) {
     const std::string key = "key_" + std::to_string(i);
-    inline_handles_200.push_back(registry_200.registerInlineKey(key));
+    inline_handles_200.push_back(descriptor_200.addInlineKey(key));
     normal_keys.push_back(key);
   }
-  InlineMapRegistry<std::string> registry_0;
+  InlineMapDescriptor<std::string> descriptor_0;
 
-  registry_200.finalize();
-  registry_0.finalize();
+  descriptor_200.finalize();
+  descriptor_0.finalize();
 
   absl::flat_hash_map<std::string, std::string> normal_map;
-  auto inline_map_200 = InlineMap<std::string, std::string>::create(registry_200);
-  auto inline_map_0 = InlineMap<std::string, std::string>::create(registry_0);
+  auto inline_map_200 = InlineMap<std::string, std::string>::create(descriptor_200);
+  auto inline_map_0 = InlineMap<std::string, std::string>::create(descriptor_0);
 
   for (size_t i = 0; i < 200; ++i) {
     normal_map[normal_keys[i]] = "value_" + std::to_string(i);

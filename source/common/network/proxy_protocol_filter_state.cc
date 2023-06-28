@@ -5,9 +5,8 @@
 namespace Envoy {
 namespace Network {
 
-auto proxy_protocol_options_inline_key =
-    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
-        "envoy.network.proxy_protocol_options");
+REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, proxy_protocol_options_inline_key,
+                    "envoy.network.proxy_protocol_options");
 
 const StreamInfo::InlineKey ProxyProtocolFilterState::key() {
   return proxy_protocol_options_inline_key;

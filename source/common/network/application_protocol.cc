@@ -5,9 +5,8 @@
 namespace Envoy {
 namespace Network {
 
-auto application_protocols_inline_key =
-    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
-        "envoy.network.application_protocols");
+REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, application_protocols_inline_key,
+                    "envoy.network.application_protocols");
 
 const StreamInfo::InlineKey ApplicationProtocols::key() { return application_protocols_inline_key; }
 

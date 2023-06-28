@@ -17,7 +17,7 @@ public:
   FilterStateImpl(FilterState::LifeSpan life_span)
       : life_span_(life_span),
         data_storage_(
-            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
+            InlineMapRegistry::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
@@ -28,7 +28,7 @@ public:
   FilterStateImpl(FilterStateSharedPtr ancestor, FilterState::LifeSpan life_span)
       : ancestor_(ancestor), life_span_(life_span),
         data_storage_(
-            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
+            InlineMapRegistry::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
@@ -42,7 +42,7 @@ public:
   FilterStateImpl(LazyCreateAncestor lazy_create_ancestor, FilterState::LifeSpan life_span)
       : ancestor_(lazy_create_ancestor), life_span_(life_span),
         data_storage_(
-            InlineMapRegistryHelper::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
+            InlineMapRegistry::createInlineMap<FilterStateInlineMapScope, FilterObject>()) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 

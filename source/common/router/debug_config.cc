@@ -5,9 +5,8 @@
 namespace Envoy {
 namespace Router {
 
-auto debug_config_inline_key =
-    InlineMapRegistryHelper::registerInlinKey<StreamInfo::FilterStateInlineMapScope>(
-        "envoy.router.debug_config");
+REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, debug_config_inline_key,
+                    "envoy.router.debug_config");
 
 DebugConfig::DebugConfig(bool append_cluster, absl::optional<Http::LowerCaseString> cluster_header,
                          bool append_upstream_host,

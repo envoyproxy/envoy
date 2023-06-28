@@ -579,12 +579,9 @@ envoy_pch_library(
 )
 
 envoy_cc_library(
-    name = "inline_map_registry",
-    srcs = [
-        "inline_map_registry.cc",
-    ],
+    name = "inline_map",
     hdrs = [
-        "inline_map_registry.h",
+        "inline_map.h",
     ],
     external_deps = [
         "abseil_node_hash_set",
@@ -597,11 +594,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "inline_map_registry_helper",
+    name = "inline_map_registry",
     hdrs = [
-        "inline_map_registry_helper.h",
+        "inline_map_registry.h",
     ],
     deps = [
-        ":inline_map_registry",
+        ":inline_map",
     ],
 )
