@@ -643,6 +643,7 @@ public:
         });
   }
 
+protected:
   IntegrationTcpClientPtr tcp_client_;
 };
 
@@ -653,7 +654,7 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Bool()),
     protocolTestParamsAndBoolToString);
 
-TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCalls) {
+TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
   config_helper_.setBufferLimits(16384, 131072);
   initialize();
 
@@ -667,6 +668,7 @@ TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCalls) {
 
   write_matcher_->setWriteReturnsEgain();
   ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
   tcp_client_->close();
 }
 
