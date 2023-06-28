@@ -1118,7 +1118,6 @@ TEST(HeaderMapImplTest, HeaderMapMaxLimits) {
   EXPECT_EQ(response_header->maxHeadersKb(), 50);
   EXPECT_EQ(response_header->maxHeadersCount(), 100);
 
-
   auto response_trailer = ResponseTrailerMapImpl::create(2, 3);
   EXPECT_EQ(response_trailer->maxHeadersKb(), 2);
   EXPECT_EQ(response_trailer->maxHeadersCount(), 3);
