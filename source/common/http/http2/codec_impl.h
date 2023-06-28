@@ -467,13 +467,11 @@ protected:
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (received_noninformational_headers_) {
-        auto trailers =
-            ResponseTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
-        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(std::move(trailers));
+        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+            ResponseTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
       } else {
-        auto trailers =
-            ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(trailers));
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(
+            ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
       }
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
@@ -524,9 +522,8 @@ protected:
       }
     }
     void allocTrailers() override {
-      auto trailers =
-          RequestTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::move(trailers));
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(
+          RequestTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);

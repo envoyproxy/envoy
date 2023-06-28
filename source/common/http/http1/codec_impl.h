@@ -550,8 +550,8 @@ private:
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      auto trailers = RequestTrailerMapImpl::create(max_headers_kb_, max_headers_count_);
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::move(trailers));
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(
+          RequestTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
@@ -656,8 +656,8 @@ private:
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      auto trailers = ResponseTrailerMapImpl::create(max_headers_kb_, max_headers_count_);
-      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(std::move(trailers));
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+          ResponseTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
