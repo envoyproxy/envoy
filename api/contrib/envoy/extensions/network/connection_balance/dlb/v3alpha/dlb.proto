@@ -33,10 +33,10 @@ message Dlb {
     // No fallback policy.
     None = 0;
 
-    // fall back to Nop Connection Balance.
+    // Fall back to Nop Connection Balance.
     NopConnectionBalance = 1;
 
-    // fall back to Exact Connection Balance.
+    // Fall back to Exact Connection Balance.
     ExactConnectionBalance = 2;
   }
 
