@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // GrpcFieldExtractionConfig supports extracting the fields from first gRPC
 // request message no matter if it is unary or streaming and inject the result
-// in headers. It won't **propagate headers** until the extraction
+// in headers. It will **block headers propagation** before the extraction
 // is done, so that the following filters can use the extraction result in headers. No op if isn't a gRPC
 // method or its type cannot be found in the proto descriptor.
 //
