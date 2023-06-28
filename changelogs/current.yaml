@@ -17,8 +17,22 @@ behavior_changes:
     behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
 - area: ext_proc
   change: |
+    The proto field :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` type is string.
+    This make it unable to support enconding non-utf8 characters in the HeaderValue message.
+    To support sending header value with non-utf8 characters, a new proto field is added in the HeaderValue message:
+    :ref:`value_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_bytes>`.
+    The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending
+    and receiving messages from the ext_proc server. This behavioral change can be temporarily
+    reverted by setting the runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
+- area: ext_proc
+  change: |
     Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
     reverted by setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
+- area: active health check
+  change: |
+    Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
+    where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
+    runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -173,6 +187,13 @@ bug_fixes:
     Fixes a bug where route properties such as key_formatter,
     prefix and remove_prefix do not take effect when configured for :ref:`catch_all_route
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`.
+- area: original_dst
+  change: |
+    Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
+    can occur if the cluster is removed while the timer is armed.
+- area: maglev loadbalancer
+  change: |
+    Fixes maglev stability problem. Previously, maglev returns slightly different backend assignment from the same backends and keys.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -211,6 +232,9 @@ removed_config_or_runtime:
     removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
 
 new_features:
+- area: golang
+  change: |
+    added new :ref:`l4 golang network filter <config_network_filters_golang>`.
 - area: access_log
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
@@ -231,6 +255,10 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: http
+  change: |
+    added support for CONNECT-UDP (RFC 9298). Can be disabled by setting runtime feature
+    ``envoy.reloadable_features.enable_connect_udp_support`` to false.
 - area: listeners
   change: |
     added :ref:`max_connections_to_accept_per_socket_event
@@ -354,6 +382,13 @@ new_features:
   change: |
     added new field ``envoy.extensions.filters.http.fault.v3.HTTPFault.filter_metadata`` to aid in logging.
     Metadata will be stored in StreamInfo dynamic metadata under a namespace corresponding to the name of the fault filter.
+- area: load_balancing
+  change: |
+    added new option
+    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
+    to compute the health of a :ref:`priority level <arch_overview_load_balancing_priority_levels>` by using
+    :ref:`load balancing weight <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>`
+    instead of the count of healthy hosts.
 - area: application_logs
   change: |
     Added bootstrap option
@@ -406,7 +441,15 @@ new_features:
 - area: lds
   change: |
     pause SRDS when LDS is updated.
-
+- area: http
+  change: |
+    added :ref:`outbound_control_frames_active <statistics>` and :ref:`outbound_frames_active <statistics>`
+    statistic.
+- area: original_dst
+  change: |
+    Filter state is pulled from request context first (if available), then falls back to connection context. Added ability to pick host
+    from dynamic metadata using :ref:`metadata_key <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.metadata_key>`.
+    Same behavior - looks in request context first (if available), falls back to connection context.
 deprecated:
 - area: access_log
   change: |
@@ -416,3 +459,8 @@ deprecated:
   change: |
     deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
     :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
+- area: stats
+  change: |
+    added :ref:`enable_deferred_creation_stats
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
+    support for ClusterTrafficStats.

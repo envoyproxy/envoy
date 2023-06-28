@@ -292,7 +292,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
-      absl::nullopt, absl::nullopt);
+      absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
@@ -357,6 +357,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (host.empty()) {
+    ENVOY_LOG(debug, "host empty");
     return nullptr;
   }
 
@@ -368,9 +369,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
     if (host_it == cluster_.host_map_.end()) {
+      ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {
       if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
+        ENVOY_LOG(debug, "host {} is unhealthy", host);
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();

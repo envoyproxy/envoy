@@ -13,6 +13,7 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -551,6 +552,10 @@ message Cluster {
     // The port to override for the original dst address. This port
     // will take precedence over filter state and header override ports
     google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
+
+    // The dynamic metadata key to override destination address.
+    // First the request metadata is considered, then the connection one.
+    type.metadata.v3.MetadataKey metadata_key = 4;
   }
 
   // Common configuration for all load balancer implementations.
