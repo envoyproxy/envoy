@@ -8,7 +8,7 @@ namespace Envoy {
 
 class TerminateHandlerTest : public testing::Test {
 public:
-void logException(const std::exception_ptr e) { handler.logException(e); };
+  void logException(const std::exception_ptr e) { handler.logException(e); };
 
   TerminateHandler handler;
 };
@@ -21,7 +21,7 @@ TEST(TerminateHandlerDeathTest, HandlerInstalledTest) {
 TEST_F(TerminateHandlerTest, LogsEnvoyException) {
   EXPECT_LOG_CONTAINS("critical",
                       "std::terminate called! Uncaught EnvoyException 'boom', see trace.",
-                      logException(std::make_exception_ptr(EnvoyException("boom"))));  
+                      logException(std::make_exception_ptr(EnvoyException("boom"))));
 }
 
 TEST_F(TerminateHandlerTest, LogsStdException) {
