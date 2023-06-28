@@ -52,8 +52,8 @@ public:                                                                         
  */
 class HeaderMapImpl : NonCopyable {
 public:
-  HeaderMapImpl() = default;
-  HeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  HeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                const uint32_t max_headers_count = UINT32_MAX)
       : max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {}
   virtual ~HeaderMapImpl() = default;
 
@@ -353,8 +353,8 @@ protected:
  */
 template <class Interface> class TypedHeaderMapImpl : public HeaderMapImpl, public Interface {
 public:
-  TypedHeaderMapImpl() = default;
-  TypedHeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  TypedHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                     const uint32_t max_headers_count = UINT32_MAX)
       : HeaderMapImpl(max_headers_kb, max_headers_count) {}
   void setFormatter(StatefulHeaderKeyFormatterPtr&& formatter) {
     formatter_ = std::move(formatter);
@@ -479,11 +479,9 @@ protected:
 class RequestHeaderMapImpl final : public TypedHeaderMapImpl<RequestHeaderMap>,
                                    public InlineStorage {
 public:
-  static std::unique_ptr<RequestHeaderMapImpl> create() {
-    return std::unique_ptr<RequestHeaderMapImpl>(new (inlineHeadersSize()) RequestHeaderMapImpl());
-  }
-  static std::unique_ptr<RequestHeaderMapImpl> create(const uint32_t max_headers_kb,
-                                                      const uint32_t max_headers_count) {
+  static std::unique_ptr<RequestHeaderMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
     return std::unique_ptr<RequestHeaderMapImpl>(
         new (inlineHeadersSize()) RequestHeaderMapImpl(max_headers_kb, max_headers_count));
   }
@@ -523,8 +521,8 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  RequestHeaderMapImpl() { clearInline(); }
-  RequestHeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  RequestHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                       const uint32_t max_headers_count = UINT32_MAX)
       : TypedHeaderMapImpl<RequestHeaderMap>(max_headers_kb, max_headers_count) {
     clearInline();
   }
@@ -539,12 +537,9 @@ private:
 class RequestTrailerMapImpl final : public TypedHeaderMapImpl<RequestTrailerMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<RequestTrailerMapImpl> create() {
-    return std::unique_ptr<RequestTrailerMapImpl>(new (inlineHeadersSize())
-                                                      RequestTrailerMapImpl());
-  }
-  static std::unique_ptr<RequestTrailerMapImpl> create(const uint32_t max_headers_kb,
-                                                       const uint32_t max_headers_count) {
+  static std::unique_ptr<RequestTrailerMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
     return std::unique_ptr<RequestTrailerMapImpl>(
         new (inlineHeadersSize()) RequestTrailerMapImpl(max_headers_kb, max_headers_count));
   }
@@ -556,9 +551,8 @@ protected:
   HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
 
 private:
-  RequestTrailerMapImpl() { clearInline(); }
-
-  RequestTrailerMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  RequestTrailerMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                        const uint32_t max_headers_count = UINT32_MAX)
       : TypedHeaderMapImpl<RequestTrailerMap>(max_headers_kb, max_headers_count) {
     clearInline();
   }
@@ -573,12 +567,9 @@ private:
 class ResponseHeaderMapImpl final : public TypedHeaderMapImpl<ResponseHeaderMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<ResponseHeaderMapImpl> create() {
-    return std::unique_ptr<ResponseHeaderMapImpl>(new (inlineHeadersSize())
-                                                      ResponseHeaderMapImpl());
-  }
-  static std::unique_ptr<ResponseHeaderMapImpl> create(const uint32_t max_headers_kb,
-                                                       const uint32_t max_headers_count) {
+  static std::unique_ptr<ResponseHeaderMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
     return std::unique_ptr<ResponseHeaderMapImpl>(
         new (inlineHeadersSize()) ResponseHeaderMapImpl(max_headers_kb, max_headers_count));
   }
@@ -608,9 +599,8 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  ResponseHeaderMapImpl() { clearInline(); }
-
-  ResponseHeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  ResponseHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                        const uint32_t max_headers_count = UINT32_MAX)
       : TypedHeaderMapImpl<ResponseHeaderMap>(max_headers_kb, max_headers_count) {
     clearInline();
   }
@@ -624,12 +614,9 @@ private:
 class ResponseTrailerMapImpl final : public TypedHeaderMapImpl<ResponseTrailerMap>,
                                      public InlineStorage {
 public:
-  static std::unique_ptr<ResponseTrailerMapImpl> create() {
-    return std::unique_ptr<ResponseTrailerMapImpl>(new (inlineHeadersSize())
-                                                       ResponseTrailerMapImpl());
-  }
-  static std::unique_ptr<ResponseTrailerMapImpl> create(const uint32_t max_headers_kb,
-                                                        const uint32_t max_headers_count) {
+  static std::unique_ptr<ResponseTrailerMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
     return std::unique_ptr<ResponseTrailerMapImpl>(
         new (inlineHeadersSize()) ResponseTrailerMapImpl(max_headers_kb, max_headers_count));
   }
@@ -651,8 +638,8 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  ResponseTrailerMapImpl() { clearInline(); }
-  ResponseTrailerMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
+  ResponseTrailerMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                         const uint32_t max_headers_count = UINT32_MAX)
       : TypedHeaderMapImpl<ResponseTrailerMap>(max_headers_kb, max_headers_count) {
     clearInline();
   }

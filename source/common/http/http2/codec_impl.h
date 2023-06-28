@@ -438,11 +438,8 @@ protected:
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_([this]() {
-            auto headers =
-                ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
-            return headers;
-          }()) {}
+          headers_or_trailers_(
+              ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
@@ -505,11 +502,9 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_([this]() {
-            auto headers =
-                RequestHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_);
-            return headers;
-          }()) {}
+        : StreamImpl(parent, buffer_limit),
+          headers_or_trailers_(
+              RequestHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
     // StreamImpl
     void destroy() override;
