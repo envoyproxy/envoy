@@ -278,6 +278,8 @@ protected:
 
     HostsSource() = default;
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(static_cast<uint8_t>(priority)), source_type_(source_type) {
       ASSERT(priority <= 128, "Priority out of bounds.");
@@ -285,6 +287,8 @@ protected:
              source_type == SourceType::DegradedHosts);
     }
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
         : priority_(static_cast<uint8_t>(priority)), source_type_(source_type),
           locality_index_(locality_index) {
