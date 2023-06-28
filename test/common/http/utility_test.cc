@@ -1245,7 +1245,7 @@ public:
   void merge(const BadConfig& other) { state_ += other.state_; }
 };
 
-// Verify that merging result is empty works as expected when the bad config is provided.
+// Verify that merging result is empty as expected when the bad config is provided.
 TEST(HttpUtility, GetMergedPerFilterBadConfig) {
   TestConfig testConfig;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
