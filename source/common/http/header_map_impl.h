@@ -52,7 +52,7 @@ public:                                                                         
  */
 class HeaderMapImpl : NonCopyable {
 public:
-  HeaderMapImpl() {}
+  HeaderMapImpl() = default;
   HeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
       : max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {}
   virtual ~HeaderMapImpl() = default;
@@ -353,7 +353,7 @@ protected:
  */
 template <class Interface> class TypedHeaderMapImpl : public HeaderMapImpl, public Interface {
 public:
-  TypedHeaderMapImpl() {}
+  TypedHeaderMapImpl() = default;
   TypedHeaderMapImpl(const uint32_t max_headers_kb, const uint32_t max_headers_count)
       : HeaderMapImpl(max_headers_kb, max_headers_count) {}
   void setFormatter(StatefulHeaderKeyFormatterPtr&& formatter) {
