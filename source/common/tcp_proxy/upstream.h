@@ -71,9 +71,6 @@ public:
 
   bool valid() const { return conn_pool_data_.has_value() || generic_conn_pool_; }
   Http::CodecType codecType() const { return type_; }
-  std::unique_ptr<Router::GenericConnPool> createConnPool(Upstream::ThreadLocalCluster&,
-                                                          Upstream::LoadBalancerContext* context,
-                                                          absl::optional<Http::Protocol> protocol);
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;

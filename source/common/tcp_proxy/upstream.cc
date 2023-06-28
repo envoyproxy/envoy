@@ -273,22 +273,6 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
       thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
 }
 
-std::unique_ptr<Router::GenericConnPool>
-HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
-                             Upstream::LoadBalancerContext* context,
-                             absl::optional<Http::Protocol> protocol) {
-  Router::GenericConnPoolFactory* factory = nullptr;
-  factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
-      "envoy.filters.connection_pools.http.generic");
-  if (!factory) {
-    return nullptr;
-  }
-
-  return factory->createGenericConnPool(cluster,
-                                        Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-                                        route_->route_entry_, protocol, context);
-}
-
 HttpConnPool::~HttpConnPool() {
   if (upstream_handle_ != nullptr) {
     // Because HTTP connections are generally shorter lived and have a higher probability of use
