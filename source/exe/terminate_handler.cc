@@ -30,8 +30,7 @@ void TerminateHandler::logException(const std::exception_ptr current_exception) 
     } catch (const std::exception& e) {
       ENVOY_LOG(critical, "std::terminate called! Uncaught exception '{}', see trace.", e.what());
     } catch (...) {
-      ENVOY_LOG(critical,
-                "std::terminate called! Uncaught unknown exception, see trace.");
+      ENVOY_LOG(critical, "std::terminate called! Uncaught unknown exception, see trace.");
     }
   } else {
     ENVOY_LOG(critical, "std::terminate called! See trace.");

@@ -8,11 +8,9 @@ namespace Envoy {
 
 class TerminateHandlerTest : public testing::Test {
 public:
-void logException(const std::exception_ptr e) {
-  handler.logException(e);  
-};
+void logException(const std::exception_ptr e) { handler.logException(e); };
 
-TerminateHandler handler;
+  TerminateHandler handler;
 };
 
 TEST(TerminateHandlerDeathTest, HandlerInstalledTest) {
@@ -21,18 +19,20 @@ TEST(TerminateHandlerDeathTest, HandlerInstalledTest) {
 }
 
 TEST_F(TerminateHandlerTest, LogsEnvoyException) {
-  EXPECT_LOG_CONTAINS("critical", "std::terminate called! Uncaught EnvoyException 'boom', see trace.",
-		     logException(std::make_exception_ptr(EnvoyException("boom"))));  
+  EXPECT_LOG_CONTAINS("critical",
+                      "std::terminate called! Uncaught EnvoyException 'boom', see trace.",
+                      logException(std::make_exception_ptr(EnvoyException("boom"))));  
 }
 
 TEST_F(TerminateHandlerTest, LogsStdException) {
-  EXPECT_LOG_CONTAINS("critical", "std::terminate called! Uncaught exception 'std::exception', see trace.",
-                     logException(std::make_exception_ptr(std::exception())));
+  EXPECT_LOG_CONTAINS("critical",
+                      "std::terminate called! Uncaught exception 'std::exception', see trace.",
+                      logException(std::make_exception_ptr(std::exception())));
 }
 
 TEST_F(TerminateHandlerTest, LogsUnknownException) {
   EXPECT_LOG_CONTAINS("critical", "std::terminate called! Uncaught unknown exception, see trace.",
-                     logException(std::make_exception_ptr("Boom")));
+                      logException(std::make_exception_ptr("Boom")));
 }
 
 TEST_F(TerminateHandlerTest, HandlesNullptrCurrentException) {
