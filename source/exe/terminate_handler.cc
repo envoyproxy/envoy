@@ -13,7 +13,6 @@ namespace Envoy {
 
 std::terminate_handler TerminateHandler::logOnTerminate() const {
   return std::set_terminate([]() {
-    std::exception_ptr current_exception = std::current_exception();
     logException(std::current_exception());
     BACKTRACE_LOG();
     std::abort();
