@@ -99,11 +99,6 @@ minor_behavior_changes:
   change: |
     Added check for existing metadata before setting metadata due to 'auto_sni', 'auto_san_validation', or
     'override_auto_sni_header' to prevent triggering ENVOY_BUG when an earlier filter has set the metadata.
-- area: resource_monitors
-  change: |
-    Changed behavior of the fixed heap monitor to count unused mapped pages as
-    free memory. This change can be reverted temporarily by setting the runtime guard
-    ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` to false.
 - area: ext_proc
   change: |
     Filter metadata containing ext proc stats has been moved from ext-proc-logging-info to a namespace corresponding
