@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // is done, so that the following filters can rely on the extraction result for processing the current request.
 //
 // The target field should be singular primitive type or repeated primitive
-// type and its value will be extracted in string format.
+// type and its value will be extracted in string format. The intermediate type could be repeated.
 //
 // The result will be written as `field<StringValue>` -> `values<ListValue of StringValue>` into the dynamic metadata<google.protobuf.Struct>.
 //
