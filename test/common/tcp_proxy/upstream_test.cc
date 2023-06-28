@@ -119,7 +119,6 @@ public:
       EXPECT_NO_THROW(upstream_->setRequestEncoder(encoder_, false));
     } else {
       upstream_->setRequestEncoder(encoder_, true);
-      EXPECT_NO_THROW(upstream_->newStream(*filter_));
       EXPECT_NO_THROW(upstream_->setRouterUpstreamRequest(nullptr));
       EXPECT_NO_THROW(upstream_->responseDecoder().decode1xxHeaders(nullptr));
       EXPECT_NO_THROW(upstream_->responseDecoder().decodeMetadata(nullptr));
