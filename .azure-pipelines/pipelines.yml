@@ -13,6 +13,9 @@ pr: none
 
 
 variables:
+- name: agentUbuntu
+  value: ubuntu-20.04
+
 - name: isDev
   # This must be checked/set in a `step` from the VERSION.txt file, in order to be useful
   value: true

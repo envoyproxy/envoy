@@ -107,7 +107,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   absl::node_hash_set<std::string> resources;
   for (const auto* watch : api_state.watches_) {
     for (const std::string& resource : watch->resources_) {
-      if (resources.count(resource) == 0) {
+      if (!resources.contains(resource)) {
         resources.emplace(resource);
         request.add_resource_names(resource);
       }

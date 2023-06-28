@@ -281,6 +281,7 @@ envoy_cc_mock(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
         "//test/mocks/upstream:health_checker_mocks",

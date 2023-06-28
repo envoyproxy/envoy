@@ -828,7 +828,7 @@ public:
                             absl::flat_hash_set<T>& result_set) {
     std::copy_if(original_set.begin(), original_set.end(),
                  std::inserter(result_set, result_set.begin()),
-                 [&remove_set](const T& v) -> bool { return remove_set.count(v) == 0; });
+                 [&remove_set](const T& v) -> bool { return !remove_set.contains(v); });
   }
 };
 

@@ -32,8 +32,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Runtime::Loader& runtime, Random::RandomGenerator& random,
-                             ProtobufMessage::ValidationVisitor& validation_visitor);
+                             Server::Configuration::CommonFactoryContext& context);
 };
 
 /**
@@ -87,8 +86,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::CommonFactoryContext& context);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -99,9 +97,8 @@ protected:
  */
 class AndFilter : public OperatorFilter {
 public:
-  AndFilter(const envoy::config::accesslog::v3::AndFilter& config, Runtime::Loader& runtime,
-            Random::RandomGenerator& random,
-            ProtobufMessage::ValidationVisitor& validation_visitor);
+  AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
+            Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -114,8 +111,8 @@ public:
  */
 class OrFilter : public OperatorFilter {
 public:
-  OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-           Random::RandomGenerator& random, ProtobufMessage::ValidationVisitor& validation_visitor);
+  OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
+           Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -280,12 +277,11 @@ public:
    * implementation is unable to produce a filter with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
    * @param config supplies the custom configuration for this filter type.
-   * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
+   * @param context supplies the server factory context.
    * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
+                                 Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
