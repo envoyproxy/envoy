@@ -2184,4 +2184,34 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
   verifyDownstreamResponse(*response, 200);
 }
 
+class ExtProcLoggingIntegrationTest : public ExtProcIntegrationTest {
+protected:
+  void initializeConfig() {
+    ExtProcIntegrationTest::initializeConfig();
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+      config_helper_.addFilter("name: log-filter");
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeferredProcessing, ExtProcLoggingIntegrationTest,
+    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
+    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+
+TEST_P(ExtProcLoggingIntegrationTest, GetAndCloseStream) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  // Just close the stream without doing anything
+  processor_stream_->startGrpcStream();
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
