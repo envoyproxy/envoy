@@ -56,8 +56,6 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
-// Header keys should not contain NUL, CR, NL characters.
-const std::regex& getInvalidHeaderPattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\0|\r|\n"); }
 
 } // namespace
 
@@ -349,8 +347,8 @@ void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcomm
   }
 
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (std::regex_search(main_header, getInvalidHeaderPattern()) ||
-      std::regex_search(alternative_header, getInvalidHeaderPattern())) {
+  if (!Envoy::Http::validHeaderString(main_header) ||
+      !Envoy::Http::validHeaderString(alternative_header)) {
     throw EnvoyException("Invalid header configuration. Format string contains null or newline.");
   }
 }
