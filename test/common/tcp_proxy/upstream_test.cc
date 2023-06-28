@@ -103,6 +103,7 @@ public:
     EXPECT_EQ(upstream_->finalUpstreamRequest(), nullptr);
     EXPECT_NO_THROW(upstream_->upstreamRequests());
     EXPECT_NO_THROW(upstream_->timeSource());
+    EXPECT_NO_THROW(upstream_->route());
     if (typeid(T) == typeid(CombinedUpstream)) {
       auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
       std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
@@ -115,8 +116,13 @@ public:
       upstream_->setRouterUpstreamRequest(std::move(mock_upst));
       EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
       upstream_->newStream(*filter_);
+      EXPECT_NO_THROW(upstream_->setRequestEncoder(encoder_, false));
     } else {
       upstream_->setRequestEncoder(encoder_, true);
+      EXPECT_NO_THROW(upstream_->newStream(*filter_));
+      EXPECT_NO_THROW(upstream_->setRouterUpstreamRequest(nullptr));
+      EXPECT_NO_THROW(upstream_->responseDecoder().decode1xxHeaders(nullptr));
+      EXPECT_NO_THROW(upstream_->responseDecoder().decodeMetadata(nullptr));
     }
   }
 

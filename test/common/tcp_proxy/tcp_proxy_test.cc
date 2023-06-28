@@ -413,6 +413,7 @@ TEST_F(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterBelowWriteBufferLowWatermark());
   EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(uint32_t{0}));
+  EXPECT_NO_THROW(stream_decoder_callbacks.decoderBufferLimit());
   EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
   EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
@@ -428,6 +429,7 @@ TEST_F(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.tracingConfig());
   Buffer::OwnedImpl inject_data;
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.injectDecodedDataToFilterChain(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedTrailers());
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedMetadata());
