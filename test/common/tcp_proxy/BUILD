@@ -65,6 +65,7 @@ envoy_cc_test(
     ],
     deps = [
         ":tcp_proxy_test_base",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
