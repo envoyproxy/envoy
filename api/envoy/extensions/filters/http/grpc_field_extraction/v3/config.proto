@@ -24,8 +24,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // When a request reaches the filter, it will check
 // 1. if the request is a gRPC request configured for extraction, try doing extraction:
-//    a. if successful, write the result into the corresponding dynamic metadata.
-//    b. if failed, for example malformed protobuf message as request payload, reject the request
+//    a. if successful, write the result into the dynamic metadata.
+//    b. if failed, reject the request.
 // 2. otherwise, pass through the request.
 //
 // When the filter is doing extraction, it will **block headers/data propagation** before the extraction
