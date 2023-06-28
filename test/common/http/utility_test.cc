@@ -1205,12 +1205,6 @@ public:
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-class BadConfig {
-public:
-  int state_;
-  void merge(const BadConfig& other) { state_ += other.state_; }
-};
-
 // Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -1245,6 +1239,13 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
+class BadConfig {
+public:
+  int state_;
+  void merge(const BadConfig& other) { state_ += other.state_; }
+};
+
+// Verify that merging result is empty works as expected when the bad config is provided.
 TEST(HttpUtility, GetMergedPerFilterBadConfig) {
   TestConfig testConfig;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -1256,7 +1257,7 @@ TEST(HttpUtility, GetMergedPerFilterBadConfig) {
       }));
 
   EXPECT_LOG_CONTAINS(
-      "error", "Failed to retrieve the correct type of route specific filter config",
+      "debug", "Failed to retrieve the correct type of route specific filter config",
       auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
           &filter_callbacks,
           [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
