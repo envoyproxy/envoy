@@ -36,10 +36,11 @@ behavior_changes:
 - area: stats tls
   change: |
     fixed metric tag extraction so that TLS parameters are properly extracted from the stats, both for listeners and clusters.
-    This changes the Prometheus names from ``envoy_listener_ssl_ciphers_ECDHE_RSA_AES128_GCM_SHA256{envoy_listener_address="0.0.0.0_10000"}`` to
-    ``envoy_listener_ssl_ciphers_ECDHE_RSA_AES128_GCM_SHA256{envoy_listener_address="0.0.0.0_10000", envoy_listener_ssl_cipher="ECDHE_RSA_AES128_GCM_SHA256"}``, and
-    similar for ``envoy_listener_ssl_versions_TLSv1_2``, ``envoy_cluster_ssl_versions_TLSv1_2``, ``envoy_listener_ssl_curves_P_256``, ``envoy_cluster_ssl_curves_P_256``,
-    ``envoy_listener_ssl_sigalgs.rsa_pss_rsae_sha256``.
+    This changes the Prometheus names from
+    ``envoy_listener_ssl_ciphers_ECDHE_RSA_AES128_GCM_SHA256{envoy_listener_address="0.0.0.0_10000"}`` to
+    ``envoy_listener_ssl_ciphers{envoy_listener_address="0.0.0.0_10000", envoy_ssl_cipher="ECDHE_RSA_AES128_GCM_SHA256"}``, and
+    similar for ``envoy_listener_ssl_versions_TLSv1_2``, ``envoy_cluster_ssl_versions_TLSv1_2``, ``envoy_listener_ssl_curves_P_256``,
+    ``envoy_cluster_ssl_curves_P_256``, ``envoy_listener_ssl_sigalgs_rsa_pss_rsae_sha256``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
