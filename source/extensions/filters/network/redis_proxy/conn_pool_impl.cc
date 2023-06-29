@@ -283,7 +283,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  uint32_t client_idx = transaction.current_client_idx;
+  uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.clients_[client_idx] =

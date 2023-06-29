@@ -265,7 +265,11 @@ struct Transaction {
   // the mirroring policies.
   std::vector<ClientPtr> clients_;
   Network::ConnectionCallbacks* connection_cb_;
-  uint32_t current_client_idx{0};
+
+  // This index represents the current client on which traffic is being sent to.
+  // When sending to the main redis server it will be 0, and when sending to one of
+  // the mirror servers it will be 1..n.
+  uint32_t current_client_idx_{0};
 };
 
 class NoOpTransaction : public Transaction {
