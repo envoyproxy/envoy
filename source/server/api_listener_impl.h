@@ -127,7 +127,7 @@ protected:
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
-      void readDisable(bool) override {}
+      ReadDisableStatus readDisable(bool) override { return ReadDisableStatus::NoTransition; }
       void detectEarlyCloseWhenReadDisabled(bool) override {
         IS_ENVOY_BUG("Unexpected function call");
       }

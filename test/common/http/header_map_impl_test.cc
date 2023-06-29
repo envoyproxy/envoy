@@ -46,6 +46,14 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ("goodbye", hello_string.get());
   }
 
+  // assignment operator with const rhs
+  {
+    LowerCaseString present_value("present_value");
+    const LowerCaseString new_value("new_value");
+    present_value = new_value;
+    EXPECT_EQ("new_value", present_value.get());
+  }
+
   // Move constructor for normal UnionString.
   {
     UnionString to_move;

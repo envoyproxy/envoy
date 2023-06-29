@@ -1336,4 +1336,12 @@ MATCHER_P(JsonStringEq, expected, "") {
 }
 #endif
 
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 } // namespace Envoy
