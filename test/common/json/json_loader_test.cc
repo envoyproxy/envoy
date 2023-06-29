@@ -4,6 +4,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -12,10 +13,25 @@ namespace Envoy {
 namespace Json {
 namespace {
 
+using ::Envoy::StatusHelpers::StatusIs;
+
 class JsonLoaderTest : public testing::Test {
 protected:
   JsonLoaderTest() : api_(Api::createApiForTest()) {}
 
+  ValueType getValidValue(const Json::Object& json, const std::string& key) {
+    auto result = json.getValue(key);
+    EXPECT_TRUE(result.ok());
+    return result.value();
+  }
+
+  void expectErrorValue(const Json::Object& json, const std::string& key,
+                        absl::StatusCode status_code, const std::string& message) {
+    auto result = json.getValue(key);
+    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, StatusIs(status_code));
+    EXPECT_EQ(result.status().message(), message);
+  }
   Api::ApiPtr api_;
 };
 
@@ -49,8 +65,9 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_TRUE(json->getBoolean("hello", false));
     EXPECT_FALSE(json->getBoolean("world", false));
 
-    EXPECT_TRUE(absl::get<bool>(json->getValue("hello")));
-    EXPECT_THROW(json->getValue("world"), Exception);
+    EXPECT_TRUE(absl::get<bool>(getValidValue(*json, "hello")));
+    expectErrorValue(*json, "world", absl::StatusCode::kNotFound,
+                     "key 'world' missing from lines 1-1");
   }
 
   {
@@ -64,7 +81,7 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_EQ(123, json->getInteger("hello", 456));
     EXPECT_EQ(456, json->getInteger("world", 456));
 
-    EXPECT_EQ(123, absl::get<int64_t>(json->getValue("hello")));
+    EXPECT_EQ(123, absl::get<int64_t>(getValidValue(*json, "hello")));
   }
 
   {
@@ -96,15 +113,15 @@ TEST_F(JsonLoaderTest, Basic) {
     ObjectSharedPtr json =
         Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}");
     int pos = 0;
-    json->iterate([&pos](const std::string& key, const Json::Object& value) {
+    json->iterate([this, &pos](const std::string& key, const Json::Object& value) {
       EXPECT_TRUE(key == "1" || key == "2");
 
       if (key == "1") {
         EXPECT_EQ("111", value.getString("11"));
-        EXPECT_EQ("111", absl::get<std::string>(value.getValue("11")));
+        EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
       } else {
         EXPECT_EQ("222", value.getString("22"));
-        EXPECT_EQ("222", absl::get<std::string>(value.getValue("22")));
+        EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
       }
 
       pos++;
@@ -161,7 +178,8 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_THROW(array[0]->asObjectArray(), Exception);
 
     // Object Array is not supported as an value.
-    EXPECT_THROW(config->getValue("descriptors"), Exception);
+    expectErrorValue(*config, "descriptors", absl::StatusCode::kInternal,
+                     "key 'descriptors' not a value type from lines 2-4");
   }
 
   {
@@ -279,15 +297,15 @@ TEST_F(JsonLoaderTest, Double) {
     EXPECT_EQ(10.5, json->getDouble("value1"));
     EXPECT_EQ(-12.3, json->getDouble("value2"));
 
-    EXPECT_EQ(10.5, absl::get<double>(json->getValue("value1")));
-    EXPECT_EQ(-12.3, absl::get<double>(json->getValue("value2")));
+    EXPECT_EQ(10.5, absl::get<double>(getValidValue(*json, "value1")));
+    EXPECT_EQ(-12.3, absl::get<double>(getValidValue(*json, "value2")));
   }
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"foo\": 13.22}");
     EXPECT_EQ(13.22, json->getDouble("foo", 0));
     EXPECT_EQ(0, json->getDouble("bar", 0));
 
-    EXPECT_EQ(13.22, absl::get<double>(json->getValue("foo")));
+    EXPECT_EQ(13.22, absl::get<double>(getValidValue(*json, "foo")));
   }
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"foo\": \"bar\"}");
