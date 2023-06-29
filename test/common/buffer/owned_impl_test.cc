@@ -1386,18 +1386,8 @@ TYPED_TEST(OwnedImplTypedTest, ReadReserveAndCommit) {
   const ssize_t rc = os_sys_calls.write(fds[1], data.data(), data.size()).return_value_;
   ASSERT_GT(rc, 0);
 
-  // The remainder Windows flakes under Windows. E.g.
-  //     [ RUN      ] OwnedImplTypedTest/0.ReadReserveAndCommit
-  //     test/common/buffer/owned_impl_test.cc(1389): error: Expected equality of these values:
-  //       result.return_value_
-  //         Which is: 0
-  //       static_cast<uint64_t>(rc)
-  //         Which is: 1
-  //     Stack trace: (elided)
-  //     ... Google Test internal frames ...
-  //
-  //     [  FAILED  ] OwnedImplTypedTest/0.ReadReserveAndCommit, where
-  //                  TypeParam = class Envoy::Network::IoSocketHandleImpl (1 ms)
+  // The remainder of this test flakes under Windows.
+  // See https://github.com/envoyproxy/envoy/issues/28177.
   DISABLE_UNDER_WINDOWS;
   Api::IoCallUint64Result result = io_handle.read(buf, read_length);
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
