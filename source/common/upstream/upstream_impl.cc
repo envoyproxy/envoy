@@ -48,6 +48,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -549,6 +550,8 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
   std::vector<std::shared_ptr<HostsPerLocalityImpl>> mutable_clones;
   std::vector<HostsPerLocalityConstSharedPtr> filtered_clones;
 
+  mutable_clones.reserve(predicates.size());
+  filtered_clones.reserve(predicates.size());
   for (size_t i = 0; i < predicates.size(); ++i) {
     mutable_clones.emplace_back(std::make_shared<HostsPerLocalityImpl>());
     filtered_clones.emplace_back(mutable_clones.back());
@@ -863,9 +866,11 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-LazyClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
-                                                       const ClusterTrafficStatNames& stat_names) {
-  return std::make_unique<ClusterTrafficStats>(stat_names, scope);
+DeferredCreationCompatibleClusterTrafficStats
+ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
+                               const ClusterTrafficStatNames& stat_names, bool defer_creation) {
+  return Stats::createDeferredCompatibleStats<ClusterTrafficStats>(scope, stat_names,
+                                                                   defer_creation);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -1042,8 +1047,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      traffic_stats_(
-          generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      traffic_stats_(generateStats(stats_scope_,
+                                   factory_context.clusterManager().clusterStatNames(),
+                                   server_context.statsConfig().enableDeferredCreationStats())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
@@ -2111,13 +2117,47 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       // If we are depending on a health checker, we initialize to unhealthy.
+      // If there's an existing host with the same health checker, the
+      // active health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
+          if (existing_host_found && !health_check_address_changed &&
+              !active_health_check_flag_changed) {
+            // If there's an existing host, use the same active health-status.
+            // The existing host can be marked PENDING_ACTIVE_HC or
+            // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-        // If we want to exclude hosts until they have been health checked, mark them with
-        // a flag to indicate that they have not been health checked yet.
-        if (info_->warmHosts()) {
-          host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            constexpr uint32_t active_hc_statuses_mask =
+                enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+
+            const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+            host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
+          } else {
+            // No previous known host, mark it as failed active HC.
+            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+            // If we want to exclude hosts until they have been health checked, mark them with
+            // a flag to indicate that they have not been health checked yet.
+            if (info_->warmHosts()) {
+              host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            }
+          }
+        } else {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+          // If we want to exclude hosts until they have been health checked, mark them with
+          // a flag to indicate that they have not been health checked yet.
+          if (info_->warmHosts()) {
+            host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+          }
         }
       }
 

@@ -28,6 +28,11 @@ behavior_changes:
   change: |
     Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
     reverted by setting the runtime guard ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` to false.
+- area: active health check
+  change: |
+    Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
+    where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
+    runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -177,6 +182,12 @@ bug_fixes:
     - `CVE-2023-31147 <https://nvd.nist.gov/vuln/detail/CVE-2023-31147>`_.
     - `CVE-2023-31124 <https://nvd.nist.gov/vuln/detail/CVE-2023-31124>`_.
     - `CVE-2023-32067 <https://nvd.nist.gov/vuln/detail/CVE-2023-32067>`_.
+- area: tcp_proxy
+  change: |
+    fixed assert crash when multiple ``readDisable`` are called for TCP tunneling
+    scenarios, by allowing multiple calls. This will also cause stats that indicate
+    disable or enable of downstream read to be flushed only once per actual disabling
+    or enabling.
 - area: redis_proxy
   change: |
     Fixes a bug where route properties such as key_formatter,
@@ -445,6 +456,11 @@ new_features:
     forward :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
     ``typed_connection_metadata_context_namespaces`` and :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
     selected by ``connection_metadata_context_namespaces`` from connection metadata to external auth service.
+- area: original_dst
+  change: |
+    Filter state is pulled from request context first (if available), then falls back to connection context. Added ability to pick host
+    from dynamic metadata using :ref:`metadata_key <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.metadata_key>`.
+    Same behavior - looks in request context first (if available), falls back to connection context.
 
 deprecated:
 - area: access_log
@@ -455,3 +471,8 @@ deprecated:
   change: |
     deprecated the :ref:`HealthCheck event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` in favor of
     :ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
+- area: stats
+  change: |
+    added :ref:`enable_deferred_creation_stats
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
+    support for ClusterTrafficStats.
