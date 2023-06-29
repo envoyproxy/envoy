@@ -69,11 +69,11 @@ public:
     auto connection_metadata_val = MessageUtil::keyValueStruct("foo2", "bar2");
     (*connection_metadata_context.mutable_filter_metadata())["conn.meta.key"] = metadata_val;
 
-    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), std::move(connection_metadata_context), request,
-                                       /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
-                                       include_peer_certificate, include_tls_session, labels,
-                                       nullptr);
+    CheckRequestUtils::createHttpCheck(
+        &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+        std::move(connection_metadata_context), request,
+        /*max_request_bytes=*/0, /*pack_as_bytes=*/false, include_peer_certificate,
+        include_tls_session, labels, nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -90,14 +90,13 @@ public:
                          .at("foo")
                          .string_value());
 
-
     EXPECT_EQ("bar2", request.attributes()
-                         .connection_metadata_context()
-                         .filter_metadata()
-                         .at("conn.meta.key")
-                         .fields()
-                         .at("foo2")
-                         .string_value());
+                          .connection_metadata_context()
+                          .filter_metadata()
+                          .at("conn.meta.key")
+                          .fields()
+                          .at("foo2")
+                          .string_value());
 
     if (include_peer_certificate) {
       EXPECT_EQ(cert_data_, request.attributes().source().certificate());
