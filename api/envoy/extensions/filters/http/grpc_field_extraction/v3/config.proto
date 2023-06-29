@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // # Assumptions
 // 1. this filter is only applicable for gRPC with Protobuf as payload.
-// 2. for bi-di and client-side gRPC streaming, the client-side body emission should not depend on receiving server initial metadata.
+// 2. for bi-di and client-side gRPC streaming, the initial message from the client should not depend on receiving server initial metadata.
 //
 // # Process Flow
 // When a request reaches the filter, it will check
@@ -97,7 +97,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // }
 
 message GrpcFieldExtractionConfig {
-  // descriptor_set is in local data source. It could be either in a local file or embedded in the
+  // The proto descriptor set for the gRPC services.
+  // It could be either in a local file or embedded in the
   // inline_bytes.
   config.core.v3.DataSource descriptor_set = 1 [(validate.rules).message = {required: true}];
 
@@ -128,10 +129,15 @@ message FieldExtractions {
   // message Bar {
   //   string name = 1;
   // }
-  map<string, RequestFieldDisposition> request_field_extractions = 1;
+  map<string, RequestFieldValueDisposition> request_field_extractions = 1;
 }
 
-message RequestFieldDisposition {
-  // Other than all writing to the default dynamic metadata, potentially we can support
-  // 1)more destinations types like headers, 2) per RequestFieldDisposition destination.
+message RequestFieldValueDisposition {
+
+  oneof disposition {
+    // The dynamic metadata namespace. If empty, "envoy.filters.http.grpc_field_extraction" will be used by default.
+    //
+    // Unimplemented. Uses "envoy.filters.http.grpc_field_extraction" for now.
+    string namespace = 1;
+  }
 }
