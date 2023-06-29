@@ -74,6 +74,20 @@ CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value
                                                  int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value);
 
+// downstream
+CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
+CAPIStatus envoyGoFilterDownstreamWrite(void* wrapper, void* buffers, int buffersNum,
+                                        int endStream);
+void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
+CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
+
+// upstream
+void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr);
+CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream);
+CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
+void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
+CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

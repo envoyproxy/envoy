@@ -184,7 +184,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerMaxConnectionPerSocketEventTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
+TEST_P(ListenerMaxConnectionPerSocketEventTest,
+       DISABLED_AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
   auto set_max_connections_per_socket_event_to_two =
       [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners()) {

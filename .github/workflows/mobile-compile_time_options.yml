@@ -16,9 +16,9 @@ jobs:
     uses: ./.github/workflows/env.yml
     secrets: inherit
 
-  cc_test:
+  cc_test_no_yaml:
     needs: env
-    name: cc_test
+    name: cc_test_no_yaml
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
@@ -27,17 +27,44 @@ jobs:
     - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Building C++ library'
+    - name: 'Running C++ test with YAML disabled'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
       run: |
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --config=ci \
             --define=envoy_yaml=disabled \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             //test/common/integration:client_integration_test --test_output=all
+  cc_test:
+    needs: env
+    name: cc_test
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 120
+    container:
+      image: envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Running C++ tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw test \
+            --test_output=all \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=ci \
+            --define=signal_trace=disabled \
+            --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_enable_http_datagrams=disabled \
+            --define=google_grpc=disabled \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+            $(bazel query //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
   swift_build:
     if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
     needs: env
@@ -52,8 +79,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw shutdown
-          ./bazelw build \
+        cd mobile
+        ./bazelw shutdown
+        ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --define=signal_trace=disabled \
@@ -85,8 +113,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile \
-        && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --fat_apk_cpu=x86_64 \
             --define=signal_trace=disabled \

@@ -29,28 +29,51 @@ TEST(DsoManagerTest, Pub) {
   auto plugin_name = "example";
   auto path = genSoPath(id);
 
-  // get before load http filter dso
-  auto dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
-  EXPECT_EQ(dso, nullptr);
+  {
+    // get before load http filter dso
+    auto dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
+    EXPECT_EQ(dso, nullptr);
 
-  // first time load http filter dso
-  dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
-  EXPECT_NE(dso, nullptr);
+    // first time load http filter dso
+    dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
+    EXPECT_NE(dso, nullptr);
 
-  // get after load http filter dso
-  dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
-  EXPECT_NE(dso, nullptr);
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 200), 200);
+    // get after load http filter dso
+    dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
+    EXPECT_NE(dso, nullptr);
+    EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 200), 200);
 
-  // second time load http filter dso
-  dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
-  EXPECT_NE(dso, nullptr);
+    // second time load http filter dso
+    dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
+    EXPECT_NE(dso, nullptr);
+  }
 
-  // first time load cluster specifier dso
-  auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
-  EXPECT_NE(dso, nullptr);
+  {
+    // first time load cluster specifier dso
+    auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
+    EXPECT_NE(cluster_dso, nullptr);
 
-  EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
+    EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
+  }
+
+  {
+    // get before load network filter dso
+    auto dso = DsoManager<NetworkFilterDsoImpl>::getDsoByID(id);
+    EXPECT_EQ(dso, nullptr);
+
+    // first time load network filter dso
+    auto res = DsoManager<NetworkFilterDsoImpl>::load(id, path);
+    EXPECT_NE(res, nullptr);
+
+    // get after load network filter dso
+    dso = DsoManager<NetworkFilterDsoImpl>::getDsoByID(id);
+    EXPECT_NE(dso, nullptr);
+    EXPECT_EQ(dso->envoyGoFilterOnNetworkFilterConfig(0, 0, 0, 0), 100);
+
+    // second time load network filter dso
+    res = DsoManager<NetworkFilterDsoImpl>::load(id, path);
+    EXPECT_NE(dso, nullptr);
+  }
 }
 
 // missing a symbol

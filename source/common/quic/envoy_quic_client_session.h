@@ -65,9 +65,11 @@ public:
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-    // TODO(https://github.com/envoyproxy/envoy/issues/23564): Http3 Datagram support should be
-    // turned on by returning quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is
-    // completed.
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+      return quic::HttpDatagramSupport::kRfc;
+    }
+#endif
     return quic::HttpDatagramSupport::kNone;
   }
 
