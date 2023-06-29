@@ -137,6 +137,19 @@ steps:
   displayName: "Create bazel directories"
   condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true))
 
+- bash: |
+    set -e
+    CACHE_DIRS=(
+        "$(Build.StagingDirectory)/.cache/"
+        "$(Build.StagingDirectory)/bazel_root/install/"
+        "$(Build.StagingDirectory)/repository_cache/"
+        "$(Build.StagingDirectory)/bazel_root/base/external")
+    sudo mkdir -p "${CACHE_DIRS[@]}"
+    sudo chown -R azure-pipelines:azure-pipelines "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
+    echo "Created bazel cache directories: "${CACHE_DIRS[*]}""
+  displayName: "Create bazel directories"
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false), eq('${{ parameters.mntTmpfs }}', false))
+
 # Caching
 - task: Cache@2
   inputs:

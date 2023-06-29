@@ -10,6 +10,8 @@ fi
 
 
 DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
+MINIMUM_MEM=16251120
+AVAILABLE_MEM="$(grep MemTotal /proc/meminfo | cut -d: -f2 | rev | cut -d' ' -f2 | rev)"
 
 echo "Stopping Docker daemon ..."
 systemctl stop docker docker.socket
@@ -22,7 +24,7 @@ if id -u vsts &> /dev/null && [[ -n "$DOCKER_BIND_PATH" ]]; then
     echo "Binding docker directory ${DOCKER_BIND_PATH} -> /var/lib/docker ..."
     mkdir -p "$DOCKER_BIND_PATH"
     mount -o bind "$DOCKER_BIND_PATH" /var/lib/docker
-elif ! id -u vsts &> /dev/null; then
+elif ! id -u vsts &> /dev/null && [[ $AVAILABLE_MEM -gt $MINIMUM_MEM ]]; then
     echo "Mounting tmpfs directory -> /var/lib/docker ..."
     # Use a ramdisk to load docker (avoids Docker slow start on big disk)
     mount -t tmpfs none /var/lib/docker
