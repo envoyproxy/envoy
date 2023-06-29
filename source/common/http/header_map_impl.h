@@ -341,9 +341,9 @@ protected:
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
   // This holds the max size of the headers in kilobyte in the HeaderMap.
-  const uint32_t max_headers_kb_ = 0;
+  const uint32_t max_headers_kb_ = UINT32_MAX;
   // This holds the max count of the headers in the HeaderMap.
-  const uint32_t max_headers_count_ = 0;
+  const uint32_t max_headers_count_ = UINT32_MAX;
 };
 
 /**
