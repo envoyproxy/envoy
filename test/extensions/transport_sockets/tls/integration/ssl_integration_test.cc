@@ -56,6 +56,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
+                                  .setCurves(server_curves_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_)
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,
@@ -230,6 +231,68 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
   connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+// Test that stats produced by the tls transport socket have correct tag extraction.
+TEST_P(SslIntegrationTest, StatsTagExtraction) {
+  // Configure TLS to use specific parameters so the exact metrics the test expects are created.
+
+  server_tlsv1_3_ = true;
+
+  // Use P-256 to test the regex on a curve containing a hyphen (instead of X25519).
+  server_curves_.push_back("P-256");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ClientSslTransportOptions{}.setTlsVersion(
+        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3));
+  };
+
+  upstream_tls_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.configureUpstreamTls(
+      false, false, absl::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
+        auto& params = *ctx.mutable_tls_params();
+        params.set_tls_minimum_protocol_version(
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+        params.set_tls_maximum_protocol_version(
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+        params.add_ecdh_curves("P-256");
+      });
+
+  testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
+  checkStats();
+
+  absl::node_hash_map<std::string, std::string> base_expected_counters = {
+      // The specific cipher chosen may change in a future version of BoringSSL. If that happens,
+      // change this test case to use the new cipher suite. The goal of this isn't to depend on a
+      // specific cipher, but to ensure whatever cipher is used is extracted.
+      {"ssl.ciphers.TLS_AES_128_GCM_SHA256", "ssl.ciphers"},
+      {"ssl.versions.TLSv1.3", "ssl.versions"},
+      {"ssl.curves.P-256", "ssl.curves"},
+      {"ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs"},
+  };
+
+  // Expect all the stats for both listeners and clusters.
+  absl::node_hash_map<std::string, std::string> expected_counters;
+  for (const auto& entry : base_expected_counters) {
+    expected_counters[listenerStatPrefix(entry.first)] = absl::StrCat("listener.", entry.second);
+    expected_counters[absl::StrCat("cluster.cluster_0.", entry.first)] =
+        absl::StrCat("cluster.", entry.second);
+  }
+
+  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+    // Useful for debugging when the test is failing.
+    if (counter->name().find("ssl") != std::string::npos) {
+      ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
+    }
+    auto it = expected_counters.find(counter->name());
+    if (it != expected_counters.end()) {
+      EXPECT_EQ(it->second, counter->tagExtractedName());
+      expected_counters.erase(it);
+    }
+  }
+  absl::node_hash_map<std::string, std::string> empty{};
+  EXPECT_EQ(expected_counters, empty);
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
