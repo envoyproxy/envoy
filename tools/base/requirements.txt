@@ -661,9 +661,9 @@ google-cloud-core==2.3.2 \
     --hash=sha256:8417acf6466be2fa85123441696c4badda48db314c607cf1e5d543fa8bdc22fe \
     --hash=sha256:b9529ee7047fd8d4bf4a2182de619154240df17fbe60ead399078c1ae152af9a
     # via google-cloud-storage
-google-cloud-storage==2.9.0 \
-    --hash=sha256:83a90447f23d5edd045e0037982c270302e3aeb45fc1288d2c2ca713d27bad94 \
-    --hash=sha256:9b6ae7b509fc294bdacb84d0f3ea8e20e2c54a8b4bbe39c5707635fec214eff3
+google-cloud-storage==2.10.0 \
+    --hash=sha256:934b31ead5f3994e5360f9ff5750982c5b6b11604dc072bc452c25965e076dc7 \
+    --hash=sha256:9433cf28801671de1c80434238fb1e7e4a1ba3087470e90f70c928ea77c2b9d7
     # via -r requirements.in
 google-crc32c==1.5.0 \
     --hash=sha256:024894d9d3cfbc5943f8f230e23950cd4906b2fe004c72e29b209420a1e6b05a \
@@ -749,8 +749,8 @@ googleapis-common-protos==1.59.0 \
     --hash=sha256:4168fcb568a826a52f23510412da405abd93f4d23ba544bb68d943b14ba3cb44 \
     --hash=sha256:b287dc48449d1d41af0c69f4ea26242b5ae4c3d7249a38b0984c86a4caffff1f
     # via google-api-core
-gsutil==5.24 \
-    --hash=sha256:1f841645cda40fcc817e9ca84d285cdf541cc015fd38a5862017b085756729a0
+gsutil==5.25 \
+    --hash=sha256:7e4cb7fa9a332c401e4b7f5fef1da3e9ef21e3e4885de6d007b07a11b5d0524a
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
@@ -1056,9 +1056,9 @@ pyflakes==3.0.1 \
     --hash=sha256:ec55bf7fe21fff7f1ad2f7da62363d749e2a470500eab1b555334b67aa1ef8cf \
     --hash=sha256:ec8b276a6b60bd80defed25add7e439881c19e64850afd9b346283d4165fd0fd
     # via flake8
-pygithub==1.58.2 \
-    --hash=sha256:1e6b1b7afe31f75151fb81f7ab6b984a7188a852bdb123dbb9ae90023c3ce60f \
-    --hash=sha256:f435884af617c6debaa76cbc355372d1027445a56fbc39972a3b9ed4968badc8
+pygithub==1.59.0 \
+    --hash=sha256:126bdbae72087d8d038b113aab6b059b4553cb59348e3024bb1a1cae406ace9e \
+    --hash=sha256:6e05ff49bac3caa7d1d6177a10c6e55a3e20c85b92424cc198571fd0cf786690
     # via -r requirements.in
 pygments==2.15.1 \
     --hash=sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c \

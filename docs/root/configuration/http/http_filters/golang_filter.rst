@@ -22,10 +22,20 @@ for more details on the filter's implementation.
 Developing a Go plugin
 ----------------------
 
-Envoy's Go plugins must implement the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`.
+Envoy's Go plugins must implement the :repo:`StreamFilter API <contrib/golang/common/go/api/filter.go>`.
+
+.. attention::
+  The Go plugin API is not yet stable, you are **strongly** recommended to use the same version of Go plugin SDK and Envoy.
+
+When you are using a release version of Envoy, i.e. 1.26.x,
+you should use ``github.com/envoyproxy/envoy v1.26.x`` in the go.mod file.
+
+When you are not using a release, i.e. the latest main branch of Envoy,
+you could use ``go get -u github.com/envoyproxy/envoy@SHA`` to get the same version of Go plugin SDK,
+the SHA is the latest commit sha.
 
 Building a Go plugin
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 .. attention::
   When building a Go plugin dynamic library, you **must** use a Go version consistent
@@ -93,7 +103,7 @@ Below is a very simple example of how such a plugin might be configured in Envoy
    :emphasize-lines: 7-10
    :caption: :download:`golang-with-config.yaml </_configs/go/golang-with-config.yaml>`
 
-See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+See the :repo:`StreamFilter API <contrib/golang/common/go/api/filter.go>`
 for more information about how the plugin's configuration data can be accessed.
 
 Per-route plugin configuration

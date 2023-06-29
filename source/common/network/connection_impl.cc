@@ -354,7 +354,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
   enable_half_close_ = enabled;
 }
 
-void ConnectionImpl::readDisable(bool disable) {
+Connection::ReadDisableStatus ConnectionImpl::readDisable(bool disable) {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
 
@@ -373,11 +373,12 @@ void ConnectionImpl::readDisable(bool disable) {
 
     if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
-      return;
+      return ReadDisableStatus::NoTransition;
     }
+
     if (read_disable_count_ > 1) {
       // The socket has already been read disabled.
-      return;
+      return ReadDisableStatus::StillReadDisabled;
     }
 
     // If half-close semantics are enabled, we never want early close notifications; we
@@ -387,18 +388,22 @@ void ConnectionImpl::readDisable(bool disable) {
     } else {
       ioHandle().enableFileEvents(Event::FileReadyType::Write);
     }
+
+    return ReadDisableStatus::TransitionedToReadDisabled;
   } else {
     ASSERT(read_disable_count_ != 0);
     --read_disable_count_;
     if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
-      return;
+      return ReadDisableStatus::NoTransition;
     }
 
+    auto read_disable_status = ReadDisableStatus::StillReadDisabled;
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
       ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+      read_disable_status = ReadDisableStatus::TransitionedToReadEnabled;
     }
 
     if (filterChainWantsData() && (read_buffer_->length() > 0 || transport_wants_read_)) {
@@ -416,6 +421,8 @@ void ConnectionImpl::readDisable(bool disable) {
       dispatch_buffered_data_ = true;
       ioHandle().activateFileEvents(Event::FileReadyType::Read);
     }
+
+    return read_disable_status;
   }
 }
 

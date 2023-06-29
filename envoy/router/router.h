@@ -1523,6 +1523,11 @@ using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
  */
 class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
+  /*
+   * Protocol used by the upstream sockets.
+   */
+  enum class UpstreamProtocol { HTTP, TCP, UDP };
+
   ~GenericConnPoolFactory() override = default;
 
   /*
@@ -1530,7 +1535,8 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

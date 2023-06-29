@@ -38,9 +38,10 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (
@@ -216,7 +217,8 @@ func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(r *httpRequest, id int) (string, bool) {
+func (c *httpCApiImpl) HttpGetStringValue(rr unsafe.Pointer, id int) (string, bool) {
+	r := (*httpRequest)(rr)
 	var value string
 	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
 	// since there might be multiple concurrency goroutines invoking this API on the Go side.
@@ -266,10 +268,10 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI HttpCAPI = &httpCApiImpl{}
+var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api HttpCAPI) {
+func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
 }
 
@@ -278,7 +280,8 @@ func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, va
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
+	r := (*httpRequest)(rr)
 	var value string
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
