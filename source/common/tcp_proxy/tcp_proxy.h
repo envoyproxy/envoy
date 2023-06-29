@@ -475,6 +475,24 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
+
+  /**
+   * @class HttpStreamDecoderFilterCallbacks
+   * @brief Interface for callbacks provided to Router::UpstreamRequest.
+   *
+   * The `HttpStreamDecoderFilterCallbacks` class serves as an interface for providing callbacks to
+   * Router::UpstreamRequest via RouterFilterInterface. It inherits from the
+   * `Http::StreamDecoderFilterCallbacks` class, which provides a set of common callback functions
+   * for interacting with the downstream connection.
+   *
+   * Router::UpstreamRequest use these callbacks to get access to the downstream resources such as
+   * downstream connection, dispatcher, watermark manager, stream info, etc.
+   * This is required for setting up the upstream connection and also to communicate back to the
+   * downstream such as setting upstream info into the stream info, managing flow control, etc.
+   *
+   * @see Http::StreamDecoderFilterCallbacks
+   * @see Http::StreamDecoderFilter
+   */
   class HttpStreamDecoderFilterCallbacks : public Http::StreamDecoderFilterCallbacks,
                                            public ScopeTrackedObject {
   public:

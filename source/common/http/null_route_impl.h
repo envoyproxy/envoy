@@ -1,3 +1,5 @@
+// This file is all about providing a no-op implementation, NullRouteImpl, of
+// Router::Route which requires no-op implementations of a variety or Router helper classes.
 #pragma once
 
 #include "envoy/router/router.h"
