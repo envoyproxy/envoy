@@ -187,7 +187,8 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
 //        DISABLED_AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
 //   auto set_max_connections_per_socket_event_to_two =
 //       [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-//         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+//         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners())
+//         {
 //           listener_config.mutable_max_connections_to_accept_per_socket_event()->set_value(2);
 //         }
 //       };
