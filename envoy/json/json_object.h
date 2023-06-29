@@ -9,6 +9,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "source/common/common/statusor.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -49,7 +51,7 @@ public:
    * @param name supplies the key name.
    * @return bool the value.
    */
-  virtual ValueType getValue(const std::string& name) const PURE;
+  virtual absl::StatusOr<ValueType> getValue(const std::string& name) const PURE;
 
   /**
    * Get a boolean value by name.
