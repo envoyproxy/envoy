@@ -18,14 +18,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_http_filters_grpc_field_extraction>`.
 // [#extension: envoy.filters.http.grpc_field_extraction]
 
-// GrpcFieldExtractionConfig supports extracting the fields from first gRPC
-// request message no matter if it is unary or streaming and write the result
-// to the destination. Currently only supports dynamic metadata as destination.
+// GrpcFieldExtraction filter supports extracting the fields from first gRPC
+// request message no matter if it is unary or streaming and it write the result
+// to the destination, for which currently only support the static dynamic metadata `envoy.filters.http.grpc_field_extraction`.
 //
 // When a request reaches the filter, it will check
-// 1. if the request is a gRPC request configured for extraction, try doing extraction:
-//    a. if successful, write the result into the dynamic metadata.
-//    b. if failed, reject the request.
+// 1. if the request is a gRPC request configured for extraction, the filter tries doing extraction on the first gRPC message:
+//    a. if successful , write the result into the dynamic metadata and proceed the request.
+//    b. if failed, caused by malformed requests, reject the request.
 // 2. otherwise, pass through the request.
 //
 // When the filter is doing extraction, it will **block headers/data propagation** before the extraction
@@ -73,7 +73,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The filter will writes the following dynamic metadata(expressed in JSON format).
 //
-// envoy.filters.http.grpc_field_extraction: {
+// `envoy.filters.http.grpc_field_extraction`: {
 //   "foo":[
 //      "val_foo"
 //   ],
