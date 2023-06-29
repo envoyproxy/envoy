@@ -93,7 +93,7 @@ public:
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
   // SSL curve for a connection
   const std::string SSL_CURVE = "envoy.ssl_curve";
-  // SSL sigalg for a connection
+  // SSL signature algorithm for a connection
   const std::string SSL_SIGALG = "envoy.ssl_sigalg";
   // SSL version for a connection
   const std::string SSL_VERSION = "envoy.ssl_version";
