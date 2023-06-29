@@ -107,18 +107,21 @@ TagNameValues::TagNameValues() {
   addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
   // listener.[<address>.]ssl.ciphers.(<cipher>)
-  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.ciphers(\.(<CIPHER>))$)");
+  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
   // Curves and ciphers have the same pattern so they use the same regex.
   // listener.[<address>.]ssl.curves.(<curve>)
-  addRe2(SSL_CURVE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.curves(\.(<CIPHER>))$)");
+  addRe2(SSL_CURVE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.curves(\.(<CIPHER>))$)",
+         ".ssl.curves.");
 
   // Signing algorithms and ciphers have the same pattern so they use the same regex.
   // listener.[<address>.]ssl.sigalgs.(<algorithm>)
-  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)");
+  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)",
+         ".ssl.sigalgs.");
 
   // listener.[<address>.]ssl.versions.(<version>)
-  addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)");
+  addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)",
+         ".ssl.versions.");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<TAG_VALUE>\.ssl\.ciphers(\.(<CIPHER>))$)",
