@@ -241,3 +241,14 @@ envoy_cc_test(
         "//source/extensions/config_subscription/grpc:xds_source_id_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "eds_resources_cache_impl_test",
+    srcs = ["eds_resources_cache_impl_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

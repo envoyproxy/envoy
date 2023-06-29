@@ -20,7 +20,7 @@ jobs:
     if: ${{ needs.env.outputs.mobile_coverage == 'true' }}
     needs: env
     name: coverage
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     defaults:
       run:

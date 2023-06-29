@@ -19,7 +19,7 @@ jobs:
   docs:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     needs: env
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 20
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}

@@ -87,7 +87,7 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt);
+      hosts_added, hosts_removed, absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
