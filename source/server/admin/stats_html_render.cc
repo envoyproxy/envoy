@@ -89,7 +89,5 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
   }
 }
 
-
-
 } // namespace Server
 } // namespace Envoy
