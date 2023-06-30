@@ -76,10 +76,13 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
   }
 }
 
-// We override the generate method for HTML to trigger some JS that will
-// render the histogram graphically. We will render that from JavaScript
-// and convey the histogram data to the JS via JSON, so we can delegate
-// to an instantiated JSON `sub-renderer` that will write into json_data_.
+// When using Detailed mode, We override the generate method for HTML to trigger
+// some JS that will render the histogram graphically. We will render that from
+// JavaScript and convey the histogram data to the JS via JSON, so we can
+// delegate to an instantiated JSON `sub-renderer` that will write into
+// json_data_. that `sub_renderer` will only be populated in Detailed mode.
+//
+// All other modes default to rendering the histogram textually.
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   if (histogram_json_render_ != nullptr) {
