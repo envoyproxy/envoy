@@ -12,22 +12,22 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   auto map = InlineMap<std::string, std::string>::create(descriptor);
 
   // Insert keys.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     map->insert("key_" + std::to_string(i), "value_" + std::to_string(i));
   }
 
   // Insert duplicate keys will fail.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
   }
 
   // Use operator[] to insert keys could overwrite existing keys.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     (*map)["key_" + std::to_string(i)] = "value_" + std::to_string(i) + "_new";
   }
 
   // Lookup keys.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     EXPECT_EQ(*map->lookup("key_" + std::to_string(i)), "value_" + std::to_string(i) + "_new");
   }
 
@@ -35,10 +35,10 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
   EXPECT_EQ(map->lookup("non_existing_key"), OptRef<std::string>{});
 
   // Remove keys.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     map->remove("key_" + std::to_string(i));
   }
-  map.release();
+  map.reset();
 }
 
 TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
@@ -51,37 +51,61 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
     inline_keys.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
   }
 
+  // Add repeated inline keys will make no effect and return the same handle.
+  for (size_t i = 0; i < 20; ++i) {
+    EXPECT_EQ(inline_keys[i].inlineId(),
+              descriptor.addInlineKey("key_" + std::to_string(i)).inlineId());
+  }
+
   descriptor.finalize();
 
   auto map = InlineMap<std::string, std::string>::create(descriptor);
 
-  // Insert keys.
-  for (size_t i = 0; i < 200; ++i) {
-    map->insert("key_" + std::to_string(i), "value_" + std::to_string(i));
+  // Insert entries by normal keys. But these keys are registered as inline keys.
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
   }
 
   // Insert duplicate keys will fail.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 10; ++i) {
     EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
   }
 
-  // Insert duplicate keys with typed inline handle will fail.
-  for (size_t i = 0; i < 20; ++i) {
-    EXPECT_FALSE(map->insert(inline_keys[i], "value_" + std::to_string(i)));
+  // Insert entries by typed inline handle.
+  for (size_t i = 10; i < 20; ++i) {
+    auto handle = inline_keys[i];
+    EXPECT_TRUE(map->insert(handle, "value_" + std::to_string(i)));
   }
 
-  // Use operator[] to insert keys could overwrite existing keys.
-  for (size_t i = 20; i < 200; ++i) {
-    (*map)["key_" + std::to_string(i)] = "value_" + std::to_string(i) + "_new";
+  // Insert duplicate keys will fail.
+  for (size_t i = 0; i < 20; ++i) {
+    auto handle = inline_keys[i];
+    EXPECT_FALSE(map->insert(handle, "value_" + std::to_string(i)));
+  }
+
+  // Insert entries by normal keys.
+  for (size_t i = 20; i < 100; ++i) {
+    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+  }
+
+  // Insert duplicate keys will fail.
+  for (size_t i = 20; i < 100; ++i) {
+    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
   }
 
   // Use operator[] to insert keys with typed inline handle could overwrite existing keys.
-  for (size_t i = 0; i < 20; ++i) {
+  for (size_t i = 0; i < 10; ++i) {
     (*map)[inline_keys[i]] = "value_" + std::to_string(i) + "_new";
   }
 
+  // Use operator[] to insert keys could overwrite existing keys (10-20 will be the keys that
+  // registered as inline keys).
+  for (size_t i = 10; i < 100; ++i) {
+    (*map)["key_" + std::to_string(i)] = "value_" + std::to_string(i) + "_new";
+  }
+
   // Lookup keys.
-  for (size_t i = 0; i < 200; ++i) {
+  for (size_t i = 0; i < 100; ++i) {
     EXPECT_EQ(*map->lookup("key_" + std::to_string(i)), "value_" + std::to_string(i) + "_new");
   }
 
@@ -104,13 +128,34 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   // Remove keys.
-  for (size_t i = 10; i < 200; ++i) {
+  for (size_t i = 10; i < 100; ++i) {
     map->remove("key_" + std::to_string(i));
   }
 
   EXPECT_EQ(map->size(), 0);
 
-  map.release();
+  // Lookup empty map by normal key will return nothing.
+  for (size_t i = 0; i < 100; ++i) {
+    EXPECT_EQ(map->lookup("key_" + std::to_string(i)), OptRef<std::string>{});
+  }
+
+  // Lookup empty map by typed inline handle will return nothing.
+  for (auto handle : inline_keys) {
+    EXPECT_EQ(map->lookup(handle), OptRef<std::string>{});
+  }
+
+  // Operator[] will insert new entry if the key does not exist.
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_EQ((*map)[inline_keys[i]], "");
+  }
+
+  for (size_t i = 10; i < 100; ++i) {
+    EXPECT_EQ((*map)["key_" + std::to_string(i)], "");
+  }
+
+  EXPECT_EQ(map->size(), 100);
+
+  map.reset();
 }
 
 } // namespace

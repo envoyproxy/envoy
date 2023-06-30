@@ -274,7 +274,7 @@ public:
         return false;
       }
 
-      resetInlineMapEntry(*entry_id, std::move(value));
+      resetInlineMapEntry(*entry_id, std::forward<ArgV>(value));
       return true;
     } else {
       // This key is not registered as inline key and try to insert the value to the normal map.
