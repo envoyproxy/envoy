@@ -1112,5 +1112,40 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
   }
 }
 
+// Test the header map max limits are setup correctly.
+TEST(HeaderMapImplTest, HeaderMapMaxLimits) {
+  auto request_header_default = RequestHeaderMapImpl::create();
+  EXPECT_EQ(request_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_header_default->maxHeadersCount(), UINT32_MAX);
+
+  auto request_header = RequestHeaderMapImpl::create(5, 10);
+  EXPECT_EQ(request_header->maxHeadersKb(), 5);
+  EXPECT_EQ(request_header->maxHeadersCount(), 10);
+
+  auto request_trailer_default = RequestTrailerMapImpl::create();
+  EXPECT_EQ(request_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_trailer_default->maxHeadersCount(), UINT32_MAX);
+
+  auto request_trailer = RequestTrailerMapImpl::create(10, 20);
+  EXPECT_EQ(request_trailer->maxHeadersKb(), 10);
+  EXPECT_EQ(request_trailer->maxHeadersCount(), 20);
+
+  auto response_header_default = ResponseHeaderMapImpl::create();
+  EXPECT_EQ(response_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_header_default->maxHeadersCount(), UINT32_MAX);
+
+  auto response_header = ResponseHeaderMapImpl::create(50, 100);
+  EXPECT_EQ(response_header->maxHeadersKb(), 50);
+  EXPECT_EQ(response_header->maxHeadersCount(), 100);
+
+  auto response_trailer_default = ResponseTrailerMapImpl::create();
+  EXPECT_EQ(response_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_trailer_default->maxHeadersCount(), UINT32_MAX);
+
+  auto response_trailer = ResponseTrailerMapImpl::create(2, 3);
+  EXPECT_EQ(response_trailer->maxHeadersKb(), 2);
+  EXPECT_EQ(response_trailer->maxHeadersCount(), 3);
+}
+
 } // namespace Http
 } // namespace Envoy
