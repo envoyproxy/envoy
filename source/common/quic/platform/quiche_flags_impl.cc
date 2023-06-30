@@ -39,7 +39,7 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
     return false;
   }
   if (name == "quic_reloadable_flag_quic_act_upon_invalid_header") {
-    // This flag changes quiche behavior that's imcompatible with current Envoy.
+    // This flag changes quiche behavior that's incompatible with current Envoy.
     return false;
   }
 
