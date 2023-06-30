@@ -191,6 +191,7 @@ def _compile_upb_protos(ctx, generator, proto_info, proto_sources):
         print("HDR: %s" % hdr)
     for file in proto_sources:
         print("proto: %s" % _get_real_short_path(file))
+    print("running %s vs %s" % (_get_real_root(srcs[0]), ctx.bin_dir.path))
     ctx.actions.run(
         inputs = depset(
             direct = [proto_info.direct_descriptor_set],
@@ -200,7 +201,7 @@ def _compile_upb_protos(ctx, generator, proto_info, proto_sources):
         outputs = srcs + hdrs,
         executable = ctx.executable._protoc,
         arguments = [
-                        "--file-descriptor_out=" + ctx.bin_dir.path,
+                        "--file-descriptor_out=" + _get_real_root(srcs[0]),
                         #"--file-descriptor_out=" + codegen_params + _get_real_root(srcs[0]),
                         "--plugin=protoc-gen-file-descriptor=" + ctx.executable._plugin.path,
                         #"--" + generator + "_out=" + codegen_params + _get_real_root(srcs[0]),
@@ -248,7 +249,16 @@ def _cc_proto_descriptor_library_rule_impl(ctx):
 
 def _upb_proto_aspect_impl(target, ctx, generator, cc_provider, file_provider):
     proto_info = target[ProtoInfo]
-    files = _compile_upb_protos(ctx, generator, proto_info, proto_info.direct_sources)
+    proto_sources = proto_info.direct_sources
+    #proto_sources = []
+    #for proto_source in proto_info.direct_sources:
+    #    print(">proto source %s" % proto_source)
+    #    if not proto_source.short_path.startswith(".."):
+    #        proto_sources.append(proto_source)
+
+    for proto_source in proto_sources:
+        print(">>proto source %s" % proto_source)
+    files = _compile_upb_protos(ctx, generator, proto_info, proto_sources)
     deps = ctx.rule.attr.deps + getattr(ctx.attr, "_" + generator)
     dep_ccinfos = [dep[CcInfo] for dep in deps if CcInfo in dep]
     dep_ccinfos += [dep[_UpbWrappedCcInfo].cc_info for dep in deps if _UpbWrappedCcInfo in dep]

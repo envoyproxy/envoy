@@ -10,9 +10,9 @@ Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& m
 
 #else
 
-#include "net/proto2/contrib/cc_proto_descriptor_library/create_dynamic_message.h"
-#include "net/proto2/contrib/cc_proto_descriptor_library/text_format_transcoder.h"
-#include "net/proto2/contrib/cc_proto_descriptor_library/file_descriptor_info.h"
+#include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
+#include "bazel/cc_descriptor_library/text_format_transcoder.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 
 #include "api/envoy/config/core/v3/base_descriptor.pb.h"
 #include "api/envoy/admin/v3/certs_descriptor.pb.h"
