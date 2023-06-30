@@ -94,5 +94,7 @@ public:
   virtual bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) PURE;
 };
 
+using ThreadLocalOverloadStateOptRef = OptRef<ThreadLocalOverloadState>;
+
 } // namespace Server
 } // namespace Envoy
