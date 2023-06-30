@@ -122,3 +122,15 @@ diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
  // This error has been generally flaky, but we need to disable it specifically
  // to fix https://github.com/protocolbuffers/protobuf/issues/12313
  #pragma clang diagnostic ignored "-Wunused-parameter"
+diff --git a/src/google/protobuf/map.h b/src/google/protobuf/map.h
+--- a/src/google/protobuf/map.h	2023-06-30 14:32:34.892148233 +0000
++++ b/src/google/protobuf/map.h	2023-06-30 14:35:37.447992493 +0000
+@@ -883,7 +883,7 @@
+         TreeConvert(b);
+       }
+       ABSL_DCHECK(TableEntryIsTree(b))
+-          << (void*)table_[b] << " " << (uintptr_t)table_[b];
++          << reinterpret_cast<void*>(table_[b]) << " " << static_cast<uintptr_t>(table_[b]);
+       InsertUniqueInTree(b, node);
+       index_of_first_non_null_ = (std::min)(index_of_first_non_null_, b);
+     }
