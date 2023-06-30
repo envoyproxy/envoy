@@ -327,7 +327,6 @@ namespace {
 
 // This is a modified copy of the UTF8CoerceToStructurallyValid from the protobuf code.
 // A copy was needed after if was removed from the protobuf.
-// This function returns a boolean indicating that
 std::string UTF8CoerceToStructurallyValid(absl::string_view str, const char replace_char) {
   std::string result(str);
   auto replace_pos = result.begin();
