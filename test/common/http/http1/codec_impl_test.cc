@@ -1978,6 +1978,40 @@ TEST_P(Http1ServerConnectionImplTest, ChunkedResponse) {
             output);
 }
 
+TEST_P(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
+  initialize();
+  InSequence sequence;
+
+  codec_settings_.allow_absolute_url_ = true;
+  codec_settings_.enable_trailers_ = true;
+  codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  TestRequestHeaderMapImpl expected_headers{
+      {{":path", "/"}, {":method", "POST"}, {"transfer-encoding", "chunked"}},
+      max_request_headers_kb_,
+      max_request_headers_count_};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
+  Buffer::OwnedImpl expected_data("Hello World");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+
+  TestRequestTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                              max_request_headers_kb_,
+                                              max_request_headers_count_};
+  EXPECT_CALL(decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
   codec_settings_.enable_trailers_ = true;
   initialize();
@@ -3784,6 +3818,38 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength1) {
 
 TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
   testClientAllowChunkedContentLength(100, true);
+}
+
+TEST_P(Http1ClientConnectionImplTest, VerifyResponseHeaderTrailerMapMaxLimits) {
+  codec_settings_.allow_chunked_length_ = true;
+  codec_settings_.enable_trailers_ = true;
+  codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{{{":status", "200"}, {"transfer-encoding", "chunked"}},
+                                             Http1::MAX_RESPONSE_HEADERS_KB,
+                                             max_response_headers_count_};
+  Buffer::OwnedImpl expected_data("Hello World");
+
+  EXPECT_CALL(response_decoder,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
+  TestResponseTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                               Http1::MAX_RESPONSE_HEADERS_KB,
+                                               max_response_headers_count_};
+  EXPECT_CALL(response_decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http1ClientConnectionImplTest,
