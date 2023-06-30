@@ -325,22 +325,22 @@ ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
 
 namespace {
 
-char* UTF8CoerceToStructurallyValid(absl::string_view str, char* dst, const char replace_char) {
-  // Copy the whole string (unless src == dst).
-  if (str.data() != dst) {
-    memmove(dst, str.data(), str.size());
-  }
-  char* const initial_dst = dst;
+// This is a modified copy of the UTF8CoerceToStructurallyValid from the protobuf code.
+// A copy was needed after if was removed from the protobuf.
+// This function returns a boolean indicating that
+std::string UTF8CoerceToStructurallyValid(absl::string_view str, const char replace_char) {
+  std::string result(str);
+  auto replace_pos = result.begin();
   while (!str.empty()) {
-    int n_valid_bytes = static_cast<int>(utf8_range::SpanStructurallyValid(str));
-    if (n_valid_bytes == static_cast<int>(str.size())) {
+    size_t n_valid_bytes = utf8_range::SpanStructurallyValid(str);
+    if (n_valid_bytes == str.size()) {
       break;
     }
-    dst += n_valid_bytes;
-    *dst++ = replace_char; // replace one bad byte
+    replace_pos += n_valid_bytes;
+    *replace_pos++ = replace_char; // replace one bad byte
     str.remove_prefix(n_valid_bytes + 1);
   }
-  return initial_dst;
+  return result;
 }
 
 } // namespace
@@ -361,14 +361,7 @@ std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
   //
   // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
   // special semantic meaning in URLs or similar.
-  std::string result(input);
-  const char* sanitized = UTF8CoerceToStructurallyValid(input, result.data(), '!');
-  ASSERT(sanitized == result.data() || sanitized == input.data());
-
-  // Validate requirement that if the input string is returned from
-  // `UTF8CoerceToStructurallyValid`, no modification was made to result so it still contains the
-  // correct return value.
-  ASSERT(sanitized == result.data() || result == input);
+  std::string result = UTF8CoerceToStructurallyValid(input, '!');
 
   return result;
 }
