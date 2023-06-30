@@ -134,3 +134,15 @@ diff --git a/src/google/protobuf/map.h b/src/google/protobuf/map.h
        InsertUniqueInTree(b, node);
        index_of_first_non_null_ = (std::min)(index_of_first_non_null_, b);
      }
+diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
+--- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
++++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
+@@ -345,7 +345,7 @@
+ 
+  protected:
+   // "protected" stops users from deleting a `MapFieldBase *`
+-  ~MapFieldBase();
++  virtual ~MapFieldBase();
+ 
+  public:
+   // Returns reference to internal repeated field. Data written using
