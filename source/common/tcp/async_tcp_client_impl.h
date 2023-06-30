@@ -83,10 +83,8 @@ private:
     }
   }
 
-  void disableUpstreamCxTimeout();
-  void reportUpstreamCxFail();
-  void reportUpstreamCxDestroy(Network::ConnectionEvent event);
-  void reportUpstreamHistogram(Stats::TimespanPtr& metric);
+  void disableConnectTimeout();
+  void reportConnectionDestroy(Network::ConnectionEvent event);
 
   Event::Dispatcher& dispatcher_;
   Network::ClientConnectionPtr connection_;

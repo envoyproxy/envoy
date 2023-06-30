@@ -81,54 +81,50 @@ void AsyncTcpClientImpl::onData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void AsyncTcpClientImpl::disableUpstreamCxTimeout() {
+void AsyncTcpClientImpl::disableConnectTimeout() {
   if (connect_timer_) {
     connect_timer_->disableTimer();
     connect_timer_.reset();
   }
 }
 
-void AsyncTcpClientImpl::reportUpstreamCxFail() {
-  if (disconnected_) {
-    cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
-  }
-}
-
-void AsyncTcpClientImpl::reportUpstreamCxDestroy(Network::ConnectionEvent event) {
+void AsyncTcpClientImpl::reportConnectionDestroy(Network::ConnectionEvent event) {
+  auto& stats = cluster_info_->trafficStats();
+  stats->upstream_cx_destroy_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
-    cluster_info_->trafficStats()->upstream_cx_destroy_remote_.inc();
+    stats->upstream_cx_destroy_remote_.inc();
   } else {
-    cluster_info_->trafficStats()->upstream_cx_destroy_local_.inc();
-  }
-  cluster_info_->trafficStats()->upstream_cx_destroy_.inc();
-}
-
-void AsyncTcpClientImpl::reportUpstreamHistogram(Stats::TimespanPtr& metric) {
-  if (metric) {
-    metric->complete();
-    metric.reset();
+    stats->upstream_cx_destroy_local_.inc();
   }
 }
 
 void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    reportUpstreamCxFail();
-    if (!disconnected_) {
-      reportUpstreamHistogram(conn_length_ms_);
+    if (disconnected_) {
+      cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
     }
+
+    if (!disconnected_ && conn_length_ms_ != nullptr) {
+      conn_length_ms_->complete();
+      conn_length_ms_.reset();
+    }
+
+    disableConnectTimeout();
+    reportConnectionDestroy(event);
     disconnected_ = true;
+
     dispatcher_.deferredDelete(std::move(connection_));
-    disableUpstreamCxTimeout();
-    reportUpstreamCxDestroy(event);
     if (callbacks_) {
       callbacks_->onEvent(event);
       callbacks_ = nullptr;
     }
   } else {
     disconnected_ = false;
-    disableUpstreamCxTimeout();
-    reportUpstreamHistogram(conn_connect_ms_);
+    conn_connect_ms_->complete();
+    conn_connect_ms_.reset();
+    disableConnectTimeout();
+
     if (!conn_length_ms_) {
       conn_length_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
           cluster_info_->trafficStats()->upstream_cx_length_ms_, dispatcher_.timeSource());
