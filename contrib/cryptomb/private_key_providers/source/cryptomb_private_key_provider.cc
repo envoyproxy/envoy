@@ -56,6 +56,72 @@ bool CryptoMbRsaContext::rsaInit(const uint8_t* in, size_t in_len) {
   return true;
 }
 
+CryptoMbEcdsaContext::~CryptoMbEcdsaContext() {
+  if (s_) {
+    ECDSA_SIG_free(s_);
+  }
+  if (ctx_) {
+    BN_CTX_end(ctx_);
+    BN_CTX_free(ctx_);
+  }
+}
+
+bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
+  if (ec_key_ == nullptr) {
+    return false;
+  }
+
+  const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
+  const BIGNUM* priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
+  const EC_POINT* pub_key = EC_KEY_get0_public_key(ec_key_.get());
+  if (group == nullptr || priv_key_ == nullptr || pub_key == nullptr) {
+    return false;
+  }
+
+  s_ = ECDSA_SIG_new();
+  if (s_ == nullptr) {
+    return false;
+  }
+  BIGNUM* sig_r = BN_new();
+  BIGNUM* sig_s = BN_new();
+  if (ECDSA_SIG_set0(s_, sig_r, sig_s) == 0) {
+    return false;
+  }
+
+  ctx_ = BN_CTX_new();
+  if (ctx_ == nullptr) {
+    return false;
+  }
+  BN_CTX_start(ctx_);
+  k_ = BN_CTX_get(ctx_);
+
+  const BIGNUM* order = EC_GROUP_get0_order(group);
+  if (order == nullptr) {
+    return false;
+  }
+
+  // Extent with zero paddings as CryptoMB expects in buf being sign length.
+  int len = BN_num_bits(order);
+  buf_len_ = (len + 7) / 8;
+  if (8 * in_len < static_cast<unsigned long>(len)) {
+    in_buf_ = std::make_unique<uint8_t[]>(buf_len_);
+    memcpy(in_buf_.get() + buf_len_ - in_len, in, in_len); // NOLINT(safe-memcpy)
+  } else {
+    in_buf_ = std::make_unique<uint8_t[]>(in_len);
+    memcpy(in_buf_.get(), in, in_len); // NOLINT(safe-memcpy)
+  }
+
+  do {
+    if (!BN_rand_range(k_, order)) {
+      return false;
+    }
+  } while (BN_is_zero(k_));
+
+  out_len_ = ECDSA_size(ec_key_.get());
+
+  return true;
+}
+
 namespace {
 
 int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned char* hash,
@@ -70,13 +136,11 @@ int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned
   return 1;
 }
 
-ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops,
-                                                     uint8_t* out, size_t* out_len, size_t max_out,
-                                                     uint16_t signature_algorithm,
+ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops, uint8_t*,
+                                                     size_t*, size_t, uint16_t signature_algorithm,
                                                      const uint8_t* in, size_t in_len) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  unsigned int out_len_unsigned;
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -105,20 +169,17 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
     return ssl_private_key_failure;
   }
 
-  if (max_out < ECDSA_size(ec_key.get())) {
+  // Create MB context which will be used for this particular
+  // signing/decryption.
+  CryptoMbEcdsaContextSharedPtr mb_ctx =
+      std::make_shared<CryptoMbEcdsaContext>(std::move(ec_key), ops->dispatcher_, ops->cb_);
+
+  if (!mb_ctx->ecdsaInit(hash, hash_len)) {
     return ssl_private_key_failure;
   }
 
-  // Borrow "out" because it has been already initialized to the max_out size.
-  if (!ECDSA_sign(0, hash, hash_len, out, &out_len_unsigned, ec_key.get())) {
-    return ssl_private_key_failure;
-  }
-
-  if (out_len_unsigned > max_out) {
-    return ssl_private_key_failure;
-  }
-  *out_len = out_len_unsigned;
-  return ssl_private_key_success;
+  ops->addToQueue(mb_ctx);
+  return ssl_private_key_retry;
 }
 
 ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
@@ -386,10 +447,16 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 }
 
 void CryptoMbQueue::processRequests() {
-  if (type_ == KeyType::Rsa) {
+  switch (type_) {
+  case KeyType::Rsa:
     // Record queue size statistic value for histogram.
     stats_.rsa_queue_sizes_.recordValue(request_queue_.size());
     processRsaRequests();
+    break;
+  case KeyType::Ec:
+    // Record queue size statistic value for histogram.
+    stats_.ecdsa_queue_sizes_.recordValue(request_queue_.size());
+    processEcdsaRequests();
   }
   request_queue_.clear();
 }
@@ -458,6 +525,48 @@ void CryptoMbQueue::processRsaRequests() {
       }
       // else keep the previous status from the private key operation
     } else {
+      status[req_num] = RequestStatus::Error;
+    }
+
+    ctx_status = status[req_num];
+    mb_ctx->scheduleCallback(ctx_status);
+  }
+}
+
+void CryptoMbQueue::processEcdsaRequests() {
+  unsigned char* sign_r[MULTIBUFF_BATCH] = {nullptr};
+  unsigned char* sign_s[MULTIBUFF_BATCH] = {nullptr};
+  const unsigned char* digest[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* eph_key[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* priv_key[MULTIBUFF_BATCH] = {nullptr};
+
+  /* Build arrays of pointers for call */
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
+    sign_r[req_num] = mb_ctx->out_buf_;
+    sign_s[req_num] = mb_ctx->out_buf_ + mb_ctx->buf_len_;
+    digest[req_num] = mb_ctx->in_buf_.get();
+    eph_key[req_num] = mb_ctx->k_;
+    priv_key[req_num] = mb_ctx->priv_key_;
+  }
+
+  ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
+
+  uint32_t ecdsa_sts =
+      ipp_->mbxNistp256EcdsaSignSslMb8(sign_r, sign_s, digest, eph_key, priv_key, nullptr);
+
+  enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
+
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbRsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbRsaContext>(request_queue_[req_num]);
+    enum RequestStatus ctx_status;
+    if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
+      ENVOY_LOG(debug, "Multibuffer RSA request {} success", req_num);
+      status[req_num] = RequestStatus::Success;
+    } else {
+      ENVOY_LOG(debug, "Multibuffer RSA request {} failure", req_num);
       status[req_num] = RequestStatus::Error;
     }
 

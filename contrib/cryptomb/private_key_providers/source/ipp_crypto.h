@@ -23,6 +23,11 @@ public:
   virtual uint32_t mbxRsaPublicSslMb8(const uint8_t* const from_pa[8], uint8_t* const to_pa[8],
                                       const BIGNUM* const e_pa[8], const BIGNUM* const n_pa[8],
                                       int expected_rsa_bitsize) PURE;
+  virtual uint32_t mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], uint8_t* pa_sign_s[8],
+                                              const uint8_t* const pa_msg[8],
+                                              const BIGNUM* const pa_eph_skey[8],
+                                              const BIGNUM* const pa_reg_skey[8],
+                                              uint8_t* p_buffer) PURE;
   virtual bool mbxGetSts(uint32_t status, unsigned req_num) PURE;
 };
 

@@ -85,8 +85,29 @@ public:
   unsigned char lenstra_to_[MAX_SIGNATURE_SIZE];
 };
 
+class CryptoMbEcdsaContext : public CryptoMbContext {
+public:
+  CryptoMbEcdsaContext(bssl::UniquePtr<EC_KEY> ec_key, Event::Dispatcher& dispatcher,
+                       Ssl::PrivateKeyConnectionCallbacks& cb)
+      : CryptoMbContext(dispatcher, cb), ec_key_(std::move(ec_key)) {}
+  ~CryptoMbEcdsaContext() override;
+  bool ecdsaInit(const uint8_t* in, size_t in_len);
+
+  // ECDSA key.
+  bssl::UniquePtr<EC_KEY> ec_key_{};
+  // ECDSA sig and context, which must be released manually.
+  ECDSA_SIG* s_{};
+  BN_CTX* ctx_{};
+  // ECDSA parameters, which will contain values whose memory is managed within
+  // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
+  const BIGNUM* priv_key_{};
+  BIGNUM* k_{};
+  size_t buf_len_{};
+};
+
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;
 using CryptoMbRsaContextSharedPtr = std::shared_ptr<CryptoMbRsaContext>;
+using CryptoMbEcdsaContextSharedPtr = std::shared_ptr<CryptoMbEcdsaContext>;
 
 // CryptoMbQueue maintains the request queue and is able to process it.
 class CryptoMbQueue : public Logger::Loggable<Logger::Id::connection> {
@@ -101,6 +122,7 @@ public:
 private:
   void processRequests();
   void processRsaRequests();
+  void processEcdsaRequests();
   void startTimer();
   void stopTimer();
 
