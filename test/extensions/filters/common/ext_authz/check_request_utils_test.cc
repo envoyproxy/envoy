@@ -200,7 +200,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, size,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
@@ -228,7 +228,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, size,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
@@ -257,7 +257,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
 
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, size,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*include_peer_certificate=*/false, /*include_tls_session=*/false,
       Protobuf::Map<std::string, std::string>(), createRequestHeaderMatchers());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
@@ -280,7 +280,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, size,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
@@ -300,7 +300,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
+      buffer_->length(), /*pack_as_bytes=*/false,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
       Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
@@ -333,7 +334,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
   // request_.SerializeToString() still returns "true" when it is failed to serialize the data.
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
+      buffer_->length(), /*pack_as_bytes=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
       Protobuf::Map<std::string, std::string>(), nullptr);
 
