@@ -5388,6 +5388,7 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         ":quiche_common_platform_export",
     ],
+    external_deps = ["ssl"],
 )
 
 envoy_quiche_platform_impl_cc_library(
