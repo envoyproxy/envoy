@@ -65,7 +65,10 @@ public:
   void noDelay(bool /*enable*/) override {}
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  ReadDisableStatus readDisable(bool /*disable*/) override {
+    IS_ENVOY_BUG("Unexpected call to readDisable");
+    return ReadDisableStatus::NoTransition;
+  }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
     IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
   }
