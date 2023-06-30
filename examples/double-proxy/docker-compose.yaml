@@ -2,6 +2,7 @@ services:
 
   proxy-frontend:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     networks:
       edge:
@@ -26,6 +27,7 @@ services:
 
   proxy-postgres-frontend:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-double-proxy-frontend
       args:
@@ -41,6 +43,7 @@ services:
 
   proxy-postgres-backend:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-double-proxy-backend
       args:
