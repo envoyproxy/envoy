@@ -28,7 +28,7 @@ public:
     client_->setAsyncTcpClientCallbacks(callbacks_);
   }
 
-  void expectCreateConnection(bool triggerConnected = true) {
+  void expectCreateConnection(bool trigger_connected = true) {
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
@@ -39,13 +39,13 @@ public:
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, addReadFilter(_));
-    if (triggerConnected) {
+    if (trigger_connected) {
       EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));
     }
 
     ASSERT_TRUE(client_->connect());
 
-    if (triggerConnected) {
+    if (trigger_connected) {
       connection_->raiseEvent(Network::ConnectionEvent::Connected);
       ASSERT_TRUE(client_->connected());
     }
