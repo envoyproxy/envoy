@@ -130,6 +130,7 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
 // By default the `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true and UHV behaves just
 // like legacy path normalization for H/2.
 TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathAllowedInHttp2) {
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
@@ -171,6 +172,7 @@ std::string generateExtendedAsciiString() {
 } // namespace
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
+  disable_client_header_validation_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "false");
   initialize();
