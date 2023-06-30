@@ -1492,7 +1492,11 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  filter_chain_factory_.createFilterChain(*this);
+  // This filter chain options is only used for the downstream filter chains for now. So, try to
+  // set valid initial route only when the downstream callbacks is available.
+  FilterChainOptionsImpl options(
+      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
+  filter_chain_factory_.createFilterChain(*this, false, options);
   return !upgrade_rejected;
 }
 

@@ -10,6 +10,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -56,11 +57,22 @@ public:
     }
   }
 
+  void
+  sendPlainEds(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,
+               bool await_update = true) {
+    if (await_update) {
+      eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
+    } else {
+      eds_helper_.setEds({cluster_load_assignment});
+    }
+  }
+
   struct EndpointSettingOptions {
     uint32_t total_endpoints = 1;
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
+    absl::optional<bool> weighted_priority_health = absl::nullopt;
     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
   };
 
@@ -76,6 +88,10 @@ public:
     if (endpoint_setting.overprovisioning_factor.has_value()) {
       cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
           endpoint_setting.overprovisioning_factor.value());
+    }
+    if (endpoint_setting.weighted_priority_health.has_value()) {
+      cluster_load_assignment.mutable_policy()->set_weighted_priority_health(
+          endpoint_setting.weighted_priority_health.value());
     }
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
 
@@ -302,6 +318,244 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
+// Validates that updating a locality of an actively checked endpoint, reuses
+// the previously determined health status.
+TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
+  // setup with active-HC.
+  initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Disable the healthy panic threshold, preventing using a non-healthy host.
+    cluster.mutable_common_lb_config()->mutable_healthy_panic_threshold();
+    cluster.mutable_health_checks(0)->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(10000));
+    cluster.mutable_health_checks(0)->mutable_no_traffic_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(10000));
+    cluster.set_ignore_health_on_host_removal(true);
+  });
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+
+  // Create an EDS message with a duplicated endpoint in 2 localities.
+  TestUtility::loadFromYaml(R"EOF(
+    cluster_name: "cluster_0"
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+      priority: 0
+      locality:
+        sub_zone: xx
+)EOF",
+                            cluster_load_assignment);
+  auto* endpoint_A = cluster_load_assignment.mutable_endpoints(0)->mutable_lb_endpoints(0);
+  setUpstreamAddress(0, *endpoint_A);
+
+  // Send the first EDS response.
+  sendPlainEds(cluster_load_assignment);
+
+  // Wait for the first HC to arrive to the upstream.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForCounterEq("cluster.cluster_0.health_check.attempt", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.health_check.success", 1);
+  cleanupUpstreamAndDownstream();
+
+  // After the first hc there should be no upstream healthy host, and any
+  // downstream request will fail, until the update-merge-window ends.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+  cleanupUpstreamAndDownstream();
+  response.reset();
+
+  // Wait for scheduled updates (update-merge-window).
+  test_server_->waitForCounterEq("cluster_manager.cluster_updated_via_merge", 1);
+
+  // Now the upstream should be healthy.
+  // There should only be 1 endpoint, and it should be healthy (according to EDS).
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Now a downstream request can be passed to the upstream.
+  registerTestServerPorts({"http"});
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+
+  // 2nd change: Connection is open, send an EDS response changing the order of the
+  // priorities in the message, but doesn't impact localities. This should have no
+  // impact on the host's health status, and cluster availability.
+  cluster_load_assignment.mutable_endpoints(0)->set_priority(1);
+  sendPlainEds(cluster_load_assignment, true);
+
+  // No locality update, so the previous pool can be used, and a request will be
+  // served.
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+
+  // There should be 3 membership changes (+2 compared to the previous, as the
+  // memberships of priority 0 and 1 have changed).
+  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 3);
+  // There should still be be 1 endpoint, and it should stay healthy.
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // 3rd change: Connection is open, send an EDS response changing the localities in the
+  // message. This will cause recreation of the LB, resending the HC to the "new"
+  // endpoint. This will impact cluster availability.
+  cluster_load_assignment.mutable_endpoints(0)->mutable_locality()->set_sub_zone("xx2");
+  sendPlainEds(cluster_load_assignment, true);
+
+  // Wait for first HC for the tcp proxy after EDS update with localities.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  cleanupUpstreamAndDownstream();
+
+  // Although the host's locality was updated, it will use the previously
+  // detected active health-status, so the upstream should be healthy, and a
+  // request will be served.
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+  // There should be 3 membership changes (+1 compared to the previous, as the
+  // membership of the first locality has changed).
+  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 4);
+  // There should still be be 1 endpoint, and it should stay healthy.
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
+// Validates that updating a locality of an actively checked endpoint, does
+// not reuse the previously determined health status.
+// The test should be removed once
+// envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update
+// is deprecated.
+TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusNoReuse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update", "false"}});
+  // setup with active-HC.
+  initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Disable the healthy panic threshold, preventing using a non-healthy host.
+    cluster.mutable_common_lb_config()->mutable_healthy_panic_threshold();
+    cluster.mutable_health_checks(0)->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(10000));
+    cluster.mutable_health_checks(0)->mutable_no_traffic_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(10000));
+    cluster.set_ignore_health_on_host_removal(true);
+  });
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+
+  // Create an EDS message with a duplicated endpoint in 2 localities.
+  TestUtility::loadFromYaml(R"EOF(
+    cluster_name: "cluster_0"
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+      priority: 0
+      locality:
+        sub_zone: xx
+)EOF",
+                            cluster_load_assignment);
+  auto* endpoint_A = cluster_load_assignment.mutable_endpoints(0)->mutable_lb_endpoints(0);
+  setUpstreamAddress(0, *endpoint_A);
+
+  // Send the first EDS response.
+  sendPlainEds(cluster_load_assignment);
+
+  // Wait for the first HC to arrive to the upstream.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForCounterEq("cluster.cluster_0.health_check.attempt", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.health_check.success", 1);
+  cleanupUpstreamAndDownstream();
+
+  // After the first hc there should be no upstream healthy host, and any
+  // downstream request will fail, until the update-merge-window ends.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+  cleanupUpstreamAndDownstream();
+  response.reset();
+
+  // Wait for scheduled updates (update-merge-window).
+  test_server_->waitForCounterEq("cluster_manager.cluster_updated_via_merge", 1);
+
+  // Now the upstream should be healthy.
+  // There should only be 1 endpoint, and it should be healthy (according to EDS).
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Now a downstream request can be passed to the upstream.
+  registerTestServerPorts({"http"});
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+
+  // 2nd change: Connection is open, send an EDS response changing the order of the
+  // priorities in the message, but doesn't impact localities. This should have no
+  // impact on the host's health status, and cluster availability.
+  cluster_load_assignment.mutable_endpoints(0)->set_priority(1);
+  sendPlainEds(cluster_load_assignment, true);
+
+  // No locality update, so the previous pool can be used, and a request will be
+  // served.
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+
+  // There should be 3 membership changes (+2 compared to the previous, as the
+  // memberships of priority 0 and 1 have changed).
+  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 3);
+  // There should still be be 1 endpoint, and it should stay healthy.
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // 3rd change: Connection is open, send an EDS response changing the localities in the
+  // message. This will cause recreation of the LB, resending the HC to the "new"
+  // endpoint. This will impact cluster availability.
+  cluster_load_assignment.mutable_endpoints(0)->mutable_locality()->set_sub_zone("xx2");
+  sendPlainEds(cluster_load_assignment, true);
+
+  // Wait for first HC for the tcp proxy after EDS update with localities.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  cleanupUpstreamAndDownstream();
+
+  // After the first hc there should be no upstream healthy host, and any
+  // downstream request will fail, until the update-merge-window ends.
+  //
+  // when reusing health-status, Envoy will be able to connect to the upstream
+  // even before receiving the HC response, because the endpoint was already
+  // set to healthy.
+  {
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+    response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster_0", "",
+                                                  downstream_protocol_, version_, "foo.com");
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+    response.reset();
+    EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_none_healthy")->value());
+
+    // Wait for scheduled updates (update-merge-window).
+    test_server_->waitForCounterEq("cluster_manager.cluster_updated_via_merge", 3);
+  }
+
+  // Now the upstream should be healthy, and a request will be served.
+  testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+  // There should be 3 membership changes (+1 compared to the previous, as the
+  // membership of the first locality has changed).
+  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 4);
+  // There should still be be 1 endpoint, and it should stay healthy.
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
 // Verifies that cluster warming proceeds even if a host is deleted before health checks complete.
 // This is a regression test for https://github.com/envoyproxy/envoy/issues/17836.
 TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
@@ -438,6 +692,31 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   options.overprovisioning_factor = 200;
   setEndpoints(options);
   get_and_compare(200);
+}
+
+// Validate that weighted_priority_health update are picked up by Envoy.
+TEST_P(EdsIntegrationTest, WeightedPriorityHealthUpdate) {
+  initializeTest(false);
+  // Default overprovisioning factor.
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  setEndpoints(options);
+  auto get_and_compare = [this](bool expected) {
+    const auto& cluster_map = test_server_->server().clusterManager().clusters();
+    EXPECT_EQ(1, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
+    const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
+    EXPECT_EQ(1, hostset_per_priority.size());
+    const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
+    EXPECT_EQ(expected, host_set->weightedPriorityHealth());
+  };
+  get_and_compare(false);
+
+  options.weighted_priority_health = true;
+  setEndpoints(options);
+  get_and_compare(true);
 }
 
 // Verifies that EDS update only triggers member update callbacks once per update.

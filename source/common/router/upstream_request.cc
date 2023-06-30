@@ -75,7 +75,6 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
-  bool hasPreparedLocalReply() const override { return false; }
   UpstreamRequest& upstream_request_;
 };
 
@@ -107,6 +106,18 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       }
     }
   }
+
+  // The router checks that the connection pool is non-null before creating the upstream request.
+  auto upstream_host = conn_pool_->host();
+  if (span_ != nullptr) {
+    span_->injectContext(*parent_.downstreamHeaders(), upstream_host);
+  } else {
+    // No independent child span for current upstream request then inject the parent span's tracing
+    // context into the request headers.
+    // The injectContext() of the parent span may be called repeatedly when the request is retried.
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), upstream_host);
+  }
+
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info_.route_ = parent.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
@@ -377,6 +388,18 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
         upstreamLog(AccessLog::AccessLogType::UpstreamPeriodic);
         resetUpstreamLogFlushTimer();
       }
+      // Both downstream and upstream bytes meters may not be initialized when
+      // the timer goes off, e.g. if it takes longer than the interval for a
+      // connection to be initialized; check for nullptr.
+      auto& downstream_bytes_meter = stream_info_.getDownstreamBytesMeter();
+      auto& upstream_bytes_meter = stream_info_.getUpstreamBytesMeter();
+      const SystemTime now = parent_.callbacks()->dispatcher().timeSource().systemTime();
+      if (downstream_bytes_meter) {
+        downstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
+      }
+      if (upstream_bytes_meter) {
+        upstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
+      }
     });
 
     resetUpstreamLogFlushTimer();
@@ -634,19 +657,16 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                                    route_entry->appendXfh());
   }
 
-  if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), host);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
-  }
-
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
   if (parent_.config().flush_upstream_log_on_upstream_stream_) {
     upstreamLog(AccessLog::AccessLogType::UpstreamPoolReady);
+  }
+
+  if (address_provider.connectionID() && stream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              address_provider.connectionID().value(),
+              stream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   for (auto* callback : upstream_callbacks_) {

@@ -228,6 +228,7 @@ void FileSystemBufferFilter::setEncoderFilterCallbacks(
 }
 
 void FileSystemBufferFilter::onDestroy() {
+  *is_destroyed_ = true;
   if (cancel_in_flight_async_action_) {
     cancel_in_flight_async_action_();
   }
@@ -400,11 +401,10 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
       // was deleted before the callback, not just do nothing.
       cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
           config_->storageBufferPath(),
-          [this, me = std::weak_ptr<FileSystemBufferFilter>(shared_from_this()),
-           dispatcher = &request_callbacks_->dispatcher(),
+          [this, is_destroyed = is_destroyed_, dispatcher = &request_callbacks_->dispatcher(),
            &state](absl::StatusOr<AsyncFileHandle> file_handle) {
-            dispatcher->post([this, me = std::move(me), &state, file_handle]() {
-              if (!me.lock()) {
+            dispatcher->post([this, is_destroyed, &state, file_handle]() {
+              if (*is_destroyed) {
                 // If we opened a file but the filter went away in the meantime, close the file
                 // to avoid leaving a dangling file handle.
                 if (file_handle.ok()) {
@@ -456,10 +456,10 @@ std::function<void(absl::Status)> FileSystemBufferFilter::getOnFileActionComplet
 }
 
 std::function<void(std::function<void()>)> FileSystemBufferFilter::getSafeDispatch() {
-  return [me = std::weak_ptr<FileSystemBufferFilter>(shared_from_this()),
+  return [is_destroyed = is_destroyed_,
           dispatcher = &request_callbacks_->dispatcher()](std::function<void()> callback) {
-    dispatcher->post([me = std::move(me), callback = std::move(callback)]() {
-      if (me.lock()) {
+    dispatcher->post([is_destroyed, callback = std::move(callback)]() {
+      if (!*is_destroyed) {
         callback();
       }
     });

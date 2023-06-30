@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type filter struct {
@@ -108,8 +108,31 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	_, found := header.Get("x-set-metadata")
 	if found {
 		md := f.callbacks.StreamInfo().DynamicMetadata()
+		empty_metadata := md.Get("filter.go")
+		if len(empty_metadata) != 0 {
+			return f.fail("Metadata should be empty")
+		}
 		md.Set("filter.go", "foo", "bar")
+		metadata := md.Get("filter.go")
+		if len(metadata) == 0 {
+			return f.fail("Metadata should not be empty")
+		}
+
+		k, ok := metadata["foo"]
+		if !ok {
+			return f.fail("Metadata foo should be found")
+		}
+
+		if fmt.Sprint(k) != "bar" {
+			return f.fail("Metadata foo has unexpected value %v", k)
+		}
 	}
+
+	fs := f.callbacks.StreamInfo().FilterState()
+	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
+
+	val := fs.GetString("go_state_test_key")
+	header.Add("go-state-test-header-key", val)
 
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
@@ -189,6 +212,14 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 		return f.sendLocalReply("decode-trailer")
 	}
 
+	trailers.Add("existed-trailer", "bar")
+	trailers.Set("x-test-trailer-0", "bar")
+	trailers.Del("x-test-trailer-1")
+
+	if trailers.GetRaw("existed-trailer") == "foo" {
+		trailers.Add("x-test-trailer-2", "bar")
+	}
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}
@@ -245,6 +276,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("test-method", f.method)
 	header.Set("test-path", f.path)
 	header.Set("test-host", f.host)
+	header.Set("test-log-level", f.callbacks.LogLevel().String())
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))

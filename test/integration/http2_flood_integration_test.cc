@@ -31,17 +31,18 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 
-bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> params) {
+bool deferredProcessing(std::tuple<Network::Address::IpVersion, Http2Impl, bool> params) {
   return std::get<2>(params);
 }
 
 } // namespace
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
-  const bool http2_new_codec_wrapper = std::get<1>(params.param);
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>
+        params) {
+  const Http2Impl http2_codec_impl = std::get<1>(params.param);
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
+                      http2_codec_impl == Http2Impl::Oghttp2 ? "Oghttp2" : "Nghttp2",
                       deferredProcessing(params.param) ? "WithDeferredProcessing"
                                                        : "NoDeferredProcessing");
 }
@@ -53,10 +54,12 @@ std::string testParamsToString(
 // Http2FrameIntegrationTest destructor completes.
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>,
       public Http2RawFrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
+  Http2FloodMitigationTest()
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
     // This test tracks the number of buffers created, and the tag extraction check uses some
     // buffers, so disable it in this test.
     skip_tag_extraction_rule_check_ = true;
@@ -65,9 +68,7 @@ public:
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
     config_helper_.addConfigModifier(configureProxyStatus());
-    const bool enable_new_wrapper = std::get<1>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      enable_new_wrapper ? "true" : "false");
+    setupHttp2ImplOverrides(std::get<1>(GetParam()));
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       deferredProcessing(GetParam()) ? "true" : "false");
   }
@@ -90,7 +91,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2FloodMitigationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), ::testing::Bool(),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn({Http2Impl::Nghttp2, Http2Impl::Oghttp2}),
                      ::testing::Bool()),
     testParamsToString);
 
@@ -239,6 +241,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   // that the first request has completed.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http2.outbound_frames_active", data_frame_count + 1);
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
@@ -359,7 +362,6 @@ TEST_P(Http2FloodMitigationTest, Data) {
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
   // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
   EXPECT_EQ(8, buffer_factory->numBuffersCreated());
@@ -678,6 +680,14 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
 
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27541): the invalid frame that used to cause Envoy to send only RST_STREAM now causes
+  // Envoy to also send 400 in UHV mode (it is allowed by RFC). The test needs to be fixed to make
+  // server only send RST_STREAM.
+  if (std::get<1>(GetParam()) == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
   // Use invalid HTTP headers to trigger sending RST_STREAM frames.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -946,14 +956,13 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeader
 // Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive
 // timer. The test verifies protocol constraint violation handling in the
 // Http2::ConnectionImpl::sendKeepalive() method.
-TEST_P(Http2FloodMitigationTest, KeepAliveTimeeTriggersFloodProtection) {
-  DISABLE_UNDER_COVERAGE; // https://github.com/envoyproxy/envoy/issues/21019
+TEST_P(Http2FloodMitigationTest, KeepAliveTimerTriggersFloodProtection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* keep_alive = hcm.mutable_http2_protocol_options()->mutable_connection_keepalive();
-        keep_alive->mutable_interval()->set_nanos(500 * 1000 * 1000);
-        keep_alive->mutable_timeout()->set_seconds(1);
+        keep_alive->mutable_interval()->set_seconds(1 * TSAN_TIMEOUT_FACTOR);
+        keep_alive->mutable_timeout()->set_seconds(2 * TSAN_TIMEOUT_FACTOR);
       });
 
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
@@ -1118,13 +1127,21 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("header"));
   // expect a downstream protocol error.
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
 }
 
 // Verify that only the offending stream is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#27541): the invalid frame that used to cause Envoy to send only RST_STREAM now causes
+  // Envoy to also send 400 in UHV mode (it is allowed by RFC). The test needs to be fixed to make
+  // server only send RST_STREAM.
+  if (std::get<1>(GetParam()) == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1159,7 +1176,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
   // expect Downstream Protocol Error
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("http2.invalid.header.field"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("header"));
   EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("DPE"));
 }
 

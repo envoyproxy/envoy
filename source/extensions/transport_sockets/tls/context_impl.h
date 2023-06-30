@@ -91,9 +91,6 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  // TODO(danzh) remove when deprecate envoy.reloadable_features.tls_async_cert_validation
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates, std::string& error_details);
-
   // Validate cert asynchronously for a QUIC connection.
   ValidationResults customVerifyCertChainForQuic(
       STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
@@ -114,9 +111,6 @@ protected:
    * in the SSL instance, for retrieval in callbacks.
    */
   static int sslContextIndex();
-
-  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
-  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);

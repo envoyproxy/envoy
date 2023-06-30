@@ -21,7 +21,8 @@ class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callback
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::LoadBalancerContext* context,
-              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
+              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+              StreamInfo::StreamInfo& downstream_info);
   ~TcpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value(); }
@@ -41,6 +42,7 @@ private:
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  StreamInfo::StreamInfo& downstream_info_;
 };
 
 class HttpUpstream;
@@ -117,6 +119,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   bool startUpstreamSecureTransport() override;
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
@@ -153,6 +156,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/custom_config_validators.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/local_info/local_info.h"
@@ -15,6 +18,9 @@ namespace Envoy {
 namespace Server {
 class Instance;
 } // namespace Server
+namespace Grpc {
+class RawAsyncClient;
+} // namespace Grpc
 
 namespace Config {
 class XdsResourcesDelegate;
@@ -102,6 +108,20 @@ public:
 
   std::string category() const override { return "envoy.config_subscription"; }
   virtual SubscriptionPtr create(SubscriptionData& data) PURE;
+};
+
+class MuxFactory : public Config::UntypedFactory {
+public:
+  std::string category() const override { return "envoy.config_mux"; }
+  virtual void shutdownAll() PURE;
+  virtual std::shared_ptr<GrpcMux>
+  create(std::unique_ptr<Grpc::RawAsyncClient>&& async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator& random, Stats::Scope& scope,
+         const envoy::config::core::v3::ApiConfigSource& ads_config,
+         const LocalInfo::LocalInfo& local_info,
+         std::unique_ptr<CustomConfigValidators>&& config_validators,
+         BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
+         OptRef<XdsResourcesDelegate> xds_resources_delegate) PURE;
 };
 
 } // namespace Config

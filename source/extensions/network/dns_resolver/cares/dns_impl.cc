@@ -146,11 +146,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   if (status != ARES_SUCCESS) {
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
-  }
 
-  if (status != ARES_SUCCESS && !isResponseWithNoRecords(status)) {
-    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    if (!isResponseWithNoRecords(status)) {
+      ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                      "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    } else {
+      ENVOY_LOG_EVENT(debug, "cares_resolution_no_records", "dns resolution without records for {}",
+                      dns_name_);
+    }
   }
 
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
@@ -284,6 +287,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     TRY_NEEDS_AUDIT {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
     }
+    END_TRY
     catch (const EnvoyException& e) {
       ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
       dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });

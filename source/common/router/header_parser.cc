@@ -22,19 +22,6 @@ namespace Router {
 
 namespace {
 
-enum class ParserState {
-  Literal,                   // processing literal data
-  VariableName,              // consuming a %VAR% name
-  ExpectArray,               // expect starting [ in %VAR([...])%
-  ExpectString,              // expect starting " in array of strings
-  String,                    // consuming an array element string
-  ExpectArrayDelimiterOrEnd, // expect array delimiter (,) or end of array (])
-  ExpectArgsEnd,             // expect closing ) in %VAR(...)%
-  ExpectVariableEnd          // expect closing % in %VAR(...)%
-};
-
-std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%%", "%"}}); }
-
 HttpHeaderFormatterPtr
 parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_value) {
   const std::string& key = header_value.key();
@@ -62,191 +49,6 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
       std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true));
 }
 
-// Implements a state machine to parse custom headers. Each character of the custom header format
-// is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
-// The statement machine does minimal validation of the arguments (if any) and does not know the
-// names of valid variables. Interpretation of the variable name and arguments is delegated to
-// StreamInfoHeaderFormatter.
-// TODO(cpakulski): parseInternal function is executed only when
-// envoy_reloadable_features_unified_header_formatter runtime guard is false. When the guard is
-// deprecated, parseInternal function is not needed anymore.
-HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value) {
-  const std::string& key = header_value.key();
-  // PGV constraints provide this guarantee.
-  ASSERT(!key.empty());
-  // We reject :path/:authority rewriting, there is already a well defined mechanism to
-  // perform this in the RouteAction, and doing this via request_headers_to_add
-  // will cause us to have to worry about interaction with other aspects of the
-  // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
-  // headers, since it seems dangerous and there doesn't appear a use case.
-  // Host is disallowed as it created confusing and inconsistent behaviors for
-  // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
-  if (!Http::HeaderUtility::isModifiableHeader(key)) {
-    throw EnvoyException(":-prefixed or host headers may not be modified");
-  }
-
-  absl::string_view format(header_value.value());
-  if (format.empty()) {
-    return std::make_unique<PlainHeaderFormatter>("");
-  }
-
-  std::vector<HeaderFormatterPtr> formatters;
-
-  size_t pos = 0, start = 0;
-  ParserState state = ParserState::Literal;
-  do {
-    const char ch = format[pos];
-    const bool has_next_ch = (pos + 1) < format.size();
-
-    switch (state) {
-    case ParserState::Literal:
-      // Searching for start of %VARIABLE% expression.
-      if (ch != '%') {
-        break;
-      }
-
-      if (!has_next_ch) {
-        throw EnvoyException(
-            fmt::format("Invalid header configuration. Un-escaped % at position {}", pos));
-      }
-
-      if (format[pos + 1] == '%') {
-        // Escaped %, skip next character.
-        pos++;
-        break;
-      }
-
-      // Un-escaped %: start of variable name. Create a formatter for preceding characters, if
-      // any.
-      state = ParserState::VariableName;
-      if (pos > start) {
-        absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal)));
-      }
-      start = pos + 1;
-      break;
-
-    case ParserState::VariableName:
-      // Consume "VAR" from "%VAR%" or "%VAR(...)%"
-      if (ch == '%') {
-        // Found complete variable name, add formatter.
-        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start)));
-        start = pos + 1;
-        state = ParserState::Literal;
-        break;
-      }
-
-      if (ch == '(') {
-        // Variable with arguments, search for start of arg array.
-        state = ParserState::ExpectArray;
-      }
-      break;
-
-    case ParserState::ExpectArray:
-      // Skip over whitespace searching for the start of JSON array args.
-      if (ch == '[') {
-        // Search for first argument string
-        state = ParserState::ExpectString;
-      } else if (!isspace(ch)) {
-        // Consume it as a string argument.
-        state = ParserState::String;
-      }
-      break;
-
-    case ParserState::ExpectArrayDelimiterOrEnd:
-      // Skip over whitespace searching for a comma or close bracket.
-      if (ch == ',') {
-        state = ParserState::ExpectString;
-      } else if (ch == ']') {
-        state = ParserState::ExpectArgsEnd;
-      } else if (!isspace(ch)) {
-        throw EnvoyException(fmt::format(
-            "Invalid header configuration. Expecting ',', ']', or whitespace after '{}', but "
-            "found '{}'",
-            absl::StrCat(format.substr(start, pos - start)), ch));
-      }
-      break;
-
-    case ParserState::ExpectString:
-      // Skip over whitespace looking for the starting quote of a JSON string.
-      if (ch == '"') {
-        state = ParserState::String;
-      } else if (!isspace(ch)) {
-        throw EnvoyException(fmt::format(
-            "Invalid header configuration. Expecting '\"' or whitespace after '{}', but found '{}'",
-            absl::StrCat(format.substr(start, pos - start)), ch));
-      }
-      break;
-
-    case ParserState::String:
-      // Consume a JSON string (ignoring backslash-escaped chars).
-      if (ch == '\\') {
-        if (!has_next_ch) {
-          throw EnvoyException(fmt::format(
-              "Invalid header configuration. Un-terminated backslash in JSON string after '{}'",
-              absl::StrCat(format.substr(start, pos - start))));
-        }
-
-        // Skip escaped char.
-        pos++;
-      } else if (ch == ')') {
-        state = ParserState::ExpectVariableEnd;
-      } else if (ch == '"') {
-        state = ParserState::ExpectArrayDelimiterOrEnd;
-      }
-      break;
-
-    case ParserState::ExpectArgsEnd:
-      // Search for the closing paren of a %VAR(...)% expression.
-      if (ch == ')') {
-        state = ParserState::ExpectVariableEnd;
-      } else if (!isspace(ch)) {
-        throw EnvoyException(fmt::format(
-            "Invalid header configuration. Expecting ')' or whitespace after '{}', but found '{}'",
-            absl::StrCat(format.substr(start, pos - start)), ch));
-      }
-      break;
-
-    case ParserState::ExpectVariableEnd:
-      // Search for closing % of a %VAR(...)% expression
-      if (ch == '%') {
-        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start)));
-        start = pos + 1;
-        state = ParserState::Literal;
-        break;
-      }
-
-      if (!isspace(ch)) {
-        throw EnvoyException(fmt::format(
-            "Invalid header configuration. Expecting '%' or whitespace after '{}', but found '{}'",
-            absl::StrCat(format.substr(start, pos - start)), ch));
-      }
-      break;
-    }
-  } while (++pos < format.size());
-
-  if (state != ParserState::Literal) {
-    // Parsing terminated mid-variable.
-    throw EnvoyException(
-        fmt::format("Invalid header configuration. Un-terminated variable expression '{}'",
-                    absl::StrCat(format.substr(start, pos - start))));
-  }
-
-  if (pos > start) {
-    // Trailing constant data.
-    absl::string_view literal = format.substr(start, pos - start);
-    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal)));
-  }
-
-  ASSERT(!formatters.empty());
-
-  if (formatters.size() == 1) {
-    return std::move(formatters[0]);
-  }
-
-  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters));
-}
-
 } // namespace
 
 HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_option)
@@ -266,24 +68,13 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_optio
     append_action_ = header_value_option.append_action();
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    formatter_ = parseHttpHeaderFormatter(header_value_option.header());
-  } else {
-    // Use "old" implementation of header formatters.
-    formatter_ =
-        std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value_option.header()));
-  }
+  formatter_ = parseHttpHeaderFormatter(header_value_option.header());
 }
 
 HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
                                      HeaderAppendAction append_action)
     : original_value_(header_value.value()), append_action_(append_action) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    formatter_ = parseHttpHeaderFormatter(header_value);
-  } else {
-    // Use "old" implementation of header formatters.
-    formatter_ = std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value));
-  }
+  formatter_ = parseHttpHeaderFormatter(header_value);
 }
 
 HeaderParserPtr

@@ -12,17 +12,16 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace RoundRobin {
 
+using RoundRobinLbProto = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
+
 struct RoundRobinCreator : public Logger::Loggable<Logger::Id::upstream> {
-  Upstream::LoadBalancerPtr operator()(Upstream::LoadBalancerParams params,
-                                       const Upstream::ClusterInfo& cluster_info,
-                                       const Upstream::PrioritySet& priority_set,
-                                       Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                       TimeSource& time_source);
+  Upstream::LoadBalancerPtr
+  operator()(Upstream::LoadBalancerParams params, OptRef<const RoundRobinLbProto> lb_config,
+             const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet& priority_set,
+             Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source);
 };
 
-class Factory : public Common::FactoryBase<
-                    envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin,
-                    RoundRobinCreator> {
+class Factory : public Common::FactoryBase<RoundRobinLbProto, RoundRobinCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.round_robin") {}
 };

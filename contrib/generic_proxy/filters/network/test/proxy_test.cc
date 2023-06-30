@@ -427,6 +427,27 @@ TEST_F(FilterTest, ActiveStreamPerFilterConfigNoRouteEntry) {
   EXPECT_EQ(nullptr, active_stream->decoderFiltersForTest()[0]->perFilterConfig());
 }
 
+TEST_F(FilterTest, ActiveStreamConnection) {
+  mock_stream_filters_.push_back(
+      {"fake_test_filter_name_0", std::make_shared<NiceMock<MockStreamFilter>>()});
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  filter_->newDownstreamRequest(std::move(request), ExtendedOptions());
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_EQ(1, active_stream->decoderFiltersForTest().size());
+  EXPECT_EQ(1, active_stream->encoderFiltersForTest().size());
+  EXPECT_EQ(1, active_stream->nextDecoderFilterIndexForTest());
+  EXPECT_EQ(0, active_stream->nextEncoderFilterIndexForTest());
+
+  EXPECT_EQ(&filter_callbacks_.connection_,
+            active_stream->decoderFiltersForTest()[0]->connection());
+}
+
 TEST_F(FilterTest, ActiveStreamAddFilters) {
   initializeFilter();
 

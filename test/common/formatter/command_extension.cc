@@ -31,7 +31,8 @@ FormatterProviderPtr TestCommandParser::parse(const std::string& command, const 
 }
 
 CommandParserPtr
-TestCommandFactory::createCommandParserFromProto(const Protobuf::Message& message) {
+TestCommandFactory::createCommandParserFromProto(const Protobuf::Message& message,
+                                                 Server::Configuration::CommonFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto config = dynamic_cast<const ProtobufWkt::StringValue&>(message);
   return std::make_unique<TestCommandParser>();
@@ -68,8 +69,8 @@ FormatterProviderPtr AdditionalCommandParser::parse(const std::string& command, 
   return nullptr;
 }
 
-CommandParserPtr
-AdditionalCommandFactory::createCommandParserFromProto(const Protobuf::Message& message) {
+CommandParserPtr AdditionalCommandFactory::createCommandParserFromProto(
+    const Protobuf::Message& message, Server::Configuration::CommonFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto config = dynamic_cast<const ProtobufWkt::UInt32Value&>(message);
   return std::make_unique<AdditionalCommandParser>();
@@ -86,7 +87,8 @@ ProtobufTypes::MessagePtr AdditionalCommandFactory::createEmptyConfigProto() {
 std::string AdditionalCommandFactory::name() const { return "envoy.formatter.AdditionalFormatter"; }
 
 CommandParserPtr
-FailCommandFactory::createCommandParserFromProto(const Protobuf::Message& message) {
+FailCommandFactory::createCommandParserFromProto(const Protobuf::Message& message,
+                                                 Server::Configuration::CommonFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto config = dynamic_cast<const ProtobufWkt::UInt64Value&>(message);
   return nullptr;

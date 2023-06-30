@@ -89,21 +89,22 @@ bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
 }
 
 bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) const {
-  bool match = slowRejectMatch(stat_name);
-
-  if (is_inclusive_ || match || fast_result != FastResult::Matches) {
-    //  is_inclusive_ | match | return
-    // ---------------+-------+--------
-    //        T       |   T   |   T   Default-inclusive and matching an (exclusion) matcher, deny.
-    //        T       |   F   |   F   Otherwise, allow.
-    //        F       |   T   |   F   Default-exclusive and matching an (inclusion) matcher, allow.
-    //        F       |   F   |   T   Otherwise, deny.
-    //
-    // This is an XNOR, which can be evaluated by checking for equality.
-    return match == is_inclusive_;
+  // Skip slowRejectMatch if we already have a definitive answer from fastRejects.
+  if (fast_result != FastResult::NoMatch) {
+    return fast_result == FastResult::Rejects;
   }
 
-  return false;
+  const bool match = slowRejectMatch(stat_name);
+
+  //  is_inclusive_ | match | return
+  // ---------------+-------+--------
+  //        T       |   T   |   T   Default-inclusive and matching an (exclusion) matcher, deny.
+  //        T       |   F   |   F   Otherwise, allow.
+  //        F       |   T   |   F   Default-exclusive and matching an (inclusion) matcher, allow.
+  //        F       |   F   |   T   Otherwise, deny.
+  //
+  // This is an XNOR, which can be evaluated by checking for equality.
+  return match == is_inclusive_;
 }
 
 bool StatsMatcherImpl::slowRejectMatch(StatName stat_name) const {

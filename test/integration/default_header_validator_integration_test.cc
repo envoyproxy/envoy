@@ -17,6 +17,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamUhvIntegrationTest,
 // in the path.
 TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride) {
   config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "false");
+  disable_client_header_validation_ = true;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });

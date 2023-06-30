@@ -22,6 +22,7 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
@@ -30,14 +31,6 @@
 #define DISABLE_UNDER_COVERAGE return
 #else
 #define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
-#ifdef WIN32
-#define DISABLE_UNDER_WINDOWS return
-#else
-#define DISABLE_UNDER_WINDOWS                                                                      \
   do {                                                                                             \
   } while (0)
 #endif
@@ -66,7 +59,11 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
+  static const InstanceConstSharedPtrFn defaultAddressFunction(Network::Address::IpVersion version);
 
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
@@ -527,7 +524,7 @@ protected:
 private:
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
-  // True if initialized() has been called.
+  // True if initialize() has been called.
   bool initialized_{};
   // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
   // the proxy uses the default watermark buffer factory to create buffers.

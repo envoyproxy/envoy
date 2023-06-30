@@ -32,6 +32,9 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//source/extensions/key_value/file_based:config_lib",

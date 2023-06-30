@@ -153,6 +153,7 @@ build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 build:remote-ci-common --grpc_keepalive_time=30s
 build:remote-ci-common --remote_timeout=3600s
 build:remote-ci-common --bes_timeout=3600s
+build:remote-ci-common --bes_upload_mode=fully_async
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################
@@ -237,6 +238,11 @@ build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
 build:remote-ci-linux-coverage --noremote_accept_cached
 build:remote-ci-linux-coverage --config=remote-ci-common
+build:remote-ci-linux-coverage --build_runfile_links
+build:remote-ci-linux-coverage --legacy_important_outputs=false
+build:remote-ci-linux-coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+build:remote-ci-linux-coverage --nocache_test_results
+
 # IPv6 tests fail on CI
 build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################

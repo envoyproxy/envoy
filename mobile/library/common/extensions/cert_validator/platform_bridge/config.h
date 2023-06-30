@@ -24,9 +24,6 @@ public:
         envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator>();
   }
   std::string category() const override { return "envoy.tls.cert_validator"; }
-
-private:
-  const envoy_cert_validator* platform_validator_ = nullptr;
 };
 
 DECLARE_FACTORY(PlatformBridgeCertValidatorFactory);

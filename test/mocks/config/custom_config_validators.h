@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/config/custom_config_validators.h"
+#include "envoy/config/config_validator.h"
 
 #include "gmock/gmock.h"
 

@@ -216,24 +216,24 @@ TEST(InternalRegexGen, LiteralEscapes) {
 TEST(InternalRegexGen, LiteralMatches) {
   absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
-  EXPECT_TRUE(RE2::FullMatch(toStringPiece(kPattern), toRegexPattern(kPattern)));
+  EXPECT_TRUE(RE2::FullMatch(kPattern, toRegexPattern(kPattern)));
 }
 
 TEST(InternalRegexGen, LiteralMatchesInNamedCapture) {
-  absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
+  re2::StringPiece kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
   RE2 regex = RE2(absl::StrCat("(?P<var>", toRegexPattern(kPattern), ")"));
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
   std::vector<re2::StringPiece> captures(2);
-  ASSERT_TRUE(regex.Match(toStringPiece(kPattern), /*startpos=*/0, /*endpos=*/kPattern.size(),
-                          RE2::ANCHOR_BOTH, captures.data(), captures.size()));
+  ASSERT_TRUE(regex.Match(kPattern, /*startpos=*/0, /*endpos=*/kPattern.size(), RE2::ANCHOR_BOTH,
+                          captures.data(), captures.size()));
 
   // Index 0 would be the full text of the matched string.
-  EXPECT_EQ(toStringPiece(kPattern), captures[0]);
+  EXPECT_EQ(kPattern, captures[0]);
   // Get the pattern matched with the named capture group.
-  EXPECT_EQ(toStringPiece(kPattern), captures.at(regex.NamedCapturingGroups().at("var")));
+  EXPECT_EQ(kPattern, captures.at(regex.NamedCapturingGroups().at("var")));
 }
 
 TEST(InternalRegexGen, LiteralOnlyMatchesItself) {
@@ -434,7 +434,7 @@ TEST_P(GenPatternRegexWithMatch, WithCapture) {
                           /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, captures.data(),
                           captures.size()));
 
-  EXPECT_EQ(captures[0], toStringPiece(requestPath()));
+  EXPECT_EQ(captures[0], requestPath());
 
   for (const auto& [name, value] : varValues()) {
     int capture_index = regex.NamedCapturingGroups().at(name);

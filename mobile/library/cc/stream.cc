@@ -21,6 +21,11 @@ Stream& Stream::sendData(envoy_data data) {
   return *this;
 }
 
+Stream& Stream::readData(size_t bytes_to_read) {
+  ::read_data(engine_handle_, handle_, bytes_to_read);
+  return *this;
+}
+
 void Stream::close(RequestTrailersSharedPtr trailers) {
   envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(trailers->allHeaders());
   ::send_trailers(engine_handle_, handle_, raw_headers);

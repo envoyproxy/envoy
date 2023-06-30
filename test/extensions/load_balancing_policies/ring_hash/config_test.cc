@@ -30,11 +30,10 @@ TEST(RingHashConfigTest, Validate) {
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
 
-    auto messsage_ptr = factory.createEmptyConfigProto();
-    EXPECT_CALL(cluster_info, loadBalancingPolicy()).WillOnce(testing::ReturnRef(messsage_ptr));
-
+    auto lb_config =
+        factory.loadConfig(factory.createEmptyConfigProto(), context.messageValidationVisitor());
     auto thread_aware_lb =
-        factory.create(cluster_info, main_thread_priority_set, context.runtime_loader_,
+        factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_);
     EXPECT_NE(nullptr, thread_aware_lb);
 
@@ -45,8 +44,6 @@ TEST(RingHashConfigTest, Validate) {
 
     auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
     EXPECT_NE(nullptr, thread_local_lb);
-
-    EXPECT_NE(nullptr, thread_local_lb_factory->create());
   }
 
   {
@@ -64,10 +61,12 @@ TEST(RingHashConfigTest, Validate) {
     auto messsage_ptr = factory.createEmptyConfigProto();
     messsage_ptr->MergeFrom(config_msg);
 
-    EXPECT_CALL(cluster_info, loadBalancingPolicy()).WillOnce(testing::ReturnRef(messsage_ptr));
+    auto message_ptr = factory.createEmptyConfigProto();
+    message_ptr->MergeFrom(config_msg);
+    auto lb_config = factory.loadConfig(std::move(message_ptr), context.messageValidationVisitor());
 
     EXPECT_THROW_WITH_MESSAGE(
-        factory.create(cluster_info, main_thread_priority_set, context.runtime_loader_,
+        factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_),
         EnvoyException, "ring hash: minimum_ring_size (4) > maximum_ring_size (2)");
   }

@@ -413,7 +413,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     final_rid_config.mutable_typed_config()->PackFrom(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
-  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  THROW_IF_STATUS_NOT_OK(extension_or_error, throw);
+  request_id_extension_ = extension_or_error.value();
 
   // Check if IP detection extensions were configured, otherwise fall back to XFF.
   auto ip_detection_extensions = config.original_ip_detection_extensions();
@@ -487,6 +489,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
+    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -563,6 +566,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     flush_access_log_on_new_request_ =
         config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -653,22 +658,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
-Http::ServerConnectionPtr
-HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
-                                         const Buffer::Instance& data,
-                                         Http::ServerConnectionCallbacks& callbacks) {
+Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -681,13 +685,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        overload_manager);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool) const {
-  Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool,
+                                                    const Http::FilterChainOptions& options) const {
+  Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
   return true;
 }
 
@@ -719,7 +725,8 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(
+      callbacks, Http::EmptyFilterChainOptions{}, *filters_to_use);
   return true;
 }
 
@@ -763,12 +770,11 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
 }
 #endif
 
-std::function<Http::ApiListenerPtr()>
+std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-    bool clear_hop_by_hop_headers) {
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -780,8 +786,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks,
-          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, clear_hop_by_hop_headers](
+             Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),

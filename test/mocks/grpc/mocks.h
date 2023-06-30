@@ -38,6 +38,7 @@ public:
   MOCK_METHOD(void, closeStream, ());
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
 };
 
 template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseType>;

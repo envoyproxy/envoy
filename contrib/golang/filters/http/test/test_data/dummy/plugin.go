@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	http.RegisterHttpFilterConfigFactory("", http.PassThroughFactory)
+	http.RegisterHttpFilterConfigFactoryAndParser("", http.PassThroughFactory, nil)
 }
 
 func main() {

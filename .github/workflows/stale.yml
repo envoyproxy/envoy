@@ -9,8 +9,13 @@ jobs:
       issues: write  # for actions/stale to close stale issues
       pull-requests: write  # for actions/stale to close stale PRs
     name: Prune Stale
-    runs-on: ubuntu-20.04
-    if: github.repository == 'envoyproxy/envoy'
+    runs-on: ubuntu-22.04
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
 
     steps:
     - name: Prune Stale

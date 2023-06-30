@@ -27,7 +27,7 @@ class SendDataTest {
 
   @Test
   fun `successful sending data`() {
-    TestJni.startTestServer();
+    TestJni.startHttp2TestServer();
     val port = TestJni.getServerPort();
 
     val expectation = CountDownLatch(1)

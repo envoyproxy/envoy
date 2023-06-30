@@ -175,6 +175,18 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  /**
+   * Atomically get multiple health flags that are set for a host. Flags are specified
+   * as a bitset of HealthFlags.
+   */
+  virtual uint32_t healthFlagsGetAll() const PURE;
+
+  /**
+   * Atomically set the health flag for a host. Flags are specified as a bitset
+   * of HealthFlags.
+   */
+  virtual void healthFlagsSetAll(uint32_t bits) PURE;
+
   enum class Health {
     /**
      * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
@@ -224,7 +236,7 @@ public:
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
-   * active healchecking.
+   * active health checking.
    */
   virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
@@ -452,6 +464,11 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
+
+  /**
+   * @return true to use host weights to calculate the health of a priority.
+   */
+  virtual bool weightedPriorityHealth() const PURE;
 };
 
 using HostSetPtr = std::unique_ptr<HostSet>;
@@ -526,13 +543,15 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+   * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
    * thread and shared by all the worker threads.
    */
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -550,11 +569,13 @@ public:
      * @param locality_weights supplies a map from locality to associated weight.
      * @param hosts_added supplies the hosts added since the last update.
      * @param hosts_removed supplies the hosts removed since the last update.
-     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+     * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -596,7 +617,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  GAUGE(warming_state, NeverImport)
 
 /**
  * All cluster endpoints related stats.
@@ -610,7 +632,7 @@ public:
   GAUGE(membership_total, NeverImport)
 
 /**
- * All cluster loadbalancing related stats.
+ * All cluster load balancing related stats.
  */
 #define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
@@ -767,12 +789,8 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-/*
- * NOTE: LazyClusterTrafficStats for now is an alias of "std::unique_ptr<ClusterTrafficStats>",
- * this is to make way for future lazy-init on trafficStats(). See
- * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
- */
-using LazyClusterTrafficStats = std::unique_ptr<ClusterTrafficStats>;
+using DeferredCreationCompatibleClusterTrafficStats =
+    Stats::DeferredCreationCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -823,6 +841,7 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class LoadBalancerConfig;
 class TypedLoadBalancerFactory;
 
 /**
@@ -939,10 +958,10 @@ public:
   }
 
   /**
-   * @return const ProtobufWkt::Message& the validated load balancing policy configuration to use
-   * for this cluster.
+   * @return OptRef<const LoadBalancerConfig> the validated load balancing policy configuration to
+   * use for this cluster.
    */
-  virtual const ProtobufTypes::MessagePtr& loadBalancingPolicy() const PURE;
+  virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
 
   /**
    * @return the load balancer factory for this cluster if the load balancing type is
@@ -1074,8 +1093,7 @@ public:
   /**
    * @return  all traffic related stats for this cluster.
    */
-  virtual LazyClusterTrafficStats& trafficStats() const PURE;
-
+  virtual DeferredCreationCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.

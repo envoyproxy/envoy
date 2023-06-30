@@ -17,6 +17,7 @@ envoy_cc_test(
         # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
         # or RBE, see comments in AddRemoveListener.
         # "exclusive",
+        "cpu:2",
     ],
     deps = [
         "//source/extensions/filters/network/echo:config",

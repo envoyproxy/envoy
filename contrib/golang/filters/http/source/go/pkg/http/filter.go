@@ -33,9 +33,10 @@ package http
 import "C"
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (
@@ -57,9 +58,12 @@ type panicInfo struct {
 	details string
 }
 type httpRequest struct {
-	req        *C.httpRequest
-	httpFilter api.StreamFilter
-	pInfo      panicInfo
+	req            *C.httpRequest
+	httpFilter     api.StreamFilter
+	pInfo          panicInfo
+	sema           sync.WaitGroup
+	waitingOnEnvoy int32
+	mutex          sync.Mutex
 }
 
 func (r *httpRequest) pluginName() string {
@@ -115,6 +119,10 @@ func (r *httpRequest) Log(level api.LogType, message string) {
 	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
 }
 
+func (r *httpRequest) LogLevel() api.LogType {
+	return cAPI.HttpLogLevel()
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
@@ -130,12 +138,12 @@ type streamInfo struct {
 }
 
 func (s *streamInfo) GetRouteName() string {
-	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueRouteName)
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueRouteName)
 	return name
 }
 
 func (s *streamInfo) FilterChainName() string {
-	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueFilterChainName)
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueFilterChainName)
 	return name
 }
 
@@ -157,7 +165,7 @@ func (s *streamInfo) ResponseCode() (uint32, bool) {
 }
 
 func (s *streamInfo) ResponseCodeDetails() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueResponseCodeDetails)
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueResponseCodeDetails)
 }
 
 func (s *streamInfo) AttemptCount() uint32 {
@@ -175,24 +183,46 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 	}
 }
 
+func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
+	return cAPI.HttpGetDynamicMetadata(unsafe.Pointer(d.request), filterName)
+}
+
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
 }
 
 func (s *streamInfo) DownstreamLocalAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueDownstreamLocalAddress)
 	return address
 }
 
 func (s *streamInfo) DownstreamRemoteAddress() string {
-	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueDownstreamRemoteAddress)
 	return address
 }
 
 func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamHostAddress)
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamHostAddress)
 }
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamClusterName)
+}
+
+type filterState struct {
+	request *httpRequest
+}
+
+func (s *streamInfo) FilterState() api.FilterState {
+	return &filterState{
+		request: s.request,
+	}
+}
+
+func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request.req), key, value, stateType, lifeSpan, streamSharing)
+}
+
+func (f *filterState) GetString(key string) string {
+	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
 }

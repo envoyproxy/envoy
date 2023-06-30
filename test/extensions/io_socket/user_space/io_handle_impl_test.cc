@@ -184,6 +184,23 @@ TEST_F(IoHandleImplTest, ReadContent) {
   ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
 }
 
+TEST_F(IoHandleImplTest, WriteClearsDrainTrackers) {
+  Buffer::OwnedImpl buf_to_write("abcdefg");
+  {
+    bool called = false;
+    // This drain tracker should be called as soon as the write happens; not on read.
+    buf_to_write.addDrainTracker([&called]() { called = true; });
+    io_handle_peer_->write(buf_to_write);
+    EXPECT_TRUE(called);
+  }
+  // Now the drain tracker refers to a stack variable that no longer exists. If the drain tracker
+  // is called subsequently, this will fail in ASan.
+  Buffer::OwnedImpl buf;
+  auto result = io_handle_->read(buf, 10);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(7, result.return_value_);
+}
+
 // Test read throttling on watermark buffer.
 TEST_F(IoHandleImplTest, ReadThrottling) {
   {

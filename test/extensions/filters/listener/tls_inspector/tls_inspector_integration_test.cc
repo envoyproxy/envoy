@@ -30,6 +30,8 @@ public:
     filter_chains:
       filters:
        -  name: envoy.filters.network.echo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
 )EOF") {}
 
   ~TlsInspectorIntegrationTest() override = default;
@@ -53,11 +55,16 @@ filter_disabled:
   void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
                                   absl::optional<bool> listener_filter_disabled = absl::nullopt,
                                   bool enable_ja3_fingerprinting = false) {
-    config_helper_.renameListener("echo");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     if (listener_filter_disabled.has_value()) {
       tls_inspector_config = appendMatcher(tls_inspector_config, listener_filter_disabled.value());
     }
+    initializeWithTlsInspector(ssl_client, log_format, tls_inspector_config);
+  }
+
+  void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
+                                  const std::string& tls_inspector_config) {
+    config_helper_.renameListener("echo");
     config_helper_.addListenerFilter(tls_inspector_config);
 
     config_helper_.addConfigModifier([ssl_client](
@@ -188,8 +195,64 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
                    /*ssl_options=*/ssl_options, /*curves_list=*/"P-256",
                    /*enable_`ja3`_fingerprinting=*/true);
   client_->close(Network::ConnectionCloseType::NoFlush);
+
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
+
+  test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
+  auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
+  EXPECT_EQ(
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      1);
+  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                        *bytes_processed_histogram)),
+            115);
+}
+
+TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
+  const std::string small_initial_buffer_tls_inspector_config = R"EOF(
+    name: "envoy.filters.listener.tls_inspector"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+      initial_read_buffer_size: 256
+  )EOF";
+  initializeWithTlsInspector(true, "%RESPONSE_CODE_DETAILS%",
+                             small_initial_buffer_tls_inspector_config);
+
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
+  ssl_options.setSni(really_long_sni);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  ASSERT(connect_callbacks_.connected());
+  client_->close(Network::ConnectionCloseType::NoFlush);
+
+  test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
+  auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
+  EXPECT_EQ(
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      1);
+  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                        *bytes_processed_histogram)),
+            515);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,

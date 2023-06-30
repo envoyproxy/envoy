@@ -84,13 +84,21 @@ bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&
 
 absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
 getAlternateProtocolsCacheOptions(
-    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    Server::Configuration::ServerFactoryContext& server_context) {
   if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
     if (!options.auto_config().has_alternate_protocols_cache_options()) {
       throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
                                        "is enabled with auto_config"));
     }
-    return options.auto_config().alternate_protocols_cache_options();
+    auto cache_options = options.auto_config().alternate_protocols_cache_options();
+    if (cache_options.has_key_value_store_config() && server_context.options().concurrency() != 1) {
+      throw EnvoyException(
+          fmt::format("options has key value store but Envoy has concurrency = {} : {}",
+                      server_context.options().concurrency(), cache_options.DebugString()));
+    }
+
+    return cache_options;
   }
   return absl::nullopt;
 }
@@ -178,7 +186,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
                     options.upstream_http_protocol_options())
               : absl::nullopt),
       http_filters_(options.http_filters()),
-      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options)),
+      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options, server_context)),
       header_validator_factory_(createHeaderValidatorFactory(options, server_context)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),

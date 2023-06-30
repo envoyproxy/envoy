@@ -187,6 +187,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
 %PROTOCOL%
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -1061,6 +1085,8 @@ The following command operators are supported:
   * TcpPeriodic - On any TCP Proxy filter periodic log record.
   * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
   * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
   * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
   * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
