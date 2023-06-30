@@ -19,8 +19,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.grpc_field_extraction]
 
 // GrpcFieldExtraction filter supports extracting the fields from first gRPC
-// request message no matter if it is unary or streaming and it write the result
-// to the destination, for which currently only the static dynamic metadata `envoy.filters.http.grpc_field_extraction` is supported.
+// request message no matter if it is unary or streaming and writing the result
+// to the destination, for which currently only the static Envoy dynamic metadata `envoy.filters.http.grpc_field_extraction` is supported.
 //
 // # Assumptions
 // 1. this filter is only applicable for gRPC with Protobuf as payload.
@@ -85,7 +85,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   nested: { "bar": ["val_bar1", "val_bar2"]}
 // }
 //
-// The filter will writes the following dynamic metadata(expressed in JSON format).
+// The filter will write the following dynamic metadata(expressed in JSON format).
 //
 // `envoy.filters.http.grpc_field_extraction`: {
 //   "foo":[
