@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "source/common/tcp_proxy/tcp_proxy.h"
@@ -82,28 +83,6 @@ public:
                                                 downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
                                     *tunnel_config_, downstream_stream_info_);
-    EXPECT_EQ(upstream_->startUpstreamSecureTransport(), false);
-    EXPECT_EQ(upstream_->getUpstreamConnectionSslInfo(), nullptr);
-    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
-    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
-    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-        *upstream_, std::move(generic_conn_pool));
-    EXPECT_NO_THROW(upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onUpstreamMetadata(nullptr));
-    EXPECT_NO_THROW(upstream_->onPerTryTimeout(*mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onPerTryIdleTimeout(*mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onStreamMaxDurationReached(*mock_upst.get()));
-    EXPECT_EQ(upstream_->dynamicMaxStreamDuration(), absl::nullopt);
-    EXPECT_EQ(upstream_->downstreamTrailers(), nullptr);
-    EXPECT_EQ(upstream_->downstreamResponseStarted(), false);
-    EXPECT_EQ(upstream_->downstreamEndStream(), false);
-    EXPECT_EQ(upstream_->attemptCount(), 0);
-    EXPECT_EQ(upstream_->requestVcluster(), nullptr);
-    EXPECT_EQ(upstream_->routeStatsContext(), Router::RouteStatsContextOptRef());
-    EXPECT_EQ(upstream_->finalUpstreamRequest(), nullptr);
-    EXPECT_NO_THROW(upstream_->upstreamRequests());
-    EXPECT_NO_THROW(upstream_->timeSource());
-    EXPECT_NO_THROW(upstream_->route());
     if (typeid(T) == typeid(CombinedUpstream)) {
       auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
       std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
@@ -315,6 +294,43 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisab
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
   this->upstream_->cleanUp();
+}
+
+TYPED_TEST(HttpUpstreamTest, RouterFilterInterface) {
+  this->setupUpstream();
+  EXPECT_EQ(this->upstream_->startUpstreamSecureTransport(), false);
+  EXPECT_EQ(this->upstream_->getUpstreamConnectionSslInfo(), nullptr);
+  auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+  std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+  auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+      *this->upstream_, std::move(generic_conn_pool));
+  EXPECT_NO_THROW(this->upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onUpstreamMetadata(nullptr));
+  EXPECT_NO_THROW(this->upstream_->onPerTryTimeout(*mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onPerTryIdleTimeout(*mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onStreamMaxDurationReached(*mock_upst.get()));
+  EXPECT_EQ(this->upstream_->dynamicMaxStreamDuration(), absl::nullopt);
+  EXPECT_EQ(this->upstream_->downstreamTrailers(), nullptr);
+  EXPECT_EQ(this->upstream_->downstreamResponseStarted(), false);
+  EXPECT_EQ(this->upstream_->downstreamEndStream(), false);
+  EXPECT_EQ(this->upstream_->attemptCount(), 0);
+  EXPECT_EQ(this->upstream_->requestVcluster(), nullptr);
+  EXPECT_EQ(this->upstream_->routeStatsContext(), Router::RouteStatsContextOptRef());
+  EXPECT_EQ(this->upstream_->finalUpstreamRequest(), nullptr);
+  EXPECT_NO_THROW(this->upstream_->upstreamRequests());
+  EXPECT_NO_THROW(this->upstream_->timeSource());
+  EXPECT_NO_THROW(this->upstream_->route());
+  EXPECT_NO_THROW(this->upstream_->onUpstreamReset(Http::StreamResetReason::ConnectionTermination,
+                                                   absl::string_view(""), *mock_upst.get()));
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  EXPECT_NO_THROW(this->upstream_->onUpstreamHeaders(
+      uint64_t(200), std::move(mock_response_headers), *mock_upst.get(), false));
+  EXPECT_NO_THROW(this->upstream_->onUpstreamTrailers(nullptr, *mock_upst.get()));
+  Buffer::OwnedImpl data;
+  EXPECT_NO_THROW(this->upstream_->onUpstreamData(data, *mock_upst.get(), false));
 }
 
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {

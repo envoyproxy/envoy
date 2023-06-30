@@ -1472,6 +1472,17 @@ TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   filter_->startUpstreamSecureTransport();
 }
 
+// Test that call to tcp_proxy filter's startUpstreamSecureTransport results
+// in upstream's startUpstreamSecureTransport call.
+TEST_F(TcpProxyTest, UpstreamStartSecureTransportWithSSL) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+  EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport).WillOnce(Return(true));
+  filter_->startUpstreamSecureTransport();
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
