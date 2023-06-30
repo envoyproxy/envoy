@@ -50,7 +50,7 @@ public:
   using ConstIterator = DataContainer::const_iterator;
 
   static constexpr size_t HeaderSize = 9;
-  static const char Preamble[25];
+  static const absl::string_view Preamble;
 
   enum class Type : uint8_t {
     Data = 0,

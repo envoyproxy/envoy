@@ -1,0 +1,36 @@
+configuration {
+  normalize_path: true
+  merge_slashes: true
+  path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "GET"
+  }
+  path {
+    value: "/path%2Fwith%2fescaped%5Cslashes%5c"
+  }
+  authority {
+    value: "foo.bar.com"
+  }
+  headers {
+    key: "foo"
+    value: "bar"
+  }
+}
+response {
+  status {
+    value: "301"
+  }
+  headers {
+    key: "location"
+    value: "/somewhere_else/not/../here/./?with=query"
+  }
+  headers {
+    key: "content-length"
+    value: "10"
+  }
+}

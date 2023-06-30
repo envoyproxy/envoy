@@ -1,0 +1,59 @@
+configuration {
+    normalize_path: true
+    http1_options {
+        enable_trailers: true
+    }
+}
+
+request {
+    scheme { value: "https" }
+    method { value: "POST" }
+    path { value: "/database?key=value&key2=value2&etc&etc2" }
+    authority { value: "foo.bar.com" }
+    headers {
+        key: "content-length"
+        value: "10"
+    }
+    headers {
+        key: "baz"
+        value: "fuz"
+    }
+}
+
+send_request_body: true
+
+request_trailers {
+    trailers {
+        key: "something"
+        value: "other"
+    }
+    trailers {
+        key: "key"
+        value: "valUe"
+    }
+}
+
+response {
+    status { value: "200" }
+    headers {
+        key: "content-length"
+        value: "10"
+    }
+    headers {
+        key: "clutz"
+        value: "O___P1278NS"
+    }
+}
+
+send_response_body: true
+
+response_trailers {
+    trailers {
+        key: "start"
+        value: "stop"
+    }
+    trailers {
+        key: "data"
+        value: "01234now"
+    }
+}

@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-const char Http2Frame::Preamble[25] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+const absl::string_view Http2Frame::Preamble("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n");
 
 void Http2Frame::setHeader(absl::string_view header) {
   ASSERT(header.size() >= HeaderSize);

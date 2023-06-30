@@ -735,7 +735,7 @@ public:
     }
 
     for (const auto& header : input_.request().headers()) {
-      absl::string_view value = header.value();
+      std::string value = header.value();
       if (input_.send_request_body() && header.key() == "content-length") {
         value = std::to_string(request_body.size());
       }

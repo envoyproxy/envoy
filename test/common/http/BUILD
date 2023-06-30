@@ -644,6 +644,7 @@ envoy_cc_fuzz_test(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/fuzz:utility_lib",
