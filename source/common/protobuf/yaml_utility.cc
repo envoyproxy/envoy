@@ -327,7 +327,7 @@ namespace {
 
 // This is a modified copy of the UTF8CoerceToStructurallyValid from the protobuf code.
 // A copy was needed after if was removed from the protobuf.
-std::string UTF8CoerceToStructurallyValid(absl::string_view str, const char replace_char) {
+std::string utf8CoerceToStructurallyValid(absl::string_view str, const char replace_char) {
   std::string result(str);
   auto replace_pos = result.begin();
   while (!str.empty()) {
@@ -360,7 +360,7 @@ std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
   //
   // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
   // special semantic meaning in URLs or similar.
-  std::string result = UTF8CoerceToStructurallyValid(input, '!');
+  std::string result = utf8CoerceToStructurallyValid(input, '!');
 
   return result;
 }
