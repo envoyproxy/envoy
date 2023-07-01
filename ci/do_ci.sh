@@ -721,8 +721,8 @@ case $CI_TARGET in
              --config=rbe-toolchain-tsan \
              -c dbg \
              --build_tests_only \
+             --test_timeout=390,750,1500,5700 \
              --remote_download_minimal \
-	     --test_timeout=390,750,1500,5700 \
              "${TEST_TARGETS[@]}"
         if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
             echo "Building and testing envoy-filter-example tests..."
