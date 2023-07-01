@@ -31,12 +31,12 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     Common::Redis::Client::Transaction& transaction) {
   // If a transaction is active, clients_[0] is the primary connection to the cluster.
   // The subsequent clients in the array are used for mirroring.
-  transaction.current_client_idx = 0;
+  transaction.current_client_idx_ = 0;
   auto handler = route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                 callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
-      transaction.current_client_idx++;
+      transaction.current_client_idx_++;
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                null_pool_callbacks, transaction);
