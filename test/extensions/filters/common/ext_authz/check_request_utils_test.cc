@@ -67,7 +67,7 @@ public:
 
     envoy::config::core::v3::Metadata connection_metadata_context;
     auto connection_metadata_val = MessageUtil::keyValueStruct("foo2", "bar2");
-    (*connection_metadata_context.mutable_filter_metadata())["conn.meta.key"] = metadata_val;
+    (*connection_metadata_context.mutable_filter_metadata())["conn.meta.key"] = connection_metadata_val;
 
     CheckRequestUtils::createHttpCheck(
         &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
