@@ -3,6 +3,8 @@
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
+#include "absl/strings/str_format.h"
+
 namespace {
 constexpr absl::string_view JsonNameTag = "{\"name\":\"";
 constexpr absl::string_view JsonValueTag = "\",\"value\":";
@@ -142,7 +144,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 // We can further optimize this by streaming out the histograms object, one
 // histogram at a time, in case buffering all the histograms in Envoy
 // buffers up too much memory.
-void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
+void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::NoBuckets: {
@@ -170,32 +172,59 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
-  case Utility::HistogramBucketsMode::Detailed: {
-    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedTotalBuckets();
-    ProtobufWkt::Struct histogram_obj;
-    ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
-    histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
-    populateQuantiles(histogram, "supported_percentiles",
-                      histogram_obj_fields["percentiles"].mutable_list_value());
-    populateDetail("totals", histogram.detailedTotalBuckets(), histogram_obj_fields);
-    populateDetail("intervals", histogram.detailedIntervalBuckets(), histogram_obj_fields);
-    *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
+  case Utility::HistogramBucketsMode::Detailed:
+    generateHistogramDetail(response, name, histogram);
     break;
-  }
   }
 }
 
-void StatsJsonRender::populateDetail(absl::string_view name,
-                                     const std::vector<Stats::ParentHistogram::Bucket>& buckets,
-                                     ProtoMap& histogram_obj_fields) {
-  ProtobufWkt::ListValue* bucket_array = histogram_obj_fields[name].mutable_list_value();
+void StatsJsonRender::generateHistogramDetail(Buffer::Instance& response, const std::string& name,
+                                              const Stats::ParentHistogram& histogram) {
+  // Unlike the other histogram formats, detailed histograms are streamed
+  // out, rather than building a single Json structure with all histogram
+  // info in it. There's one common element in all histograms: the array
+  // of supported percentiles. So the first time we render a histogram,
+  // we'll first render the 'supported_percentiles' as its own record, at the
+  // same json hierarchical level as counters or gagues.
+  auto x100 = [](double fraction) -> double { return fraction * 100; };
+  if (!found_used_histogram_) {
+    found_used_histogram_ = true;
+    // It is not possible for the supported quantiles to differ across
+    // histograms, so it is ok to send them once.
+    Stats::HistogramStatisticsImpl empty_statistics;
+    std::vector<double> supported = empty_statistics.supportedQuantiles();
+    std::transform(supported.begin(), supported.end(), supported.begin(), x100);
+    response.addFragments({delim_, "{\"supported_percentiles\":[",
+        absl::StrJoin(supported, ","), "]}"});
+    delim_ = ",";
+  }
+
+  // Now we produce the streamable histogram records, without using the json intermediate
+  // representation or serializer.
+  response.addFragments({delim_, "{\"histogram\":{\"name\":\"", Json::sanitize(name_buffer_, name),
+      "\",\"totals\":["});
+  populateBuckets(histogram.detailedTotalBuckets(), response);
+  response.addFragments({"],\"intervals\":["});
+  populateBuckets(histogram.detailedIntervalBuckets(), response);
+  std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles(),
+                   intervals = histogram.intervalStatistics().computedQuantiles();
+  //std::transform(totals.begin(), totals.end(), totals.begin(), x100);
+  //std::transform(intervals.begin(), intervals.end(), intervals.begin(), x100);
+  response.addFragments({"],"
+          "\"total_percentiles\":[", absl::StrJoin(totals, ","), "],"
+          "\"cumulative_percentiles\":[", absl::StrJoin(intervals, ","), "]"
+          "}}"});
+  delim_ = ",";
+}
+
+
+void StatsJsonRender::populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                      Buffer::Instance& response) {
+  absl::string_view prefix = "";
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    ProtobufWkt::Struct bucket_json;
-    ProtoMap& bucket_fields = *bucket_json.mutable_fields();
-    bucket_fields["lower_bound"] = ValueUtil::numberValue(bucket.lower_bound_);
-    bucket_fields["width"] = ValueUtil::numberValue(bucket.width_);
-    bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
-    *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
+    response.add(absl::StrFormat("%s[%g,%g,%g]", prefix, bucket.lower_bound_, bucket.width_,
+                                 bucket.count_));
+    prefix = ",";
   }
 }
 
@@ -210,11 +239,7 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
         histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
             histogram_array_.release());
         histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
-      } else if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
-        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-        histograms_obj_fields["details"].set_allocated_list_value(histogram_array_.release());
-        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
-      } else {
+      } else if (histogram_buckets_mode_ != Utility::HistogramBucketsMode::Detailed) {
         IS_ENVOY_BUG("reached unexpected buckets mode with found_used_histogram_ set");
       }
     } else {

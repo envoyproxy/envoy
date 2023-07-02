@@ -96,6 +96,10 @@ private:
                       ProtoMap& histogram_obj_fields);
   static void populateVector(absl::string_view name, const std::vector<double>& values,
                              uint32_t multiplier, ProtoMap& histograms_obj_fields);
+  void generateHistogramDetail(Buffer::Instance& response, const std::string& name,
+                               const Stats::ParentHistogram& histogram);
+  static void populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                              Buffer::Instance& response);
 
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
