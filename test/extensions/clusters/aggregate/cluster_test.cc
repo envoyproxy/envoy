@@ -34,8 +34,8 @@ class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testin
 public:
   AggregateClusterTest()
       : stat_names_(server_context_.store_.symbolTable()),
-        stats_(Upstream::ClusterInfoImpl::generateStats(*server_context_.store_.rootScope(),
-                                                        stat_names_)) {
+        traffic_stats_(Upstream::ClusterInfoImpl::generateStats(server_context_.store_.rootScope(),
+                                                                stat_names_, false)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
 
@@ -138,7 +138,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterTrafficStatNames stat_names_;
-  Upstream::LazyClusterTrafficStats stats_;
+  Upstream::DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{

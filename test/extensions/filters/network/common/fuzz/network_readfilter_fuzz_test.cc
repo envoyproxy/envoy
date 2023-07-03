@@ -11,10 +11,6 @@
 
 #include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
 
-// TODO: Needed for protobuf_mutator::ParseTextMessage() and ::SaveMessageAsText(). Replace by
-// envoy-style input parsing methods.
-#include "src/text_format.h" // from libprotobuf_mutator/
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -63,8 +59,14 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
     return true;
   }();
 
+  // Attempt reading the input string as a text proto.
   FuzzerProtoType input;
-  protobuf_mutator::ParseTextMessage(data, size, &input);
+  if (!input.ParseFromString(std::string(reinterpret_cast<const char*>(data), size))) {
+    return 0;
+  }
+
+  // Mutate the config part of the test case with a low probability, and
+  // the actions part with high probability.
   if (random.random() % 100 < config_mutation_probability) {
     test::extensions::filters::network::FuzzHelperForActions actions;
     *actions.mutable_actions() = std::move(*input.mutable_actions());
@@ -75,7 +77,15 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
     ensuredValidFilter(random.random(), input.mutable_config());
   }
 
-  return protobuf_mutator::SaveMessageAsText(input, data, max_size);
+  // Convert the proto back to a string and validate its length.
+  std::string input_str;
+  if (!Protobuf::TextFormat::PrintToString(input, &input_str) || (input_str.size() > max_size)) {
+    return 0;
+  }
+  // Copy the input string back to data. data is at least max_size bytes,
+  // so it is safe to copy input_text because of the validation above.
+  safeMemcpyUnsafeDst(data, input_str.data());
+  return input_str.size();
 }
 
 DEFINE_CUSTOM_PROTO_CROSSOVER_IMPL(false, FuzzerProtoType)

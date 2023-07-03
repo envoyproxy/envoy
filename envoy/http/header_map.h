@@ -450,6 +450,16 @@ public:
   virtual uint64_t byteSize() const PURE;
 
   /**
+   * @return uint32_t the max size of the header map in kilobyte.
+   */
+  virtual uint32_t maxHeadersKb() const PURE;
+
+  /**
+   * @return uint32_t the max count of headers in a header map.
+   */
+  virtual uint32_t maxHeadersCount() const PURE;
+
+  /**
    * This is a wrapper for the return result from get(). It avoids a copy when translating from
    * non-const HeaderEntry to const HeaderEntry and only provides const access to the result.
    */

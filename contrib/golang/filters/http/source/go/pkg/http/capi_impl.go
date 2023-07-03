@@ -243,6 +243,26 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
+func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
+	r := (*httpRequest)(rr)
+	var buf []byte
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+	// copy the memory from c to Go.
+	var meta structpb.Struct
+	proto.Unmarshal(buf, &meta)
+	return meta.AsMap()
+}
+
 func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
 	v, err := structpb.NewValue(value)
 	if err != nil {
@@ -283,6 +303,8 @@ func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, va
 func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
 	r := (*httpRequest)(rr)
 	var value string
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
 	if res == C.CAPIYield {
