@@ -236,16 +236,21 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
 // Test that stats produced by the tls transport socket have correct tag extraction.
 TEST_P(SslIntegrationTest, StatsTagExtraction) {
   // Configure TLS to use specific parameters so the exact metrics the test expects are created.
-
-  server_tlsv1_3_ = true;
-
+  // TLSv1.3 doesn't allow specifying the cipher suites, so use TLSv1.2 to force a specific cipher
+  // suite to simplify the test.
   // Use P-256 to test the regex on a curve containing a hyphen (instead of X25519).
+
+  // Configure test-client to Envoy connection.
   server_curves_.push_back("P-256");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(ClientSslTransportOptions{}.setTlsVersion(
-        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3));
+    return makeSslClientConnection(
+        ClientSslTransportOptions{}
+            .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+            .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"})
+            .setSigningAlgorithms({"rsa_pss_rsae_sha256"}));
   };
 
+  // Configure Envoy to fake-upstream connection.
   upstream_tls_ = true;
   setUpstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.configureUpstreamTls(
@@ -253,21 +258,20 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
         auto& params = *ctx.mutable_tls_params();
         params.set_tls_minimum_protocol_version(
-            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
         params.set_tls_maximum_protocol_version(
-            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
         params.add_ecdh_curves("P-256");
+        params.add_signature_algorithms("rsa_pss_rsae_sha256");
+        params.add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
       });
 
   testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
   checkStats();
 
   absl::node_hash_map<std::string, std::string> base_expected_counters = {
-      // The specific cipher chosen may change in a future version of BoringSSL. If that happens,
-      // change this test case to use the new cipher suite. The goal of this isn't to depend on a
-      // specific cipher, but to ensure whatever cipher is used is extracted.
-      {"ssl.ciphers.TLS_AES_128_GCM_SHA256", "ssl.ciphers"},
-      {"ssl.versions.TLSv1.3", "ssl.versions"},
+      {"ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256", "ssl.ciphers"},
+      {"ssl.versions.TLSv1.2", "ssl.versions"},
       {"ssl.curves.P-256", "ssl.curves"},
       {"ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs"},
   };
