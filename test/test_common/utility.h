@@ -948,6 +948,19 @@ public:
     }
     header_map_->verifyByteSizeInternalForTest();
   }
+  TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values,
+                        const uint32_t max_headers_kb, const uint32_t max_headers_count) {
+    if (header_map_) {
+      header_map_.reset();
+    }
+    header_map_ = Impl::create(max_headers_kb, max_headers_count);
+
+    for (auto& value : values) {
+      header_map_->addCopy(LowerCaseString(value.first), value.second);
+    }
+    header_map_->verifyByteSizeInternalForTest();
+  }
+
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
@@ -1030,6 +1043,8 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
+  uint32_t maxHeadersKb() const override { return header_map_->maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return header_map_->maxHeadersCount(); }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
@@ -1319,6 +1334,14 @@ MATCHER_P(JsonStringEq, expected, "") {
   }
   return equal;
 }
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
 #endif
 
 } // namespace Envoy

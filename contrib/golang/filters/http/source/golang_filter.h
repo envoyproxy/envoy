@@ -30,8 +30,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
                Server::Configuration::FactoryContext& context);
-  // TODO: delete config in Go
-  virtual ~FilterConfig() = default;
+  ~FilterConfig();
 
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
@@ -57,8 +56,7 @@ class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
 public:
   RoutePluginConfig(const std::string plugin_name,
                     const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
-  // TODO: delete plugin config in Go
-  ~RoutePluginConfig() = default;
+  ~RoutePluginConfig();
   uint64_t getConfigId();
   uint64_t getMergedConfigId(uint64_t parent_id);
 
@@ -68,7 +66,11 @@ private:
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  uint64_t merged_config_id_{0};
+  // since these two fields are updated in worker threads, we need to protect them with a mutex.
+  uint64_t merged_config_id_ ABSL_GUARDED_BY(mutex_){0};
+  uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
+
+  absl::Mutex mutex_;
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
@@ -179,6 +181,8 @@ public:
   CAPIStatus removeTrailer(absl::string_view key);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+
+  CAPIStatus getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
@@ -213,6 +217,9 @@ private:
 
   void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
                                   const absl::string_view& buf);
+
+  void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                 GoSlice* buf_slice);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;

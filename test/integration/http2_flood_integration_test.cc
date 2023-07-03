@@ -241,6 +241,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   // that the first request has completed.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http2.outbound_frames_active", data_frame_count + 1);
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
@@ -361,7 +362,6 @@ TEST_P(Http2FloodMitigationTest, Data) {
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
   // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
   EXPECT_EQ(8, buffer_factory->numBuffersCreated());
@@ -956,14 +956,13 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeader
 // Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive
 // timer. The test verifies protocol constraint violation handling in the
 // Http2::ConnectionImpl::sendKeepalive() method.
-TEST_P(Http2FloodMitigationTest, KeepAliveTimeeTriggersFloodProtection) {
-  DISABLE_UNDER_COVERAGE; // https://github.com/envoyproxy/envoy/issues/21019
+TEST_P(Http2FloodMitigationTest, KeepAliveTimerTriggersFloodProtection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* keep_alive = hcm.mutable_http2_protocol_options()->mutable_connection_keepalive();
-        keep_alive->mutable_interval()->set_nanos(500 * 1000 * 1000);
-        keep_alive->mutable_timeout()->set_seconds(1);
+        keep_alive->mutable_interval()->set_seconds(1 * TSAN_TIMEOUT_FACTOR);
+        keep_alive->mutable_timeout()->set_seconds(2 * TSAN_TIMEOUT_FACTOR);
       });
 
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);

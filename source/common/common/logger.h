@@ -91,7 +91,8 @@ const static bool should_log = true;
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)                                                                                   \
-  FUNCTION(websocket)
+  FUNCTION(websocket)                                                                              \
+  FUNCTION(golang)
 
 // clang-format off
 enum class Id {
@@ -360,6 +361,11 @@ public:
   static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
 
   /**
+   * @return true if JSON log format was set using setJsonLogFormat.
+   */
+  static bool jsonLogFormatSet() { return json_log_format_set_; }
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -376,6 +382,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static bool json_log_format_set_;
 };
 
 /**
@@ -396,6 +404,10 @@ protected:
 
 namespace Utility {
 
+constexpr static absl::string_view TagsPrefix = "[Tags: ";
+constexpr static absl::string_view TagsSuffix = "] ";
+constexpr static absl::string_view TagsSuffixForSearch = "\"] ";
+
 /**
  * Sets the log format for a specific logger.
  */
@@ -403,8 +415,14 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
 
 /**
  * Serializes custom log tags to a string that will be prepended to the log message.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escaping.
  */
 std::string serializeLogTags(const std::map<std::string, std::string>& tags);
+
+/**
+ * Escapes the payload to a JSON string and writes the output to the destination buffer.
+ */
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest);
 
 } // namespace Utility
 
@@ -448,6 +466,31 @@ public:
   }
 
   constexpr static char Placeholder = 'j';
+};
+
+class ExtractedTags : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedTags>();
+  }
+
+  constexpr static char Placeholder = '*';
+  constexpr static char JsonPropertyDeimilter = ',';
+};
+
+class ExtractedMessage : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedMessage>();
+  }
+
+  constexpr static char Placeholder = '+';
 };
 
 } // namespace CustomFlagFormatter
@@ -531,6 +574,28 @@ public:
     }                                                                                              \
   } while (0)
 
+#define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      TAGS.emplace("ConnectionId", std::to_string((CONNECTION).id()));                             \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      TAGS.emplace("ConnectionId",                                                                 \
+                   (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0");     \
+      TAGS.emplace("StreamId", std::to_string((STREAM).streamId()));                               \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
 /**
  * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
  * are serialized and prepended to the log message.
@@ -540,6 +605,22 @@ public:
  */
 #define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
   ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
+
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection ID to the tags, if the provided
+ * tags do not already have a ConnectionId key existing.
+ */
+#define ENVOY_TAGGED_CONN_LOG(LEVEL, TAGS, CONNECTION, FORMAT, ...)                                \
+  ENVOY_TAGGED_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, CONNECTION, FORMAT, ##__VA_ARGS__)
+
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection and stream ID to the tags,
+ * if the provided tags do not already have a ConnectionId or StreamId keys existing.
+ */
+#define ENVOY_TAGGED_STREAM_LOG(LEVEL, TAGS, STREAM, FORMAT, ...)                                  \
+  ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, STREAM, FORMAT, ##__VA_ARGS__)
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to

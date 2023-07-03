@@ -438,7 +438,8 @@ protected:
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
+          headers_or_trailers_(
+              ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
@@ -466,9 +467,11 @@ protected:
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (received_noninformational_headers_) {
-        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
+        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+            ResponseTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
       } else {
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(
+            ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
       }
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
@@ -497,7 +500,9 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
+        : StreamImpl(parent, buffer_limit),
+          headers_or_trailers_(
+              RequestHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
     // StreamImpl
     void destroy() override;
@@ -517,7 +522,8 @@ protected:
       }
     }
     void allocTrailers() override {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(
+          RequestTrailerMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_));
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);

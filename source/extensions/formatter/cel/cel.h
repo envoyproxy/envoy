@@ -14,7 +14,7 @@ namespace Formatter {
 
 class CELFormatter : public ::Envoy::Formatter::FormatterProvider {
 public:
-  CELFormatter(Extensions::Filters::Common::Expr::Builder&,
+  CELFormatter(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
                const google::api::expr::v1alpha1::Expr&, absl::optional<size_t>&);
 
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -25,6 +25,7 @@ public:
                                  absl::string_view, AccessLog::AccessLogType) const override;
 
 private:
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr expr_builder_;
   const google::api::expr::v1alpha1::Expr parsed_expr_;
   const absl::optional<size_t> max_length_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
@@ -32,14 +33,14 @@ private:
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
-  CELFormatterCommandParser()
-      : expr_builder_(Extensions::Filters::Common::Expr::createBuilder(nullptr)){};
+  CELFormatterCommandParser(Server::Configuration::CommonFactoryContext& context)
+      : expr_builder_(Extensions::Filters::Common::Expr::getBuilder(context)){};
   ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command,
                                                  const std::string& subcommand,
                                                  absl::optional<size_t>& max_length) const override;
 
 private:
-  Extensions::Filters::Common::Expr::BuilderPtr expr_builder_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr expr_builder_;
 };
 
 } // namespace Formatter

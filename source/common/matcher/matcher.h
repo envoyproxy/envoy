@@ -166,7 +166,7 @@ public:
     case MatcherType::MATCHER_TYPE_NOT_SET:
       return createAnyMatcher(config);
     }
-    return nullptr;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>

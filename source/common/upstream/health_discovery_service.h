@@ -64,9 +64,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   // Compare changes in the cluster proto, and update parts of the cluster as needed.
-  void update(envoy::config::cluster::v3::Cluster cluster,
-              const envoy::config::core::v3::BindConfig& bind_config,
-              ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
+  absl::Status update(envoy::config::cluster::v3::Cluster cluster,
+                      const envoy::config::core::v3::BindConfig& bind_config,
+                      ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
   // Creates healthcheckers and adds them to the list, then does initial start.
   void initHealthchecks();
 
@@ -98,7 +98,7 @@ private:
   HealthCheckerMap health_checkers_map_;
   TimeSource& time_source_;
 
-  void updateHealthchecks(
+  absl::Status updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);
   void
   updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
@@ -157,12 +157,13 @@ private:
   void handleFailure();
   // Establishes a connection with the management server
   void establishNewStream();
-  void processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
+  absl::Status
+  processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
   envoy::config::cluster::v3::Cluster
   createClusterConfig(const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
-  void updateHdsCluster(HdsClusterPtr cluster,
-                        const envoy::config::cluster::v3::Cluster& cluster_health_check,
-                        const envoy::config::core::v3::BindConfig& bind_config);
+  absl::Status updateHdsCluster(HdsClusterPtr cluster,
+                                const envoy::config::cluster::v3::Cluster& cluster_health_check,
+                                const envoy::config::core::v3::BindConfig& bind_config);
   HdsClusterPtr createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check,
                                  const envoy::config::core::v3::BindConfig& bind_config);
   HdsDelegateStats stats_;

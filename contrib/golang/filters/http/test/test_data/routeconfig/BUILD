@@ -14,7 +14,7 @@ go_binary(
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
     deps = [
-        "//contrib/golang/filters/http/source/go/pkg/api",
+        "//contrib/golang/common/go/api",
         "//contrib/golang/filters/http/source/go/pkg/http",
         "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
