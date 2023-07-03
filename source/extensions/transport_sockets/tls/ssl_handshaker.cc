@@ -101,7 +101,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_SYSCALL:
       // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate
       // in the error queue. Therefore, setting `syscall_error_occurred` to true to report the error
-      // in `drainErrorQueue`. flag to here to report the error.
+      // in `drainErrorQueue`.
       handshake_callbacks_->onFailure(/*syscall_error_occurred=*/true);
       return PostIoAction::Close;
     default:

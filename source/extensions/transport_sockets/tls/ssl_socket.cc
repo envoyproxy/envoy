@@ -228,6 +228,7 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
                                         absl::NullSafeStringView(ERR_func_error_string(err)), ":",
                                         absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
+
   if (syscall_error_occurred) {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
