@@ -269,20 +269,30 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
   checkStats();
 
-  absl::node_hash_map<std::string, std::string> base_expected_counters = {
-      {"ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256", "ssl.ciphers"},
-      {"ssl.versions.TLSv1.2", "ssl.versions"},
-      {"ssl.curves.P-256", "ssl.curves"},
-      {"ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs"},
+  using ExpectedResultsMap =
+      absl::node_hash_map<std::string, std::pair<std::string, Stats::TagVector>>;
+  ExpectedResultsMap base_expected_counters = {
+      {"ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+       {"ssl.ciphers", {{"envoy.ssl_cipher", "ECDHE-RSA-AES128-GCM-SHA256"}}}},
+      {"ssl.versions.TLSv1.2", {"ssl.versions", {{"envoy.ssl_version", "TLSv1.2"}}}},
+      {"ssl.curves.P-256", {"ssl.curves", {{"envoy.ssl_curve", "P-256"}}}},
+      {"ssl.sigalgs.rsa_pss_rsae_sha256",
+       {"ssl.sigalgs", {{"envoy.ssl_sigalg", "rsa_pss_rsae_sha256"}}}},
   };
 
   // Expect all the stats for both listeners and clusters.
-  absl::node_hash_map<std::string, std::string> expected_counters;
+  ExpectedResultsMap expected_counters;
   for (const auto& entry : base_expected_counters) {
-    expected_counters[listenerStatPrefix(entry.first)] = absl::StrCat("listener.", entry.second);
-    expected_counters[absl::StrCat("cluster.cluster_0.", entry.first)] =
-        absl::StrCat("cluster.", entry.second);
+    expected_counters[listenerStatPrefix(entry.first)] = {
+        absl::StrCat("listener.", entry.second.first), entry.second.second};
+    expected_counters[absl::StrCat("cluster.cluster_0.", entry.first)] = {
+        absl::StrCat("cluster.", entry.second.first), entry.second.second};
   }
+
+  // The cipher suite extractor is written as two rules for listener and cluster, and they don't
+  // match unfortunately, but it's left this way for backwards compatibility.
+  expected_counters["cluster.cluster_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"].second = {
+      {"cipher_suite", "ECDHE-RSA-AES128-GCM-SHA256"}};
 
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     // Useful for debugging when the test is failing.
@@ -291,12 +301,15 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
     }
     auto it = expected_counters.find(counter->name());
     if (it != expected_counters.end()) {
-      EXPECT_EQ(it->second, counter->tagExtractedName());
+      EXPECT_EQ(counter->tagExtractedName(), it->second.first);
+
+      // There are other extracted tags such as listener and cluster name, hence ``IsSupersetOf``.
+      EXPECT_THAT(counter->tags(), ::testing::IsSupersetOf(it->second.second));
       expected_counters.erase(it);
     }
   }
-  absl::node_hash_map<std::string, std::string> empty{};
-  EXPECT_EQ(expected_counters, empty);
+
+  EXPECT_THAT(expected_counters, ::testing::IsEmpty());
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
