@@ -1225,7 +1225,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
                             hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (lb_factory_ != nullptr) {
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }

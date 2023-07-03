@@ -239,6 +239,12 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/network/test/test_data"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/examples/ext_authz/auth/grpc-service"
   schedule:
     interval: daily

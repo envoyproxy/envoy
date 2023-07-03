@@ -22,6 +22,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -446,6 +447,9 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
+  }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &callbacks_->streamInfo();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 

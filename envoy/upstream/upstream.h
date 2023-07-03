@@ -175,6 +175,18 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  /**
+   * Atomically get multiple health flags that are set for a host. Flags are specified
+   * as a bitset of HealthFlags.
+   */
+  virtual uint32_t healthFlagsGetAll() const PURE;
+
+  /**
+   * Atomically set the health flag for a host. Flags are specified as a bitset
+   * of HealthFlags.
+   */
+  virtual void healthFlagsSetAll(uint32_t bits) PURE;
+
   enum class Health {
     /**
      * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
@@ -777,12 +789,8 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-/*
- * NOTE: LazyClusterTrafficStats for now is an alias of "std::unique_ptr<ClusterTrafficStats>",
- * this is to make way for future lazy-init on trafficStats(). See
- * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
- */
-using LazyClusterTrafficStats = std::unique_ptr<ClusterTrafficStats>;
+using DeferredCreationCompatibleClusterTrafficStats =
+    Stats::DeferredCreationCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1085,8 +1093,7 @@ public:
   /**
    * @return  all traffic related stats for this cluster.
    */
-  virtual LazyClusterTrafficStats& trafficStats() const PURE;
-
+  virtual DeferredCreationCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.
