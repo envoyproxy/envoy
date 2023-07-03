@@ -196,7 +196,8 @@ message PrivateKeyProviderEntry {
 // it may fallback to BoringSSL default implementation based on the `fallback` fallback.
 message PrivateKeyProviderList {
   // A list of private key providers, and at least one private key provider provided.
-  repeated PrivateKeyProviderEntry private_key_provider = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated PrivateKeyProviderEntry private_key_provider = 1
+      [(validate.rules).repeated = {min_items: 1}];
 
   // If there is no available private key provider from the list, Envoy will fallback to
   // the BoringSSL default implementation when the `fallback` is true. The default value
