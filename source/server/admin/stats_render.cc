@@ -108,31 +108,35 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : histogram_buckets_mode_(params.histogram_buckets_mode_) {
+    : histogram_buckets_mode_(params.histogram_buckets_mode_),
+      json_streamer_(response),
+      json_stats_map_(json_streamer_.newMap()) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the stats output, as that makes
   // streaming difficult. Instead we emit the preamble in the constructor here,
   // and create json models for each stats entry.
-  response.add("{\"stats\":[");
+  json_streamer_.addLiteralNoCopy("\"stats|\");
+  json_stats_array_ = json_streamer_.newArray();
 }
 
 // Buffers a JSON fragment for a numeric stats, flushing to the response
 // buffer once we exceed JsonStatsFlushCount stats.
-void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
+void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
                                uint64_t value) {
   ASSERT(!found_used_histogram_);
-  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
-                         std::to_string(value), JsonCloseBrace});
+  streamer_.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
+      std::to_string(value), JsonCloseBrace});
+  //streamer_.flush();
   delim_ = ",";
 }
 
 // Buffers a JSON fragment for a text-readout stat, flushing to the response
 // buffer once we exceed JsonStatsFlushCount stats.
-void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
+void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
                                const std::string& value) {
   ASSERT(!found_used_histogram_);
-  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
-                         Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
+  streamer_.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
+      Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
   delim_ = ",";
 }
 
@@ -146,7 +150,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 // We can further optimize this by streaming out the histograms object, one
 // histogram at a time, in case buffering all the histograms in Envoy
 // buffers up too much memory.
-void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
+void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   if (!found_used_histogram_) {
     renderHistogramStart(response);
@@ -197,16 +201,18 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   }
 }
 
-void StatsJsonRender::populateSupportedPercentiles(Buffer::Instance& response, absl::string_view name) {
+void StatsJsonRender::populateSupportedPercentiles(Buffer::Instance&, absl::string_view name) {
   auto x100 = [](double fraction) -> double { return fraction * 100; };
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
   std::transform(supported.begin(), supported.end(), supported.begin(), x100);
-  response.addFragments({delim_, "{\"", name, "\":[",
+  streamer_.addFragments({delim_, "{\"", name, "\":[",
       absl::StrJoin(supported, ","), "]"});
 }
 
-void StatsJsonRender::renderHistogramStart(Buffer::Instance& response) {
+void StatsJsonRender::renderHistogramStart(Buffer::Instance&) {
+  histograms_map_ = json_streamer_.newMap();
+  histograms_map_.newEntry
   response.addFragments({delim_, "{\"histograms\":"});
   switch (histogram_buckets_mode_) {
     case Utility::HistogramBucketsMode::Detailed:
@@ -233,7 +239,7 @@ void StatsJsonRender::renderHistogramStart(Buffer::Instance& response) {
 
 void StatsJsonRender::generateHistogramDetail(Buffer::Instance& response, const std::string& name,
                                               const Stats::ParentHistogram& histogram,
-                                              bool combined) {
+                                              bool /*combined*/) {
   // Now we produce the streamable histogram records, without using the json intermediate
   // representation or serializer.
   response.addFragments({delim_, "{\"name\":\"", Json::sanitize(name_buffer_, name),

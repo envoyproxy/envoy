@@ -4,6 +4,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_streamer.h"
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
@@ -107,7 +108,11 @@ private:
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
-};
+  Json::Streamer json_streamer_;
+  Json::Streamer::LevelPtr json_stats_map_;
+  Json::Streamer::LevelPtr json_stats_array_;
+  Json::Streamer::LevelPtr json_histograms_map_;
+
 
 } // namespace Server
 } // namespace Envoy
