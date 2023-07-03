@@ -76,7 +76,7 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
   }
 }
 
-// When using Detailed mode, We override the generate method for HTML to trigger
+// When using Detailed mode, we override the generate method for HTML to trigger
 // some JS that will render the histogram graphically. We will render that from
 // JavaScript and convey the histogram data to the JS via JSON, so we can
 // delegate to an instantiated JSON `sub-renderer` that will write into
