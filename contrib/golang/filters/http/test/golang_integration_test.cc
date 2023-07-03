@@ -469,7 +469,7 @@ typed_config:
     // verify phase
     EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
 
-    // verify content-type 
+    // verify content-type
     EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
     cleanup();
