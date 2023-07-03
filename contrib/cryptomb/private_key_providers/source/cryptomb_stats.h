@@ -9,8 +9,8 @@ namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
 #define ALL_CRYPTOMB_STATS(HISTOGRAM)                                                              \
-  HISTOGRAM(rsa_queue_sizes, Unspecified)                                                          \
-  HISTOGRAM(ecdsa_queue_sizes, Unspecified)
+  HISTOGRAM(ecdsa_queue_sizes, Unspecified)                                                        \
+  HISTOGRAM(rsa_queue_sizes, Unspecified)
 
 /**
  * CryptoMb stats struct definition. @see stats_macros.h
