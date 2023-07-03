@@ -89,21 +89,19 @@ private:
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
-                      const std::vector<uint64_t>& cumulative_buckets);
+                      const std::vector<uint64_t>& cumulative_buckets,
+                      Buffer::Instance& response);
 
   void populateDetail(absl::string_view name,
                       const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                       ProtoMap& histogram_obj_fields);
-  static void populateVector(absl::string_view name, const std::vector<double>& values,
-                             uint32_t multiplier, ProtoMap& histograms_obj_fields);
   void generateHistogramDetail(Buffer::Instance& response, const std::string& name,
-                               const Stats::ParentHistogram& histogram);
+                               const Stats::ParentHistogram& histogram, bool combined);
   static void populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                               Buffer::Instance& response);
+  void renderHistogramStart(Buffer::Instance& response);
+  void populateSupportedPercentiles(Buffer::Instance& response, absl::string_view name);
 
-  ProtobufWkt::Struct histograms_obj_;
-  ProtobufWkt::Struct histograms_obj_container_;
-  std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
   bool found_used_histogram_{false};
   absl::string_view delim_{""};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;

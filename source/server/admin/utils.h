@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Server {
 namespace Utility {
 
-enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint, Detailed };
+enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint, Detailed, Combined };
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
