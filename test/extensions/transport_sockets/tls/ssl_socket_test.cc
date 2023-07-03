@@ -7088,14 +7088,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
-
-#if defined(WIN32)
-  // SSL library on windows platform behaves differently, the failure reason was not populated.
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
-                                 /*expected_server_transport_failure_reason_empty=*/true);
-#else
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
-#endif
   // Client connection is failed with key_usage_mismatch, which is expected.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
   // Server connection failed with connection error.
