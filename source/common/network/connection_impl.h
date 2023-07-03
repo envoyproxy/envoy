@@ -75,7 +75,7 @@ public:
   }
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
-  void readDisable(bool disable) override;
+  ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
   ConnectionInfoSetter& connectionInfoSetter() override {

@@ -659,15 +659,19 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 
   absl::optional<ConfigType> merged;
 
-  callbacks->traversePerFilterConfig(
-      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (!merged) {
-          merged.emplace(*typed_cfg);
-        } else {
-          reduce(merged.value(), *typed_cfg);
-        }
-      });
+  callbacks->traversePerFilterConfig([&reduce,
+                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged) {
+      merged.emplace(*typed_cfg);
+    } else {
+      reduce(merged.value(), *typed_cfg);
+    }
+  });
 
   return merged;
 }

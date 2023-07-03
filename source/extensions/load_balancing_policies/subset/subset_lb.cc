@@ -903,7 +903,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // Create a new worker local LB if needed.
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
-  if (thread_aware_lb_ != nullptr) {
+  if (thread_aware_lb_ != nullptr && thread_aware_lb_->factory()->recreateOnHostChange()) {
     lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   }
 }

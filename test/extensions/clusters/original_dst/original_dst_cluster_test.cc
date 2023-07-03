@@ -34,6 +34,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -41,10 +42,14 @@ namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
-  TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
+  TestLoadBalancerContext(const Network::Connection* connection)
+      : TestLoadBalancerContext(connection, nullptr) {}
+  TestLoadBalancerContext(const Network::Connection* connection,
+                          const StreamInfo::StreamInfo* request_stream_info)
+      : connection_(connection), request_stream_info_(request_stream_info) {}
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
-      : connection_(connection) {
+      : TestLoadBalancerContext(connection) {
     downstream_headers_ =
         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{key, value}}};
   }
@@ -52,12 +57,14 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
   const Http::RequestHeaderMap* downstreamHeaders() const override {
     return downstream_headers_.get();
   }
 
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
+  const StreamInfo::StreamInfo* request_stream_info_;
   Http::RequestHeaderMapPtr downstream_headers_;
 };
 
@@ -869,6 +876,180 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
   HostConstSharedPtr host3 = lb.chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
+}
+
+TEST_F(OriginalDstClusterTest, UseMetadataKeyWithRequest) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      metadata_key:
+        key: xxx
+        path:
+        - key: a
+        - key: b
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> request_stream_info;
+  TestLoadBalancerContext lb_context(&connection, &request_stream_info);
+
+  envoy::config::core::v3::Metadata req_dynamic_metadata;
+  (*(*(*req_dynamic_metadata.mutable_filter_metadata())["xxx"].mutable_fields())["a"]
+        .mutable_struct_value()
+        ->mutable_fields())["b"]
+      .set_string_value("127.0.0.1:6666");
+  envoy::config::core::v3::Metadata conn_dynamic_metadata;
+  (*(*(*conn_dynamic_metadata.mutable_filter_metadata())["xxx"].mutable_fields())["a"]
+        .mutable_struct_value()
+        ->mutable_fields())["b"]
+      .set_string_value("127.0.0.1:7777");
+
+  EXPECT_CALL(Const(request_stream_info), dynamicMetadata())
+      .WillRepeatedly(ReturnRef(req_dynamic_metadata));
+  EXPECT_CALL(Const(connection.stream_info_), dynamicMetadata())
+      .WillRepeatedly(ReturnRef(conn_dynamic_metadata));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host = lb.chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("127.0.0.1:6666", host->address()->asString());
+}
+
+TEST_F(OriginalDstClusterTest, UseMetadataKeyNoRequest) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      metadata_key:
+        key: xxx
+        path:
+        - key: a
+        - key: b
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  (*(*(*dynamic_metadata.mutable_filter_metadata())["xxx"].mutable_fields())["a"]
+        .mutable_struct_value()
+        ->mutable_fields())["b"]
+      .set_string_value("127.0.0.1:6666");
+
+  EXPECT_CALL(Const(connection.stream_info_), dynamicMetadata())
+      .WillRepeatedly(ReturnRef(dynamic_metadata));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host = lb.chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("127.0.0.1:6666", host->address()->asString());
+}
+
+TEST_F(OriginalDstClusterTest, UseMetadataKeyInvalidValue) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      metadata_key:
+        key: xxx
+        path:
+        - key: a
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  (*(*dynamic_metadata.mutable_filter_metadata())["xxx"].mutable_fields())["a"].set_string_value(
+      "$IP$");
+
+  EXPECT_CALL(Const(connection.stream_info_), dynamicMetadata())
+      .WillRepeatedly(ReturnRef(dynamic_metadata));
+
+  EXPECT_CALL(membership_updated_, ready()).Times(0);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  HostConstSharedPtr host = lb.chooseHost(&lb_context);
+  EXPECT_EQ(host, nullptr);
+  EXPECT_EQ(
+      1, TestUtility::findCounter(stats_store_, "cluster.name.original_dst_host_invalid")->value());
+}
+
+TEST_F(OriginalDstClusterTest, UseMetadataKeyListValue) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      metadata_key:
+        key: xxx
+        path:
+        - key: a
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  (*(*dynamic_metadata.mutable_filter_metadata())["xxx"].mutable_fields())["a"]
+      .mutable_list_value()
+      ->add_values()
+      ->set_string_value("127.0.0.1:6666");
+
+  EXPECT_CALL(Const(connection.stream_info_), dynamicMetadata())
+      .WillRepeatedly(ReturnRef(dynamic_metadata));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host = lb.chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("127.0.0.1:6666", host->address()->asString());
 }
 
 TEST_F(OriginalDstClusterTest, UseFilterState) {

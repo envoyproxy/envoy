@@ -162,6 +162,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -579,6 +580,7 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         ":tracked_watermark_buffer_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration/filters:tee_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:test_runtime_lib",
@@ -586,6 +588,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 

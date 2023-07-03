@@ -2,6 +2,7 @@ services:
 
   front-envoy:
     build:
+      context: .
       dockerfile: ../../shared/envoy/Dockerfile
     depends_on:
       backend-service:

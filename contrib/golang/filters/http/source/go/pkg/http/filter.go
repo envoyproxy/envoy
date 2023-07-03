@@ -183,6 +183,10 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 	}
 }
 
+func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
+	return cAPI.HttpGetDynamicMetadata(unsafe.Pointer(d.request), filterName)
+}
+
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
 }
