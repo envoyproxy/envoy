@@ -101,8 +101,12 @@ public:
   // ECDSA parameters, which will contain values whose memory is managed within
   // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
   const BIGNUM* priv_key_{};
+  BIGNUM* sig_r_{};
+  BIGNUM* sig_s_{};
   BIGNUM* k_{};
   size_t buf_len_{};
+  size_t sig_len_{};
+  std::unique_ptr<uint8_t[]> sig_buf_;
 };
 
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;

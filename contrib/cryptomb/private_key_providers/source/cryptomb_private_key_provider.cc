@@ -72,7 +72,7 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   }
 
   const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
-  const BIGNUM* priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
+  priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
   const EC_POINT* pub_key = EC_KEY_get0_public_key(ec_key_.get());
   if (group == nullptr || priv_key_ == nullptr || pub_key == nullptr) {
     return false;
@@ -82,9 +82,9 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   if (s_ == nullptr) {
     return false;
   }
-  BIGNUM* sig_r = BN_new();
-  BIGNUM* sig_s = BN_new();
-  if (ECDSA_SIG_set0(s_, sig_r, sig_s) == 0) {
+  sig_r_ = BN_new();
+  sig_s_ = BN_new();
+  if (ECDSA_SIG_set0(s_, sig_r_, sig_s_) == 0) {
     return false;
   }
 
@@ -117,7 +117,8 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
     }
   } while (BN_is_zero(k_));
 
-  out_len_ = ECDSA_size(ec_key_.get());
+  sig_len_ = ECDSA_size(ec_key_.get());
+  sig_buf_ = std::make_unique<uint8_t[]>(sig_len_);
 
   return true;
 }
@@ -544,8 +545,8 @@ void CryptoMbQueue::processEcdsaRequests() {
   for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
     CryptoMbEcdsaContextSharedPtr mb_ctx =
         std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
-    sign_r[req_num] = mb_ctx->out_buf_;
-    sign_s[req_num] = mb_ctx->out_buf_ + mb_ctx->buf_len_;
+    sign_r[req_num] = mb_ctx->sig_buf_.get();
+    sign_s[req_num] = mb_ctx->sig_buf_.get() + mb_ctx->buf_len_;
     digest[req_num] = mb_ctx->in_buf_.get();
     eph_key[req_num] = mb_ctx->k_;
     priv_key[req_num] = mb_ctx->priv_key_;
@@ -559,14 +560,20 @@ void CryptoMbQueue::processEcdsaRequests() {
   enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
 
   for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
-    CryptoMbRsaContextSharedPtr mb_ctx =
-        std::static_pointer_cast<CryptoMbRsaContext>(request_queue_[req_num]);
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
     enum RequestStatus ctx_status;
     if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
-      ENVOY_LOG(debug, "Multibuffer RSA request {} success", req_num);
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
       status[req_num] = RequestStatus::Success;
+
+      BN_bin2bn(mb_ctx->sig_buf_.get(), mb_ctx->buf_len_, mb_ctx->sig_r_);
+      BN_bin2bn(mb_ctx->sig_buf_.get() + mb_ctx->buf_len_, mb_ctx->buf_len_, mb_ctx->sig_s_);
+      uint8_t* out = nullptr;
+      mb_ctx->out_len_ = i2d_ECDSA_SIG(mb_ctx->s_, &out);
+      memcpy(mb_ctx->out_buf_, out, mb_ctx->out_len_); // NOLINT(safe-memcpy)
     } else {
-      ENVOY_LOG(debug, "Multibuffer RSA request {} failure", req_num);
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} failure", req_num);
       status[req_num] = RequestStatus::Error;
     }
 
