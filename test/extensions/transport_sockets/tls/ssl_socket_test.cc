@@ -7098,9 +7098,8 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 #endif
   // Client connection is failed with key_usage_mismatch, which is expected.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
-  // Since the underlying transport does not participate in the error
-  // queue for SSL_ERROR_SYSCALL case, no ssl stats is recorded.
-  test_options.setExpectedServerStats("");
+  // Server connection failed with connection error.
+  test_options.setExpectedServerStats("ssl.connection_error");
   testUtilV2(test_options);
 }
 

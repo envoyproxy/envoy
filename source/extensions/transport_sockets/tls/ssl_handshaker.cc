@@ -99,11 +99,11 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     case SSL_ERROR_SYSCALL:
-      // When SSL_ERROR_SYSCALL occurred, the underlying transport does not participate in the error
-      // queue, which means the failure reason is not recorded in drainErrorQueue. Thus, setting
-      // flag to here to report the error.
-      syscall_error_occurred_ = true;
-      ABSL_FALLTHROUGH_INTENDED;
+      // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate
+      // in the error queue. Therefore, setting `syscall_error_occurred` to true to report the error
+      // in `drainErrorQueue`. flag to here to report the error.
+      handshake_callbacks_->onFailure(/*syscall_error_occurred=*/true);
+      return PostIoAction::Close;
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;
