@@ -57,9 +57,6 @@ bool CryptoMbRsaContext::rsaInit(const uint8_t* in, size_t in_len) {
 }
 
 CryptoMbEcdsaContext::~CryptoMbEcdsaContext() {
-  if (s_) {
-    ECDSA_SIG_free(s_);
-  }
   if (ctx_) {
     BN_CTX_end(ctx_);
     BN_CTX_free(ctx_);
@@ -78,16 +75,7 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
     return false;
   }
 
-  s_ = ECDSA_SIG_new();
-  if (s_ == nullptr) {
-    return false;
-  }
-  sig_r_ = BN_new();
-  sig_s_ = BN_new();
-  if (ECDSA_SIG_set0(s_, sig_r_, sig_s_) == 0) {
-    return false;
-  }
-
+  // Make an ephemeral key k_.
   ctx_ = BN_CTX_new();
   if (ctx_ == nullptr) {
     return false;
@@ -100,6 +88,12 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
     return false;
   }
 
+  do {
+    if (!BN_rand_range(k_, order)) {
+      return false;
+    }
+  } while (BN_is_zero(k_));
+
   // Extent with zero paddings as CryptoMB expects in buf being sign length.
   int len = BN_num_bits(order);
   buf_len_ = (len + 7) / 8;
@@ -111,13 +105,10 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
     memcpy(in_buf_.get(), in, in_len); // NOLINT(safe-memcpy)
   }
 
-  do {
-    if (!BN_rand_range(k_, order)) {
-      return false;
-    }
-  } while (BN_is_zero(k_));
-
   sig_len_ = ECDSA_size(ec_key_.get());
+  if (sig_len_ > MAX_SIGNATURE_SIZE) {
+    return false;
+  }
   sig_buf_ = std::make_unique<uint8_t[]>(sig_len_);
 
   return true;
@@ -565,13 +556,11 @@ void CryptoMbQueue::processEcdsaRequests() {
     enum RequestStatus ctx_status;
     if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
       ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
-      status[req_num] = RequestStatus::Success;
-
-      BN_bin2bn(mb_ctx->sig_buf_.get(), mb_ctx->buf_len_, mb_ctx->sig_r_);
-      BN_bin2bn(mb_ctx->sig_buf_.get() + mb_ctx->buf_len_, mb_ctx->buf_len_, mb_ctx->sig_s_);
-      uint8_t* out = nullptr;
-      mb_ctx->out_len_ = i2d_ECDSA_SIG(mb_ctx->s_, &out);
-      memcpy(mb_ctx->out_buf_, out, mb_ctx->out_len_); // NOLINT(safe-memcpy)
+      if (postprocessEcdsaRequest(mb_ctx)) {
+        status[req_num] = RequestStatus::Success;
+      } else {
+        status[req_num] = RequestStatus::Error;
+      }
     } else {
       ENVOY_LOG(debug, "Multibuffer ECDSA request {} failure", req_num);
       status[req_num] = RequestStatus::Error;
@@ -580,6 +569,34 @@ void CryptoMbQueue::processEcdsaRequests() {
     ctx_status = status[req_num];
     mb_ctx->scheduleCallback(ctx_status);
   }
+}
+
+bool CryptoMbQueue::postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx) {
+  ECDSA_SIG* s = ECDSA_SIG_new();
+  if (s == nullptr) {
+    return false;
+  }
+  BIGNUM* sig_r = BN_new();
+  BIGNUM* sig_s = BN_new();
+  if (ECDSA_SIG_set0(s, sig_r, sig_s) == 0) {
+    ECDSA_SIG_free(s);
+    return false;
+  }
+
+  BN_bin2bn(mb_ctx->sig_buf_.get(), mb_ctx->buf_len_, sig_r);
+  BN_bin2bn(mb_ctx->sig_buf_.get() + mb_ctx->buf_len_, mb_ctx->buf_len_, sig_s);
+
+  // Marshal signature into out_buf_.
+  CBB cbb;
+  if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->sig_len_) || !ECDSA_SIG_marshal(&cbb, s) ||
+      !CBB_finish(&cbb, nullptr, &mb_ctx->out_len_)) {
+    CBB_cleanup(&cbb);
+    ECDSA_SIG_free(s);
+    return false;
+  }
+
+  ECDSA_SIG_free(s);
+  return true;
 }
 
 CryptoMbPrivateKeyConnection::CryptoMbPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,

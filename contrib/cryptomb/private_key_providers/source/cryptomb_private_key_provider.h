@@ -95,16 +95,14 @@ public:
 
   // ECDSA key.
   bssl::UniquePtr<EC_KEY> ec_key_{};
-  // ECDSA sig and context, which must be released manually.
-  ECDSA_SIG* s_{};
+  // ECDSA context, which must be released manually.
   BN_CTX* ctx_{};
   // ECDSA parameters, which will contain values whose memory is managed within
   // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
-  const BIGNUM* priv_key_{};
-  BIGNUM* sig_r_{};
-  BIGNUM* sig_s_{};
-  BIGNUM* k_{};
   size_t buf_len_{};
+  BIGNUM* k_{};
+  const BIGNUM* priv_key_{};
+  // ECDSA intermediate buffer, which stores signature by CryptoMB.
   size_t sig_len_{};
   std::unique_ptr<uint8_t[]> sig_buf_;
 };
@@ -127,6 +125,7 @@ private:
   void processRequests();
   void processRsaRequests();
   void processEcdsaRequests();
+  bool postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx);
   void startTimer();
   void stopTimer();
 
