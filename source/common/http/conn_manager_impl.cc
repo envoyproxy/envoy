@@ -109,7 +109,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       time_source_(time_source), proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_.serverName(),
-                                     /*proxy_status_config=*/config_.proxyStatusConfig())) {}
+                                     /*proxy_status_config=*/config_.proxyStatusConfig())),
+      refresh_rtt_after_request_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -300,10 +302,14 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
 
-  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
-  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
-  if (t.has_value()) {
-    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  // If refresh rtt after request is required explicitly, then try to get rtt again set it into
+  // connection info.
+  if (refresh_rtt_after_request_) {
+    // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+    absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+    if (t.has_value()) {
+      read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+    }
   }
 
   stream.filter_manager_.onStreamComplete();
