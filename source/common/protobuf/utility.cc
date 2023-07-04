@@ -349,7 +349,9 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
 }
 
 std::string MessageUtil::codeEnumToString(absl::StatusCode code) {
-  return absl::Status(code, "").ToString();
+  std::string result = absl::StatusCodeToString(code);
+  // This preserves the behavior of the `ProtobufUtil::Status(code, "").ToString();`
+  return !result.empty() ? result : "UNKNOWN: ";
 }
 
 namespace {
