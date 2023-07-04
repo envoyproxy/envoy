@@ -263,7 +263,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   if (canSkipOAuth(headers)) {
-    ENVOY_LOG(debug, "skipping oauth flow:\n{}", headers);
     // Update the path header with the query string parameters after a successful OAuth login.
     // This is necessary if a website requests multiple resources which get redirected to the
     // auth server. A cached login on the authorization server side will set cookies
@@ -274,6 +273,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
+        ENVOY_LOG(debug, "state query param does not exist: \n{}", query_parameters);
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -287,11 +287,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       }
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
+        ENVOY_LOG(debug, "state url {} can not be initialized", state_url.toString());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
+        ENVOY_LOG(debug, "state url query params {} does not match redirect config",
+                  state_url.pathAndQueryParams());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -372,18 +375,18 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
-    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
+    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie: \n{}", headers);
     return true;
   }
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
     for (const auto& matcher : config_->passThroughMatchers()) {
       if (matcher.matchesHeaders(headers)) {
-        ENVOY_LOG(debug, "skipping oauth flow due to passthrough matcher match");
+        ENVOY_LOG(debug, "skipping oauth flow due to passthrough matcher match: \n{}", headers);
         return true;
       }
     }
   }
-  ENVOY_LOG(debug, "can not skip oauth flow");
+  ENVOY_LOG(debug, "can not skip oauth flow: \n{}", headers);
   return false;
 }
 
