@@ -53,19 +53,6 @@ protected:
         fakeIpp_(std::make_shared<FakeIppCryptoImpl>(true)),
         stats_(generateCryptoMbStats("cryptomb", *store_.rootScope())) {}
 
-  bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
-    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-        "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-1024.pem"));
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
-
-    bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
-
-    RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(rsa != nullptr, "PEM_read_bio_RSAPrivateKey failed.");
-    RELEASE_ASSERT(1 == EVP_PKEY_assign_RSA(key.get(), rsa), "EVP_PKEY_assign_RSA failed.");
-    return key;
-  }
-
   bssl::UniquePtr<EVP_PKEY> makeEcdsaKey() {
     std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         "{{ test_rundir "
@@ -78,6 +65,19 @@ protected:
 
     RELEASE_ASSERT(ec != nullptr, "PEM_read_bio_ECPrivateKey failed.");
     RELEASE_ASSERT(1 == EVP_PKEY_assign_EC_KEY(key.get(), ec), "EVP_PKEY_assign_EC_KEY failed.");
+    return key;
+  }
+
+  bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-1024.pem"));
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
+
+    bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
+
+    RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(rsa != nullptr, "PEM_read_bio_RSAPrivateKey failed.");
+    RELEASE_ASSERT(1 == EVP_PKEY_assign_RSA(key.get(), rsa), "EVP_PKEY_assign_RSA failed.");
     return key;
   }
 
@@ -104,6 +104,17 @@ protected:
   size_t out_len_ = 0;
 };
 
+class CryptoMbProviderEcdsaTest : public CryptoMbProviderTest {
+protected:
+  CryptoMbProviderEcdsaTest()
+      : queue_(std::chrono::milliseconds(200), KeyType::Ec, 256, fakeIpp_, *dispatcher_, stats_),
+        pkey_(makeEcdsaKey()) {}
+  CryptoMbQueue queue_;
+  bssl::UniquePtr<EVP_PKEY> pkey_;
+
+  const std::string queue_size_histogram_name_ = "cryptomb.ecdsa_queue_sizes";
+};
+
 class CryptoMbProviderRsaTest : public CryptoMbProviderTest {
 protected:
   CryptoMbProviderRsaTest()
@@ -116,17 +127,6 @@ protected:
   bssl::UniquePtr<EVP_PKEY> pkey_;
 
   const std::string queue_size_histogram_name_ = "cryptomb.rsa_queue_sizes";
-};
-
-class CryptoMbProviderEcdsaTest : public CryptoMbProviderTest {
-protected:
-  CryptoMbProviderEcdsaTest()
-      : queue_(std::chrono::milliseconds(200), KeyType::Ec, 256, fakeIpp_, *dispatcher_, stats_),
-        pkey_(makeEcdsaKey()) {}
-  CryptoMbQueue queue_;
-  bssl::UniquePtr<EVP_PKEY> pkey_;
-
-  const std::string queue_size_histogram_name_ = "cryptomb.ecdsa_queue_sizes";
 };
 
 TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
