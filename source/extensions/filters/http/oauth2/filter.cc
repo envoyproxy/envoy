@@ -263,7 +263,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   if (canSkipOAuth(headers)) {
-    ENVOY_LOG(debug, "skipping oauth flow");
+    ENVOY_LOG(debug, "skipping oauth flow:\n{}", headers);
     // Update the path header with the query string parameters after a successful OAuth login.
     // This is necessary if a website requests multiple resources which get redirected to the
     // auth server. A cached login on the authorization server side will set cookies
@@ -314,7 +314,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
   if (!config_->redirectPathMatcher().match(path_str)) {
-    ENVOY_LOG(debug, "path does not match with redirect matcher. redirecting to OAuth server.");
+    ENVOY_LOG(debug, "path {} does not match with redirect matcher. redirecting to OAuth server.",
+              path_str);
     redirectToOAuthServer(headers);
     return Http::FilterHeadersStatus::StopIteration;
   }
