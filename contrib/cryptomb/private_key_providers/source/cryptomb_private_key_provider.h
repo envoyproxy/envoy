@@ -57,6 +57,28 @@ private:
   Event::SchedulableCallbackPtr schedulable_{};
 };
 
+// CryptoMbEcdsaContext is a CryptoMbContext which holds the extra ECDSA parameters and has
+// custom initialization function.
+class CryptoMbEcdsaContext : public CryptoMbContext {
+public:
+  CryptoMbEcdsaContext(bssl::UniquePtr<EC_KEY> ec_key, Event::Dispatcher& dispatcher,
+                       Ssl::PrivateKeyConnectionCallbacks& cb)
+      : CryptoMbContext(dispatcher, cb), ec_key_(std::move(ec_key)) {}
+  ~CryptoMbEcdsaContext() override;
+  bool ecdsaInit(const uint8_t* in, size_t in_len);
+
+  // ECDSA key.
+  bssl::UniquePtr<EC_KEY> ec_key_{};
+  // ECDSA context to create the ephemeral key k_, which must be released manually after the using
+  // of k_.
+  BN_CTX* ctx_{};
+  BIGNUM* k_{};
+  // ECDSA parameters, which will contain values whose memory is managed within
+  // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
+  const BIGNUM* priv_key_{};
+  size_t sig_len_{};
+};
+
 // CryptoMbRsaContext is a CryptoMbContext which holds the extra RSA parameters and has
 // custom initialization function. It also has a separate buffer for RSA result
 // verification.
@@ -85,31 +107,9 @@ public:
   unsigned char lenstra_to_[MAX_SIGNATURE_SIZE];
 };
 
-class CryptoMbEcdsaContext : public CryptoMbContext {
-public:
-  CryptoMbEcdsaContext(bssl::UniquePtr<EC_KEY> ec_key, Event::Dispatcher& dispatcher,
-                       Ssl::PrivateKeyConnectionCallbacks& cb)
-      : CryptoMbContext(dispatcher, cb), ec_key_(std::move(ec_key)) {}
-  ~CryptoMbEcdsaContext() override;
-  bool ecdsaInit(const uint8_t* in, size_t in_len);
-
-  // ECDSA key.
-  bssl::UniquePtr<EC_KEY> ec_key_{};
-  // ECDSA context, which must be released manually.
-  BN_CTX* ctx_{};
-  // ECDSA parameters, which will contain values whose memory is managed within
-  // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
-  size_t buf_len_{};
-  BIGNUM* k_{};
-  const BIGNUM* priv_key_{};
-  // ECDSA intermediate buffer, which stores signature by CryptoMB.
-  size_t sig_len_{};
-  std::unique_ptr<uint8_t[]> sig_buf_;
-};
-
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;
-using CryptoMbRsaContextSharedPtr = std::shared_ptr<CryptoMbRsaContext>;
 using CryptoMbEcdsaContextSharedPtr = std::shared_ptr<CryptoMbEcdsaContext>;
+using CryptoMbRsaContextSharedPtr = std::shared_ptr<CryptoMbRsaContext>;
 
 // CryptoMbQueue maintains the request queue and is able to process it.
 class CryptoMbQueue : public Logger::Loggable<Logger::Id::connection> {
@@ -125,7 +125,8 @@ private:
   void processRequests();
   void processRsaRequests();
   void processEcdsaRequests();
-  bool postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx);
+  bool postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx, const uint8_t* sign_r,
+                               const uint8_t* sign_s);
   void startTimer();
   void stopTimer();
 
