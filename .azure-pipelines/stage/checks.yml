@@ -48,7 +48,7 @@ jobs:
   steps:
   - template: ../bazel.yml
     parameters:
-      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only"
       cacheKeyDockerPath: ""
       cacheTestResults: ${{ parameters.cacheTestResults }}
       ciTarget: $(CI_TARGET)
