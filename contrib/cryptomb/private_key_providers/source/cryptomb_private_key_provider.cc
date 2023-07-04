@@ -29,13 +29,6 @@ void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
   schedulable_->scheduleCallbackNextIteration();
 }
 
-CryptoMbEcdsaContext::~CryptoMbEcdsaContext() {
-  if (ctx_) {
-    BN_CTX_end(ctx_);
-    BN_CTX_free(ctx_);
-  }
-}
-
 bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   if (ec_key_ == nullptr) {
     return false;
@@ -54,12 +47,12 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   }
 
   // Create an ephemeral key.
-  ctx_ = BN_CTX_new();
+  ctx_ = bssl::UniquePtr<BN_CTX>(BN_CTX_new());
   if (ctx_ == nullptr) {
     return false;
   }
-  BN_CTX_start(ctx_);
-  k_ = BN_CTX_get(ctx_);
+  BN_CTX_start(ctx_.get());
+  k_ = BN_CTX_get(ctx_.get());
   do {
     if (!BN_rand_range(k_, order)) {
       return false;
@@ -568,6 +561,9 @@ void CryptoMbQueue::processEcdsaRequests() {
 
     ctx_status = status[req_num];
     mb_ctx->scheduleCallback(ctx_status);
+
+    // End context to invalid the ephemeral key.
+    BN_CTX_end(mb_ctx->ctx_.get());
   }
 }
 

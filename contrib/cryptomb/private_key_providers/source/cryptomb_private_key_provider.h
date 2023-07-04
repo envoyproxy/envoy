@@ -64,14 +64,12 @@ public:
   CryptoMbEcdsaContext(bssl::UniquePtr<EC_KEY> ec_key, Event::Dispatcher& dispatcher,
                        Ssl::PrivateKeyConnectionCallbacks& cb)
       : CryptoMbContext(dispatcher, cb), ec_key_(std::move(ec_key)) {}
-  ~CryptoMbEcdsaContext() override;
   bool ecdsaInit(const uint8_t* in, size_t in_len);
 
   // ECDSA key.
   bssl::UniquePtr<EC_KEY> ec_key_{};
-  // ECDSA context to create the ephemeral key k_, which must be released manually after the using
-  // of k_.
-  BN_CTX* ctx_{};
+  // ECDSA context to create the ephemeral key k_.
+  bssl::UniquePtr<BN_CTX> ctx_{};
   BIGNUM* k_{};
   // ECDSA parameters, which will contain values whose memory is managed within
   // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
