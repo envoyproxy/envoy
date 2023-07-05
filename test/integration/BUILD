@@ -1825,7 +1825,6 @@ envoy_cc_test(
     deps = [
         ":tracked_watermark_buffer_lib",
         "//test/mocks/http:stream_reset_handler_mock",
-        "//test/test_common:test_runtime_lib",
     ],
 )
 

@@ -5,7 +5,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
