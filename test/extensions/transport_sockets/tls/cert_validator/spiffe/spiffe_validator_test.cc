@@ -14,8 +14,8 @@
 #include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
