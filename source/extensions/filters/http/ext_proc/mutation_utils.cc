@@ -84,8 +84,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 
     // Only one of value or value_in_bytes in the HeaderValue message should be set.
     if (!sh.header().value().empty() && !sh.header().value_in_bytes().empty()) {
-      ENVOY_LOG(debug, "Only one of value or value_in_bytes in the HeaderValue message should be set, "
-                       "may not be append.");
+      ENVOY_LOG(debug,
+                "Only one of value or value_in_bytes in the HeaderValue message should be set, "
+                "may not be append.");
       rejected_mutations.inc();
       return absl::InvalidArgumentError(
           "Only one of value or value_in_bytes in the HeaderValue message should be set.");
