@@ -41,6 +41,11 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
 
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
+  // TODO(https://github.com/envoyproxy/envoy/issues/23564): Remove this line when the QUICHE is
+  // updated with a more reasonable default expiry time for QUIC Datagrams.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+    SetMaxDatagramTimeInQueue(::quic::QuicTime::Delta::FromMilliseconds(100));
+  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -228,9 +233,11 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
+  auto server_session = static_cast<EnvoyQuicServerSession*>(session());
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
+          header_list, *this, server_session->max_inbound_header_list_size(),
+          filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_, rst);
     return;
@@ -258,6 +265,14 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
+  }
+#endif
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
+       Http::HeaderUtility::isConnectUdp(*headers))) {
+    useCapsuleProtocol();
   }
 #endif
 
@@ -353,9 +368,10 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
+    auto server_session = static_cast<EnvoyQuicServerSession*>(session());
     auto trailers = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
-        rst);
+        received_trailers(), server_session->max_inbound_header_list_size(),
+        filterManagerConnection()->maxIncomingHeadersCount(), *this, details_, rst);
     if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;

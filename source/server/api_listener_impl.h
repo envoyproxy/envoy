@@ -122,12 +122,12 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
-      Event::Dispatcher& dispatcher() override { return dispatcher_; }
+      Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
-      void readDisable(bool) override {}
+      ReadDisableStatus readDisable(bool) override { return ReadDisableStatus::NoTransition; }
       void detectEarlyCloseWhenReadDisabled(bool) override {
         IS_ENVOY_BUG("Unexpected function call");
       }

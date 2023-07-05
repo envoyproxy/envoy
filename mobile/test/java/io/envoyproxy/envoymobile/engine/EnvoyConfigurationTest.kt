@@ -98,13 +98,13 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
-    rtdsLayerName: String = "",
+    rtdsResourceName: String = "",
     rtdsTimeoutSeconds: Int = 0,
-    adsAddress: String = "",
-    adsPort: Int = 0,
-    adsJwtToken: String = "",
-    adsJwtTokenLifetimeSeconds: Int = 0,
-    adsSslRootCerts: String = "",
+    xdsAddress: String = "",
+    xdsPort: Int = 0,
+    xdsJwtToken: String = "",
+    xdsJwtTokenLifetimeSeconds: Int = 0,
+    xdsSslRootCerts: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -147,13 +147,13 @@ class EnvoyConfigurationTest {
       statSinks,
       runtimeGuards,
       enablePlatformCertificatesValidation,
-      rtdsLayerName,
+      rtdsResourceName,
       rtdsTimeoutSeconds,
-      adsAddress,
-      adsPort,
-      adsJwtToken,
-      adsJwtTokenLifetimeSeconds,
-      adsSslRootCerts,
+      xdsAddress,
+      xdsPort,
+      xdsJwtToken,
+      xdsJwtTokenLifetimeSeconds,
+      xdsSslRootCerts,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -311,10 +311,10 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `test adding RTDS and ADS`() {
+  fun `test adding RTDS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -328,7 +328,7 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and CDS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0, enableCds = true
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -342,7 +342,7 @@ class EnvoyConfigurationTest {
   fun `test not using enableCds`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -355,7 +355,7 @@ class EnvoyConfigurationTest {
   fun `test enableCds with default string`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      enableCds = true, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -368,7 +368,7 @@ class EnvoyConfigurationTest {
   fun `test RTDS default timeout`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)

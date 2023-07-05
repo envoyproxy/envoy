@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -20,9 +21,6 @@ using envoy::service::ext_proc::v3::BodyMutation;
 
 using Filters::Common::MutationRules::Checker;
 using Http::LowerCaseString;
-
-const uint32_t kMaxRequestHeadersKb = 60;
-const uint32_t kMaxRequestHeadersCount = 100;
 
 TEST(MutationUtils, TestBuildHeaders) {
   Http::TestRequestHeaderMapImpl headers{
@@ -50,6 +48,8 @@ TEST(MutationUtils, TestBuildHeaders) {
 }
 
 TEST(MutationUtils, TestApplyMutations) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},
       {":method", "GET"},
@@ -134,9 +134,8 @@ TEST(MutationUtils, TestApplyMutations) {
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc()).Times(10);
   // There were 10 attempts to change un-changeable headers above.
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(kMaxRequestHeadersKb, kMaxRequestHeadersCount,
-                                                  mutation, headers, false, checker, rejections)
-                  .ok());
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":scheme", "https"},
@@ -158,6 +157,8 @@ TEST(MutationUtils, TestApplyMutations) {
 }
 
 TEST(MutationUtils, TestNonAppendableHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
@@ -183,9 +184,8 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   // There were two invalid attempts above.
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc()).Times(2);
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(kMaxRequestHeadersKb, kMaxRequestHeadersCount,
-                                                  mutation, headers, false, checker, rejections)
-                  .ok());
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":path", "/foo"},
@@ -195,6 +195,8 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
 }
 
 TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {"host", "localhost:1000"},
@@ -207,9 +209,8 @@ TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_key("x-append-this\n");
   s->mutable_header()->set_value("value");
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(MutationUtils::applyHeaderMutations(kMaxRequestHeadersKb, kMaxRequestHeadersCount,
-                                                   mutation, headers, false, checker, rejections)
-                   .ok());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   mutation.Clear();
   s = mutation.add_set_headers();
@@ -217,9 +218,8 @@ TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("value\r");
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(MutationUtils::applyHeaderMutations(kMaxRequestHeadersKb, kMaxRequestHeadersCount,
-                                                   mutation, headers, false, checker, rejections)
-                   .ok());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
 TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
@@ -232,9 +232,8 @@ TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(MutationUtils::applyHeaderMutations(kMaxRequestHeadersKb, kMaxRequestHeadersCount,
-                                                   mutation, headers, false, checker, rejections)
-                   .ok());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
 // Ensure that we actually replace the body

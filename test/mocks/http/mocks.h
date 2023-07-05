@@ -99,8 +99,6 @@ public:
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
-  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(void, onResponseDataTooLarge, ());
   MOCK_METHOD(void, onRequestDataTooLarge, ());
@@ -230,8 +228,6 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
-  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -901,6 +897,27 @@ IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
   const bool equal = (*arg == *rhs);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("header map:") << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(HeaderMapEqualWithMaxSize, rhs, "") {
+  bool equal = (*arg == *rhs);
+
+  // Check the max header count and size of the HeaderMap also equal.
+  if (equal) {
+    if (arg->maxHeadersCount() != rhs->maxHeadersCount() ||
+        arg->maxHeadersKb() != rhs->maxHeadersKb()) {
+      equal = false;
+    }
+  }
+
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("header map:") << "\n"

@@ -51,9 +51,14 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
   if (status == quic::MessageStatus::MESSAGE_STATUS_SUCCESS) {
     return true;
   }
-  // Drops the Datagram and move on without reporting a failure in the following statuses.
-  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKED ||
-      status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
+  // When SendHttp3Datagram cannot send a datagram immediately, it puts it into the queue and
+  // returns MESSAGE_STATUS_BLOCKED.
+  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKED) {
+    ENVOY_LOG(trace, fmt::format("SendHttpH3Datagram failed: status = {}, buffers the Datagram.",
+                                 quic::MessageStatusToString(status)));
+    return true;
+  }
+  if (status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
     ENVOY_LOG(warn, fmt::format("SendHttpH3Datagram failed: status = {}, drops the Datagram.",
                                 quic::MessageStatusToString(status)));
     return true;

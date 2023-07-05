@@ -181,6 +181,8 @@ public:
   CAPIStatus removeTrailer(absl::string_view key);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+
+  CAPIStatus getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
@@ -215,6 +217,9 @@ private:
 
   void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
                                   const absl::string_view& buf);
+
+  void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                 GoSlice* buf_slice);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;

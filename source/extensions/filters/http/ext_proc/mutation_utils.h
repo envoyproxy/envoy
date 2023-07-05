@@ -28,7 +28,6 @@ public:
   // will be incremented with the number of invalid mutations, regardless of
   // whether an error is returned.
   static absl::Status applyHeaderMutations(
-      const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       const envoy::service::ext_proc::v3::HeaderMutation& mutation, Http::HeaderMap& headers,
       bool replacing_message, const Filters::Common::MutationRules::Checker& rule_checker,
       Stats::Counter& rejected_mutations);
@@ -46,13 +45,11 @@ private:
                                 const std::vector<Matchers::StringMatcherPtr>& header_matchers);
   // Check whether the header mutations in the response is over the HCM size config.
   static absl::Status
-  responseHeaderSizeCheck(const uint32_t max_request_headers_count,
+  responseHeaderSizeCheck(const Http::HeaderMap& headers,
                           const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                           Stats::Counter& rejected_mutations);
   // Check whether the header size after mutation is over the HCM size config.
-  static absl::Status headerMutationResultCheck(const uint32_t max_request_headers_kb,
-                                                const uint32_t max_request_headers_count,
-                                                const Http::HeaderMap& headers,
+  static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);
 };
 

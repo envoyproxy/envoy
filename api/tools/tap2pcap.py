@@ -49,7 +49,7 @@ def tap2pcap(tap_path, pcap_path):
         with open(tap_path, 'r') as f:
             text_format.Merge(f.read(), wrapper)
     else:
-        with open(tap_path, 'r') as f:
+        with open(tap_path, 'rb') as f:
             wrapper.ParseFromString(f.read())
 
     trace = wrapper.socket_buffered_trace

@@ -85,7 +85,6 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     const auto& common_response = response.response();
     if (common_response.has_header_mutation()) {
       const auto mut_status = MutationUtils::applyHeaderMutations(
-          filter_.maxRequestHeadersKb(), filter_.maxRequestHeadersCount(),
           common_response.header_mutation(), *headers_,
           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
           filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
@@ -216,7 +215,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         if (headers_ != nullptr) {
           ENVOY_LOG(debug, "Applying header mutations to buffered body message");
           const auto mut_status = MutationUtils::applyHeaderMutations(
-              filter_.maxRequestHeadersKb(), filter_.maxRequestHeadersCount(),
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
               filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
@@ -281,7 +279,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         if (headers_ != nullptr) {
           ENVOY_LOG(debug, "Applying header mutations to buffered body message");
           const auto mut_status = MutationUtils::applyHeaderMutations(
-              filter_.maxRequestHeadersKb(), filter_.maxRequestHeadersCount(),
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
               filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
@@ -348,7 +345,6 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     ENVOY_LOG(debug, "Applying response to buffered trailers");
     if (response.has_header_mutation()) {
       auto mut_status = MutationUtils::applyHeaderMutations(
-          filter_.maxRequestHeadersKb(), filter_.maxRequestHeadersCount(),
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
           filter_.stats().rejected_header_mutations_);
       if (!mut_status.ok()) {
