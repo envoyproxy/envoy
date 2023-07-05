@@ -5385,10 +5385,10 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
+    external_deps = ["ssl"],
     deps = [
         ":quiche_common_platform_export",
     ],
-    external_deps = ["ssl"],
 )
 
 envoy_quiche_platform_impl_cc_library(
