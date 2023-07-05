@@ -46,8 +46,7 @@ private:
                                 const std::vector<Matchers::StringMatcherPtr>& header_matchers);
   // Check whether the header mutations in the response is over the HCM size config.
   static absl::Status
-  responseHeaderSizeCheck(const uint32_t max_request_headers_kb,
-                          const uint32_t max_request_headers_count,
+  responseHeaderSizeCheck(const uint32_t max_request_headers_count,
                           const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                           Stats::Counter& rejected_mutations);
   // Check whether the header size after mutation is over the HCM size config.
