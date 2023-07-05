@@ -146,6 +146,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return true
 	})
 
+	header.RangeWithCopy(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in RangeWithCopy")
+			return false
+		}
+		return true
+	})
+
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
 	if found {
