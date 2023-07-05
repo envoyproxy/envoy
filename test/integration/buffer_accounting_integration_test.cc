@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -604,6 +605,71 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
   } else {
     EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
   }
+}
+
+class TcpTunnelingWatermarkIntegrationTest : public Http2BufferWatermarksTest {
+public:
+  void SetUp() override {
+    enableHalfClose(true);
+
+    setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
+    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+          proxy_config.set_stat_prefix("tcp_stats");
+          proxy_config.set_cluster("cluster_0");
+          proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+          auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+          listener->set_name("tcp_proxy");
+          auto* socket_address = listener->mutable_address()->mutable_socket_address();
+          socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+          socket_address->set_port_value(0);
+
+          auto* filter_chain = listener->add_filter_chains();
+          auto* filter = filter_chain->add_filters();
+          filter->mutable_typed_config()->PackFrom(proxy_config);
+          filter->set_name("envoy.filters.network.tcp_proxy");
+
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          auto* options =
+              protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          options->mutable_initial_stream_window_size()->set_value(65536);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  }
+
+protected:
+  IntegrationTcpClientPtr tcp_client_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, TcpTunnelingWatermarkIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
+  config_helper_.setBufferLimits(16384, 131072);
+  initialize();
+
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  write_matcher_->setWriteReturnsEgain();
+  ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+  tcp_client_->close();
 }
 
 class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
