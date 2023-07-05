@@ -181,22 +181,12 @@ message PrivateKeyProvider {
 }
 
 // [#not-implemented-hide:]
-// BoringSSL private key method configuration. The private key methods are used for external
-// (potentially asynchronous) signing and decryption operations. Some use cases for private key
-// methods would be TPM support and TLS acceleration.
-message PrivateKeyProviderEntry {
-  // Private key method provider name. The name must match a
-  // supported private key method provider type.
-  string provider_name = 1 [(validate.rules).string = {min_len: 1}];
-}
-
-// [#not-implemented-hide:]
 // Provides a list of private key providers. Envoy will find out an available private
 // key provider from the list on order. If there is none of available private key provider,
 // it may fallback to BoringSSL default implementation based on the `fallback` fallback.
 message PrivateKeyProviderList {
   // A list of private key providers, and at least one private key provider provided.
-  repeated PrivateKeyProviderEntry private_key_provider = 1
+  repeated PrivateKeyProvider private_key_provider = 1
       [(validate.rules).repeated = {min_items: 1}];
 
   // If there is no available private key provider from the list, Envoy will fallback to
