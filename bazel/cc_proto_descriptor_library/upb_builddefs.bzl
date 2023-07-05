@@ -1,28 +1,3 @@
-# Copyright (c) 2009-2021, Google LLC
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of Google LLC nor the
-#       names of its contributors may be used to endorse or promote products
-#       derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL Google LLC BE LIABLE FOR ANY
-# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 """Public rules for using cc proto descriptor library with protos:
   - cc_proto_descriptor_library()
 """
@@ -161,12 +136,12 @@ GeneratedSrcsInfo = provider(
     },
 )
 
-_UpbWrappedCcInfo = provider(fields = ["cc_info"])
-_UpbDefsWrappedCcInfo = provider(fields = ["cc_info"])
+_WrappedCcInfo = provider(fields = ["cc_info"])
+_DefsWrappedCcInfo = provider(fields = ["cc_info"])
 _WrappedGeneratedSrcsInfo = provider(fields = ["srcs"])
 _WrappedDefsGeneratedSrcsInfo = provider(fields = ["srcs"])
 
-def _compile_upb_protos(ctx, generator, proto_info, proto_sources):
+def _compile_protos(ctx, generator, proto_info, proto_sources):
     if len(proto_sources) == 0:
         return GeneratedSrcsInfo(srcs = [], hdrs = [])
 
@@ -227,13 +202,13 @@ def _cc_proto_descriptor_library_rule_impl(ctx):
         fail("proto_library rule must generate _WrappedGeneratedSrcsInfo or " +
              "_WrappedDefsGeneratedSrcsInfo (aspect should have handled this).")
 
-    if _UpbDefsWrappedCcInfo in dep:
-        cc_info = dep[_UpbDefsWrappedCcInfo].cc_info
-    elif _UpbWrappedCcInfo in dep:
-        cc_info = dep[_UpbWrappedCcInfo].cc_info
+    if _DefsWrappedCcInfo in dep:
+        cc_info = dep[_DefsWrappedCcInfo].cc_info
+    elif _WrappedCcInfo in dep:
+        cc_info = dep[_WrappedCcInfo].cc_info
     else:
-        fail("proto_library rule must generate _UpbWrappedCcInfo or " +
-             "_UpbDefsWrappedCcInfo (aspect should have handled this).")
+        fail("proto_library rule must generate _WrappedCcInfo or " +
+             "_DefsWrappedCcInfo (aspect should have handled this).")
 
     lib = cc_info.linking_context.linker_inputs.to_list()[0].libraries[0]
     files = _filter_none([
@@ -247,7 +222,7 @@ def _cc_proto_descriptor_library_rule_impl(ctx):
         cc_info,
     ]
 
-def _upb_proto_aspect_impl(target, ctx, generator, cc_provider, file_provider):
+def _cc_proto_descriptor_library_aspect_impl(target, ctx, generator, cc_provider, file_provider):
     proto_info = target[ProtoInfo]
     proto_sources = proto_info.direct_sources
     #proto_sources = []
@@ -258,15 +233,11 @@ def _upb_proto_aspect_impl(target, ctx, generator, cc_provider, file_provider):
 
     for proto_source in proto_sources:
         print(">>proto source %s" % proto_source)
-    files = _compile_upb_protos(ctx, generator, proto_info, proto_sources)
+    files = _compile_protos(ctx, generator, proto_info, proto_sources)
     deps = ctx.rule.attr.deps + getattr(ctx.attr, "_" + generator)
     dep_ccinfos = [dep[CcInfo] for dep in deps if CcInfo in dep]
-    dep_ccinfos += [dep[_UpbWrappedCcInfo].cc_info for dep in deps if _UpbWrappedCcInfo in dep]
-    dep_ccinfos += [dep[_UpbDefsWrappedCcInfo].cc_info for dep in deps if _UpbDefsWrappedCcInfo in dep]
-    if generator == "upbdefs":
-        if _UpbWrappedCcInfo not in target:
-            fail("Target should have _UpbWrappedCcInfo provider")
-        dep_ccinfos += [target[_UpbWrappedCcInfo].cc_info]
+    dep_ccinfos += [dep[_WrappedCcInfo].cc_info for dep in deps if _WrappedCcInfo in dep]
+    dep_ccinfos += [dep[_DefsWrappedCcInfo].cc_info for dep in deps if _DefsWrappedCcInfo in dep]
     cc_info = _cc_library_func(
         ctx = ctx,
         name = ctx.rule.attr.name + "." + generator,
@@ -279,7 +250,7 @@ def _upb_proto_aspect_impl(target, ctx, generator, cc_provider, file_provider):
     return [cc_provider(cc_info = cc_info), file_provider(srcs = files)]
 
 def _cc_proto_descriptor_library_aspect_impl(target, ctx):
-    return _upb_proto_aspect_impl(target, ctx, "descriptor", _UpbWrappedCcInfo, _WrappedGeneratedSrcsInfo)
+    return _cc_proto_descriptor_library_aspect_impl(target, ctx, "descriptor", _WrappedCcInfo, _WrappedGeneratedSrcsInfo)
 
 def _maybe_add(d):
     if _is_google3:
@@ -328,7 +299,7 @@ _cc_proto_descriptor_library_aspect = aspect(
     }),
     implementation = _cc_proto_descriptor_library_aspect_impl,
     provides = [
-        _UpbWrappedCcInfo,
+        _WrappedCcInfo,
         _WrappedGeneratedSrcsInfo,
     ],
     attr_aspects = ["deps"],
