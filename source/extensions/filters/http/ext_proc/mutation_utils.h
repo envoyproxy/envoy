@@ -27,10 +27,11 @@ public:
   // configured to reject failed mutations. The "rejected_mutations" counter
   // will be incremented with the number of invalid mutations, regardless of
   // whether an error is returned.
-  static absl::Status applyHeaderMutations(
-      const envoy::service::ext_proc::v3::HeaderMutation& mutation, Http::HeaderMap& headers,
-      bool replacing_message, const Filters::Common::MutationRules::Checker& rule_checker,
-      Stats::Counter& rejected_mutations);
+  static absl::Status
+  applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
+                       Http::HeaderMap& headers, bool replacing_message,
+                       const Filters::Common::MutationRules::Checker& rule_checker,
+                       Stats::Counter& rejected_mutations);
 
   // Modify a buffer based on a set of mutations from a protobuf
   static void applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,

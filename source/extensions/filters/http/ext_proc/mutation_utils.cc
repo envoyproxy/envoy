@@ -72,7 +72,7 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& heade
 
 absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& headers,
                                                       Counter& rejected_mutations) {
-  if (headers.byteSize() > headers.maxHeadersKb() ||
+  if (headers.byteSize() > headers.maxHeadersKb() * 1024 ||
       headers.size() > headers.maxHeadersCount()) {
     ENVOY_LOG(debug,
               "After mutation, the total header count {} or total header size {} exceed the "
