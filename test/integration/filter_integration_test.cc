@@ -201,6 +201,8 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
 }
 
 TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.refresh_rtt_after_request", "true");
+
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
   )EOF");
