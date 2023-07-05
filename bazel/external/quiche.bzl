@@ -8,13 +8,11 @@ def envoy_quiche_platform_impl_cc_library(
         name,
         srcs = [],
         hdrs = [],
-        external_deps = [],
         deps = []):
     envoy_cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        external_deps = external_deps,
         deps = deps,
         repository = "@envoy",
         strip_include_prefix = "quiche/common/platform/default/",
