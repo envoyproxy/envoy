@@ -20,8 +20,8 @@ behavior_changes:
     The proto field :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` type is string.
     This make it unable to support enconding non-utf8 characters in the HeaderValue message.
     To support sending header value with non-utf8 characters, a new proto field is added in the HeaderValue message:
-    :ref:`value_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_bytes>`.
-    The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending
+    :ref:`value_in_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_in_bytes>`.
+    The header values are now encoded in this ``value_in_bytes`` field when Envoy ext_proc filter sending
     and receiving messages from the ext_proc server. This behavioral change can be temporarily
     reverted by setting the runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
 - area: ext_proc

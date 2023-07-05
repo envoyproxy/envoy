@@ -38,9 +38,9 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
     if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
-      // Setting up value or value_bytes field based on the runtime flag.
+      // Setting up value or value_in_bytes field based on the runtime flag.
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
-        new_header->set_value_bytes(std::string(e.value().getStringView()));
+        new_header->set_value_in_bytes(std::string(e.value().getStringView()));
       } else {
         new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
       }
@@ -82,18 +82,18 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       continue;
     }
 
-    // Only one of value or value_bytes in the HeaderValue message should be set.
-    if (!sh.header().value().empty() && !sh.header().value_bytes().empty()) {
-      ENVOY_LOG(debug, "Only one of value or value_bytes in the HeaderValue message should be set, "
+    // Only one of value or value_in_bytes in the HeaderValue message should be set.
+    if (!sh.header().value().empty() && !sh.header().value_in_bytes().empty()) {
+      ENVOY_LOG(debug, "Only one of value or value_in_bytes in the HeaderValue message should be set, "
                        "may not be append.");
       rejected_mutations.inc();
       return absl::InvalidArgumentError(
-          "Only one of value or value_bytes in the HeaderValue message should be set.");
+          "Only one of value or value_in_bytes in the HeaderValue message should be set.");
     }
 
     absl::string_view header_value;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_value_in_bytes")) {
-      header_value = sh.header().value_bytes();
+      header_value = sh.header().value_in_bytes();
     } else {
       header_value = sh.header().value();
     }
