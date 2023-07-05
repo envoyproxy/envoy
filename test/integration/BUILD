@@ -2247,7 +2247,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_protocol_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    shard_count = 12,
+    shard_count = 24,
     tags = [
         "cpu:4",
         "nofips",

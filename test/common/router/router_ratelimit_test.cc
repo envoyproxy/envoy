@@ -292,14 +292,15 @@ virtual_hosts:
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
-        parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
+                                                                   factory_context_);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
@@ -313,14 +314,15 @@ public:
 class RateLimitPolicyEntryIpv6Test : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
-        parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
+                                                                   factory_context_);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
