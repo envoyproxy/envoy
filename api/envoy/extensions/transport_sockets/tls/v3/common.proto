@@ -254,10 +254,12 @@ message TlsCertificate {
   // This provides a list of BoringSSL private key method provider. Envoy will find out
   // an available private key method provider. It may fallback to BoringSSL default implementation
   // when there is no available one. All the private key provider will share the same private key
-  // in the `private_key` field, so the `private_key` field must be specified when the
-  // `proviate_key_provider_list` field is used. The old `private_key_provider` field will be
-  // deprecated. If both `private_key_provider` and `private_key_provider_list` are provided, the
-  // config will be rejected.
+  // in the :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field,
+  // so the :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field
+  // must be specified when the `proviate_key_provider_list` field is used. The old :ref:`private_key_provider
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` field will be
+  // deprecated. If both :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+  // and `private_key_provider_list` are provided, the config will be rejected.
   PrivateKeyProviderList private_key_provider_list = 9;
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
