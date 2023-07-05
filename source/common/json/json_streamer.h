@@ -22,23 +22,37 @@ class Streamer {
   struct Level {
     Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
     ~Level();
-    void newEntry();
+
+   protected:
+    void newEntryHelper();
 
     Streamer& streamer_;
+
+   private:
     absl::string_view closer_;
     bool is_first_;
   };
   using LevelPtr = std::unique_ptr<Level>;
 
-  LevelPtr newMap() { return std::make_unique<Level>(*this, "{", "}"); }
-  LevelPtr newArray() { return std::make_unique<Level>(*this, "[", "]"); }
+  struct Map : public Level {
+    Map(Streamer& streamer) : Level(streamer, "{", "}") {}
+    void newEntry(absl::string_view name);
+  };
+
+  struct Array : public Level {
+    Array(Streamer& streamer) : Level(streamer, "[", "]") {}
+    void newEntry() { newEntryHelper(); }
+  };
+
+  Map& newMap();
+  Array& newArray();
+  void pop(Level& level);
+  void clear();
 
   void addSanitized(absl::string_view token);
-  void addLiteralCopy(absl::string_view token);
-  void addLiteralNoCopy(absl::string_view token) { fragments_.push_back(token); }
-  void addFragments(absl::Span<const absl::string_view> src) {
-    fragments.insert(fragments_.end(), src.begin(), src.end());
-  }
+  void addCopy(absl::string_view token);
+  void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
+  void addFragments(absl::Span<const absl::string_view> src);
   void flush();
 
  private:
@@ -46,6 +60,7 @@ class Streamer {
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;
   std::string buffer_;
+  std::stack<LevelPtr> levels_;
 };
 
 } // namespace Json

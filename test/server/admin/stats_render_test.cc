@@ -344,7 +344,7 @@ TEST_F(StatsRenderTest, JsonHistogramDetailed) {
 }
 
 TEST_F(StatsRenderTest, JsonHistogramCombined) {
-  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Combined;
   StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF(
 {
@@ -355,8 +355,7 @@ TEST_F(StatsRenderTest, JsonHistogramCombined) {
           "name": "h1",
           "totals": [[200, 10, 1], [300, 10, 2]],
           "intervals": [[200, 10, 1], [300, 10, 2]],
-          "total_percentiles": [200, 207.5, 302.5, 306.25, 308.5, 309.25, 309.85, 309.925, 309.985, 310],
-          "cumulative_percentiles": [200, 207.5, 302.5, 306.25, 308.5, 309.25, 309.85, 309.925, 309.985, 310]
+          "percentiles": [200, 207.5, 302.5, 306.25, 308.5, 309.25, 309.85, 309.925, 309.985, 310],
         }
       ]}]}
   )EOF";

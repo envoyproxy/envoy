@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
@@ -90,29 +91,28 @@ private:
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
-                      const std::vector<uint64_t>& cumulative_buckets,
-                      Buffer::Instance& response);
+                      const std::vector<uint64_t>& cumulative_buckets);
 
   void populateDetail(absl::string_view name,
                       const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                       ProtoMap& histogram_obj_fields);
-  void generateHistogramDetail(Buffer::Instance& response, const std::string& name,
-                               const Stats::ParentHistogram& histogram, bool combined);
-  static void populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
-                              Buffer::Instance& response);
-  void renderHistogramStart(Buffer::Instance& response);
-  void populateSupportedPercentiles(Buffer::Instance& response, absl::string_view name);
+  void generateHistogramDetail(const std::string& name,
+                               const Stats::ParentHistogram& histogram);
+  void populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
+  void renderHistogramStart();
+  void populateSupportedPercentiles();
 
-  bool found_used_histogram_{false};
-  absl::string_view delim_{""};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
+  bool histograms_initialized_{false};
   Json::Streamer json_streamer_;
-  Json::Streamer::LevelPtr json_stats_map_;
-  Json::Streamer::LevelPtr json_stats_array_;
-  Json::Streamer::LevelPtr json_histograms_map_;
-
+  OptRef<Json::Streamer::Map> json_stats_map_;
+  OptRef<Json::Streamer::Array> json_stats_array_;
+  OptRef<Json::Streamer::Map> json_histogram_map1_;
+  OptRef<Json::Streamer::Map> json_histogram_map2_;
+  OptRef<Json::Streamer::Array> json_histogram_array_;
+};
 
 } // namespace Server
 } // namespace Envoy
