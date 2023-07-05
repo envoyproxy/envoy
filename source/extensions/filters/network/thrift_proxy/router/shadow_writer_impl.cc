@@ -25,7 +25,7 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
     return absl::nullopt;
   }
 
-  auto& active_routers = tls_->getTyped<ActiveRouters>().activeRouters();
+  auto& active_routers = tls_->activeRouters();
 
   LinkedList::moveIntoList(std::move(shadow_router), active_routers);
   return *active_routers.front();
