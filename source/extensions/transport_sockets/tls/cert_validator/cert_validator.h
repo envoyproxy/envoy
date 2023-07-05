@@ -46,7 +46,10 @@ struct ValidationResults {
 class CertValidator {
 public:
   // Wraps cert validation parameters added from time to time.
-  struct ExtraValidationContext {};
+  struct ExtraValidationContext {
+    // The pointer to SSL object. It is optional (nullptr by default).
+    const SSL* ssl = nullptr;
+  };
 
   virtual ~CertValidator() = default;
 
