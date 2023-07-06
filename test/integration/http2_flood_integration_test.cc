@@ -18,7 +18,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -956,13 +955,13 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeader
 // Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive
 // timer. The test verifies protocol constraint violation handling in the
 // Http2::ConnectionImpl::sendKeepalive() method.
-TEST_P(Http2FloodMitigationTest, KeepAliveTimeeTriggersFloodProtection) {
+TEST_P(Http2FloodMitigationTest, KeepAliveTimerTriggersFloodProtection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* keep_alive = hcm.mutable_http2_protocol_options()->mutable_connection_keepalive();
-        keep_alive->mutable_interval()->set_nanos(500 * 1000 * 1000);
-        keep_alive->mutable_timeout()->set_seconds(1 * TSAN_TIMEOUT_FACTOR);
+        keep_alive->mutable_interval()->set_seconds(1 * TSAN_TIMEOUT_FACTOR);
+        keep_alive->mutable_timeout()->set_seconds(2 * TSAN_TIMEOUT_FACTOR);
       });
 
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);

@@ -8,7 +8,6 @@
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/stream_reset_handler.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gtest/gtest.h"
