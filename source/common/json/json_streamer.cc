@@ -6,15 +6,11 @@ namespace Envoy {
 namespace Json {
 
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
-    : streamer_(streamer),
-      closer_(closer),
-      is_first_(true) {
+    : streamer_(streamer), closer_(closer), is_first_(true) {
   streamer_.addNoCopy(opener);
 }
 
-Streamer::Level::~Level() {
-  streamer_.addNoCopy(closer_);
-}
+Streamer::Level::~Level() { streamer_.addNoCopy(closer_); }
 
 Streamer::Map& Streamer::newMap() {
   auto map = std::make_unique<Map>(*this);

@@ -108,8 +108,7 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : histogram_buckets_mode_(params.histogram_buckets_mode_),
-      json_streamer_(response),
+    : histogram_buckets_mode_(params.histogram_buckets_mode_), json_streamer_(response),
       json_stats_map_(json_streamer_.newMap()) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the stats output, as that makes
@@ -121,12 +120,11 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
 
 // Buffers a JSON fragment for a numeric stats, flushing to the response
 // buffer once we exceed JsonStatsFlushCount stats.
-void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
-                               uint64_t value) {
+void StatsJsonRender::generate(Buffer::Instance&, const std::string& name, uint64_t value) {
   ASSERT(!histograms_initialized_);
   json_stats_array_->newEntry();
   json_streamer_.addFragments({JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
-      std::to_string(value), JsonCloseBrace});
+                               std::to_string(value), JsonCloseBrace});
 }
 
 // Buffers a JSON fragment for a text-readout stat, flushing to the response
@@ -136,7 +134,7 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   ASSERT(!histograms_initialized_);
   json_stats_array_->newEntry();
   json_streamer_.addFragments({JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
-      Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
+                               Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
 }
 
 // In JSON we buffer all histograms and don't write them immediately, so we
@@ -156,35 +154,34 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   }
 
   switch (histogram_buckets_mode_) {
-    case Utility::HistogramBucketsMode::NoBuckets: {
-      json_histogram_array_->newEntry();
-      json_streamer_.addFragments({
-          "{\"name\":\"", Json::sanitize(name_buffer_, name),
-          "\",\"values\":["});
-      populatePercentiles(histogram);
-      json_streamer_.addNoCopy("]}");
-      break;
-    }
-    case Utility::HistogramBucketsMode::Cumulative: {
-      const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
-      const std::vector<uint64_t>& interval_buckets = interval_statistics.computedBuckets();
-      const std::vector<uint64_t>& cumulative_buckets =
-          histogram.cumulativeStatistics().computedBuckets();
-      collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
-      break;
-    }
-    case Utility::HistogramBucketsMode::Disjoint: {
-      const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
-      const std::vector<uint64_t> interval_buckets = interval_statistics.computeDisjointBuckets();
-      const std::vector<uint64_t> cumulative_buckets =
-          histogram.cumulativeStatistics().computeDisjointBuckets();
-      collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
-      break;
-    }
-    case Utility::HistogramBucketsMode::Detailed:
-    case Utility::HistogramBucketsMode::Combined:
-      generateHistogramDetail(name, histogram);
-      break;
+  case Utility::HistogramBucketsMode::NoBuckets: {
+    json_histogram_array_->newEntry();
+    json_streamer_.addFragments(
+        {"{\"name\":\"", Json::sanitize(name_buffer_, name), "\",\"values\":["});
+    populatePercentiles(histogram);
+    json_streamer_.addNoCopy("]}");
+    break;
+  }
+  case Utility::HistogramBucketsMode::Cumulative: {
+    const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
+    const std::vector<uint64_t>& interval_buckets = interval_statistics.computedBuckets();
+    const std::vector<uint64_t>& cumulative_buckets =
+        histogram.cumulativeStatistics().computedBuckets();
+    collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
+    break;
+  }
+  case Utility::HistogramBucketsMode::Disjoint: {
+    const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
+    const std::vector<uint64_t> interval_buckets = interval_statistics.computeDisjointBuckets();
+    const std::vector<uint64_t> cumulative_buckets =
+        histogram.cumulativeStatistics().computeDisjointBuckets();
+    collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
+    break;
+  }
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Combined:
+    generateHistogramDetail(name, histogram);
+    break;
   }
 }
 
@@ -198,14 +195,14 @@ void StatsJsonRender::populateSupportedPercentiles() {
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram) {
   std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles(),
-                   intervals = histogram.intervalStatistics().computedQuantiles();
+                      intervals = histogram.intervalStatistics().computedQuantiles();
   uint32_t min_size = std::min(totals.size(), intervals.size());
   ASSERT(totals.size() == min_size);
   ASSERT(intervals.size() == min_size);
   const char* prefix = "";
   for (uint32_t i = 0; i < min_size; ++i) {
-    json_streamer_.addCopy(absl::StrCat(prefix, "{\"cumulative\":", totals[i], ",\"interval\":",
-                                        intervals[i], "}"));
+    json_streamer_.addCopy(
+        absl::StrCat(prefix, "{\"cumulative\":", totals[i], ",\"interval\":", intervals[i], "}"));
     prefix = ",";
   }
 };
@@ -220,48 +217,48 @@ void StatsJsonRender::renderHistogramStart() {
   }
 
   switch (histogram_buckets_mode_) {
-    case Utility::HistogramBucketsMode::Detailed:
-      json_histogram_map2_ = json_streamer_.newMap();
-      json_histogram_map2_->newKey("supported_percentiles");
-      populateSupportedPercentiles();
-      json_histogram_map2_->newKey("details");
-      json_histogram_array_ = json_streamer_.newArray();
-      break;
-    case Utility::HistogramBucketsMode::Combined: {
-      // 'Combined' histogram mode results in a stat of type
-      // 'supported_percentileds' being created once, covering all
-      // histograms. All other histograms are emitted at the same logical level
-      // as counter, gauges, or text readouts, simplifying the hierarchy, but
-      // making the 'combined' mode work somewhat different from the others.
-      //
-      // Both the single 'supported_percentiles'.
-      Json::Streamer::Map& map = json_streamer_.newMap();
-      map.newKey("supported_percentiles");
-      populateSupportedPercentiles();
-      json_streamer_.pop(map);
-      json_stats_array_->newEntry();
-      json_histogram_map1_ = json_streamer_.newMap();
-      json_streamer_.addNoCopy("\"histograms\":");
-      json_histogram_array_ = json_streamer_.newArray();
-      break;
-    }
-    case Utility::HistogramBucketsMode::NoBuckets:
-      json_histogram_map2_ = json_streamer_.newMap();
-      json_histogram_map2_->newKey("supported_quantiles");
-      populateSupportedPercentiles();
-      json_histogram_map2_->newKey("computed_quantiles");
-      json_histogram_array_ = json_streamer_.newArray();
-      break;
-    case Utility::HistogramBucketsMode::Cumulative:
-    case Utility::HistogramBucketsMode::Disjoint:
-      json_histogram_array_ = json_streamer_.newArray();
-      break;
+  case Utility::HistogramBucketsMode::Detailed:
+    json_histogram_map2_ = json_streamer_.newMap();
+    json_histogram_map2_->newKey("supported_percentiles");
+    populateSupportedPercentiles();
+    json_histogram_map2_->newKey("details");
+    json_histogram_array_ = json_streamer_.newArray();
+    break;
+  case Utility::HistogramBucketsMode::Combined: {
+    // 'Combined' histogram mode results in a stat of type
+    // 'supported_percentiles' being created once, covering all
+    // histograms. All other histograms are emitted at the same logical level
+    // as counter, gauges, or text readouts, simplifying the hierarchy, but
+    // making the 'combined' mode work somewhat different from the others.
+    //
+    // Both the single 'supported_percentiles'.
+    Json::Streamer::Map& map = json_streamer_.newMap();
+    map.newKey("supported_percentiles");
+    populateSupportedPercentiles();
+    json_streamer_.pop(map);
+    json_stats_array_->newEntry();
+    json_histogram_map1_ = json_streamer_.newMap();
+    json_streamer_.addNoCopy("\"histograms\":");
+    json_histogram_array_ = json_streamer_.newArray();
+    break;
+  }
+  case Utility::HistogramBucketsMode::NoBuckets:
+    json_histogram_map2_ = json_streamer_.newMap();
+    json_histogram_map2_->newKey("supported_quantiles");
+    populateSupportedPercentiles();
+    json_histogram_map2_->newKey("computed_quantiles");
+    json_histogram_array_ = json_streamer_.newArray();
+    break;
+  case Utility::HistogramBucketsMode::Cumulative:
+  case Utility::HistogramBucketsMode::Disjoint:
+    json_histogram_array_ = json_streamer_.newArray();
+    break;
   }
 }
 
 void StatsJsonRender::generateHistogramDetail(const std::string& name,
                                               const Stats::ParentHistogram& histogram) {
-  // Now we produce the streamable histogram records, without using the json intermediate
+  // Now we produce the stream-able histogram records, without using the json intermediate
   // representation or serializer.
   Json::Streamer::Map& map = json_streamer_.newMap();
   map.newEntries({{"name", absl::StrCat("\"", Json::sanitize(name_buffer_, name), "\"")}});
@@ -291,8 +288,8 @@ void StatsJsonRender::populateBucketsTerse(
   Json::Streamer::Array& buckets_array = json_streamer_.newArray();
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     buckets_array.newEntry();
-    json_streamer_.addCopy(absl::StrFormat("[%g,%g,%g]", bucket.lower_bound_, bucket.width_,
-                                           bucket.count_));
+    json_streamer_.addCopy(
+        absl::StrFormat("[%g,%g,%g]", bucket.lower_bound_, bucket.width_, bucket.count_));
   }
   json_streamer_.pop(buckets_array);
 }
@@ -303,10 +300,9 @@ void StatsJsonRender::populateBucketsVerbose(
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     buckets_array.newEntry();
     Json::Streamer::Map& map = json_streamer_.newMap();
-    map.newEntries({
-        {"lower_bound", absl::StrCat(bucket.lower_bound_)},
-        {"width", absl::StrCat(bucket.width_)},
-        {"count", absl::StrCat(bucket.count_)}});
+    map.newEntries({{"lower_bound", absl::StrCat(bucket.lower_bound_)},
+                    {"width", absl::StrCat(bucket.width_)},
+                    {"count", absl::StrCat(bucket.count_)}});
     json_streamer_.pop(map);
   }
   json_streamer_.pop(buckets_array);
@@ -314,9 +310,7 @@ void StatsJsonRender::populateBucketsVerbose(
 
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
-void StatsJsonRender::finalize(Buffer::Instance&) {
-  json_streamer_.clear();
-}
+void StatsJsonRender::finalize(Buffer::Instance&) { json_streamer_.clear(); }
 
 // Collects the buckets from the specified histogram, using either the
 // cumulative or disjoint views, as controlled by buckets_fn.
@@ -341,14 +335,13 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   for (uint32_t i = 0; i < min_size; ++i) {
     buckets.newEntry();
     Json::Streamer::Map& bucket_map = json_streamer_.newMap();
-    //using NameValue = Json::Streamer::Map::NameValue;
-    bucket_map.newEntries({
-        {"upper_bound", absl::StrCat(supported_buckets[i])},
-        {"interval", absl::StrCat(interval_buckets[i])},
-        {"cumulative", absl::StrCat(cumulative_buckets[i])}});
+    // using NameValue = Json::Streamer::Map::NameValue;
+    bucket_map.newEntries({{"upper_bound", absl::StrCat(supported_buckets[i])},
+                           {"interval", absl::StrCat(interval_buckets[i])},
+                           {"cumulative", absl::StrCat(cumulative_buckets[i])}});
 
-    //NameValue n3{"cumulative", absl::StrCat(cumulative_buckets[i])};
-    //Json::Streamer::Map::Entries entries({n1, n2, n3});*/
+    // NameValue n3{"cumulative", absl::StrCat(cumulative_buckets[i])};
+    // Json::Streamer::Map::Entries entries({n1, n2, n3});*/
 
     json_streamer_.pop(bucket_map);
   }

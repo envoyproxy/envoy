@@ -96,8 +96,7 @@ private:
   void populateDetail(absl::string_view name,
                       const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                       ProtoMap& histogram_obj_fields);
-  void generateHistogramDetail(const std::string& name,
-                               const Stats::ParentHistogram& histogram);
+  void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
   void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
   void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
   void renderHistogramStart();

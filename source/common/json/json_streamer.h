@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Json {
 
 class Streamer {
- public:
+public:
   Streamer(Buffer::Instance& response) : response_(response) {}
 
   // A Level represents the current map or array. We keep track
@@ -23,12 +23,12 @@ class Streamer {
     Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
     ~Level();
 
-   protected:
+  protected:
     void newEntryHelper();
 
     Streamer& streamer_;
 
-   private:
+  private:
     absl::string_view closer_;
     bool is_first_;
   };
@@ -59,8 +59,7 @@ class Streamer {
   void addFragments(absl::Span<const absl::string_view> src);
   void flush();
 
- private:
-
+private:
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;
   std::string buffer_;
