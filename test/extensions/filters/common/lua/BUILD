@@ -19,6 +19,10 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test(
@@ -33,6 +37,10 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test_library(
@@ -42,4 +50,8 @@ envoy_cc_test_library(
         "//source/extensions/filters/common/lua:lua_lib",
         "//test/mocks/thread_local:thread_local_mocks",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )

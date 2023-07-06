@@ -29,6 +29,10 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_extension_cc_test(
@@ -44,6 +48,10 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_extension_cc_test(
@@ -59,6 +67,10 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_extension_cc_test(
@@ -71,4 +83,8 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
