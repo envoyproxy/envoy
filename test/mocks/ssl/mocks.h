@@ -55,6 +55,8 @@ public:
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansLocalCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, ipSansPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, ipSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
