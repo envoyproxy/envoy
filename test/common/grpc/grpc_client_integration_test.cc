@@ -383,7 +383,7 @@ TEST_P(GrpcClientIntegrationTest, MaximumKnownPlusOne) {
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
   auto stream = createStream(empty_metadata_);
-  // stream->sendRequest(true);
+
   RequestOptions request_option;
   request_option.end_stream = true;
   stream->sendRequest(request_option);
