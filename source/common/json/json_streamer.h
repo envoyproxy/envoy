@@ -36,7 +36,9 @@ class Streamer {
 
   struct Map : public Level {
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
-    void newEntry(absl::string_view name);
+    void newKey(absl::string_view name);
+    using NameValue = std::pair<absl::string_view, absl::string_view>;
+    void newEntries(absl::Span<NameValue> entries);
   };
 
   struct Array : public Level {

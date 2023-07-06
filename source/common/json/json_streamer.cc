@@ -50,9 +50,16 @@ void Streamer::Level::newEntryHelper() {
   }
 }
 
-void Streamer::Map::newEntry(absl::string_view name) {
+void Streamer::Map::newKey(absl::string_view name) {
   newEntryHelper();
   streamer_.addFragments({"\"", name, "\":"});
+}
+
+void Streamer::Map::newEntries(absl::Span<NameValue> entries) {
+  for (const NameValue& entry : entries) {
+    newEntryHelper();
+    streamer_.addFragments({"\"", entry.first, "\":", entry.second});
+  }
 }
 
 void Streamer::addCopy(absl::string_view str) {
@@ -75,7 +82,7 @@ void Streamer::addFragments(absl::Span<const absl::string_view> src) {
 }
 
 void Streamer::addSanitized(absl::string_view token) {
-  addCopy(Json::sanitize(buffer_, token));
+  addFragments({"\"", Json::sanitize(buffer_, token), "\""});
 }
 
 } // namespace Json
