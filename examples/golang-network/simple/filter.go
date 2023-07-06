@@ -28,6 +28,7 @@ func (f *configFactory) CreateFactoryFromConfig(config interface{}) network.Filt
 	addr, err := net.LookupHost(v.(string))
 	if err != nil {
 		fmt.Printf("fail to resolve: %v, err: %v\n", v.(string), err)
+		return nil
 	}
 	upAddr := addr[0] + ":1025"
 

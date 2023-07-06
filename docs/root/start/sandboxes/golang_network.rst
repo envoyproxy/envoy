@@ -1,6 +1,6 @@
 .. _install_sandboxes_golang_network:
 
-Golang Network Filter
+Golang network filter
 =====================
 
 .. sidebar:: Requirements
@@ -14,8 +14,6 @@ In this example, we show how the `Golang <https://go.dev/>`_ network filter can 
 proxy.
 
 The example demonstrates a Go plugin that can process tcp data stream directly.
-
-It also shows how Go plugins can be independently configured at runtime.
 
 Step 1: Compile the go plugin library
 *************************************
@@ -48,7 +46,7 @@ Start all the containers.
 
   NAME                            COMMAND                  SERVICE        STATUS   PORTS
   golang-network-echo_service-1   "/tcp-echo"              echo_service   Up       0.0.0.0:1025->1025/tcp
-  golang-network-proxy-1          "/docker-entrypoint.…"   proxy          Up       0.0.0.0:10000->10000/tcp
+  golang-network-proxy-1          "/docker-entrypoint.…"   proxy          Up       0.0.0.0:10720->10720/tcp
 
 Step 3: Send some data to be handled by the Go plugin
 *****************************************************
@@ -57,7 +55,7 @@ The output from the ``nc`` command below should include the "hello, " prefix add
 
 .. code-block:: console
 
-   $ echo "world" | nc localhost 10000 2>&1
+   $ echo "world" | nc localhost 10720 2>&1
    < hello, world
 
 .. seealso::

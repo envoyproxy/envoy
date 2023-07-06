@@ -34,6 +34,8 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
+            "golang-http/*.yaml",
+            "golang-network/*.yaml",
             "mysql/*.yaml",
             "postgres/*.yaml",
             "kafka/*.yaml",
