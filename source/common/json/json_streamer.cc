@@ -55,11 +55,10 @@ void Streamer::Map::newKey(absl::string_view name) {
   streamer_.addFragments({"\"", name, "\":"});
 }
 
-void Streamer::Map::newEntries(Entries entries) {
-  ASSERT((entries.size() & 1) == 0);
-  for (uint32_t i = 0, n = entries.size(); i < n; i += 2) {
+void Streamer::Map::newEntries(const Entries& entries) {
+  for (const NameValue& entry : entries) {
     newEntryHelper();
-    streamer_.addFragments({"\"", entries[i], "\":", entries[i + 1]});
+    streamer_.addFragments({"\"", entry.first, "\":", entry.second});
   }
 }
 
