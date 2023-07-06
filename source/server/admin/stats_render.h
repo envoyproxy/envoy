@@ -98,9 +98,11 @@ private:
                       ProtoMap& histogram_obj_fields);
   void generateHistogramDetail(const std::string& name,
                                const Stats::ParentHistogram& histogram);
-  void populateBuckets(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
+  void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
+  void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
   void renderHistogramStart();
   void populateSupportedPercentiles();
+  void populatePercentiles(const Stats::ParentHistogram& histogram);
 
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
