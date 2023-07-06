@@ -554,7 +554,6 @@ envoy_cc_test(
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/mocks/upstream:typed_load_balancer_factory_mocks",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
