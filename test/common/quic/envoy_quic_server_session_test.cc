@@ -1079,9 +1079,11 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
 
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
-  void doSetUp() { EnvoyQuicServerSessionTest::SetUp(); }
-  void TearDown() override {}
-  void doTearDown() { EnvoyQuicServerSessionTest::TearDown(); }
+  void TearDown() override {
+    EnvoyQuicServerSessionTest::SetUp();
+    installReadFilter();
+    EnvoyQuicServerSessionTest::TearDown();
+  }
 };
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
