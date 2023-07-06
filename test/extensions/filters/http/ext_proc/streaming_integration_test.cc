@@ -43,8 +43,7 @@ protected:
   }
 
   void initializeConfig() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
     proto_config_.set_allow_mode_override(true);
