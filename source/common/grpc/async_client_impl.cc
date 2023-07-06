@@ -139,6 +139,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
+  stream_->streamInfo().addBytesReceived(data.length());
   decoded_frames_.clear();
   if (!decoder_.decode(data, decoded_frames_)) {
     streamError(Status::WellKnownGrpcStatus::Internal);

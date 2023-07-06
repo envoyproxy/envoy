@@ -204,6 +204,8 @@ public:
      * @returns the stream info object associated with the stream.
      */
     virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+    virtual StreamInfo::StreamInfo& streamInfo() PURE;
   };
 
   /***

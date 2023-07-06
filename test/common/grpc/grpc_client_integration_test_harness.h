@@ -105,21 +105,30 @@ public:
   Event::Dispatcher& dispatcher_;
 };
 
+struct RequestOptions {
+  helloworld::HelloRequest* request = nullptr;
+  bool end_stream = false;
+};
+
 // Stream related test utilities.
 class HelloworldStream : public MockAsyncStreamCallbacks<helloworld::HelloReply> {
 public:
   HelloworldStream(DispatcherHelper& dispatcher_helper) : dispatcher_helper_(dispatcher_helper) {}
 
-  void sendRequest(bool end_stream = false) {
+  void sendRequest(RequestOptions request_option = {}) {
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
-    grpc_stream_->sendMessage(request_msg, end_stream);
+    if (request_option.request == nullptr) {
+      request_option.request = &request_msg;
+    }
+
+    grpc_stream_->sendMessage(*request_option.request, request_option.end_stream);
 
     helloworld::HelloRequest received_msg;
     AssertionResult result =
         fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
-    EXPECT_THAT(request_msg, ProtoEq(received_msg));
+    EXPECT_THAT(*request_option.request, ProtoEq(received_msg));
   }
 
   void expectInitialMetadata(const TestMetadata& metadata) {
@@ -156,10 +165,22 @@ public:
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
-  void sendReply() {
+  // `check_response_size` only could be set to true in Envoy gRPC because bytes info tracking
+  // is only implemented in Envoy gPRC.
+  void sendReply(bool check_response_size = false) {
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
+    EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY)))
+        .WillOnce(Invoke([this, check_response_size](const helloworld::HelloReply& reply_msg) {
+          if (check_response_size) {
+            auto recv_buf = Common::serializeMessage(reply_msg);
+            Common::prependGrpcFrameHeader(*recv_buf);
+            // Verify that the number of tracked received bytes equals to the length of response's
+            // buffer.
+            EXPECT_EQ(this->grpc_stream_->streamInfo().bytesReceived(), recv_buf->length());
+          }
+          dispatcher_helper_.exitDispatcherIfNeeded();
+        }));
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage<helloworld::HelloReply>(reply);
   }

@@ -29,6 +29,32 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   dispatcher_helper_.runDispatcher();
 }
 
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesInfo) {
+  // Currently, bytes info tracking is only implemented in Envoy gRPC. Therefore, skip this test for
+  // google gRPC.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  // Create the send request.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(HELLO_REQUEST);
+  auto send_buf = Common::serializeMessage(request_msg);
+  Common::prependGrpcFrameHeader(*send_buf);
+
+  RequestOptions request_option;
+  request_option.request = &request_msg;
+  stream->sendRequest(request_option);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  // Verify that the number of tracked sent bytes equals to the length of request's buffer.
+  EXPECT_EQ(stream->grpc_stream_->streamInfo().bytesSent(), send_buf->length());
+
+  stream->sendReply(/*check_response_size=*/true);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that a client destruction with open streams cleans up appropriately.
 TEST_P(GrpcClientIntegrationTest, ClientDestruct) {
   initialize();
@@ -357,7 +383,10 @@ TEST_P(GrpcClientIntegrationTest, MaximumKnownPlusOne) {
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
   auto stream = createStream(empty_metadata_);
-  stream->sendRequest(true);
+  // stream->sendRequest(true);
+  RequestOptions request_option;
+  request_option.end_stream = true;
+  stream->sendRequest(request_option);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);

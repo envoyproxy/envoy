@@ -194,6 +194,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     }
   }
 
+  streamInfo().addBytesSent(data.length());
   router_.decodeData(data, end_stream);
   closeLocal(end_stream);
 }
