@@ -48,7 +48,7 @@ public:
   // Wraps cert validation parameters added from time to time.
   struct ExtraValidationContext {
     // The pointer to SSL object.
-    // It is optional and the context doesn't take the owernship of this object.
+    // It is optional and the context doesn't take the ownership of ssl object.
     const SSL* ssl = nullptr;
   };
 
