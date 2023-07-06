@@ -33,6 +33,14 @@ behavior_changes:
     Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
     where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
     runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
+- area: stats tls
+  change: |
+    fixed metric tag extraction so that TLS parameters are properly extracted from the stats, both for listeners and clusters.
+    This changes the Prometheus names from
+    ``envoy_listener_ssl_ciphers_ECDHE_RSA_AES128_GCM_SHA256{envoy_listener_address="0.0.0.0_10000"}`` to
+    ``envoy_listener_ssl_ciphers{envoy_listener_address="0.0.0.0_10000", envoy_ssl_cipher="ECDHE_RSA_AES128_GCM_SHA256"}``, and
+    similar for ``envoy_listener_ssl_versions_TLSv1_2``, ``envoy_cluster_ssl_versions_TLSv1_2``, ``envoy_listener_ssl_curves_P_256``,
+    ``envoy_cluster_ssl_curves_P_256``, ``envoy_listener_ssl_sigalgs_rsa_pss_rsae_sha256``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
