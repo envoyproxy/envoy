@@ -322,10 +322,17 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   Json::Streamer::Array& buckets = json_streamer_.newArray();
   for (uint32_t i = 0; i < min_size; ++i) {
     buckets.newEntry();
-    json_streamer_.addCopy(absl::StrCat("{\"upper_bound\":", supported_buckets[i],
-                                        ",\"interval\":", interval_buckets[i],
-                                        ",\"cumulative\":", cumulative_buckets[i],
-                                        "}"));
+    Json::Streamer::Map& bucket_map = json_streamer_.newMap();
+    //using NameValue = Json::Streamer::Map::NameValue;
+    bucket_map.newEntries({
+        "upper_bound", absl::StrCat(supported_buckets[i]),
+        "interval", absl::StrCat(interval_buckets[i]),
+        "cumulative", absl::StrCat(cumulative_buckets[i])});
+
+    //NameValue n3{"cumulative", absl::StrCat(cumulative_buckets[i])};
+    //Json::Streamer::Map::Entries entries({n1, n2, n3});
+
+    json_streamer_.pop(bucket_map);
   }
   json_streamer_.pop(buckets);
   json_streamer_.pop(map);

@@ -35,10 +35,11 @@ class Streamer {
   using LevelPtr = std::unique_ptr<Level>;
 
   struct Map : public Level {
+    using Entries = absl::Span<const absl::string_view>;
+
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
     void newKey(absl::string_view name);
-    using NameValue = std::pair<absl::string_view, absl::string_view>;
-    void newEntries(absl::Span<NameValue> entries);
+    void newEntries(Entries entries);
   };
 
   struct Array : public Level {
