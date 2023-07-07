@@ -4,9 +4,11 @@
 #include <string>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -48,11 +50,16 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
 
     Config::Utility::checkTransportVersion(proto_config);
-    callback = [&context, filter_config, timeout_ms,
-                proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
+    std::shared_ptr<ThreadLocal::TypedSlot<GetGrpcClient>> get_grpc_client =
+        std::make_shared<ThreadLocal::TypedSlot<GetGrpcClient>>(context.threadLocal());
+    get_grpc_client->set([](Event::Dispatcher&) { return std::make_shared<GetGrpcClient>(); });
+    callback = [filter_config, timeout_ms, grpc_service = proto_config.grpc_service(), &context,
+                get_grpc_client](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              proto_config.grpc_service(), context.scope(), true),
+          (*get_grpc_client)->getCache([&context, &grpc_service]() {
+            return context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+                grpc_service, context.scope(), true);
+          }),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };

@@ -1,7 +1,11 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -31,6 +35,20 @@ private:
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
+
+  class GetGrpcClient : public ThreadLocal::ThreadLocalObject {
+  public:
+    ::Envoy::Grpc::RawAsyncClientSharedPtr
+    getCache(std::function<::Envoy::Grpc::RawAsyncClientSharedPtr()> cb) {
+      if (!raw_async_client_) {
+        raw_async_client_ = cb();
+      }
+      return raw_async_client_;
+    }
+
+  private:
+    ::Envoy::Grpc::RawAsyncClientSharedPtr raw_async_client_;
+  };
 };
 
 } // namespace ExtAuthz
