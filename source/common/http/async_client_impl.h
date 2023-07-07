@@ -145,7 +145,6 @@ public:
 protected:
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
-  // StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
   // Callback to listen for stream destruction.

@@ -176,9 +176,10 @@ public:
         .WillOnce(Invoke([this, check_response_size](const helloworld::HelloReply& reply_msg) {
           if (check_response_size) {
             auto recv_buf = Common::serializeMessage(reply_msg);
+            // gRPC message in Envoy gRPC mode is prepended with a frame header.
             Common::prependGrpcFrameHeader(*recv_buf);
-            // Verify that the number of tracked received bytes equals to the length of response's
-            // buffer.
+            // Verify that the number of received byte that is tracked in the stream info equals to
+            // the length of reply response buffer.
             EXPECT_EQ(this->grpc_stream_->streamInfo().bytesReceived(), recv_buf->length());
           }
           dispatcher_helper_.exitDispatcherIfNeeded();

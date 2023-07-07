@@ -40,14 +40,16 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   // Create the send request.
   helloworld::HelloRequest request_msg;
   request_msg.set_name(HELLO_REQUEST);
-  auto send_buf = Common::serializeMessage(request_msg);
-  Common::prependGrpcFrameHeader(*send_buf);
 
   RequestArgs request_args;
   request_args.request = &request_msg;
   stream->sendRequest(request_args);
   stream->sendServerInitialMetadata(empty_metadata_);
-  // Verify that the number of tracked sent bytes equals to the length of request's buffer.
+
+  auto send_buf = Common::serializeMessage(request_msg);
+  Common::prependGrpcFrameHeader(*send_buf);
+  // Verify that the number of sent bytes that is tracked in stream info equals to the length of
+  // request buffer.
   EXPECT_EQ(stream->grpc_stream_->streamInfo().bytesSent(), send_buf->length());
 
   stream->sendReply(/*check_response_size=*/true);
