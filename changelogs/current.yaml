@@ -213,6 +213,9 @@ bug_fixes:
 - area: maglev loadbalancer
   change: |
     Fixes maglev stability problem. Previously, maglev returns slightly different backend assignment from the same backends and keys.
+- area: redis
+  change: |
+    Fixes a bug where redis transactions do not work properly when redis traffic is mirrored.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
