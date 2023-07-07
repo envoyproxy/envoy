@@ -63,9 +63,9 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& heade
               remove_size, set_size, max_request_headers_count);
     rejected_mutations.inc();
     return absl::InvalidArgumentError(absl::StrCat(
-        "Header mutation remove header count ", std::to_string(remove_size), " or set header count ",
-        std::to_string(set_size),
-        " exceed the HCM header countlimit ", std::to_string(max_request_headers_count)));
+        "Header mutation remove header count ", std::to_string(remove_size),
+        " or set header count ", std::to_string(set_size), " exceed the HCM header countlimit ",
+        std::to_string(max_request_headers_count)));
   }
   return absl::OkStatus();
 }
@@ -75,14 +75,15 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
   if (headers.byteSize() > headers.maxHeadersKb() * 1024 ||
       headers.size() > headers.maxHeadersCount()) {
     ENVOY_LOG(debug,
-              "After mutation, the total header count {} or total header size {} exceed the "
-              "count limit {} or the size limit {}. Returning error.", headers.size(),
-              headers.byteSize(), headers.maxHeadersCount(), headers.maxHeadersKb());
+              "After mutation, the total header count {} or total header size {} bytes, exceed the "
+              "count limit {} or the size limit {} kilobytes. Returning error.",
+              headers.size(), headers.byteSize(), headers.maxHeadersCount(),
+              headers.maxHeadersKb());
     rejected_mutations.inc();
-    return absl::InvalidArgumentError(
-        absl::StrCat("Header mutation causes end result header count ", headers.size(),
-                     " or header size ", headers.byteSize(), " exceeding the count limit ",
-                     headers.maxHeadersCount(), " or the size limit ", headers.maxHeadersKb()));
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Header mutation causes end result header count ", headers.size(), " or header size ",
+        headers.byteSize(), " bytes, exceeding the count limit ", headers.maxHeadersCount(),
+        " or the size limit ", headers.maxHeadersKb(), " kilobytes"));
   }
   return absl::OkStatus();
 }

@@ -2542,7 +2542,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
 // Set the HCM max request headers size limit to be 2kb. Test the
 // header mutation end result size check works for the trailer response.
 TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
-  Http::TestResponseTrailerMapImpl resp_trailers_(2, 100);
+  Http::TestResponseTrailerMapImpl resp_trailers_({}, 2, 100);
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
