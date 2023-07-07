@@ -57,6 +57,7 @@ public:
   void addSanitized(absl::string_view token);
   void addCopy(absl::string_view token);
   void addDouble(double number);
+  static std::string quote(absl::string_view str);
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
   void addFragments(absl::Span<const absl::string_view> src);
   void flush();

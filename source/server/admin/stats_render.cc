@@ -5,14 +5,6 @@
 
 #include "absl/strings/str_format.h"
 
-namespace {
-constexpr absl::string_view JsonNameTag = "{\"name\":\"";
-constexpr absl::string_view JsonValueTag = "\",\"value\":";
-constexpr absl::string_view JsonValueTagQuote = "\",\"value\":\"";
-constexpr absl::string_view JsonCloseBrace = "}";
-constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
-} // namespace
-
 namespace Envoy {
 namespace Server {
 
@@ -129,9 +121,9 @@ void StatsJsonRender::drainIfNeeded(Buffer::Instance& response) {
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   ASSERT(!histograms_initialized_);
-  json_stats_array_->newEntry();
-  json_streamer_.addFragments({JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
-                               std::to_string(value), JsonCloseBrace});
+  json_streamer_.mapEntries({
+      {"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
+      {"value", Json::Streamer::number(value)}});
   drainIfNeeded(response);
 }
 
@@ -140,9 +132,9 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
   ASSERT(!histograms_initialized_);
-  json_stats_array_->newEntry();
-  json_streamer_.addFragments({JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
-                               Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
+  json_streamer_.mapEntries({
+      {"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
+      {"value", Json::Streamer::quote(Json::sanitize(value_buffer_, value))}});
   drainIfNeeded(response);
 }
 

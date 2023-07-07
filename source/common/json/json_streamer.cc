@@ -95,6 +95,10 @@ std::string Streamer::number(double number) {
   }
 }
 
+std::string Streamer::quote(absl::string_view str) {
+  return absl::StrCat("\"", str, "\"");
+}
+
 void Streamer::flush() {
   response_.addFragments(fragments_);
   fragments_.clear();
