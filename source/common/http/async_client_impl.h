@@ -140,7 +140,6 @@ public:
   void reset() override;
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
-
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
 protected:

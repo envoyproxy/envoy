@@ -29,8 +29,9 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   dispatcher_helper_.runDispatcher();
 }
 
-TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesInfo) {
-  // Currently, bytes info tracking is only implemented in Envoy gRPC. Therefore, skip this test for
+// Validate that a simple request-reply stream works with bytes metering.
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
+  // Currently, bytes metering is only implemented in Envoy gRPC. Therefore, skip this test for
   // google gRPC.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   initialize();
@@ -42,9 +43,9 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesInfo) {
   auto send_buf = Common::serializeMessage(request_msg);
   Common::prependGrpcFrameHeader(*send_buf);
 
-  RequestOptions request_option;
-  request_option.request = &request_msg;
-  stream->sendRequest(request_option);
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
   stream->sendServerInitialMetadata(empty_metadata_);
   // Verify that the number of tracked sent bytes equals to the length of request's buffer.
   EXPECT_EQ(stream->grpc_stream_->streamInfo().bytesSent(), send_buf->length());
@@ -384,9 +385,9 @@ TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
   auto stream = createStream(empty_metadata_);
 
-  RequestOptions request_option;
-  request_option.end_stream = true;
-  stream->sendRequest(request_option);
+  RequestArgs request_args;
+  request_args.end_stream = true;
+  stream->sendRequest(request_args);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);

@@ -105,7 +105,7 @@ public:
   Event::Dispatcher& dispatcher_;
 };
 
-struct RequestOptions {
+struct RequestArgs {
   helloworld::HelloRequest* request = nullptr;
   bool end_stream = false;
 };
@@ -115,20 +115,22 @@ class HelloworldStream : public MockAsyncStreamCallbacks<helloworld::HelloReply>
 public:
   HelloworldStream(DispatcherHelper& dispatcher_helper) : dispatcher_helper_(dispatcher_helper) {}
 
-  void sendRequest(RequestOptions request_option = {}) {
+  void sendRequest(RequestArgs request_args = {}) {
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
-    if (request_option.request == nullptr) {
-      request_option.request = &request_msg;
+    // Update the request pointer to local request message when it is not set at caller site (i.e.,
+    // nullptr).
+    if (request_args.request == nullptr) {
+      request_args.request = &request_msg;
     }
 
-    grpc_stream_->sendMessage(*request_option.request, request_option.end_stream);
+    grpc_stream_->sendMessage(*request_args.request, request_args.end_stream);
 
     helloworld::HelloRequest received_msg;
     AssertionResult result =
         fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
-    EXPECT_THAT(*request_option.request, ProtoEq(received_msg));
+    EXPECT_THAT(*request_args.request, ProtoEq(received_msg));
   }
 
   void expectInitialMetadata(const TestMetadata& metadata) {
@@ -165,8 +167,8 @@ public:
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
-  // `check_response_size` only could be set to true in Envoy gRPC because bytes info tracking
-  // is only implemented in Envoy gPRC.
+  // `check_response_size` only could be set to true in Envoy gRPC because bytes metering is only
+  // implemented in Envoy gPRC mode.
   void sendReply(bool check_response_size = false) {
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
