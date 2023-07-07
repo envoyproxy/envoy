@@ -35,6 +35,8 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
     if (validate_proto_descriptors) {
       Envoy::Server::validateProtoDescriptors();
     }
+#else
+    (void)validate_proto_descriptors;
 #endif
     Http::Http2::initializeNghttp2Logging();
 

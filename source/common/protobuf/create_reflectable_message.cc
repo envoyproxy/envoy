@@ -11,7 +11,7 @@ Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& m
 #else
 
 #include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
-#include "bazel/cc_descriptor_library/text_format_transcoder.h"
+#include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
 #include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 
 #include "api/envoy/config/core/v3/base_descriptor.pb.h"
@@ -189,12 +189,12 @@ Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& m
 //#include "udpa/xds/type/v3/typed_struct_descriptor.pb.h"
 //#include "udpa/udpa/type/v1/typed_struct_descriptor.pb.h"
 
-using ::protobuf::contrib::cc_proto_descriptor_library::internal::FileDescriptorInfo;
+using ::cc_proto_descriptor_library::internal::FileDescriptorInfo;
 
 namespace {
-std::unique_ptr<protobuf::contrib::TextFormatTranscoder> createReserializer() {
-  std::unique_ptr<protobuf::contrib::TextFormatTranscoder> reserializer =
-      std::make_unique<protobuf::contrib::TextFormatTranscoder>();
+std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReserializer() {
+  std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> reserializer =
+      std::make_unique<cc_proto_descriptor_library::TextFormatTranscoder>();
   std::vector<FileDescriptorInfo> file_descriptors = {
 
       protobuf::reflection::third_party_envoy_src_api_envoy_config_core_v3_base::kFileDescriptorInfo,
@@ -553,7 +553,7 @@ std::unique_ptr<protobuf::contrib::TextFormatTranscoder> createReserializer() {
 
 namespace Envoy {
 Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& message) {
-  static std::unique_ptr<protobuf::contrib::TextFormatTranscoder> reserializer = createReserializer();
+  static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> reserializer = createReserializer();
   return CreateDynamicMessage(*reserializer, message);
 }
 } // namespace Envoy

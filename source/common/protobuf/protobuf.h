@@ -59,6 +59,7 @@ using ::google::protobuf::DynamicCastToGenerated;
 using ::google::protobuf::DynamicMessageFactory;
 using ::google::protobuf::EnumValueDescriptor;
 using ::google::protobuf::FieldDescriptor;
+using ::google::protobuf::UInt32Value;
 using ::google::protobuf::Map;
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::Message;
@@ -79,6 +80,7 @@ T* DynamicCastToGenerated(Message* from) {
 
 
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
+using uint32 = uint32_t;
 #endif
 using ::google::protobuf::DescriptorPoolDatabase;
 using ::google::protobuf::FileDescriptorProto;

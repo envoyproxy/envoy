@@ -1,2 +1,0 @@
-This file is a "dependency" of cc_proto_descriptor_library targets so that we
-can visibility control who can use them.
