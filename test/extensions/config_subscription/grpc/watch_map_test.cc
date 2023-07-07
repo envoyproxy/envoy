@@ -260,7 +260,7 @@ TEST(WatchMapTest, Overlap) {
   }
 }
 
-// Checks that a resource is added to the cache the first time it is receved,
+// Checks that a resource is added to the cache the first time it is received,
 // and removed when there's no more interest.
 TEST(WatchMapTest, CacheResourceAddResource) {
   MockSubscriptionCallbacks callbacks1;
