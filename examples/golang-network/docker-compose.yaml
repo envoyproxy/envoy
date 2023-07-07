@@ -14,6 +14,4 @@ services:
 
   echo_service:
     image: cjimti/go-echo
-    ports:
-    - 1025:1025
     hostname: echo_service

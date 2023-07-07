@@ -17,7 +17,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )
 
-// NOTICE: it's just for testing, please remove it.
+// TODO: remove when #26173 enters the main version(maybe 1.27).
 // And check the "API compatibility" section in doc:
 // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/golang_filter#developing-a-go-plugin
 replace github.com/envoyproxy/envoy => ../../..
