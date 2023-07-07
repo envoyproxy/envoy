@@ -6,7 +6,7 @@ PROTOBUF_VERSION = "21.12"
 # and both must match the names from the protobuf releases (see
 # https://github.com/protocolbuffers/protobuf/releases).
 # The names change in upcoming versions.
-# The sha256 values are calculated from the downloads on the releases page.
+# The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
     linux_aarch_64 = "2dd17f75d66a682640b136e31848da9fb2eefe68d55303baf8b32617374f6711",
     linux_x86_64 = "3a4c1e5f2516c639d3079b1586e703fc7bcfa2136d58bda24d1d54f949c315e8",
