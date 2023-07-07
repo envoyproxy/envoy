@@ -2,6 +2,8 @@
 
 #include "source/common/json/json_sanitizer.h"
 
+#include "absl/strings/str_format.h"
+
 namespace Envoy {
 namespace Json {
 
@@ -58,9 +60,32 @@ void Streamer::Map::newEntries(const Entries& entries) {
   }
 }
 
+void Streamer::Array::newEntries(const absl::Span<const absl::string_view>& entries) {
+  for (absl::string_view str : entries) {
+    newEntryHelper();
+    streamer_.addCopy(str);
+  }
+}
+
 void Streamer::addCopy(absl::string_view str) {
   addNoCopy(str);
   flush();
+}
+
+void Streamer::addDouble(double number) {
+  if (std::isnan(number)) {
+    addNoCopy("null");
+  } else {
+    addCopy(absl::StrFormat("%g", number));
+  }
+}
+
+std::string Streamer::number(double number) {
+  if (std::isnan(number)) {
+    return "null";
+  } else {
+    return absl::StrFormat("%g", number);
+  }
 }
 
 void Streamer::flush() {

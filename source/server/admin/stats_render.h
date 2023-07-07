@@ -102,6 +102,7 @@ private:
   void renderHistogramStart();
   void populateSupportedPercentiles();
   void populatePercentiles(const Stats::ParentHistogram& histogram);
+  void drainIfNeeded(Buffer::Instance& response);
 
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
@@ -113,6 +114,7 @@ private:
   OptRef<Json::Streamer::Map> json_histogram_map1_;
   OptRef<Json::Streamer::Map> json_histogram_map2_;
   OptRef<Json::Streamer::Array> json_histogram_array_;
+  Buffer::Instance& response_;
 };
 
 } // namespace Server
