@@ -94,6 +94,13 @@ def envoy_select_enable_yaml(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if exceptions are disabled in the current build.
+def envoy_select_disable_exceptions(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_exceptions": xs,
+        "//conditions:default": [],
+    })
+
 # Selects the given values if HTTP datagram support is enabled in the current build.
 def envoy_select_enable_http_datagrams(xs, repository = ""):
     return select({

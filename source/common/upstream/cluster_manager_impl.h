@@ -377,6 +377,7 @@ protected:
       LocalityWeightsConstSharedPtr locality_weights_;
       // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
       const uint32_t priority_;
+      bool weighted_priority_health_;
       uint32_t overprovisioning_factor_;
     };
 
@@ -533,6 +534,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
@@ -560,13 +562,16 @@ private:
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
+
+      // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
+      // may keep a reference to the cluster_info_.
+      ClusterInfoConstSharedPtr cluster_info_;
       // LB factory if applicable. Not all load balancer types have a factory. LB types that have
       // a factory will create a new LB on every membership update. LB types that don't have a
       // factory will create an LB on construction and use it forever.
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
-      ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientPtr lazy_http_async_client_;
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
@@ -620,7 +625,7 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor,
+                                 bool weighted_priority_health, uint64_t overprovisioning_factor,
                                  HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
@@ -677,6 +682,8 @@ private:
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
+    // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may
+    // keep a reference to the cluster_.
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;

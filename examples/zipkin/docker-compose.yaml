@@ -2,6 +2,7 @@ services:
 
   envoy-front-proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
@@ -17,6 +18,7 @@ services:
 
   envoy-1:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-1.yaml
@@ -30,6 +32,7 @@ services:
 
   envoy-2:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-2.yaml
@@ -55,6 +58,7 @@ services:
 
   zipkin:
     build:
+      context: .
       dockerfile: Dockerfile-zipkin
     ports:
     - "${PORT_UI:-9411}:9411"

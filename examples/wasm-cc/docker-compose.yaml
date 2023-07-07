@@ -2,6 +2,7 @@ services:
 
   proxy:
     build:
+      context: .
       dockerfile: Dockerfile-proxy
     depends_on:
     - web_service

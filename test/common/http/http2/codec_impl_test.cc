@@ -982,6 +982,52 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
   EXPECT_THAT(status.message(), testing::HasSubstr("missing required"));
 }
 
+TEST_P(Http2CodecImplTest, VerifyHeaderMapMaxSizeLimits) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_request_headers{
+      {}, max_request_headers_kb_, max_request_headers_count_};
+  HttpTestUtility::addDefaultHeaders(expected_request_headers);
+  EXPECT_CALL(request_decoder_,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_request_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  driveToCompletion();
+
+  TestRequestTrailerMapImpl request_trailers{{"trailing", "header"}};
+  TestRequestTrailerMapImpl expected_request_trailers{
+      {{"trailing", "header"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(request_decoder_,
+              decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_request_trailers)));
+  request_encoder_->encodeTrailers(request_trailers);
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_response_headers{
+      {{":status", "200"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(response_decoder_,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_response_headers), false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  driveToCompletion();
+
+  TestResponseTrailerMapImpl response_trailers{{"trailing", "header"}};
+  TestResponseTrailerMapImpl expected_response_trailers{
+      {{"trailing", "header"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(response_decoder_,
+              decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_response_trailers)));
+  response_encoder_->encodeTrailers(response_trailers);
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
   initialize();
 

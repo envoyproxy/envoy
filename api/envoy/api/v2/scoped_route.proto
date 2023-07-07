@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 //       fragments:
 //         - header_value_extractor:
 //             name: X-Route-Selector
-//             element_separator: ,
+//             element_separator: ","
 //             element:
 //               separator: =
 //               key: vip

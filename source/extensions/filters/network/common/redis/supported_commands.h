@@ -84,14 +84,15 @@ struct SupportedCommands {
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {
-    CONSTRUCT_ON_FIRST_USE(
-        absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "expire",
-        "expireat", "eval", "evalsha", "geoadd", "hdel", "hincrby", "hincrbyfloat", "hmset", "hset",
-        "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lpop", "lpush", "lpushx", "lrem",
-        "lset", "ltrim", "mset", "persist", "pexpire", "pexpireat", "pfadd", "psetex", "restore",
-        "rpop", "rpush", "rpushx", "sadd", "set", "setbit", "setex", "setnx", "setrange", "spop",
-        "srem", "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem", "zremrangebylex",
-        "zremrangebyrank", "zremrangebyscore", "unlink");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby",
+                           "del", "discard", "exec", "expire", "expireat", "eval", "evalsha",
+                           "geoadd", "hdel", "hincrby", "hincrbyfloat", "hmset", "hset", "hsetnx",
+                           "incr", "incrby", "incrbyfloat", "linsert", "lpop", "lpush", "lpushx",
+                           "lrem", "lset", "ltrim", "mset", "multi", "persist", "pexpire",
+                           "pexpireat", "pfadd", "psetex", "restore", "rpop", "rpush", "rpushx",
+                           "sadd", "set", "setbit", "setex", "setnx", "setrange", "spop", "srem",
+                           "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem",
+                           "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "unlink");
   }
 
   static bool isReadCommand(const std::string& command) {

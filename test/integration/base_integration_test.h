@@ -22,6 +22,7 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
@@ -30,14 +31,6 @@
 #define DISABLE_UNDER_COVERAGE return
 #else
 #define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
-#ifdef WIN32
-#define DISABLE_UNDER_WINDOWS return
-#else
-#define DISABLE_UNDER_WINDOWS                                                                      \
   do {                                                                                             \
   } while (0)
 #endif
@@ -531,7 +524,7 @@ protected:
 private:
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
-  // True if initialized() has been called.
+  // True if initialize() has been called.
   bool initialized_{};
   // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
   // the proxy uses the default watermark buffer factory to create buffers.

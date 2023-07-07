@@ -18,7 +18,8 @@ class Factory
 public:
   Factory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.cluster_provided") {}
 
-  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo& cluster_info,
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                              const Upstream::ClusterInfo& cluster_info,
                                               const Upstream::PrioritySet& priority_set,
                                               Runtime::Loader& runtime,
                                               Random::RandomGenerator& random,

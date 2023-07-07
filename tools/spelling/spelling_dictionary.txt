@@ -815,6 +815,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -924,6 +925,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin

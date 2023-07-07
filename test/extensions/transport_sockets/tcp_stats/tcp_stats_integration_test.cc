@@ -1,4 +1,6 @@
 #if defined(__linux__)
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "test/integration/integration.h"
@@ -18,6 +20,8 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       envoy::config::core::v3::TransportSocket inner_socket;
       inner_socket.set_name("envoy.transport_sockets.raw_buffer");
+      envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
       proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 
