@@ -139,8 +139,6 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
-  stream_->streamInfo().addBytesReceived(data.length());
-
   decoded_frames_.clear();
   if (!decoder_.decode(data, decoded_frames_)) {
     streamError(Status::WellKnownGrpcStatus::Internal);
@@ -198,7 +196,6 @@ void AsyncStreamImpl::onReset() {
 
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
   Common::prependGrpcFrameHeader(*buffer);
-  stream_->streamInfo().addBytesSent(buffer->length());
   stream_->sendData(*buffer, end_stream);
 }
 
