@@ -69,7 +69,7 @@ protected:
 
   void initializeConfig() {
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.send_header_value_in_bytes", header_value_bytes_}});
+        {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
     scoped_runtime_.mergeValues(
         {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
@@ -389,7 +389,7 @@ protected:
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
-  std::string header_value_bytes_{"false"};
+  std::string header_raw_value_{"false"};
   std::string filter_mutation_rule_{"false"};
 };
 
@@ -588,7 +588,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(!header.value().empty());
-          EXPECT_TRUE(header.value_bytes().empty());
+          EXPECT_TRUE(header.raw_value().empty());
           ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -619,8 +619,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  // Set up runtime flag to have header value encoded in value_bytes.
-  header_value_bytes_ = "true";
+  // Set up runtime flag to have header value encoded in raw_value.
+  header_raw_value_ = "true";
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -646,8 +646,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(header.value().empty());
-          EXPECT_TRUE(!header.value_bytes().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.value_bytes());
+          EXPECT_TRUE(!header.raw_value().empty());
+          ENVOY_LOG_MISC(critical, "{}", header.raw_value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -660,7 +660,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
         invalid_unicode.append(1, char(0xc3));
         invalid_unicode.append(1, char(0x28));
         invalid_unicode.append("valid_suffix");
-        mut1->mutable_header()->set_value_bytes(invalid_unicode);
+        mut1->mutable_header()->set_raw_value(invalid_unicode);
         return true;
       });
 
@@ -676,8 +676,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
 
 TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  // Set up runtime flag to have header value encoded in value_bytes.
-  header_value_bytes_ = "true";
+  // Set up runtime flag to have header value encoded in raw_value.
+  header_raw_value_ = "true";
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -688,7 +688,7 @@ TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_value("foo");
-        mut1->mutable_header()->set_value_bytes("bar");
+        mut1->mutable_header()->set_raw_value("bar");
         return true;
       });
   verifyDownstreamResponse(*response, 500);
