@@ -37,7 +37,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-*.s??
+*.sw*
 tags
 TAGS
 /test/coverage/BUILD
