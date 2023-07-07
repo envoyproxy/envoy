@@ -38,6 +38,7 @@ cscope.*
 **/pyformat
 SOURCE_VERSION
 *.s??
+!go.sum
 tags
 TAGS
 /test/coverage/BUILD

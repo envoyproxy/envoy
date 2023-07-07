@@ -20,5 +20,5 @@ require (
 	google.golang.org/grpc v1.25.1 // indirect
 )
 
-// TODO: remove when #26173 enters the main version(maybe 1.27).
+// TODO: remove when #26173 lands.
 replace github.com/envoyproxy/envoy => ../../..

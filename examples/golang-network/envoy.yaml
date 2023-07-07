@@ -23,7 +23,5 @@ static_resources:
   - name: plainText
     type: ORIGINAL_DST
     lb_policy: CLUSTER_PROVIDED
-    connect_timeout: 10s
     original_dst_lb_config:
       use_http_header: true
-    per_connection_buffer_limit_bytes: 10485760
