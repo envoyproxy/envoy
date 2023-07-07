@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
 #include "absl/strings/string_view.h"
+#include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
 #include "google/protobuf/io/tokenizer.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
@@ -15,13 +15,13 @@ namespace internal {
 
 struct FileDescriptorInfo;
 
-}  // namespace internal
+} // namespace internal
 
 // Takes a text formatted proto and translates it to a MessageLite proto so it
 // can be used by the lite runtime. Requires the that text formatted protos and
 // all of its extensions are registered with this object.
 class TextFormatTranscoder final {
- public:
+public:
   explicit TextFormatTranscoder(
       // Whether to allow using the global descriptor pool as a fallback. See
       // text_format_transcoder.cc for more information.
@@ -35,27 +35,25 @@ class TextFormatTranscoder final {
                  google::protobuf::MessageLite* msg,
                  google::protobuf::io::ErrorCollector* error_collector = nullptr) const;
 
-  void LoadFileDescriptors(
-      const internal::FileDescriptorInfo& file_descriptor_info);
+  void LoadFileDescriptors(const internal::FileDescriptorInfo& file_descriptor_info);
 
- private:
+private:
   // This function needs the member function CreateEmptyDynamicMessage. The
   // target the defines the function has its own visibility whitelist which
   // requires a dance with these declarations.
-  friend std::unique_ptr<google::protobuf::Message> CreateDynamicMessage(
-      const TextFormatTranscoder& transcoder,
-      const google::protobuf::MessageLite& message,
-      google::protobuf::io::ErrorCollector* error_collector);
+  friend std::unique_ptr<google::protobuf::Message>
+  CreateDynamicMessage(const TextFormatTranscoder& transcoder,
+                       const google::protobuf::MessageLite& message,
+                       google::protobuf::io::ErrorCollector* error_collector);
 
-  std::unique_ptr<google::protobuf::Message> CreateEmptyDynamicMessage(
-      absl::string_view type_name,
-      google::protobuf::io::ErrorCollector* error_collector) const;
+  std::unique_ptr<google::protobuf::Message>
+  CreateEmptyDynamicMessage(absl::string_view type_name,
+                            google::protobuf::io::ErrorCollector* error_collector) const;
 
-  bool ToBinarySerializationInternal(
-      absl::string_view type_name,
-      google::protobuf::io::ZeroCopyInputStream* input_stream,
-      std::string* binary_serializtion,
-      google::protobuf::io::ErrorCollector* error_collector) const;
+  bool ToBinarySerializationInternal(absl::string_view type_name,
+                                     google::protobuf::io::ZeroCopyInputStream* input_stream,
+                                     std::string* binary_serializtion,
+                                     google::protobuf::io::ErrorCollector* error_collector) const;
 
   struct InternalData;
 
@@ -63,4 +61,4 @@ class TextFormatTranscoder final {
   const bool allow_global_fallback_;
 };
 
-}  // namespace cc_proto_descriptor_library
+} // namespace cc_proto_descriptor_library

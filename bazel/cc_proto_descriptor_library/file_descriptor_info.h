@@ -16,5 +16,5 @@ struct FileDescriptorInfo final {
   const FileDescriptorInfo** const deps;
 };
 
-}  // namespace internal
-}  // namespace cc_proto_descriptor_library
+} // namespace internal
+} // namespace cc_proto_descriptor_library

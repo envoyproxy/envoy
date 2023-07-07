@@ -17,8 +17,9 @@ class TextFormatTranscoder;
 // gives you access to the Descriptor for the message. The message must have
 // been registered with the passed in TextFormatTranscoder. Returned messages
 // cannot outlive transcoder.
-std::unique_ptr<google::protobuf::Message> CreateDynamicMessage(
-    const TextFormatTranscoder& transcoder, const google::protobuf::MessageLite& message,
-    google::protobuf::io::ErrorCollector* error_collector = nullptr);
+std::unique_ptr<google::protobuf::Message>
+CreateDynamicMessage(const TextFormatTranscoder& transcoder,
+                     const google::protobuf::MessageLite& message,
+                     google::protobuf::io::ErrorCollector* error_collector = nullptr);
 
-}  // namespace cc_proto_descriptor_library
+} // namespace cc_proto_descriptor_library

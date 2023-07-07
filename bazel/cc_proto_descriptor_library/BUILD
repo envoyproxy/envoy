@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 cc_library(
     name = "file_descriptor_info",
     hdrs = ["file_descriptor_info.h"],

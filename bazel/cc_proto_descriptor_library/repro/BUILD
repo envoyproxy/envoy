@@ -1,7 +1,9 @@
+load("//bazel/cc_proto_descriptor_library:builddefs.bzl", "cc_proto_descriptor_library")
+
+licenses(["notice"])  # Apache 2
+
 # Tests for go/cc_proto_descriptor_library.
 # These need to be in a separate directory to test visibility restrictions.
-
-load("//bazel/cc_proto_descriptor_library:builddefs.bzl", "cc_proto_descriptor_library")
 
 proto_library(
     name = "all_proto",

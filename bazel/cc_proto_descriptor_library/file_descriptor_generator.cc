@@ -4,7 +4,6 @@
 #include <sstream>
 #include <string>
 
-#include "google/protobuf/descriptor.pb.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -12,6 +11,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 
@@ -43,8 +43,7 @@ std::string GetDescriptorNamespace(const google::protobuf::FileDescriptor* file)
 }
 
 std::string GetDependencyFileDescriptorInfoSymbol(const google::protobuf::FileDescriptor* file) {
-  return absl::StrFormat("%s::kFileDescriptorInfo",
-                         GetDescriptorNamespace(file));
+  return absl::StrFormat("%s::kFileDescriptorInfo", GetDescriptorNamespace(file));
 }
 
 std::string GetDependencyFileDescriptorHeaderGuard(const google::protobuf::FileDescriptor* file) {
@@ -85,8 +84,8 @@ extern const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDe
 #endif // %s
 
 )text",
-                              header_guard, header_guard, unique_namespace,
-                              unique_namespace, header_guard);
+                              header_guard, header_guard, unique_namespace, unique_namespace,
+                              header_guard);
 
   google::protobuf::io::CodedOutputStream output(output_stream);
   output.WriteString(contents.str());
@@ -99,19 +98,16 @@ bool GenerateSource(const google::protobuf::FileDescriptor* file,
   auto unique_namespace = GetDescriptorNamespace(file);
   std::stringstream contents;
 
-  contents << absl::StrFormat("#include \"%s\"\n",
-                              GetDescriptorHeaderName(file));
+  contents << absl::StrFormat("#include \"%s\"\n", GetDescriptorHeaderName(file));
   for (int i = 0; i < file->dependency_count(); ++i) {
-    contents << absl::StrFormat("#include \"%s\"\n",
-                                GetDescriptorHeaderName(file->dependency(i)));
+    contents << absl::StrFormat("#include \"%s\"\n", GetDescriptorHeaderName(file->dependency(i)));
   }
-  contents
-      << R"text(#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
+  contents << R"text(#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 )text";
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
   file->CopyTo(&file_descriptor_proto);
-  //XXX
+  // XXX
   /*
     google::protobuf::FileDescriptorProto file_descriptor_proto =
       google::protobuf::compiler::StripSourceRetentionOptions(*file);
@@ -130,8 +126,8 @@ namespace %s {
               "::cc_proto_descriptor_library::internal::"
               "FileDescriptorInfo* kDeps[] = {\n";
   for (int i = 0; i < file->dependency_count(); ++i) {
-    contents << absl::StrFormat(
-        "&%s,\n", GetDependencyFileDescriptorInfoSymbol(file->dependency(i)));
+    contents << absl::StrFormat("&%s,\n",
+                                GetDependencyFileDescriptorInfoSymbol(file->dependency(i)));
   }
   contents << "nullptr};\n";
 
@@ -149,8 +145,7 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
 } // namespace protobuf
 
 )text",
-      file->name(),
-      absl::Base64Escape(file_descriptor_proto.SerializeAsString()),
+      file->name(), absl::Base64Escape(file_descriptor_proto.SerializeAsString()),
       unique_namespace);
 
   google::protobuf::io::CodedOutputStream output(output_stream);
@@ -158,12 +153,11 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
   output.Trim();
   return !output.HadError();
 }
-}  // namespace
+} // namespace
 
 bool ProtoDescriptorGenerator::Generate(
     const google::protobuf::FileDescriptor* file, const std::string& parameter,
-    google::protobuf::compiler::GeneratorContext* generator_context,
-    std::string* error) const {
+    google::protobuf::compiler::GeneratorContext* generator_context, std::string* error) const {
   std::string header_path = GetDescriptorHeaderName(file);
   std::string source_path = GetDescriptorSourceName(file);
 
@@ -182,4 +176,4 @@ bool ProtoDescriptorGenerator::Generate(
   return true;
 }
 
-}  // namespace cc_proto_descriptor_library
+} // namespace cc_proto_descriptor_library

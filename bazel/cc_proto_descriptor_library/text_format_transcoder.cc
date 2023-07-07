@@ -3,13 +3,13 @@
 #include <memory>
 #include <string>
 
-#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
-#include "google/protobuf/descriptor.pb.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/text_format.h"
@@ -21,30 +21,28 @@ struct TextFormatTranscoder::InternalData {
   google::protobuf::DynamicMessageFactory message_factory;
 };
 
-TextFormatTranscoder::TextFormatTranscoder(
-    bool allow_global_fallback /*= true*/)
-    : internals_(std::make_unique<InternalData>()),
-      allow_global_fallback_(allow_global_fallback) {}
+TextFormatTranscoder::TextFormatTranscoder(bool allow_global_fallback /*= true*/)
+    : internals_(std::make_unique<InternalData>()), allow_global_fallback_(allow_global_fallback) {}
 
 // Needs to be defined here so std::unique_ptr doesn't complain about
 // TextToBinaryProtoReserializerInternals being incomplete in it's
 // destructor.
 TextFormatTranscoder::~TextFormatTranscoder() = default;
 
-bool TextFormatTranscoder::ParseInto(
-    absl::string_view text_format, google::protobuf::MessageLite* msg,
-    google::protobuf::io::ErrorCollector* error_collector) const {
+bool TextFormatTranscoder::ParseInto(absl::string_view text_format,
+                                     google::protobuf::MessageLite* msg,
+                                     google::protobuf::io::ErrorCollector* error_collector) const {
   google::protobuf::io::ArrayInputStream input(text_format.data(), text_format.size());
   return ParseInto(&input, msg, error_collector);
 }
 
-bool TextFormatTranscoder::ParseInto(
-    google::protobuf::io::ZeroCopyInputStream* input_stream, google::protobuf::MessageLite* msg,
-    google::protobuf::io::ErrorCollector* error_collector) const {
+bool TextFormatTranscoder::ParseInto(google::protobuf::io::ZeroCopyInputStream* input_stream,
+                                     google::protobuf::MessageLite* msg,
+                                     google::protobuf::io::ErrorCollector* error_collector) const {
   std::string serialization;
 
-  if (!ToBinarySerializationInternal(msg->GetTypeName(), input_stream,
-                                     &serialization, error_collector)) {
+  if (!ToBinarySerializationInternal(msg->GetTypeName(), input_stream, &serialization,
+                                     error_collector)) {
     return false;
   }
 
@@ -53,8 +51,7 @@ bool TextFormatTranscoder::ParseInto(
 
 void TextFormatTranscoder::LoadFileDescriptors(
     const internal::FileDescriptorInfo& file_descriptor_info) {
-  if (internals_->descriptor_pool.FindFileByName(
-          std::string(file_descriptor_info.file_name))) {
+  if (internals_->descriptor_pool.FindFileByName(std::string(file_descriptor_info.file_name))) {
     return;
   }
 
@@ -64,16 +61,14 @@ void TextFormatTranscoder::LoadFileDescriptors(
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
   std::string file_descriptor_bytes;
-  absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64,
-                       &file_descriptor_bytes);
+  absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64, &file_descriptor_bytes);
   file_descriptor_proto.ParseFromString(file_descriptor_bytes);
   internals_->descriptor_pool.BuildFile(file_descriptor_proto);
 }
 
 bool TextFormatTranscoder::ToBinarySerializationInternal(
     absl::string_view type_name, google::protobuf::io::ZeroCopyInputStream* input_stream,
-    std::string* binary_serializtion,
-    google::protobuf::io::ErrorCollector* error_collector) const {
+    std::string* binary_serializtion, google::protobuf::io::ErrorCollector* error_collector) const {
   auto dynamic_message = CreateEmptyDynamicMessage(type_name, error_collector);
   if (!dynamic_message) {
     // CreateEmptyDynamicMessage already would have written to the
@@ -93,10 +88,8 @@ bool TextFormatTranscoder::ToBinarySerializationInternal(
   return dynamic_message->SerializePartialToString(binary_serializtion);
 }
 
-std::unique_ptr<google::protobuf::Message>
-TextFormatTranscoder::CreateEmptyDynamicMessage(
-    absl::string_view type_name,
-    google::protobuf::io::ErrorCollector* error_collector) const {
+std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::CreateEmptyDynamicMessage(
+    absl::string_view type_name, google::protobuf::io::ErrorCollector* error_collector) const {
   const google::protobuf::Descriptor* descriptor =
       internals_->descriptor_pool.FindMessageTypeByName(std::string(type_name));
   // If you're built with the full runtime then embeddng the descriptors and
@@ -113,25 +106,22 @@ TextFormatTranscoder::CreateEmptyDynamicMessage(
   }
   if (descriptor == nullptr) {
     if (error_collector) {
-      error_collector->AddError(
-          0, 0,
-          absl::StrFormat("Could not find descriptor for: %s", type_name));
+      error_collector->AddError(0, 0,
+                                absl::StrFormat("Could not find descriptor for: %s", type_name));
     }
     return nullptr;
   }
 
-  auto dynamic_message = absl::WrapUnique(
-      internals_->message_factory.GetPrototype(descriptor)->New());
+  auto dynamic_message =
+      absl::WrapUnique(internals_->message_factory.GetPrototype(descriptor)->New());
   if (!dynamic_message) {
     if (error_collector) {
       error_collector->AddError(
-          0, 0,
-          absl::StrFormat("Could not create dynamic message for: %s",
-                          type_name));
+          0, 0, absl::StrFormat("Could not create dynamic message for: %s", type_name));
     }
     return nullptr;
   }
   return dynamic_message;
 }
 
-}  // namespace cc_proto_descriptor_library
+} // namespace cc_proto_descriptor_library

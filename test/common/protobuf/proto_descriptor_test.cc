@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base_descriptor.pb.h"
+
 #include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
 #include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -34,9 +34,7 @@ TEST(ProtoDescriptorLibrary, CreateDynamicMessage) {
   auto reflection = dynamic_message->GetReflection();
   const auto bar_feld_descriptor = descriptor->FindFieldByName("region");
   ASSERT_THAT(bar_feld_descriptor, NotNull());
-  ASSERT_THAT(reflection->GetString(*dynamic_message, bar_feld_descriptor),
-              Eq("Region"));
+  ASSERT_THAT(reflection->GetString(*dynamic_message, bar_feld_descriptor), Eq("Region"));
 }
-
 
 } // namespace Envoy

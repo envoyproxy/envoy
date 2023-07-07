@@ -4,9 +4,9 @@
 #include "bazel/cc_proto_descriptor_library/testdata/test.pb.h"
 #include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/text_format.h"
+#include "gtest/gtest.h"
 
 namespace {
 
@@ -37,4 +37,4 @@ bar: "hello world"
                                       &concrete_message));
 }
 
-}  // namespace
+} // namespace
