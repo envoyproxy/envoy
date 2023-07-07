@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 
@@ -258,6 +259,10 @@ void Registry::setLogFormat(const std::string& log_format) {
 }
 
 absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+#ifndef ENVOY_ENABLE_YAML
+  UNREFERENCED_PARAMETER(log_format_struct);
+  throw EnvoyException("JSON/YAML support compiled out");
+#else
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   json_options.always_print_primitive_fields = true;
@@ -297,6 +302,7 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
   setLogFormat(format_as_json);
   json_log_format_set_ = true;
   return absl::OkStatus();
+#endif
 }
 
 bool Registry::json_log_format_set_ = false;
