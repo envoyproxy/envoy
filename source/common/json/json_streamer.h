@@ -23,9 +23,9 @@ public:
     Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
     ~Level();
 
-  protected:
-    void newEntryHelper();
+    void newEntry();
 
+  protected:
     Streamer& streamer_;
 
   private:
@@ -45,11 +45,11 @@ public:
 
   struct Array : public Level {
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
-    void newEntry() { newEntryHelper(); }
     void newEntries(const absl::Span<const absl::string_view>& entries);
   };
 
   Map& newMap();
+  void mapEntries(const Map::Entries& entries);
   Array& newArray();
   void pop(Level& level);
   void clear();

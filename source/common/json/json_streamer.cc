@@ -21,6 +21,13 @@ Streamer::Map& Streamer::newMap() {
   return ret;
 }
 
+void Streamer::mapEntries(const Map::Entries& entries) {
+  if (!levels_.empty()) {
+    levels_.top()->newEntry();
+  }
+  std::make_unique<Map>(*this)->newEntries(entries);
+}
+
 Streamer::Array& Streamer::newArray() {
   auto array = std::make_unique<Array>(*this);
   Array& ret = *array;
@@ -40,7 +47,7 @@ void Streamer::clear() {
   flush();
 }
 
-void Streamer::Level::newEntryHelper() {
+void Streamer::Level::newEntry() {
   if (is_first_) {
     is_first_ = false;
   } else {
@@ -49,20 +56,20 @@ void Streamer::Level::newEntryHelper() {
 }
 
 void Streamer::Map::newKey(absl::string_view name) {
-  newEntryHelper();
+  newEntry();
   streamer_.addFragments({"\"", name, "\":"});
 }
 
 void Streamer::Map::newEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
-    newEntryHelper();
+    newEntry();
     streamer_.addFragments({"\"", entry.first, "\":", entry.second});
   }
 }
 
 void Streamer::Array::newEntries(const absl::Span<const absl::string_view>& entries) {
   for (absl::string_view str : entries) {
-    newEntryHelper();
+    newEntry();
     streamer_.addCopy(str);
   }
 }
