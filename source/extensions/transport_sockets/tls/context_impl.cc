@@ -558,6 +558,15 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
+
+#ifndef BORINGSSL_FIPS
+  // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
+  // error but is allowed because the enforcement that rsa key usage and tls usage need to be
+  // matched has been disabled.
+  if (SSL_was_key_usage_invalid(ssl)) {
+    stats_.was_key_usage_invalid_.inc();
+  }
+#endif
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
@@ -634,6 +643,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
     : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
+      enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()) {
   // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
@@ -708,6 +718,8 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   if (allow_renegotiation_) {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
+
+  SSL_set_enforce_rsa_key_usage(ssl_con.get(), enforce_rsa_key_usage_);
 
   if (max_session_keys_ > 0) {
     if (session_keys_single_use_) {

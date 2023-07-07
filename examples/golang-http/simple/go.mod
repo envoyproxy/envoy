@@ -11,13 +11,10 @@ require (
 )
 
 require (
-	github.com/envoyproxy/protoc-gen-validate v0.1.0 // indirect
-	github.com/golang/protobuf v1.5.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
-	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
-	google.golang.org/grpc v1.25.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )
 
 // NOTICE: it's just for testing, please remove it.
