@@ -418,7 +418,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {});
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, false);
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       const std::string target_xds_authority =
@@ -441,7 +441,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref);
+          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, false);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
