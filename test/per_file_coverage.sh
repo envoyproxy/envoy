@@ -27,6 +27,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
+"source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.5"
 "source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"

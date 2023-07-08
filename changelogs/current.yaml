@@ -33,6 +33,10 @@ bug_fixes:
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
     The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
