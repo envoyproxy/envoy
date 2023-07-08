@@ -12,6 +12,7 @@
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -51,7 +52,7 @@ public:
     ON_CALL(*host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
   }
 
-  void testPoolReady(bool oneway = false) {
+  void testPoolReady(bool oneway = false, bool router_destroyed = false) {
     NiceMock<Network::MockClientConnection> connection;
 
     EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
@@ -88,7 +89,13 @@ public:
     request_owner.continueDecoding();
 
     if (!oneway) {
-      EXPECT_CALL(connection, close(_));
+      auto& shadow_router = *(shadow_writer_->tls_->activeRouters().front());
+      EXPECT_CALL(connection, close(_)).WillRepeatedly(Invoke([&](Network::ConnectionCloseType) {
+        shadow_router.router_destroyed_ = router_destroyed;
+        // connection close raises event to ActiveTcpClient, which leads shadow router's cleanup.
+        shadow_router.onEvent(Network::ConnectionEvent::LocalClose);
+      }));
+      ;
     }
 
     shadow_writer_ = nullptr;
@@ -273,6 +280,8 @@ public:
   envoy::config::core::v3::Locality upstream_locality_;
   std::shared_ptr<const RouterStats> stats_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_;
+  NiceMock<ThreadLocal::MockInstance> tls_allocator_;
+  std::unique_ptr<ThreadLocal::TypedSlot<ActiveRouters>> tls_slot_;
 };
 
 TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
@@ -339,6 +348,8 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReadyOneWay) {
   metadata_->setMessageType(MessageType::Oneway);
   testPoolReady(true);
 }
+
+TEST_F(ShadowWriterTest, ShadowRequestPoolReadyRouterDestroyed) { testPoolReady(false, true); }
 
 TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   Tcp::ConnectionPool::Callbacks* callbacks;

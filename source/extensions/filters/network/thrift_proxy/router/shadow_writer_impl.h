@@ -244,7 +244,15 @@ public:
 
   ~ShadowWriterImpl() override = default;
 
-  void remove(ShadowRouterImpl& router) { tls_->remove(router); }
+  void remove(ShadowRouterImpl& router) {
+    // While router is destroyed but the request is in progress. The cleanup
+    // is possibly deferred to tls shutdown, thus leading us to check if
+    // the storage is valid.
+    if (!tls_.get().has_value()) {
+      return;
+    }
+    tls_->remove(router);
+  }
   const RouterStats& stats() { return stats_; }
 
   // Router::ShadowWriter
@@ -256,6 +264,7 @@ public:
 
 private:
   friend class ShadowRouterImpl;
+  friend class ShadowWriterTest;
 
   Upstream::ClusterManager& cm_;
   const RouterStats& stats_;

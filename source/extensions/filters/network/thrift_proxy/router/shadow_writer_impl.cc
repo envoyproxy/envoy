@@ -20,11 +20,12 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
   auto shadow_router = std::make_unique<ShadowRouterImpl>(*this, cluster_name, metadata,
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
-  if (!created) {
+  if (!created || !tls_.get().has_value()) {
     stats_.named_.shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 
+  std::cout << "submit: " << &tls_ << std::endl;
   auto& active_routers = tls_->activeRouters();
 
   LinkedList::moveIntoList(std::move(shadow_router), active_routers);
