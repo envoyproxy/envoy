@@ -32,6 +32,10 @@ bug_fixes:
   change: |
     Fixed a bug that caused the Datadog tracing extension to drop traces that
     should be kept on account of an extracted sampling decision.
+- area: proxy protocol
+  change: |
+    fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
 
 
 removed_config_or_runtime:
