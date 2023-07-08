@@ -119,7 +119,7 @@ public:
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
     router_->onAboveWriteBufferHighWatermark();
-    router->onBelowWriteBufferLowWatermark();
+    router_->onBelowWriteBufferLowWatermark();
 
     router_->setDecoderFilterCallbacks(callbacks_);
   }
