@@ -89,6 +89,7 @@ public:
 
     if (!oneway) {
       auto& shadow_router = *(shadow_writer_->tls_->activeRouters().front());
+      shadow_router.dispatcher();
       EXPECT_CALL(connection, close(_)).WillRepeatedly(Invoke([&](Network::ConnectionCloseType) {
         // Simulate that router is destroyed.
         shadow_router.router_destroyed_ = router_destroyed;

@@ -245,14 +245,12 @@ public:
   ~ShadowWriterImpl() override = default;
 
   void remove(ShadowRouterImpl& router) {
-    ENVOY_LOG(trace, "remove router from tls. valid: {}", tls_.get().has_value());
     // While router is destroyed but the request is in progress. The cleanup
     // is possibly deferred to tls shutdown, thus leading us to check if
     // the storage is valid.
-    if (!tls_.get().has_value()) {
-      return;
+    if (tls_.get().has_value()) {
+      tls_->remove(router);
     }
-    tls_->remove(router);
   }
   const RouterStats& stats() { return stats_; }
 
