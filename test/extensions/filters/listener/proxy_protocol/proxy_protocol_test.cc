@@ -627,6 +627,34 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
+  // A well-formed local proxy protocol v2 header sampled from an AWS NLB healthcheck request,
+  // no address, 1 TLV is present.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x20, 0x00, 0x00, 0x07, 0x00, 0x00, 0x04, 0x0a, 0x0b, 0x0c,
+                                0x0d, 'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  expectData("moredata");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+      Envoy::Network::Address::IpVersion::v6) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "::1");
+  } else if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+             Envoy::Network::Address::IpVersion::v4) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "127.0.0.1");
+  }
+  EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
+  disconnect();
+}
+
 TEST_P(ProxyProtocolTest, V2ShortV4) {
   // An ipv4/tcp connection that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
