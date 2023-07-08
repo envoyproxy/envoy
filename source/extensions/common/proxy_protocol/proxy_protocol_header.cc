@@ -127,6 +127,15 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
   }
 
   ASSERT(extension_length <= std::numeric_limits<uint16_t>::max());
+  if (proxy_proto_data.src_addr_ == nullptr || proxy_proto_data.src_addr_->ip() == nullptr) {
+    IS_ENVOY_BUG("Missing or incorrect source IP in proxy_proto_data_");
+    return false;
+  }
+  if (proxy_proto_data.dst_addr_ == nullptr || proxy_proto_data.dst_addr_->ip() == nullptr) {
+    IS_ENVOY_BUG("Missing or incorrect dest IP in proxy_proto_data_");
+    return false;
+  }
+
   const auto& src = *proxy_proto_data.src_addr_->ip();
   const auto& dst = *proxy_proto_data.dst_addr_->ip();
   generateV2Header(src.addressAsString(), dst.addressAsString(), src.port(), dst.port(),
