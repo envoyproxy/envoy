@@ -25,7 +25,6 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
     return absl::nullopt;
   }
 
-  std::cout << "submit: " << &tls_ << std::endl;
   auto& active_routers = tls_->activeRouters();
 
   LinkedList::moveIntoList(std::move(shadow_router), active_routers);
@@ -269,6 +268,7 @@ bool ShadowRouterImpl::waitingForConnection() const {
 }
 
 void ShadowRouterImpl::maybeCleanup() {
+  ENVOY_LOG(debug, "maybeCleanup, removed: {}, router_destroyed: {}", removed_, router_destroyed_);
   if (removed_) {
     return;
   }

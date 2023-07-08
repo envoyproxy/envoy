@@ -12,7 +12,6 @@
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -91,9 +90,8 @@ public:
     if (!oneway) {
       auto& shadow_router = *(shadow_writer_->tls_->activeRouters().front());
       EXPECT_CALL(connection, close(_)).WillRepeatedly(Invoke([&](Network::ConnectionCloseType) {
+        // Simulate that router is destroyed.
         shadow_router.router_destroyed_ = router_destroyed;
-        // connection close raises event to ActiveTcpClient, which leads shadow router's cleanup.
-        shadow_router.onEvent(Network::ConnectionEvent::LocalClose);
       }));
       ;
     }
@@ -280,8 +278,6 @@ public:
   envoy::config::core::v3::Locality upstream_locality_;
   std::shared_ptr<const RouterStats> stats_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_;
-  NiceMock<ThreadLocal::MockInstance> tls_allocator_;
-  std::unique_ptr<ThreadLocal::TypedSlot<ActiveRouters>> tls_slot_;
 };
 
 TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
