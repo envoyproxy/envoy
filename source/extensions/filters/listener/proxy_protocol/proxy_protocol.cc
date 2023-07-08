@@ -144,24 +144,37 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   if (proxy_protocol_header_.has_value() &&
       !cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
           Network::ProxyProtocolFilterState::key())) {
-    if (!proxy_protocol_header_.value().local_command_) {
-      auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+    auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+    if (proxy_protocol_header_.value().local_command_) {
+      ENVOY_LOG(trace, "Parsed proxy protocol header, cmd: LOCAL, length: {}, buffer: {}",
+                proxy_protocol_header_.value().wholeHeaderLength(),
+                Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()));
+
+      cb_->filterState().setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              socket.connectionInfoProvider().remoteAddress(),
+              socket.connectionInfoProvider().localAddress(), parsed_tlvs_}),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    } else {
       ENVOY_LOG(
           trace,
-          "Parsed proxy protocol header, length: {}, buffer: {}, TLV length: {}, TLV buffer: {}",
+          "Parsed proxy protocol header, cmd: PROXY, length: {}, buffer: {}, TLV length: {}, TLV "
+          "buffer: {}",
           proxy_protocol_header_.value().wholeHeaderLength(),
           Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()),
           proxy_protocol_header_.value().extensions_length_,
           Envoy::Hex::encode(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
                              proxy_protocol_header_.value().extensions_length_));
+      cb_->filterState().setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              proxy_protocol_header_.value().remote_address_,
+              proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
     }
-
-    cb_->filterState().setData(
-        Network::ProxyProtocolFilterState::key(),
-        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-            proxy_protocol_header_.value().remote_address_,
-            proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   if (proxy_protocol_header_.has_value() && !proxy_protocol_header_.value().local_command_) {

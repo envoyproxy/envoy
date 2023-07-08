@@ -48,6 +48,10 @@ bug_fixes:
 - area: tracing
   change: |
     Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
