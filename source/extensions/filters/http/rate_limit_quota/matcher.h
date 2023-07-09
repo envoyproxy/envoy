@@ -41,6 +41,8 @@ public:
                                             Server::Configuration::FactoryContext& factory_context,
                                             RateLimitQuotaValidationVisitor& visitor) const;
 
+  const RateLimitQuotaBucketSettings& bucketSettings() const { return setting_; }
+
 private:
   RateLimitQuotaBucketSettings setting_;
 };

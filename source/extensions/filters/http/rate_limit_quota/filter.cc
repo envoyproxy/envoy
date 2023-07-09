@@ -11,6 +11,68 @@ namespace RateLimitQuota {
 
 using ::envoy::type::v3::RateLimitStrategy;
 
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
+                                      const RateLimitOnMatchAction* match_action) {
+  // The request has been matched to the quota bucket for the first time.
+  auto bucket_settings = match_action->bucketSettings();
+  // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
+  // action is performed based on pre-configured strategy from no assignment behavior config.
+  if (bucket_settings.has_no_assignment_behavior()) {
+    // Retrieve the `blanket_rule` value from the config to decide if we want to fail-open or
+    // fail-close.
+    auto strategy = bucket_settings.no_assignment_behavior().fallback_rate_limit();
+    if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
+      // TODO(tyxia) Implement the allow/deny interface
+    }
+  } else {
+    // TODO(tyxia) Change it to error, debug for testing
+    ENVOY_LOG(debug, "No assignment behavior is not configured.");
+    // We just use fail-open (i.e. ALLOW_ALL) here.
+    // return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  Bucket new_bucket = {};
+  // Create the gRPC client.
+  new_bucket.rate_limit_client_ = createRateLimitClient(
+      factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
+  // TODO(tyxia) nullptr check.
+  // Start the streaming on the first request.
+  auto status = new_bucket.rate_limit_client_->startStream(callbacks_->streamInfo());
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  initiating_call_ = true;
+  // Send the usage report to RLQS server immediately on the first time when the request is
+  // matched.
+  // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
+  // absl::optional
+  new_bucket.rate_limit_client_->sendUsageReport(config_->domain(), bucket_id);
+
+  // Set up the quota usage report method that sends the reports the RLS server periodically.
+  new_bucket.send_reports_timer =
+      // TODO(tyxia) Timer should be on localThread dispatcher !!!
+      // decode callback's dispatcher ----- worker thread dispatcher!!!!
+      callbacks_->dispatcher().createTimer([&new_bucket, this]() -> void {
+        ASSERT(new_bucket.rate_limit_client_ != nullptr);
+        // No `BucketID` is provided (i.e., absl::nullopt) in periodical usage reports.
+        new_bucket.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
+      });
+  // Set the reporting interval.
+  const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
+  new_bucket.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
+
+  // Store the bucket into the buckets map.
+  quota_buckets_[bucket_id] = std::move(new_bucket);
+  initiating_call_ = false;
+  // TODO(tyxia) Do we need to stop here???
+  // Stop the iteration for headers as well as data and trailers for the current filter and the
+  // filters following.
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+}
+
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
   // First, perform the request matching.
@@ -28,6 +90,12 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // succeeds.
   const RateLimitOnMatchAction* match_action =
       dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
+
+  // TODO(tyxia) Handle dynamic cast failure!!
+  if (match_action == nullptr) {
+    ENVOY_LOG(debug, "Failed to retrieve match action.");
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
   auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
@@ -39,64 +107,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   BucketId bucket_id = ret.value();
 
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
-    // The request has been matched to the quota bucket for the first time.
-    auto bucket_settings = match_action->bucketSettings();
-    // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
-    // action is performed based on pre-configured strategy from no assignment behavior config.
-    if (bucket_settings.has_no_assignment_behavior()) {
-      // Retrieve the `blanket_rule` value from the config to decide if we want to fail-open or
-      // fail-close.
-      auto strategy = bucket_settings.no_assignment_behavior().fallback_rate_limit();
-      if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-        // TODO(tyxia) Implement the allow/deny interface
-      }
-    } else {
-      // TODO(tyxia) Change it to error, debug for testing
-      ENVOY_LOG(debug, "No assignment behavior is not configured.");
-      // We just use fail-open (i.e. ALLOW_ALL) here.
-      // return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-
-    Bucket new_bucket = {};
-    // Create the gRPC client.
-    new_bucket.rate_limit_client_ = createRateLimitClient(
-        factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
-    // TODO(tyxia) nullptr check.
-    // Start the streaming on the first request.
-    auto status = new_bucket.rate_limit_client_->startStream(callbacks_->streamInfo());
-    if (!status.ok()) {
-      ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-
-    initiating_call_ = true;
-    // Send the usage report to RLQS server immediately on the first time when the request is
-    // matched.
-    // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
-    // absl::optional
-    new_bucket.rate_limit_client_->sendUsageReport(config_->domain(), bucket_id);
-
-    // Set up the quota usage report method that sends the reports the RLS server periodically.
-    new_bucket.send_reports_timer =
-        // TODO(tyxia) Timer should be on localThread dispatcher !!!
-        // decode callback's dispatcher ----- worker thread dispatcher!!!!
-        callbacks_->dispatcher().createTimer([&new_bucket, this]() -> void {
-          ASSERT(new_bucket.rate_limit_client_ != nullptr);
-          // No `BucketID` is provided (i.e., absl::nullopt) in periodical usage reports.
-          new_bucket.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
-        });
-    // Set the reporting interval.
-    const int64_t reporting_interval =
-        PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-    new_bucket.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
-
-    // Store the bucket into the buckets map.
-    quota_buckets_[bucket_id] = std::move(new_bucket);
-    initiating_call_ = false;
-    // TODO(tyxia) Do we need to stop here???
-    // Stop the iteration for headers as well as data and trailers for the current filter and the
-    // filters following.
-    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    return createNewBucket(bucket_id, match_action);
   } else {
     // TODO(tyxia) consider move to a new function. reduce the function length multiple places.
     // Found the cached bucket entry.
@@ -110,13 +121,13 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
       case RateLimitStrategy::StrategyCase::kRequestsPerTimeUnit: {
         if (quota_buckets_[bucket_id].quota_usage.num_requests_allowed() <
             rate_limit_strategy.requests_per_time_unit().requests_per_time_unit()) {
-
-            }
+        }
       }
 
       case RateLimitStrategy::StrategyCase::kTokenBucket: {
-        // // TODO(tyxia) Look into token bucket algortihm.
-        // // Token bucket ratelimiter 1)google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc
+        // // TODO(tyxia) Look into token bucket algorithm.
+        // // Token bucket ratelimiter
+        // 1)google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc
         // // 2)google3/dos/quotas/bouncer/client/internal/rate_limiter/token_bucket_rate_limiter.cc
 
         // // Maybe have token_bucket_rate_limiter class
@@ -124,7 +135,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
         // uint32_t max_tokens = token_bucket.max_tokens();
         // uint32_t tokens_per_fill = token_bucket.tokens_per_fill().value();
         // // TODO(tyxia) Need to implement requestAllowedHelper
-        // // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc;rcl=508241966;l=168
+        // //
+        // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc;rcl=508241966;l=168
       }
       case RateLimitStrategy::StrategyCase::STRATEGY_NOT_SET: {
         PANIC_DUE_TO_PROTO_UNSET;
@@ -132,7 +144,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
         PANIC_DUE_TO_CORRUPT_ENUM;
       }
     } else {
-
     }
   }
   // Get the quota usage info.
