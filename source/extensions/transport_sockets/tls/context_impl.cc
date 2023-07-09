@@ -187,12 +187,12 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-#ifdef BORINGSSL_FIPS
+#if BORINGSSL_API_VERSION >= 18
   if (!capabilities_.is_fips_compliant) {
     throw EnvoyException(
         "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
   }
-#endif
+#endif  // BORINGSSL_API_VERSION
 
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
