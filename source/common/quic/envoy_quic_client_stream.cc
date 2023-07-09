@@ -88,6 +88,13 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     sent_head_request_ = true;
   }
 #endif
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+       Http::HeaderUtility::isConnectUdp(headers))) {
+    useCapsuleProtocol();
+  }
+#endif
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -227,10 +234,11 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+  auto client_session = static_cast<EnvoyQuicClientSession*>(session());
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_,
-          transform_rst);
+          header_list, *this, client_session->max_inbound_header_list_size(),
+          filterManagerConnection()->maxIncomingHeadersCount(), details_, transform_rst);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
@@ -376,9 +384,10 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+    auto client_session = static_cast<EnvoyQuicClientSession*>(session());
     auto trailers = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
-        transform_rst);
+        received_trailers(), client_session->max_inbound_header_list_size(),
+        filterManagerConnection()->maxIncomingHeadersCount(), *this, details_, transform_rst);
     if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;

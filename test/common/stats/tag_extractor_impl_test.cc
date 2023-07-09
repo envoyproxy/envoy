@@ -180,7 +180,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   cipher_name.name_ = tag_names.SSL_CIPHER;
   cipher_name.value_ = "AES256-SHA";
 
-  regex_tester.testRegex("listener.[__1]_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+  regex_tester.testRegex("listener.[__1]_0.ssl.ciphers.AES256-SHA", "listener.ssl.ciphers",
                          {listener_address, cipher_name});
 
   // Cipher suite
@@ -194,26 +194,26 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // ipv6 non-loopback (for alphabetical chars)
   listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
   regex_tester.testRegex(
-      "listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA",
-      "listener.ssl.cipher", {listener_address, cipher_name});
+      "listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.ciphers.AES256-SHA",
+      "listener.ssl.ciphers", {listener_address, cipher_name});
 
   // ipv4 address
   listener_address.value_ = "127.0.0.1_0";
-  regex_tester.testRegex("listener.127.0.0.1_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+  regex_tester.testRegex("listener.127.0.0.1_0.ssl.ciphers.AES256-SHA", "listener.ssl.ciphers",
                          {listener_address, cipher_name});
 
   // Stat prefix listener
   listener_address.value_ = "my_prefix";
-  regex_tester.testRegex("listener.my_prefix.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+  regex_tester.testRegex("listener.my_prefix.ssl.ciphers.AES256-SHA", "listener.ssl.ciphers",
                          {listener_address, cipher_name});
 
   // Stat prefix with invalid period.
   listener_address.value_ = "prefix";
-  regex_tester.testRegex("listener.prefix.notmatching.ssl.cipher.AES256-SHA",
-                         "listener.notmatching.ssl.cipher", {listener_address, cipher_name});
+  regex_tester.testRegex("listener.prefix.notmatching.ssl.ciphers.AES256-SHA",
+                         "listener.notmatching.ssl.ciphers", {listener_address, cipher_name});
 
   // Stat prefix with negative match for `admin`.
-  regex_tester.testRegex("listener.admin.ssl.cipher.AES256-SHA", "listener.admin.ssl.cipher",
+  regex_tester.testRegex("listener.admin.ssl.ciphers.AES256-SHA", "listener.admin.ssl.ciphers",
                          {cipher_name});
 
   // Mongo

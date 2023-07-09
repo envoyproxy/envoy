@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}
@@ -11,8 +12,13 @@ concurrency:
 
 jobs:
   sync:
-    runs-on: ubuntu-20.04
-    if: github.repository == 'envoyproxy/envoy'
+    runs-on: ubuntu-22.04
+    if: |
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.push
+              || !contains(github.actor, '[bot]'))
+      }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,7 +27,7 @@ jobs:
         - envoy-filter-example
         - data-plane-api
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.2
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.3
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

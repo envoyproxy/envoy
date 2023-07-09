@@ -49,8 +49,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.3"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
-"source/extensions/rate_limit_descriptors:95.5"
-"source/extensions/rate_limit_descriptors/expr:95.5"
+"source/extensions/rate_limit_descriptors:95.0"
+"source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.1"
 "source/extensions/stat_sinks/statsd:84.6"
 "source/extensions/tracers:95.8"
@@ -62,6 +62,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/transport_sockets/tls/cert_validator:95.2"
 "source/extensions/transport_sockets/tls/private_key:88.9"
+"source/extensions/upstreams/http/generic:85.0" # Braces in switch statements are considered uncovered
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build

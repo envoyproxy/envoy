@@ -20,7 +20,7 @@ jobs:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
     name: format_all
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 45
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
@@ -51,7 +51,7 @@ jobs:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
     name: swift_lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 5
     container:
       image: ghcr.io/realm/swiftlint:0.50.3

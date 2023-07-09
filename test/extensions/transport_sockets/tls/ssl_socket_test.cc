@@ -393,6 +393,7 @@ void testUtil(const TestUtilOptions& options) {
                                                                std::move(ssl_socket), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   if (options.ocspStaplingEnabled()) {
     const SslHandshakerImpl* ssl_socket =
@@ -751,6 +752,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
             std::move(socket), std::move(transport_socket), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -3003,6 +3005,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
         server_connection->write(data, false);
         server_connection->close(Network::ConnectionCloseType::FlushWrite);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
@@ -3075,6 +3078,7 @@ TEST_P(SslSocketTest, HalfClose) {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, true);
       }));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(*server_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
@@ -3156,6 +3160,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(*server_read_filter, onNewConnection());
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -3245,6 +3250,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
@@ -3361,6 +3367,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
             stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -3455,6 +3462,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         server_connection = dispatcher->createServerConnection(
             std::move(socket), tsf.createDownstreamTransportSocket(), stream_info);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -3501,6 +3509,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
             std::move(socket), tsf.createDownstreamTransportSocket(), stream_info2);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   // Different tests have different order of whether client or server gets Connected event
   // first, so always wait until both have happened.
@@ -3603,6 +3612,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
           EXPECT_EQ(SSL_OP_NO_TICKET, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
         }
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -4205,6 +4215,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
             std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
@@ -4247,6 +4258,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
             std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -4334,6 +4346,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
             stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   const bool expect_tls13 =
       client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
@@ -4380,6 +4393,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
             stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older),
   // and whether or not the session was successfully resumed.
@@ -4565,6 +4579,7 @@ TEST_P(SslSocketTest, SslError) {
             stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -5146,6 +5161,7 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
 
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -5812,6 +5828,7 @@ protected:
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -5888,6 +5905,7 @@ protected:
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -6008,6 +6026,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -6041,6 +6060,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
         EXPECT_EQ("", server_connection_->nextProtocol());
         EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
       }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -7006,6 +7026,64 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
   revoked_test_options.setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose);
   testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+}
+
+TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  // Bad server certificate to cause the mismatch between TLS usage and key usage.
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // Disable the rsa_key_usage enforcement.
+  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
+  // Both server connection (Client->Envoy) and client connection (Envoy->Backend) are expected to
+  // be successful.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
+  // `was_key_usage_invalid` stats is expected to set to report the mismatched usage.
+#ifndef BORINGSSL_FIPS
+  test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
+#endif
+  testUtilV2(test_options);
+}
+
+TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  // Bad server certificate to cause the mismatch between TLS usage and key usage.
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // Enable the rsa_key_usage enforcement.
+  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
+  // Client connection is failed with key_usage_mismatch, which is expected.
+  test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
+  // Server connection failed with connection error.
+  test_options.setExpectedServerStats("ssl.connection_error");
+  testUtilV2(test_options);
 }
 
 } // namespace Tls
