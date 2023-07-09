@@ -187,12 +187,12 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-#if BORINGSSL_API_VERSION >= 18
+#ifdef BORINGSSL_FIPS
   if (!capabilities_.is_fips_compliant) {
     throw EnvoyException(
         "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
   }
-#endif  // BORINGSSL_API_VERSION
+#endif
 
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
@@ -559,14 +559,14 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-#ifndef BORINGSSL_FIPS
+#if BORINGSSL_API_VERSION >= 18
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
-#endif
+#endif // BORINGSSL_API_VERSION
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
