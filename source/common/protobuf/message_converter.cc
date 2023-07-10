@@ -104,8 +104,8 @@ MessageConverter::ConvertBackToBuffer(std::unique_ptr<StreamMessage> message) {
   }
 
   // Create gRPC frame header and add to output buffer.
-  const uint64_t esf_out_message_size = message->size();
-  auto delimiter = SizeToDelimiter(esf_out_message_size);
+  const uint64_t out_message_size = message->size();
+  auto delimiter = SizeToDelimiter(out_message_size);
   if (!delimiter.ok()) {
     return delimiter.status();
   }
