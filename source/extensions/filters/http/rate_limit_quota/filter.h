@@ -25,7 +25,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
@@ -51,7 +50,8 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsMap& quota_buckets, RateLimitQuotaUsageReports& quota_usage_reports)
+                       BucketsContainer& quota_buckets,
+                       RateLimitQuotaUsageReports& quota_usage_reports)
       : config_(std::move(config)), factory_context_(factory_context),
         quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports) {
     createMatcher();
@@ -93,7 +93,7 @@ private:
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 
   // Don't take ownership here and these objects are stored in TLS.
-  BucketsMap& quota_buckets_;
+  BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& quota_usage_reports_;
 
   bool initiating_call_{};

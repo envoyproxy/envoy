@@ -86,7 +86,7 @@ public:
   bool grpc_closed_ = false;
   bool external_inited_ = false;
   RateLimitQuotaUsageReports reports_;
-  BucketsMap bucket_cache_;
+  BucketsContainer bucket_cache_;
 };
 
 } // namespace

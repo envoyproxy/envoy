@@ -1,18 +1,3 @@
-// #include "envoy/config/core/v3/grpc_service.pb.h"
-
-// #include "source/common/grpc/common.h"
-// #include "source/common/http/header_map_impl.h"
-// #include "source/extensions/filters/http/rate_limit_quota/client.h"
-// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
-// #include "test/extensions/filters/http/rate_limit_quota/mocks.h"
-// #include "test/mocks/grpc/mocks.h"
-// #include "test/mocks/server/mocks.h"
-// #include "test/test_common/status_utility.h"
-
-// #include "gmock/gmock.h"
-// #include "gtest/gtest.h"
-
 #include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
 
 namespace Envoy {
@@ -21,9 +6,9 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
 
-using Server::Configuration::MockFactoryContext;
-using testing::Invoke;
-using testing::Unused;
+// using Server::Configuration::MockFactoryContext;
+// using testing::Invoke;
+// using testing::Unused;
 
 constexpr char SingleBukcetId[] = R"EOF(
   bucket:

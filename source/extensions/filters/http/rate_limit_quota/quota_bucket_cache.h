@@ -10,8 +10,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
-// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -38,7 +36,7 @@ struct BucketIdEqual {
   }
 };
 
-// Each bucket entry
+// Single bucket entry
 struct Bucket {
   // TODO(tyxia) This copy constructor is tricky
   // the unique ptr inside of this class and can only be moveable.
@@ -52,20 +50,16 @@ struct Bucket {
   virtual ~Bucket() = default;
   // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report
   // periodically.
-  std::unique_ptr<RateLimitClientImpl> rate_limit_client_;
+  std::unique_ptr<RateLimitClientImpl> rate_limit_client;
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
-
-  // Cached bucket action from the response received from the RLQS server.
+  // Cached bucket action from the response that was received from the RLQS server.
   BucketAction bucket_action;
-
-  // TODO(tyxia) Consider remove them!!!
-  // UsageReport usage;
-  // TODO(tyxia) Also stores bucketId in its element.
+  // TODO(tyxia) No need to store bucket ID  as it is already the key of BucketsContainer.
   BucketQuotaUsage quota_usage;
 };
 
-using BucketsMap = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
+using BucketsContainer = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
@@ -74,20 +68,15 @@ public:
   // in the `rate_limit_quota_filter` when the request comes.
   ThreadLocalBucket() = default;
 
-  // Return objects by reference to let caller site modify its content.
-  // Return the buckets
-  BucketsMap& buckets() { return buckets_; }
+  // Return the buckets. Buckets are returned by reference so that caller site can modify its
+  // content.
+  BucketsContainer& buckets() { return buckets_; }
   // Return the quota usage reports.
   RateLimitQuotaUsageReports& quotaUsageReports() { return quota_usage_reports_; }
 
 private:
-  // TODO(tyxia) How these two structs work together????!!!
-  // 1. *RateLimitQuotaUsageReports* is the usage report for a list of buckets
-  // *BucketsMap* is the map of bucketId <-> Bucket
-  // So those two are in parallel.
-  // 2. buckets_ is used in filter, quota_usage_reports_ is used in client.
-  BucketsMap buckets_;
-  // Thread local storage for this proto.
+  // Thread local storage for bucket container and quota usage report.
+  BucketsContainer buckets_;
   RateLimitQuotaUsageReports quota_usage_reports_;
 };
 

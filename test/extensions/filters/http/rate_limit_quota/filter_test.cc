@@ -365,7 +365,7 @@ public:
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
   // TODO(tyxia) No need for TLS storage???
-  BucketsMap bucket_cache_;
+  BucketsContainer bucket_cache_;
   RateLimitQuotaUsageReports reports_;
 };
 

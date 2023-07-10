@@ -36,7 +36,7 @@ public:
                       Server::Configuration::FactoryContext& context,
                       // TODO(tyxia) life time, filter itself destroyed but client is
                       // stored in the cached. need to outlived filter object!!
-                      RateLimitQuotaCallbacks& callbacks, BucketsMap& quota_buckets,
+                      RateLimitQuotaCallbacks& callbacks, BucketsContainer& quota_buckets,
                       RateLimitQuotaUsageReports& usage_reports)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
@@ -56,7 +56,9 @@ public:
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
   void closeStream();
 
+  // Build the usage report (i.e., the request sent to RLQS server).
   RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
+  // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id);
 
 private:
@@ -74,7 +76,7 @@ private:
   bool stream_closed_ = false;
 
   // Don't take ownership here and these objects are stored in TLS.
-  BucketsMap& quota_buckets_;
+  BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& reports_;
 };
 
@@ -85,7 +87,7 @@ using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service,
-                      RateLimitQuotaCallbacks& callbacks, BucketsMap& quota_buckets,
+                      RateLimitQuotaCallbacks& callbacks, BucketsContainer& quota_buckets,
                       RateLimitQuotaUsageReports& quota_usage_reports) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context, callbacks, quota_buckets,
                                                quota_usage_reports);

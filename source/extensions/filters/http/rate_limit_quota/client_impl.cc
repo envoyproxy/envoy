@@ -7,7 +7,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-// Helper function to build the usage report.
 RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_view domain,
                                                                  const BucketId& bucket_id) {
   // ASSERT(reports_ != nullptr);
@@ -29,7 +28,9 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     // update is write to map.
     usage->set_num_requests_allowed(1);
     usage->set_num_requests_denied(0);
-  } else {
+  }
+  // If the cached report exists.
+  else {
     RateLimitQuotaUsageReports& cached_report = reports_;
     bool updated = false;
     // TODO(tyxia) That will be better if it can be a map
@@ -38,7 +39,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
       // Only update the quota usage for that specific bucket id.
       if (Protobuf::util::MessageDifferencer::Equals(usage->bucket_id(), bucket_id)) {
         usage->set_num_requests_allowed(usage->num_requests_allowed() + 1);
-        // TODO(tyxia) How set the time elapsed.
+        // TODO(tyxia) Update the logic of setting the second logic.
         usage->mutable_time_elapsed()->set_seconds(1000);
         updated = true;
         // TODO(tyxia) Break the loop here since it should only one unique usage report for
@@ -60,8 +61,10 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
 void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
                                           absl::optional<BucketId> bucket_id) {
   ASSERT(stream_ != nullptr);
-  // There is no bucked id provided in periodical sending behavior.
-  // TODO(tyxia) end_stream should be
+  // In periodical report case, there is no bucked id provided because client just reports
+  // based on the cached report which is also updated every time we build the report (i.e.,
+  // buildUsageReport is called).
+  // TODO(tyxia) end_stream!!
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(domain, bucket_id.value())
                                              : reports_,
                        /*end_stream=*/true);
