@@ -346,7 +346,7 @@ absl::Status JsonTranscoderConfig::createTranscoder(
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_info) {
-    return {StatusCode::kNotFound, "Could not resolve " + path + " to a method."};
+    return {StatusCode::kNotFound, "Unknown method " + method + " in the path " + path + "."};
   }
 
   auto status = methodToRequestInfo(method_info, &request_info);
