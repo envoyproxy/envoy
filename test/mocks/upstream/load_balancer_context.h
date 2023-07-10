@@ -1,4 +1,5 @@
 #pragma once
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
   MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
   MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
+  MOCK_METHOD(const StreamInfo::StreamInfo*, requestStreamInfo, (), (const));
   MOCK_METHOD(const Http::RequestHeaderMap*, downstreamHeaders, (), (const));
   MOCK_METHOD(const HealthyAndDegradedLoad&, determinePriorityLoad,
               (const PrioritySet&, const HealthyAndDegradedLoad&,

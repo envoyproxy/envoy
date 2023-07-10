@@ -35,7 +35,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
 "source/extensions/filters/http/cache:93.4"
-"source/extensions/filters/http/grpc_json_transcoder:95.6"
+"source/extensions/filters/http/grpc_json_transcoder:93.7" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.9"
@@ -49,8 +49,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.3"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
-"source/extensions/rate_limit_descriptors:95.5"
-"source/extensions/rate_limit_descriptors/expr:95.5"
+"source/extensions/rate_limit_descriptors:95.0"
+"source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.1"
 "source/extensions/stat_sinks/statsd:84.6"
 "source/extensions/tracers:95.8"

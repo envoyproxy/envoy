@@ -35,15 +35,8 @@ public:
     StatsTextRender::generate(response, name, value);
   }
 
-  // We override the generate method for HTML to trigger some JS that will
-  // render the histogram graphically. We will render that from JavaScript
-  // and convey the histogram data to the JS via JSON, so we can delegate
-  // to an instantiated JSON `sub-renderer` that will write into json_data_.
   void generate(Buffer::Instance&, const std::string& name,
-                const Stats::ParentHistogram& histogram) override {
-    histogram_json_render_->generate(json_data_, name, histogram);
-  }
-
+                const Stats::ParentHistogram& histogram) override;
   void finalize(Buffer::Instance&) override;
 
 private:

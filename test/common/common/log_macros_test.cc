@@ -35,6 +35,12 @@ public:
     ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val");
     ENVOY_TAGGED_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), "fake message {}",
                      "val");
+    ENVOY_TAGGED_CONN_LOG(info, tags_, connection_, "fake message {}", "val");
+    ENVOY_TAGGED_CONN_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), connection_,
+                          "fake message {}", "val");
+    ENVOY_TAGGED_STREAM_LOG(info, tags_, stream_, "fake message {}", "val");
+    ENVOY_TAGGED_STREAM_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), stream_,
+                            "fake message {}", "val");
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }

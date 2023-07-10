@@ -19,6 +19,7 @@
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -221,6 +222,8 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return nullptr; }
+
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
@@ -263,7 +266,7 @@ protected:
   // RoundRobinLoadBalancer, to index into auxiliary data structures specific to the LB for
   // a given host set selection.
   struct HostsSource {
-    enum class SourceType {
+    enum class SourceType : uint8_t {
       // All hosts in the host set.
       AllHosts,
       // All healthy hosts in the host set.
@@ -278,20 +281,27 @@ protected:
 
     HostsSource() = default;
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type)
-        : priority_(priority), source_type_(source_type) {
+        : priority_(static_cast<uint8_t>(priority)), source_type_(source_type) {
+      ASSERT(priority <= 128, "Priority out of bounds.");
       ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
              source_type == SourceType::DegradedHosts);
     }
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
-        : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
+        : priority_(static_cast<uint8_t>(priority)), source_type_(source_type),
+          locality_index_(locality_index) {
+      ASSERT(priority <= 128, "Priority out of bounds.");
       ASSERT(source_type == SourceType::LocalityHealthyHosts ||
              source_type == SourceType::LocalityDegradedHosts);
     }
 
     // Priority in PrioritySet.
-    uint32_t priority_{};
+    uint8_t priority_{};
 
     // How to index into HostSet for a given priority.
     SourceType source_type_{};
@@ -307,7 +317,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::flat_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -509,7 +519,7 @@ private:
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::flat_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;
 
@@ -599,7 +609,7 @@ private:
   }
 
   uint64_t peekahead_index_{};
-  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**

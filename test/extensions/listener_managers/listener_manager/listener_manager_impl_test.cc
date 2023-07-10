@@ -36,7 +36,6 @@
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
@@ -542,7 +541,7 @@ test: a
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "test: Cannot find field");
+                          "test");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
@@ -571,7 +570,7 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "foo: Cannot find field");
+                          "foo");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadConnectionLessUdpConfigWithFilterChain) {

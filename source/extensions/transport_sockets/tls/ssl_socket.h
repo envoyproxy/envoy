@@ -69,7 +69,7 @@ public:
   // Ssl::HandshakeCallbacks
   Network::Connection& connection() const override;
   void onSuccess(SSL* ssl) override;
-  void onFailure() override;
+  void onFailure(bool syscall_error_occurred = false) override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
   void onAsynchronousCertValidationComplete() override;
 
@@ -86,7 +86,7 @@ private:
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
 
   Network::PostIoAction doHandshake();
-  void drainErrorQueue();
+  void drainErrorQueue(bool syscall_error_occurred = false);
   void shutdownSsl();
   void shutdownBasic();
   void resumeHandshake();
