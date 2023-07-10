@@ -10,7 +10,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace ProtobufMessage {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 
 // The null validation visitor doesn't do anything on unknown fields.
@@ -57,5 +59,8 @@ TEST(StrictValidationVisitorImpl, UnknownField) {
 }
 
 } // namespace
-} // namespace ProtobufMessage
+
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
