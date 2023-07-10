@@ -85,7 +85,7 @@ private:
                       const Protobuf::RepeatedPtrField<std::string>& aliases,
                       const ProtobufWkt::Any& resource, bool has_resource,
                       const std::string& version, absl::optional<std::chrono::milliseconds> ttl,
-                      const absl::optional<envoy::config::core::v3::Metadata> metadata)
+                      const absl::optional<envoy::config::core::v3::Metadata>& metadata)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
