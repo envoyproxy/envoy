@@ -353,3 +353,13 @@ with the following statistics:
 
   active, Gauge, "Active state of the action (0=scaling, 1=saturated)"
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+
+Each configured Load Shed Point has a statistics tree rooted at *overload.<name>.*
+with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+

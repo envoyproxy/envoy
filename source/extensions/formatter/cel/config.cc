@@ -8,11 +8,12 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-::Envoy::Formatter::CommandParserPtr
-CELFormatterFactory::createCommandParserFromProto(const Protobuf::Message&) {
+::Envoy::Formatter::CommandParserPtr CELFormatterFactory::createCommandParserFromProto(
+    const Protobuf::Message&, Server::Configuration::CommonFactoryContext& context) {
 #if defined(USE_CEL_PARSER)
-  return std::make_unique<CELFormatterCommandParser>();
+  return std::make_unique<CELFormatterCommandParser>(context);
 #else
+  UNREFERENCED_PARAMETER(context);
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif
 }

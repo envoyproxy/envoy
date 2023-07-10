@@ -39,7 +39,7 @@ public:
 
   void createVerifier() {
     filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
-    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
+    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
                                  *filter_config_);
   }
 
@@ -208,7 +208,7 @@ rules:
 TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   auto* provider_and_audiences =
-      proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
+      proto_config_.mutable_rules(0)->mutable_requires_()->mutable_provider_and_audiences();
   provider_and_audiences->set_provider_name("example_provider");
   provider_and_audiences->add_audiences("invalid_service");
   createVerifier();
@@ -230,7 +230,7 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
 // This test verifies that requirement referencing nonexistent provider will throw exception
 TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
-  proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
+  proto_config_.mutable_rules(0)->mutable_requires_()->set_provider_name("nosuchprovider");
 
   EXPECT_THROW(FilterConfigImpl(proto_config_, "", mock_factory_ctx_), EnvoyException);
 }

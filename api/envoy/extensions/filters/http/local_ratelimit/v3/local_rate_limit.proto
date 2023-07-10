@@ -71,7 +71,7 @@ message LocalRateLimit {
       [(validate.rules).repeated = {max_items: 10}];
 
   // Specifies a list of HTTP headers that should be added to each response for requests that
-  // have been rate limited. This occurs when the filter is either enabled or fully enforced.
+  // have been rate limited. This occurs when the filter is enabled and fully enforced.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6
       [(validate.rules).repeated = {max_items: 10}];
 

@@ -1,14 +1,17 @@
 services:
   envoy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-fault-injection
     volumes:
     - ./runtime:/srv/runtime
     ports:
     - 9211:9211
+
   backend:
     build:
+      context: .
       dockerfile: Dockerfile-backend
     ports:
     - ${PORT_PROXY:-8080}:80

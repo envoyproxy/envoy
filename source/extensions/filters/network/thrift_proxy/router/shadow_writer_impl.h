@@ -31,11 +31,9 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     upstream_buffer_.move(data);
 
     bool underflow = false;
-    try {
-      underflow = onData();
-    } catch (const AppException&) {
-      return ThriftFilters::ResponseStatus::Reset;
-    } catch (const EnvoyException&) {
+    TRY_NEEDS_AUDIT { underflow = onData(); }
+    END_TRY catch (const AppException&) { return ThriftFilters::ResponseStatus::Reset; }
+    catch (const EnvoyException&) {
       return ThriftFilters::ResponseStatus::Reset;
     }
 
@@ -239,15 +237,14 @@ class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrif
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm, const RouterStats& stats,
                    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls)
-      : cm_(cm), stats_(stats), dispatcher_(dispatcher), tls_(tls.allocateSlot()) {
-    tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ActiveRouters>(dispatcher);
-    });
+      : cm_(cm), stats_(stats), dispatcher_(dispatcher), tls_(tls) {
+    tls_.set(
+        [](Event::Dispatcher& dispatcher) { return std::make_shared<ActiveRouters>(dispatcher); });
   }
 
   ~ShadowWriterImpl() override = default;
 
-  void remove(ShadowRouterImpl& router) { tls_->getTyped<ActiveRouters>().remove(router); }
+  void remove(ShadowRouterImpl& router) { tls_->remove(router); }
   const RouterStats& stats() { return stats_; }
 
   // Router::ShadowWriter
@@ -263,7 +260,7 @@ private:
   Upstream::ClusterManager& cm_;
   const RouterStats& stats_;
   Event::Dispatcher& dispatcher_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ActiveRouters> tls_;
 };
 
 } // namespace Router
