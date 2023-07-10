@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -70,4 +71,59 @@ envoy_cc_fuzz_test(
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = ["//source/common/protobuf:utility_lib"],
+)
+
+envoy_cc_test_library(
+    name = "message_converter_test_lib",
+    hdrs = ["message_converter_test_lib.h"],
+    external_deps = [
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/protobuf:stream_message_lib",
+        "//test/proto:apikeys_proto_cc_proto",
+        "@com_google_protofieldextraction//:all_libs",
+    ],
+)
+
+envoy_cc_test(
+    name = "message_converter_utility_test",
+    srcs = ["message_converter_utility_test.cc"],
+    deps = [
+        ":message_converter_test_lib",
+        "//source/common/protobuf:message_converter_utility_lib",
+        "//test/proto:apikeys_proto_cc_proto",
+        "//test/test_common:status_utility_lib",
+        "@com_google_protofieldextraction//:all_libs",
+        "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_cc_test(
+    name = "message_converter_test",
+    srcs = ["message_converter_test.cc"],
+    deps = [
+        ":message_converter_test_lib",
+        "//source/common/protobuf:message_converter_lib",
+        "//source/common/protobuf:message_converter_utility_lib",
+        "//test/proto:apikeys_proto_cc_proto",
+        "//test/test_common:status_utility_lib",
+        "@com_google_protofieldextraction//:all_libs",
+        "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_cc_test(
+    name = "message_converter_overflow_test",
+    srcs = ["message_converter_overflow_test.cc"],
+    deps = [
+        ":message_converter_test_lib",
+        "//source/common/protobuf:message_converter_lib",
+        "//source/common/protobuf:message_converter_utility_lib",
+        "//test/proto:apikeys_proto_cc_proto",
+        "//test/test_common:status_utility_lib",
+        "@com_google_protofieldextraction//:all_libs",
+        "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
 )
