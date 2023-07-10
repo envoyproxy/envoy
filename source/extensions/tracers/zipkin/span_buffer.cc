@@ -75,7 +75,7 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
             out, absl::StrJoin(
                      toListOfSpans(zipkin_span, replacements), ",",
                      [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
-                       ProtobufUtil::StatusOr<std::string> json_or_error =
+                       absl::StatusOr<std::string> json_or_error =
                            MessageUtil::getJsonStringFromMessage(span, false, true);
                        ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
                        if (json_or_error.ok()) {

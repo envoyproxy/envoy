@@ -21,9 +21,6 @@
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/service.h"
 #include "google/protobuf/struct.pb.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
-#include "google/protobuf/stubs/stringpiece.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/field_mask_util.h"
 #include "google/protobuf/util/json_util.h"
@@ -59,10 +56,3 @@ using Int64 = int64_t;
 
 } // namespace ProtobufTypes
 } // namespace Envoy
-
-// NOLINT(namespace-envoy)
-namespace fmt {
-// Provide formatter for google::protobuf::StringPiece
-template <>
-struct formatter<google::protobuf::stringpiece_internal::StringPiece> : ostream_formatter {};
-} // namespace fmt
