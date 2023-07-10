@@ -10,7 +10,6 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 
 #include "absl/status/statusor.h"
-#include "grpc_transcoding/message_reader.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
 namespace Envoy::ProtobufMessage {
@@ -18,7 +17,8 @@ namespace Envoy::ProtobufMessage {
 using CreateMessageDataFunc =
     std::function<std::unique_ptr<google::protobuf::field_extraction::MessageData>()>;
 
-struct MaybeParseGrpcMessageOutput {
+// The output for the ParseGrpcMessage function.
+struct ParseGrpcMessageOutput {
   // When true, parser needs more data. `request_in` was not changed and no
   // other members below are set.
   bool needs_more_data = false;
@@ -41,14 +41,14 @@ struct MaybeParseGrpcMessageOutput {
 //
 // Parsing occurs from `request_reader` and `request_in`. When a message is
 // successfully parsed, the entire gRPC frame will be removed from
-// `request_in` and moved to `MaybeParseGrpcMessageOutput`. Otherwise,
+// `request_in` and moved to `ParseGrpcMessageOutput`. Otherwise,
 // `request_in` is left un-altered.
 //
 // Returns OK with message and buffer owning parsed data if parsing succeeds.
 // Returns OK with flag if more data is needed.
 // Returns error if parsing fails.
-absl::StatusOr<MaybeParseGrpcMessageOutput>
-MaybeParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in);
+absl::StatusOr<ParseGrpcMessageOutput>
+ParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in);
 
 // Creates a gRPC frame header for the given message size.
 absl::StatusOr<std::string> SizeToDelimiter(size_t size);

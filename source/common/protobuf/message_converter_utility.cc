@@ -17,13 +17,13 @@ using ::google::grpc::transcoding::MessageAndGrpcFrame;
 using ::google::grpc::transcoding::MessageReader;
 } // namespace
 
-absl::StatusOr<MaybeParseGrpcMessageOutput>
-MaybeParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in) {
+absl::StatusOr<ParseGrpcMessageOutput>
+ParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in) {
   // Parse the gRPC frame header.
   if (request_in.length() < kGrpcDelimiterByteSize) {
     ENVOY_LOG_MISC(info, "Need more data for gRPC frame header parsing. Current size={}",
                    request_in.length());
-    MaybeParseGrpcMessageOutput ret;
+    ParseGrpcMessageOutput ret;
     ret.needs_more_data = true;
     return ret;
   }
@@ -40,13 +40,13 @@ MaybeParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& r
   if (request_in.length() < total_size) {
     ENVOY_LOG_MISC(info, "Need more data for gRPC frame. Current size={}, needed={}",
                    request_in.length(), total_size);
-    MaybeParseGrpcMessageOutput ret;
+    ParseGrpcMessageOutput ret;
     ret.needs_more_data = true;
     return ret;
   }
 
   // Drain out the gRPC frame header as we already buffered it separately.
-  MaybeParseGrpcMessageOutput output;
+  ParseGrpcMessageOutput output;
   output.frame_header.move(request_in, kGrpcDelimiterByteSize);
 
   // Move the required data to its own BEFORE any parsing occurs.

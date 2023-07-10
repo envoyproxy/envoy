@@ -5,7 +5,6 @@
 #include "source/common/protobuf/message_converter_utility.h"
 #include "source/common/protobuf/stream_message.h"
 
-#include "grpc_transcoding/message_reader.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
 namespace Envoy::ProtobufMessage {
@@ -34,10 +33,14 @@ namespace Envoy::ProtobufMessage {
 
 class MessageConverter {
 public:
-  MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory)
+  explicit MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory)
       : MessageConverter(std::move(factory), std::numeric_limits<uint32_t>::max()) {}
 
-  explicit MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory, uint32_t buffer_limit);
+   MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory, uint32_t buffer_limit);
+
+    // MessageConverter is neither copyable nor movable.
+  MessageConverter(const MessageConverter&) = delete;
+  MessageConverter& operator=(const MessageConverter&) = delete;
 
   // Accumulates a gRPC data buffer into a single StreamMessage.
   //
@@ -81,10 +84,6 @@ public:
   // we do not go over buffer limits. But callers may use this for their own
   // watermarking.
   [[nodiscard]] uint64_t BytesBuffered() const;
-
-  // MessageConverter is neither copyable nor movable.
-  MessageConverter(const MessageConverter&) = delete;
-  MessageConverter& operator=(const MessageConverter&) = delete;
 
 private:
   std::unique_ptr<CreateMessageDataFunc> factory_;

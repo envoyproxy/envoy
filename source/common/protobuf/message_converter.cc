@@ -8,14 +8,11 @@
 
 #include "absl/log/absl_check.h"
 #include "google/protobuf/io/zero_copy_stream.h"
-#include "grpc_transcoding/message_reader.h"
 
 namespace Envoy::ProtobufMessage {
 
 namespace {
 using Envoy::Protobuf::io::ZeroCopyInputStream;
-using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
-using ::google::grpc::transcoding::MessageReader;
 } // namespace
 
 MessageConverter::MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory,
@@ -34,7 +31,7 @@ MessageConverter::AccumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
     return absl::FailedPreconditionError("Rejected because internal buffer limits are exceeded.");
   }
 
-  auto parsed_output = MaybeParseGrpcMessage(*factory_, parsing_buffer_);
+  absl::StatusOr<ParseGrpcMessageOutput> parsed_output = ParseGrpcMessage(*factory_, parsing_buffer_);
   if (!parsed_output.ok()) {
     return parsed_output.status();
   }
