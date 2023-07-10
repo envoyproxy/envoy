@@ -48,7 +48,6 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lambda_sanitize_host_header")) {
     headers.setHost("lambda");
   }
-  
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
