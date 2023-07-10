@@ -78,6 +78,7 @@ TEST_F(AwsLambdaFilterTest, HostHeaderLambdaTrue) {
 }
 
 TEST_F(AwsLambdaFilterTest, HostHeaderLambdaFalse) {
+  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   if Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lambda_sanitize_host_header",false) {
     Http::TestRequestHeaderMapImpl headers;
     EXPECT_STRNE(headers.getHostValue(), "lambda");
