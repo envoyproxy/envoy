@@ -694,7 +694,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 TEST_P(ListenerMultiAddressesIntegrationTest,
        MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
 // https://github.com/envoyproxy/envoy/issues/26336
-#if defined(__arm64__)
+#if defined(__aarch64__)
   return;
 #endif
   on_server_init_function_ = [&]() {
