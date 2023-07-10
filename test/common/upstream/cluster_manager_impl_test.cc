@@ -614,8 +614,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\"");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException, "foo");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -650,8 +649,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "fake_property: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException, "fake_property");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {

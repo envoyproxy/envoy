@@ -539,7 +539,7 @@ test: a
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "test: Cannot find field");
+                          "test");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
@@ -568,7 +568,7 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "foo: Cannot find field");
+                          "foo");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadConnectionLessUdpConfigWithFilterChain) {

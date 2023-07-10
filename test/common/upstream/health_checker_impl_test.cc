@@ -6397,47 +6397,62 @@ TEST(HealthCheckEventLoggerImplTest, All) {
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\",\"ipv4_compat\":false}},"
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
-                         "\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+                         "cluster\",\"add_healthy_event\":{\"first_check\":false},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":"
+                         "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+                         "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
                          "\"first_check\":false},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
                             false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"degraded_healthy_host\":{},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"degraded_healthy_host\":{},"
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"no_longer_degraded_host\":{},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"no_longer_degraded_host\":{},"
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
-
 // Validate that the proto constraints don't allow zero length edge durations.
 TEST(HealthCheckProto, Validation) {
   {
