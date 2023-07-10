@@ -8,6 +8,8 @@ import (
 )
 
 type filter struct {
+	api.DefaultStreamFilter
+
 	callbacks api.FilterCallbackHandler
 	path      string
 	config    *config
@@ -39,26 +41,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	return api.Continue
 }
 
-func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
-	return api.Continue
-}
-
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
 	header.Set("Rsp-Header-From-Go", "bar-test")
 	return api.Continue
-}
-
-func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) OnDestroy(reason api.DestroyReason) {
 }
