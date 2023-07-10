@@ -30,7 +30,7 @@ CreateApiKeyRequest GetCreateApiKeyRequest() {
   return req;
 }
 
-TEST(MaybeParseGrpcMessage, ParseSingleMessageSingleFrame) {
+TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
@@ -41,7 +41,7 @@ TEST(MaybeParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Single message is parsed.
   Envoy::Buffer::OwnedImpl request_in;
   request_in.move(*request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
@@ -53,7 +53,7 @@ TEST(MaybeParseGrpcMessage, ParseSingleMessageSingleFrame) {
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
-TEST(MaybeParseGrpcMessage, ParseSingleMessageSplitFrames) {
+TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   constexpr uint start_data_size = 3;
   constexpr uint middle_data_size = 4;
 
@@ -77,15 +77,15 @@ TEST(MaybeParseGrpcMessage, ParseSingleMessageSplitFrames) {
   // are buffered internally.
   Envoy::Buffer::OwnedImpl request_in;
   request_in.move(start_request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 
   request_in.move(middle_request_data);
-  ASSERT_OK_AND_ASSIGN(parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 
   request_in.move(end_request_data);
-  ASSERT_OK_AND_ASSIGN(parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
@@ -97,7 +97,7 @@ TEST(MaybeParseGrpcMessage, ParseSingleMessageSplitFrames) {
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
-TEST(MaybeParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
+TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   Envoy::Buffer::OwnedImpl request_out;
 
   // Setup request data.
@@ -111,7 +111,7 @@ TEST(MaybeParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   // Multiple messages are parsed individually.
   auto request_in = std::make_unique<Envoy::Buffer::OwnedImpl>();
   request_in->move(*request_data1);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output1, MaybeParseGrpcMessage(factory, *request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output1, ParseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output1.needs_more_data);
   ASSERT_NE(parsed_output1.message, nullptr);
   ASSERT_NE(parsed_output1.owned_bytes, nullptr);
@@ -122,7 +122,7 @@ TEST(MaybeParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   // parsed (for the next message).
   request_in = std::make_unique<Envoy::Buffer::OwnedImpl>();
   request_in->move(*request_data2);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output2, MaybeParseGrpcMessage(factory, *request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output2, ParseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output2.needs_more_data);
   ASSERT_NE(parsed_output2.message, nullptr);
   ASSERT_NE(parsed_output2.owned_bytes, nullptr);
@@ -133,14 +133,14 @@ TEST(MaybeParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request, request});
 }
 
-TEST(MaybeParseGrpcMessage, ParseNeedsMoreData) {
+TEST(ParseGrpcMessage, ParseNeedsMoreData) {
   Envoy::Buffer::OwnedImpl request_in;
 
   // No data to parse.
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 }
 
@@ -156,7 +156,7 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
 
   // Single message is parsed, but `request_out` not provided.
   request_in.move(*request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
@@ -172,7 +172,7 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
-TEST(MaybeParseGrpcMessage, ParseZeroLengthMessage) {
+TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
   Envoy::Buffer::OwnedImpl request_in;
   auto delimiter = SizeToDelimiter(0);
   ASSERT_OK(delimiter);
@@ -183,7 +183,7 @@ TEST(MaybeParseGrpcMessage, ParseZeroLengthMessage) {
   };
 
   // Single message (of length 0) to be parsed.
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, MaybeParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
