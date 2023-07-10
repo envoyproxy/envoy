@@ -86,22 +86,6 @@ TEST_F(DlbConnectionBalanceFactoryTest, MockDetectDlbDevice) {
   TestEnvironment::removePath(dlb_path);
 }
 
-TEST_F(DlbConnectionBalanceFactoryTest, Fallback) {
-  DlbConnectionBalanceFactory factory;
-  const std::string& test_message = "this is a test for dlb";
-  factory.fallback_policy =
-      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::NopConnectionBalance;
-  EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("error: {}, fallback to Nop Connection Balance", test_message),
-                      factory.fallback(test_message));
-
-  factory.fallback_policy =
-      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::ExactConnectionBalance;
-  EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("error: {}, fallback to Exact Connection Balance", test_message),
-                      factory.fallback(test_message));
-}
-
 #ifndef DLB_DISABLED
 
 using testing::HasSubstr;
@@ -118,6 +102,22 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeFromDefaultProto) {
                              EnvoyException, HasSubstr("no available dlb hardware"));
 }
 
+TEST_F(DlbConnectionBalanceFactoryTest, MakeFromNopFallbackProto) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  DlbConnectionBalanceFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  dlb.set_fallback_policy(
+      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::NopConnectionBalance);
+  makeDlbConnectionBalanceConfig(typed_config, dlb);
+
+  EXPECT_LOG_CONTAINS("warn", "fallback to Nop Connection Balance",
+                      factory.createConnectionBalancerFromProto(typed_config, context));
+  EXPECT_TRUE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+      factory.createConnectionBalancerFromProto(typed_config, context).get()));
+}
+
 TEST_F(DlbConnectionBalanceFactoryTest, MakeFromExactFallbackProto) {
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   DlbConnectionBalanceFactory factory;
@@ -130,6 +130,8 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeFromExactFallbackProto) {
 
   EXPECT_LOG_CONTAINS("warn", "fallback to Exact Connection Balance",
                       factory.createConnectionBalancerFromProto(typed_config, context));
+  EXPECT_TRUE(dynamic_cast<Network::ExactConnectionBalancerImpl*>(
+      factory.createConnectionBalancerFromProto(typed_config, context).get()));
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
