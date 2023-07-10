@@ -45,7 +45,10 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
                       InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
-  headers.setHost("lambda");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lambda_sanitize_host_header")) {
+    headers.setHost("lambda");
+  }
+  
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {

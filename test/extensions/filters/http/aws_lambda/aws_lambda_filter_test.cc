@@ -69,10 +69,19 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
 
-TEST_F(AwsLambdaFilterTest, HostHeaderLambda) {
+TEST_F(AwsLambdaFilterTest, HostHeaderLambdaTrue) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(headers.getHostValue(), "lambda");
+  if  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lambda_sanitize_host_headers",true) {
+    Http::TestRequestHeaderMapImpl headers;
+    EXPECT_STREQ(headers.getHostValue(), "lambda");
+  }
+}
+
+TEST_F(AwsLambdaFilterTest, HostHeaderLambdaFalse) {
+  if Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lambda_sanitize_host_header",false) {
+    Http::TestRequestHeaderMapImpl headers;
+    EXPECT_STRNE(headers.getHostValue(), "lambda");
+  }
 }
 
 /**
