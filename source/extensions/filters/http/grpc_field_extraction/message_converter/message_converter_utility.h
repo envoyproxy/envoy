@@ -12,7 +12,10 @@
 #include "absl/status/statusor.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 using CreateMessageDataFunc =
     std::function<std::unique_ptr<google::protobuf::field_extraction::MessageData>()>;
@@ -47,8 +50,8 @@ struct ParseGrpcMessageOutput {
 // Returns OK with message and buffer owning parsed data if parsing succeeds.
 // Returns OK with flag if more data is needed.
 // Returns error if parsing fails.
-absl::StatusOr<ParseGrpcMessageOutput>
-ParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in);
+absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& factory,
+                                                        Envoy::Buffer::Instance& request_in);
 
 // Creates a gRPC frame header for the given message size.
 absl::StatusOr<std::string> SizeToDelimiter(size_t size);
@@ -56,4 +59,7 @@ absl::StatusOr<std::string> SizeToDelimiter(size_t size);
 // Determines the gRPC message size based on the gRPC frame delimiter.
 absl::StatusOr<uint64_t> DelimiterToSize(const unsigned char* delimiter);
 
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

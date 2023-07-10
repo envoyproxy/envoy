@@ -4,9 +4,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/common.h"
-#include "source/common/protobuf/message_converter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 
-#include "test/common/protobuf/message_converter_test_lib.h"
+#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/status_utility.h"
 
@@ -16,11 +16,14 @@
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 using ::apikeys::CreateApiKeyRequest;
 using ::Envoy::StatusHelpers::StatusIs;
-using Protobuf::field_extraction::CordMessageData;
+using google::protobuf::field_extraction::CordMessageData;
 using Protobuf::util::MessageDifferencer;
 
 // Request body to populate runtime messages with.
@@ -33,7 +36,7 @@ CreateApiKeyRequest GetCreateApiKeyRequest() {
 
 std::unique_ptr<CreateMessageDataFunc> Factory() {
   return std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); });
 }
 
 TEST(MessageConverterReadOnly, MessageLengthDoesNotOverflowFrame) {
@@ -78,4 +81,7 @@ TEST(MessageConverterMutable, SingleMessageOverflowMutation) {
 }
 
 } // namespace
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

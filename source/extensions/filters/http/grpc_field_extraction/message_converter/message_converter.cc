@@ -1,4 +1,4 @@
-#include "source/common/protobuf/message_converter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 
 #include <memory>
 #include <utility>
@@ -8,8 +8,12 @@
 
 #include "absl/log/absl_check.h"
 #include "google/protobuf/io/zero_copy_stream.h"
+#include "grpc_transcoding/message_reader.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 namespace {
 using Envoy::Protobuf::io::ZeroCopyInputStream;
@@ -31,7 +35,8 @@ MessageConverter::AccumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
     return absl::FailedPreconditionError("Rejected because internal buffer limits are exceeded.");
   }
 
-  absl::StatusOr<ParseGrpcMessageOutput> parsed_output = ParseGrpcMessage(*factory_, parsing_buffer_);
+  absl::StatusOr<ParseGrpcMessageOutput> parsed_output =
+      ParseGrpcMessage(*factory_, parsing_buffer_);
   if (!parsed_output.ok()) {
     return parsed_output.status();
   }
@@ -149,4 +154,7 @@ uint64_t MessageConverter::BytesBuffered() const {
   return parsing_buffer_.length() + *parsed_bytes_usage_;
 }
 
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

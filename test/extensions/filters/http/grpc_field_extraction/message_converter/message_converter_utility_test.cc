@@ -3,9 +3,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/common.h"
-#include "source/common/protobuf/message_converter_utility.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
 
-#include "test/common/protobuf/message_converter_test_lib.h"
+#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/status_utility.h"
 
@@ -16,7 +16,10 @@
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::CreateApiKeyRequest;
@@ -34,12 +37,12 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
   // Single message is parsed.
-  Envoy::Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl request_in;
   request_in.move(*request_data);
   ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
@@ -47,7 +50,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
 
   // Single message is correctly preserved.
-  Envoy::Buffer::OwnedImpl request_out;
+  Buffer::OwnedImpl request_out;
   request_out.move(parsed_output.frame_header);
   request_out.move(*parsed_output.owned_bytes);
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
@@ -59,15 +62,15 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
 
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
 
   // Split into multiple buffers.
-  Envoy::Buffer::OwnedImpl start_request_data;
-  Envoy::Buffer::OwnedImpl middle_request_data;
-  Envoy::Buffer::OwnedImpl end_request_data;
+  Buffer::OwnedImpl start_request_data;
+  Buffer::OwnedImpl middle_request_data;
+  Buffer::OwnedImpl end_request_data;
   start_request_data.move(*request_data, start_data_size);
   middle_request_data.move(*request_data, middle_data_size);
   end_request_data.move(*request_data);
@@ -75,7 +78,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
 
   // Function under test. First 2 calls do not have the entire message, so they
   // are buffered internally.
-  Envoy::Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl request_in;
   request_in.move(start_request_data);
   ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
@@ -91,25 +94,25 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
 
   // When complete, data is preserved.
-  Envoy::Buffer::OwnedImpl request_out;
+  Buffer::OwnedImpl request_out;
   request_out.move(parsed_output.frame_header);
   request_out.move(*parsed_output.owned_bytes);
   CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
 TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
-  Envoy::Buffer::OwnedImpl request_out;
+  Buffer::OwnedImpl request_out;
 
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
-  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request);
 
   // Multiple messages are parsed individually.
-  auto request_in = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  auto request_in = std::make_unique<Buffer::OwnedImpl>();
   request_in->move(*request_data1);
   ASSERT_OK_AND_ASSIGN(auto parsed_output1, ParseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output1.needs_more_data);
@@ -120,7 +123,7 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
 
   // Caller is expected to re-create transcoder objects once a message is
   // parsed (for the next message).
-  request_in = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  request_in = std::make_unique<Buffer::OwnedImpl>();
   request_in->move(*request_data2);
   ASSERT_OK_AND_ASSIGN(auto parsed_output2, ParseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output2.needs_more_data);
@@ -134,24 +137,24 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
 }
 
 TEST(ParseGrpcMessage, ParseNeedsMoreData) {
-  Envoy::Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl request_in;
 
   // No data to parse.
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
   ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 }
 
 TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
-  Envoy::Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl request_in;
 
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
 
   // Single message is parsed, but `request_out` not provided.
@@ -162,7 +165,7 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
 
   // Function under test used to fill in `request_out`.
-  Envoy::Buffer::OwnedImpl request_out;
+  Buffer::OwnedImpl request_out;
   ASSERT_OK_AND_ASSIGN(std::string delimiter, SizeToDelimiter(parsed_output.message->Size()));
   EXPECT_EQ(delimiter.length(), kGrpcDelimiterByteSize);
   request_out.add(delimiter);
@@ -173,13 +176,13 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
 }
 
 TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
-  Envoy::Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl request_in;
   auto delimiter = SizeToDelimiter(0);
   ASSERT_OK(delimiter);
   EXPECT_EQ(delimiter->length(), kGrpcDelimiterByteSize);
   request_in.add(*delimiter);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
   };
 
   // Single message (of length 0) to be parsed.
@@ -192,4 +195,7 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
 }
 
 } // namespace
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

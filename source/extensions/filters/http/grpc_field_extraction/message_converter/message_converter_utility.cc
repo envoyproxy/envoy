@@ -1,4 +1,4 @@
-#include "source/common/protobuf/message_converter_utility.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
 
 #include <limits>
 #include <memory>
@@ -9,7 +9,10 @@
 #include "absl/log/absl_check.h"
 #include "grpc_transcoding/message_reader.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 namespace {
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
@@ -17,8 +20,8 @@ using ::google::grpc::transcoding::MessageAndGrpcFrame;
 using ::google::grpc::transcoding::MessageReader;
 } // namespace
 
-absl::StatusOr<ParseGrpcMessageOutput>
-ParseGrpcMessage(CreateMessageDataFunc& factory, Envoy::Buffer::Instance& request_in) {
+absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& factory,
+                                                        Envoy::Buffer::Instance& request_in) {
   // Parse the gRPC frame header.
   if (request_in.length() < kGrpcDelimiterByteSize) {
     ENVOY_LOG_MISC(info, "Need more data for gRPC frame header parsing. Current size={}",
@@ -124,4 +127,7 @@ absl::StatusOr<uint64_t> DelimiterToSize(const unsigned char* delimiter) {
   size = size | static_cast<unsigned>(delimiter[4]);
   return size;
 }
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

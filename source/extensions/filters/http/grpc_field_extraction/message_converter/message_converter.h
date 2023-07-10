@@ -2,12 +2,15 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-#include "source/common/protobuf/message_converter_utility.h"
-#include "source/common/protobuf/stream_message.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/stream_message.h"
 
 #include "proto_field_extraction/message_data/message_data.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 // MessageConverter is an object that allows conversion from Envoy's gRPC Buffer
 // -> StreamMetadata -> Envoy's gRPC Buffer. API usage example:
@@ -36,9 +39,9 @@ public:
   explicit MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory)
       : MessageConverter(std::move(factory), std::numeric_limits<uint32_t>::max()) {}
 
-   MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory, uint32_t buffer_limit);
+  MessageConverter(std::unique_ptr<CreateMessageDataFunc> factory, uint32_t buffer_limit);
 
-    // MessageConverter is neither copyable nor movable.
+  // MessageConverter is neither copyable nor movable.
   MessageConverter(const MessageConverter&) = delete;
   MessageConverter& operator=(const MessageConverter&) = delete;
 
@@ -109,4 +112,7 @@ private:
 
 using MessageConverterPtr = std::unique_ptr<MessageConverter>;
 
-} // namespace Envoy::ProtobufMessage
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

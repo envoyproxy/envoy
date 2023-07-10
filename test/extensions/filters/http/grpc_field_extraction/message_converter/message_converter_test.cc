@@ -8,9 +8,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/common.h"
-#include "source/common/protobuf/message_converter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 
-#include "test/common/protobuf/message_converter_test_lib.h"
+#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/status_utility.h"
 
@@ -22,14 +22,17 @@
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
-namespace Envoy::ProtobufMessage {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::CreateApiKeyRequest;
-using ::Envoy::StatusHelpers::IsOkAndHolds;
-using ::Envoy::StatusHelpers::StatusIs;
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
 using Protobuf::util::MessageDifferencer;
+using StatusHelpers::IsOkAndHolds;
+using StatusHelpers::StatusIs;
 using ::testing::Bool;
 using ::testing::Combine;
 using ::testing::Values;
@@ -84,27 +87,27 @@ std::vector<CreateApiKeyRequest> CreateRequestMessages(int num_requests, int mes
 
 // Create buffers with each buffer contains exactly 1 full gRPC frame. 1 buffer
 // per request message.
-std::vector<Envoy::Buffer::InstancePtr>
+std::vector<Buffer::InstancePtr>
 CreateOneFramePerBuffer(const std::vector<CreateApiKeyRequest>& request_messages) {
-  std::vector<Envoy::Buffer::InstancePtr> buffers;
+  std::vector<Buffer::InstancePtr> buffers;
   buffers.reserve(request_messages.size());
   for (auto& request_message : request_messages) {
-    buffers.emplace_back(Envoy::Grpc::Common::serializeToGrpcFrame(request_message));
+    buffers.emplace_back(Grpc::Common::serializeToGrpcFrame(request_message));
   }
   return buffers;
 }
 
 // Creates a single buffer that contains all request data.
 // There is no guarantee on the slice format in the buffer due to internal
-// optimizations in the `Envoy::Buffer::move` API.
-std::vector<Envoy::Buffer::InstancePtr>
-ConsolidateBuffers(const std::vector<Envoy::Buffer::InstancePtr> request_buffers) {
-  Envoy::Buffer::InstancePtr consolidated_buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+// optimizations in the `Buffer::move` API.
+std::vector<Buffer::InstancePtr>
+ConsolidateBuffers(const std::vector<Buffer::InstancePtr> request_buffers) {
+  Buffer::InstancePtr consolidated_buffer = std::make_unique<Buffer::OwnedImpl>();
   for (auto& request_buffer : request_buffers) {
     consolidated_buffer->move(*request_buffer);
   }
 
-  std::vector<Envoy::Buffer::InstancePtr> buffers;
+  std::vector<Buffer::InstancePtr> buffers;
   buffers.push_back(std::move(consolidated_buffer));
   return buffers;
 }
@@ -115,10 +118,10 @@ ConsolidateBuffers(const std::vector<Envoy::Buffer::InstancePtr> request_buffers
 // frames and messages being split across multiple buffers.
 //
 // Input buffers should be a single consolidated buffer.
-std::vector<Envoy::Buffer::InstancePtr>
-ConsolidateBuffersIntoSplitFrames(const std::vector<Envoy::Buffer::InstancePtr> request_buffers,
+std::vector<Buffer::InstancePtr>
+ConsolidateBuffersIntoSplitFrames(const std::vector<Buffer::InstancePtr> request_buffers,
                                   int num_splits) {
-  std::vector<Envoy::Buffer::InstancePtr> buffers;
+  std::vector<Buffer::InstancePtr> buffers;
   buffers.reserve(num_splits);
 
   // Calculate how much data we need for each buffer.
@@ -130,7 +133,7 @@ ConsolidateBuffersIntoSplitFrames(const std::vector<Envoy::Buffer::InstancePtr> 
   // 1 byte to each buffer).
   if (data_per_buffer == 0) {
     while (request_buffers[0]->length() > 0) {
-      buffers.push_back(std::make_unique<Envoy::Buffer::OwnedImpl>());
+      buffers.push_back(std::make_unique<Buffer::OwnedImpl>());
       buffers.back()->move(*request_buffers[0], 1);
     }
     return buffers;
@@ -138,7 +141,7 @@ ConsolidateBuffersIntoSplitFrames(const std::vector<Envoy::Buffer::InstancePtr> 
 
   // Move enough data into each individual buffer.
   for (int i = 0; i < num_splits; i++) {
-    buffers.push_back(std::make_unique<Envoy::Buffer::OwnedImpl>());
+    buffers.push_back(std::make_unique<Buffer::OwnedImpl>());
     buffers.back()->move(*request_buffers[0], data_per_buffer);
   }
 
@@ -150,8 +153,8 @@ ConsolidateBuffersIntoSplitFrames(const std::vector<Envoy::Buffer::InstancePtr> 
 // Creates a single buffer that contains a single slice with all request data.
 // The slice has an allocation that matches the exact size all the gRPC request
 // data.
-std::vector<Envoy::Buffer::InstancePtr> ConsolidateBuffersSingleSliceExactAlloc(
-    const std::vector<Envoy::Buffer::InstancePtr> request_buffers) {
+std::vector<Buffer::InstancePtr>
+ConsolidateBuffersSingleSliceExactAlloc(const std::vector<Buffer::InstancePtr> request_buffers) {
   // Calculate size we need to allocate for the single slice.
   uint64_t alloc_size = 0;
   for (auto& request_buffer : request_buffers) {
@@ -159,7 +162,7 @@ std::vector<Envoy::Buffer::InstancePtr> ConsolidateBuffersSingleSliceExactAlloc(
   }
 
   // Make reservation.
-  Envoy::Buffer::InstancePtr consolidated_buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  Buffer::InstancePtr consolidated_buffer = std::make_unique<Buffer::OwnedImpl>();
   auto reservation = consolidated_buffer->reserveSingleSlice(alloc_size);
   EXPECT_GE(reservation.slice().len_, alloc_size);
 
@@ -173,16 +176,16 @@ std::vector<Envoy::Buffer::InstancePtr> ConsolidateBuffersSingleSliceExactAlloc(
 
   // Finalize and return.
   reservation.commit(alloc_size);
-  std::vector<Envoy::Buffer::InstancePtr> buffers;
+  std::vector<Buffer::InstancePtr> buffers;
   buffers.push_back(std::move(consolidated_buffer));
   return buffers;
 }
 
 // Creates a single buffer that contains exactly 1 slice per request buffer.
 // However, the slices are reserved with large amounts of extra capacity.
-std::vector<Envoy::Buffer::InstancePtr> ConsolidateBuffersSlicePerRequestExtraAlloc(
-    const std::vector<Envoy::Buffer::InstancePtr> request_buffers) {
-  Envoy::Buffer::InstancePtr consolidated_buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+std::vector<Buffer::InstancePtr> ConsolidateBuffersSlicePerRequestExtraAlloc(
+    const std::vector<Buffer::InstancePtr> request_buffers) {
+  Buffer::InstancePtr consolidated_buffer = std::make_unique<Buffer::OwnedImpl>();
 
   // Copy each slice from each individual buffer into a new (larger)
   // reservation.
@@ -195,7 +198,7 @@ std::vector<Envoy::Buffer::InstancePtr> ConsolidateBuffersSlicePerRequestExtraAl
     reservation.commit(single_slice_request_data->length());
   }
 
-  std::vector<Envoy::Buffer::InstancePtr> buffers;
+  std::vector<Buffer::InstancePtr> buffers;
   buffers.push_back(std::move(consolidated_buffer));
   return buffers;
 }
@@ -247,7 +250,7 @@ void BatchMutateStreamMessages(const std::vector<std::unique_ptr<StreamMessage>>
 
 std::unique_ptr<CreateMessageDataFunc> Factory() {
   return std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); });
 }
 
 // Base class that all tests in this file inherit from.
@@ -265,7 +268,7 @@ class MessageConverterReadOnlyBehavior : public MessageConverterTest {};
 
 TEST_F(MessageConverterReadOnlyBehavior, SingleMessageSingleFrame) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
   // Function under test.
   MessageConverter converter(Factory());
@@ -291,12 +294,12 @@ TEST_F(MessageConverterReadOnlyBehavior, SingleMessageSplitFrame) {
   constexpr uint middle_data_size = 4;
 
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
   // Split into multiple buffers.
-  Envoy::Buffer::OwnedImpl start_request_data;
-  Envoy::Buffer::OwnedImpl middle_request_data;
-  Envoy::Buffer::OwnedImpl end_request_data;
+  Buffer::OwnedImpl start_request_data;
+  Buffer::OwnedImpl middle_request_data;
+  Buffer::OwnedImpl end_request_data;
   start_request_data.move(*request_data, start_data_size);
   middle_request_data.move(*request_data, middle_data_size);
   end_request_data.move(*request_data);
@@ -333,13 +336,13 @@ TEST_F(MessageConverterReadOnlyBehavior, MultipleMessagesSingleFrame) {
   CreateApiKeyRequest request1 = GetCreateApiKeyRequest();
   request1.set_parent(kAlternativeParent);
   CreateApiKeyRequest request2 = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
-  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request1);
+  Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request2);
 
   // Move all data to one buffer.
   MessageConverter converter(Factory());
-  Envoy::Buffer::OwnedImpl request_in;
-  Envoy::Buffer::OwnedImpl final_data;
+  Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl final_data;
   request_in.move(*request_data1);
   request_in.move(*request_data2);
 
@@ -381,13 +384,13 @@ TEST_F(MessageConverterReadOnlyBehavior, MultipleMessagesSingleFrameEndStreamAft
   CreateApiKeyRequest request1 = GetCreateApiKeyRequest();
   request1.set_parent(kAlternativeParent);
   CreateApiKeyRequest request2 = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
-  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request1);
+  Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request2);
 
   // Move all data to one buffer.
   MessageConverter converter(Factory());
-  Envoy::Buffer::OwnedImpl request_in;
-  Envoy::Buffer::OwnedImpl final_data;
+  Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl final_data;
   request_in.move(*request_data1);
   request_in.move(*request_data2);
 
@@ -436,8 +439,8 @@ TEST_F(MessageConverterReadOnlyBehavior, MultipleMessagesSingleFrameEndStreamAft
 
 TEST_F(MessageConverterReadOnlyBehavior, SingleMessageNotEnoughData) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  Envoy::Buffer::OwnedImpl partial_data;
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::OwnedImpl partial_data;
   partial_data.move(*request_data, request_data->length() / 2);
 
   // First call with `end_stream=true` returns error due to not enough data.
@@ -461,7 +464,7 @@ TEST_F(MessageConverterReadOnlyBehavior, SingleMessageNotEnoughData) {
 }
 
 TEST_F(MessageConverterReadOnlyBehavior, EmptyFrame) {
-  Envoy::Buffer::OwnedImpl request_data;
+  Buffer::OwnedImpl request_data;
   request_data.add(kZeroSizeFrame, kGrpcDelimiterByteSize);
 
   // Function under test.
@@ -478,7 +481,7 @@ TEST_F(MessageConverterReadOnlyBehavior, EmptyFrame) {
 }
 
 TEST_F(MessageConverterReadOnlyBehavior, InvalidFrame) {
-  Envoy::Buffer::OwnedImpl request_data;
+  Buffer::OwnedImpl request_data;
   request_data.add(kInvalidFrame, kGrpcDelimiterByteSize);
 
   // Function under test.
@@ -491,13 +494,13 @@ TEST_F(MessageConverterReadOnlyBehavior, OutOfOrderConversionSucceeds) {
   CreateApiKeyRequest request1 = GetCreateApiKeyRequest();
   request1.set_parent(kAlternativeParent);
   CreateApiKeyRequest request2 = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
-  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request1);
+  Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request2);
 
   // Move all data to one buffer.
   MessageConverter converter(Factory());
-  Envoy::Buffer::OwnedImpl request_in;
-  Envoy::Buffer::OwnedImpl final_data;
+  Buffer::OwnedImpl request_in;
+  Buffer::OwnedImpl final_data;
   request_in.move(*request_data1);
   request_in.move(*request_data2);
 
@@ -519,7 +522,7 @@ TEST_F(MessageConverterReadOnlyBehavior, OutOfOrderConversionSucceeds) {
 
 TEST_F(MessageConverterReadOnlyBehavior, OutOfOrderCallsFail) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
   // Get a StreamMessage from the first converter.
   MessageConverter converter1(Factory());
@@ -539,8 +542,8 @@ TEST_F(MessageConverterReadOnlyBehavior, SingleMessageOutOfOrderDrainingWorks) {
   request.set_parent(kAlternativeParent1);
   request.mutable_key()->set_current_key(kAlternativeParent1);
 
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  Envoy::Buffer::OwnedImpl for_split_message;
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::OwnedImpl for_split_message;
 
   for_split_message.move(*request_data, 16 * 1024);
   for_split_message.move(*request_data);
@@ -561,13 +564,13 @@ TEST_F(MessageConverterReadOnlyBehavior, SingleMessageOutOfOrderDrainingWorks) {
 
   // There are three slices in final_data. Move the first two slices to
   // final_data1; move the last slice to final_data2.
-  Envoy::Buffer::OwnedImpl final_data1;
-  Envoy::Buffer::OwnedImpl final_data2;
+  Buffer::OwnedImpl final_data1;
+  Buffer::OwnedImpl final_data2;
   final_data1.move(*final_data, 16384);
   final_data2.move(*final_data);
 
   // Make a copy and release the underlying final_data2.
-  Envoy::Buffer::OwnedImpl copy_out;
+  Buffer::OwnedImpl copy_out;
   copy_out.add(final_data2.toString());
   final_data2.drain(final_data2.length());
 
@@ -584,8 +587,8 @@ TEST_F(MessageConverterReadOnlyBehavior, MultipleMessagesOutOfOrderDrainingWorks
   std::string kAlternativeParent1(16 * 1024, '*');
   request.set_parent(kAlternativeParent1);
   request.mutable_key()->set_current_key(kAlternativeParent1);
-  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request);
 
   // Move all data to one buffer.
   MessageConverter converter(Factory());
@@ -618,7 +621,7 @@ class MessageConverterMutableBehavior : public MessageConverterTest {};
 
 TEST_F(MessageConverterMutableBehavior, SingleMessageEmptyMutation) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
   // Convert to StreamMessage.
   MessageConverter converter(Factory());
@@ -656,7 +659,7 @@ TEST_F(MessageConverterMutableBehavior, SingleMessageEmptyMutation) {
 // - `message_size` is the extra size appended to each input request during
 // mutation.
 void RunConversionOnMessage(MessageConverter& converter,
-                            const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+                            const std::vector<Buffer::InstancePtr>& input_buffers,
                             const std::vector<CreateApiKeyRequest>&, int message_size) {
   ASSERT_FALSE(input_buffers.empty());
   ASSERT_OK_AND_ASSIGN(auto message_data, converter.AccumulateMessage(*input_buffers[0], true));
@@ -684,7 +687,7 @@ void RunConversionOnMessage(MessageConverter& converter,
 // chain.
 // - `message_size` is the extra size appended to each input request during
 // mutation.
-void RunOutOfScope(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunOutOfScope(const std::vector<Buffer::InstancePtr>& input_buffers,
                    const std::vector<CreateApiKeyRequest>& input_requests, int num_conversions,
                    int message_size) {
   ASSERT_EQ(input_buffers.size(), 1);
@@ -716,7 +719,7 @@ void RunOutOfScope(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
 // chain.
 // - `message_size` is the extra size appended to each input request during
 // mutation.
-void RunInScope(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunInScope(const std::vector<Buffer::InstancePtr>& input_buffers,
                 const std::vector<CreateApiKeyRequest>& input_requests, int num_conversions,
                 int message_size) {
   ASSERT_EQ(input_buffers.size(), 1);
@@ -826,7 +829,7 @@ TEST_P(RunChained, ConsolidateBuffersSlicePerRequestExtraAlloc) {
 // creating the buffers.
 // - `message_size` is the extra size appended to each input request during
 // mutation.
-void RunStreaming(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunStreaming(const std::vector<Buffer::InstancePtr>& input_buffers,
                   const std::vector<CreateApiKeyRequest>& input_requests, int message_size) {
   ASSERT_FALSE(input_buffers.empty());
   auto num_messages = input_requests.size();
@@ -856,7 +859,7 @@ void RunStreaming(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
   }
 
   // Ensure there is no lingering data in the converter.
-  Envoy::Buffer::OwnedImpl empty_buffer;
+  Buffer::OwnedImpl empty_buffer;
   ASSERT_OK_AND_ASSIGN(auto final_messages, converter.AccumulateMessages(empty_buffer, true));
   ASSERT_EQ(final_messages.size(), 1);
   EXPECT_TRUE(final_messages[0]->is_final_message());
@@ -877,10 +880,10 @@ void RunStreaming(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
 // wants.
 // - `output_data` is an output variable that will contain all the converted
 // back data after (for verification by caller).
-void RunBatch(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunBatch(const std::vector<Buffer::InstancePtr>& input_buffers,
               const std::vector<CreateApiKeyRequest>& input_requests,
               const std::vector<CreateApiKeyRequest>&, int message_size,
-              std::vector<Envoy::Buffer::InstancePtr>& output_data) {
+              std::vector<Buffer::InstancePtr>& output_data) {
   // Data should outlive the converter.
   std::vector<std::unique_ptr<StreamMessage>> message_datas;
   {
@@ -893,7 +896,7 @@ void RunBatch(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
     }
 
     // Ensure there is no lingering data in the converter.
-    Envoy::Buffer::OwnedImpl empty_buffer;
+    Buffer::OwnedImpl empty_buffer;
     ASSERT_OK_AND_ASSIGN(auto final_messages, converter.AccumulateMessages(empty_buffer, true));
     ASSERT_EQ(final_messages.size(), 1);
     EXPECT_TRUE(final_messages[0]->is_final_message());
@@ -915,12 +918,12 @@ void RunBatch(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
   }
 }
 
-void RunBatchAndVerifyInOrder(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunBatchAndVerifyInOrder(const std::vector<Buffer::InstancePtr>& input_buffers,
                               const std::vector<CreateApiKeyRequest>& input_requests,
                               int message_size) {
   auto num_messages = input_requests.size();
   auto output_requests = CreateRequestMessages(num_messages, message_size, true);
-  std::vector<Envoy::Buffer::InstancePtr> output_data;
+  std::vector<Buffer::InstancePtr> output_data;
   output_data.reserve(num_messages);
 
   // Run test.
@@ -928,7 +931,7 @@ void RunBatchAndVerifyInOrder(const std::vector<Envoy::Buffer::InstancePtr>& inp
 
   // Verification of data integrity in regular destruction order.
   // Buffer data is freed in absolute ordering.
-  Envoy::Buffer::OwnedImpl merged_data;
+  Buffer::OwnedImpl merged_data;
   for (auto& data : output_data) {
     merged_data.move(*data);
   }
@@ -1069,13 +1072,13 @@ std::string IncomingWithStreamingDataParamsString(
 // mutation.
 // - `num_wait_iterations` is the number of conversion iterations to wait
 // before adding in the last half of data (i.e. the incoming streaming data).
-void RunIncomingStreamingData(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunIncomingStreamingData(const std::vector<Buffer::InstancePtr>& input_buffers,
                               const std::vector<CreateApiKeyRequest>& input_requests,
                               int message_size, int num_wait_iterations) {
   ASSERT_FALSE(input_buffers.empty());
 
-  Envoy::Buffer::OwnedImpl first_half_requests;
-  Envoy::Buffer::OwnedImpl last_half_requests;
+  Buffer::OwnedImpl first_half_requests;
+  Buffer::OwnedImpl last_half_requests;
   first_half_requests.move(*input_buffers[0], input_buffers[0]->length() / 2);
   last_half_requests.move(*input_buffers[0]);
 
@@ -1111,7 +1114,7 @@ void RunIncomingStreamingData(const std::vector<Envoy::Buffer::InstancePtr>& inp
   }
 
   // Ensure there is no lingering data in the converter.
-  Envoy::Buffer::OwnedImpl empty_buffer;
+  Buffer::OwnedImpl empty_buffer;
   ASSERT_OK_AND_ASSIGN(auto final_messages, converter.AccumulateMessages(empty_buffer, true));
   ASSERT_EQ(final_messages.size(), 1);
   EXPECT_TRUE(final_messages[0]->is_final_message());
@@ -1145,12 +1148,12 @@ std::string RunOutOfOrderDrainParamsString(
                       std::get<1>(info.param));
 }
 
-void RunBatchAndDrainBackwards(const std::vector<Envoy::Buffer::InstancePtr>& input_buffers,
+void RunBatchAndDrainBackwards(const std::vector<Buffer::InstancePtr>& input_buffers,
                                const std::vector<CreateApiKeyRequest>& input_requests,
                                int message_size) {
   auto num_messages = input_requests.size();
   auto output_requests = CreateRequestMessages(num_messages, message_size, true);
-  std::vector<Envoy::Buffer::InstancePtr> output_data;
+  std::vector<Buffer::InstancePtr> output_data;
   output_data.reserve(num_messages);
 
   // Run test.
@@ -1244,4 +1247,8 @@ INSTANTIATE_TEST_SUITE_P(MessageConverterDataIntegrity, RunWithIncomingStreaming
                                  ),
                          IncomingWithStreamingDataParamsString);
 } // namespace
-} // namespace Envoy::ProtobufMessage
+
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
