@@ -85,7 +85,10 @@ func (f *filter) fail(msg string, a ...any) api.StatusType {
 }
 
 func (f *filter) sendLocalReply(phase string) api.StatusType {
-	headers := make(map[string]string)
+	headers := map[string]string{
+		"Content-type": "text/html",
+		"test-phase":   phase,
+	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
 	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
 	return api.LocalReply
