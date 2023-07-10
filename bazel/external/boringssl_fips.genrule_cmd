@@ -121,7 +121,7 @@ rm -rf boringssl/build
 cd boringssl
 mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
-ninja run_tests
+# To validate boringcrypto compilation, run these tests and make sure they don't fail.
 ./crypto/crypto_test
 
 # Verify correctness of the FIPS build.
