@@ -72,8 +72,8 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_EQ(metadata->DebugString(), decoded_resource.metadata()->DebugString());
   }
 
-  // To verify the metadata is decoded as expected for fromResoure variant
-  // with the ProtobufWkt::Any& input.
+  // To verify the metadata is decoded as expected for the fromResource variant
+  // with ProtobufWkt::Any& input.
   {
     envoy::service::discovery::v3::Resource resource_wrapper;
     resource_wrapper.set_name("real_name");
