@@ -289,8 +289,8 @@ TEST_F(MessageConverterReadOnlyBehavior, SingleMessageSingleFrame) {
 }
 
 TEST_F(MessageConverterReadOnlyBehavior, SingleMessageSplitFrame) {
-  constexpr uint start_data_size = 3;
-  constexpr uint middle_data_size = 4;
+  const uint32_t start_data_size = 3;
+  const uint32_t middle_data_size = 4;
 
   CreateApiKeyRequest request = getCreateApiKeyRequest();
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
