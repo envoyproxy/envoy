@@ -76,11 +76,11 @@ RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+RUNTIME_GUARD(envoy_reloadable_features_lambda_sanitize_host_header);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
-RUNTIME_GUARD(envoy_reloadable_features_lambda_sanitize_host_header);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
