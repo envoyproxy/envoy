@@ -77,7 +77,7 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   return nullptr;
 }
 
-HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks&,
+HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks*,
                            Router::Route&, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
                            StreamInfo::StreamInfo& downstream_info)
@@ -261,11 +261,11 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (type_ == Http::CodecType::HTTP1) {
     upstream_ =
-        std::make_unique<Http1Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
+        std::make_unique<Http1Upstream>(*this, upstream_callbacks_, decoder_filter_callbacks_,
                                         *(route_), config_, downstream_info_);
   } else {
     upstream_ =
-        std::make_unique<Http2Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
+        std::make_unique<Http2Upstream>(*this, upstream_callbacks_, decoder_filter_callbacks_,
                                         *(route_), config_, downstream_info_);
   }
 
@@ -317,7 +317,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 
 CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                                   Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                                   Http::StreamDecoderFilterCallbacks* decoder_callbacks,
                                    Router::Route& route, const TunnelingConfigHelper& config,
                                    StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
@@ -414,7 +414,7 @@ void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_
 
 Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
                              Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                             Http::StreamDecoderFilterCallbacks* decoder_callbacks,
                              Router::Route& route, const TunnelingConfigHelper& config,
                              StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
@@ -457,7 +457,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
 Http1Upstream::Http1Upstream(HttpConnPool& http_conn_pool,
                              Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                             Http::StreamDecoderFilterCallbacks* decoder_callbacks,
                              Router::Route& route, const TunnelingConfigHelper& config,
                              StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}

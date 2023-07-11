@@ -188,7 +188,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
 
 protected:
-  HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+  HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks* decoder_callbacks,
                Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void virtual resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
@@ -258,7 +258,7 @@ private:
 class Http1Upstream : public HttpUpstream {
 public:
   Http1Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
+                Http::StreamDecoderFilterCallbacks* decoder_callbacks, Router::Route& route,
                 const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   ~Http1Upstream() override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -271,7 +271,7 @@ public:
 class Http2Upstream : public HttpUpstream {
 public:
   Http2Upstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
+                Http::StreamDecoderFilterCallbacks* decoder_callbacks, Router::Route& route,
                 const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   ~Http2Upstream() override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -287,7 +287,7 @@ public:
 class CombinedUpstream : public HttpUpstream {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                   Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
+                   Http::StreamDecoderFilterCallbacks* decoder_callbacks, Router::Route& route,
                    const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   ~CombinedUpstream() override;
   void setRouterUpstreamRequest(UpstreamRequestPtr) override;
