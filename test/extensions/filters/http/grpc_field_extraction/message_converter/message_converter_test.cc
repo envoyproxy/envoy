@@ -250,7 +250,7 @@ void BatchMutateStreamMessages(const std::vector<std::unique_ptr<StreamMessage>>
 
 std::unique_ptr<CreateMessageDataFunc> Factory() {
   return std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 }
 
 // Base class that all tests in this file inherit from.
@@ -696,7 +696,7 @@ void RunOutOfScope(const std::vector<Buffer::InstancePtr>& input_buffers,
   auto output_requests = CreateRequestMessages(1, message_size, true);
 
   for (int i = 0; i < num_conversions; i++) {
-    // Emulate conversion by filter adaptor. It is testing "Out of scope"
+    // It is testing "Out of scope"
     // since each converter is destructed every iteration.
     MessageConverter converter(Factory());
     RunConversionOnMessage(converter, input_buffers, input_requests, message_size);

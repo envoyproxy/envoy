@@ -30,7 +30,6 @@ message ApiKey {
   // The location of the key.
   string location = 6;
 
-  // The KMS key name of the key.
   string kms_key = 7;
 
   // The expiration time of the key

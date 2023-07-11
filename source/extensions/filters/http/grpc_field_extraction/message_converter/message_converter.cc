@@ -7,7 +7,6 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "absl/log/absl_check.h"
-#include "google/protobuf/io/zero_copy_stream.h"
 #include "grpc_transcoding/message_reader.h"
 
 namespace Envoy {

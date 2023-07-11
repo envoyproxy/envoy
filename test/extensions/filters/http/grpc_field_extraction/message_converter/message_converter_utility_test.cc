@@ -37,7 +37,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
 
@@ -64,7 +64,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
 
   // Split into multiple buffers.
@@ -106,7 +106,7 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   // Setup request data.
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
   Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request);
   Buffer::InstancePtr request_data2 = Grpc::Common::serializeToGrpcFrame(request);
@@ -141,7 +141,7 @@ TEST(ParseGrpcMessage, ParseNeedsMoreData) {
 
   // No data to parse.
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
   ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
@@ -154,7 +154,7 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
   CreateApiKeyRequest request = GetCreateApiKeyRequest();
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
 
   // Single message is parsed, but `request_out` not provided.
@@ -182,7 +182,7 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
   EXPECT_EQ(delimiter->length(), kGrpcDelimiterByteSize);
   request_in.add(*delimiter);
   CreateMessageDataFunc factory = []() {
-    return std::make_unique<google::protobuf::field_extraction::CordMessageData>();
+    return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
 
   // Single message (of length 0) to be parsed.
