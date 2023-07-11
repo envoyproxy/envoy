@@ -54,7 +54,7 @@ absl::StatusOr<ParseGrpcMessageOutput> parseGrpcMessage(CreateMessageDataFunc& f
                                                         Envoy::Buffer::Instance& request_in);
 
 // Creates a gRPC frame header for the given message size.
-absl::StatusOr<std::string> sizeToDelimiter(size_t size);
+absl::StatusOr<std::string> sizeToDelimiter(uint64_t size);
 
 // Determines the gRPC message size based on the gRPC frame delimiter.
 absl::StatusOr<uint64_t> delimiterToSize(const unsigned char* delimiter);

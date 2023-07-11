@@ -85,7 +85,7 @@ absl::StatusOr<ParseGrpcMessageOutput> parseGrpcMessage(CreateMessageDataFunc& f
   return output;
 }
 
-absl::StatusOr<std::string> sizeToDelimiter(size_t size) {
+absl::StatusOr<std::string> sizeToDelimiter(uint64_t size) {
   if (size > std::numeric_limits<uint32_t>::max()) {
     return absl::FailedPreconditionError(absl::StrCat(
         "Current input message size ", size, " is larger than max allowed gRPC message length of ",

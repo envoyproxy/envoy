@@ -49,3 +49,11 @@ envoy_cc_test(
         "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
+
+envoy_cc_test(
+    name = "stream_message_test",
+    srcs = ["stream_message_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/grpc_field_extraction/message_converter:stream_message_lib",
+    ],
+)

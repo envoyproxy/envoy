@@ -193,6 +193,14 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
   EXPECT_EQ(parsed_output.owned_bytes->length(), 0);
 }
 
+TEST(SizeToDelimiter, Oversize) {
+  auto delimiter = sizeToDelimiter(std::numeric_limits<uint64_t>::max());
+  ASSERT_FALSE(delimiter.ok());
+  EXPECT_EQ(delimiter.status().ToString(),
+            "FAILED_PRECONDITION: Current input message size 18446744073709551615 is larger than "
+            "max allowed gRPC message length of 4294967295");
+}
+
 } // namespace
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

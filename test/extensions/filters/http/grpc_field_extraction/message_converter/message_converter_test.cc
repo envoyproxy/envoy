@@ -374,6 +374,24 @@ TEST_F(MessageConverterReadOnlyBehavior, MultipleMessagesSingleFrame) {
   EXPECT_EQ(converter.bytesBuffered(), 0);
 }
 
+TEST_F(MessageConverterReadOnlyBehavior, ReachBufferLimit) {
+  CreateApiKeyRequest request1 = getCreateApiKeyRequest();
+  request1.set_parent(kAlternativeParent);
+  Buffer::InstancePtr request_data1 = Grpc::Common::serializeToGrpcFrame(request1);
+
+  // Move all data to one buffer.
+  MessageConverter converter(factory(), 0);
+  Buffer::OwnedImpl request_in;
+  request_in.move(*request_data1);
+
+  // Convert the message.
+  // The converter is set with buffer_limit=0 so the accumlateMessage should fail.
+  auto result = converter.accumulateMessage(request_in, true);
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().ToString(),
+            "FAILED_PRECONDITION: Rejected because internal buffer limits are exceeded.");
+}
+
 // Tests a streaming RPC request with only data (no trailers) where the stream
 // ends after the last message is already sent to the upstream.
 // In this case, Envoy calls `decodeData` with `end_stream=true` but an empty
