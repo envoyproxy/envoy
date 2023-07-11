@@ -81,9 +81,10 @@ minor_behavior_changes:
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 - area: aws
   change: |
-    Default sanitize host header prior to direct invocation of a lambda.  This behavior can reverted by setting runtime flag 
-    ``envoy.reloadable_features.lambda_sanitize_host_headers`` to false, in which case requests will retain the originating header to the 
-    AWS invocation lambda API, causing a signature mismatch error to be returned.  This is only applicable when using the Lambda Invocation Filter.
+    Default sanitize host header prior to direct invocation of a lambda.  This behavior can reverted by setting runtime flag
+    ``envoy.reloadable_features.lambda_sanitize_host_headers`` to false, in which case requests will retain the originating header to the
+    AWS invocation lambda API, causing a signature mismatch error to be returned.  This is only applicable when using
+    the Lambda Invocation Filter.
 - area: ext_proc
   change: |
     When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check
@@ -494,3 +495,6 @@ deprecated:
     added :ref:`enable_deferred_creation_stats
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
     support for ClusterTrafficStats.
+- area: aws
+  change: |
+    added runtime key ``envoy_reloadable_features.lambda_sanitize_host_header``
