@@ -21,12 +21,12 @@ gRPC streaming endpoints
 See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
-.. literalinclude:: __include/xds_api/dynamic-resources.yaml
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
    :lines: 14-21
    :linenos:
    :lineno-start: 14
-   :caption: :download:`xds-api-cds-demo.yaml <__include/xds_api/dynamic-resources.yaml>`
+   :caption: :download:`xds-api-cds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
