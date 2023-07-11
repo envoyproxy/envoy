@@ -127,12 +127,11 @@ MessageConverter::convertBackToBuffer(std::unique_ptr<StreamMessage> message) {
   // data reference (no copy).
   const void* data = nullptr;
   int size = 0;
-  Envoy::Buffer::BufferFragmentImpl* last_fragment = nullptr;
   bool is_empty = true;
 
   while (input_stream->Next(&data, &size)) {
     is_empty = false;
-    last_fragment = new Envoy::Buffer::BufferFragmentImpl(data, size, fragment_releasor);
+    auto* last_fragment = new Envoy::Buffer::BufferFragmentImpl(data, size, fragment_releasor);
     output_message->addBufferFragment(*last_fragment);
   }
 
