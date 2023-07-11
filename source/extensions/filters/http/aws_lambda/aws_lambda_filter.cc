@@ -45,6 +45,11 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
                       InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
+  // If the reloadable feature is true (default) sanitize the host header, otherwise do not. This
+  // can be reverted by setting
+  //  the runtime feature flag envoy.reloadable_features.lambda_sanitize_host_headers to false
+  //  This should not cause any negative side effects but if any are seen, please open a github
+  //  issue.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lambda_sanitize_host_header")) {
     headers.setHost("lambda");
   }

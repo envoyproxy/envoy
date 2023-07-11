@@ -69,22 +69,24 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
 
-TEST_F(AwsLambdaFilterTest, HostHeaderLambdaTrue) {
+TEST_F(AwsLambdaFilterTest, HostHeaderSanitized) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  if  Runtime
-      ::maybeSetRuntimeGuard("envoy.reloadable_features.lambda_sanitize_host_headers",true) {
-    Http::TestRequestHeaderMapImpl headers;
-    EXPECT_STREQ(headers.getHostValue(), "lambda");
-  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.lambda_sanitize_host_headers", "true"},
+  });
+
+  EXPECT_STREQ(headers.getHostValue(), "lambda");
 }
 
-TEST_F(AwsLambdaFilterTest, HostHeaderLambdaFalse) {
+TEST_F(AwsLambdaFilterTest, HostHeaderNotSanitized) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  if Runtime
-    ::maybeSetRuntimeGuard("envoy.reloadable_features.lambda_sanitize_host_header",false) {
-    Http::TestRequestHeaderMapImpl headers;
-    EXPECT_STRNE(headers.getHostValue(), "lambda");
-  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.lambda_sanitize_host_headers", "false"},
+  });
+
+  EXPECT_STRNE(headers.getHostValue(), "lambda");
 }
 
 /**
