@@ -85,6 +85,9 @@ public:
   const std::vector<std::string>& expectedClientCertUri() const {
     return expected_client_cert_uri_;
   }
+  const std::vector<std::string>& expectedClientCertIpSans() const {
+    return expected_client_cert_ip_sans_;
+  }
   const std::string& expectedServerStats() const { return expected_server_stats_; }
   bool expectSuccess() const { return expect_success_; }
   Network::Address::IpVersion version() const { return version_; }
@@ -97,6 +100,10 @@ protected:
     expected_client_cert_uri_ = {expected_client_cert_uri};
   }
 
+  void setExpectedClientIpSans(const std::vector<std::string>& expected_client_ip_sans) {
+    expected_client_cert_ip_sans_ = expected_client_ip_sans;
+  }
+
   void setExpectedServerStats(const std::string& expected_server_stats) {
     expected_server_stats_ = expected_server_stats;
   }
@@ -107,6 +114,7 @@ private:
 
   std::string expected_server_stats_;
   std::vector<std::string> expected_client_cert_uri_;
+  std::vector<std::string> expected_client_cert_ip_sans_;
 };
 
 /**
@@ -769,6 +777,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertIpSans(),
+                server_connection->ssl()->ipSansPeerCertificate());
       const SslHandshakerImpl* ssl_socket =
           dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
