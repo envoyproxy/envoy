@@ -160,7 +160,7 @@ TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
 
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
 public:
-  void testFilterFactoryAndFilterWithGoogleGrpcClient(const std::string& ext_authz_config_yaml) {
+  void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
     Http::FilterFactoryCb filter_factory;
     runOnMainBlocking([&]() {
@@ -169,28 +169,6 @@ public:
     });
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .Times(5);
-
-    int request_sent_per_thread = 5;
-    // Initialize address instance to prepare for grpc traffic.
-    initAddress();
-    // Create filter from filter factory per thread and send grpc request.
-    for (int i = 0; i < request_sent_per_thread; i++) {
-      runOnAllWorkersBlocking([&, filter_factory]() {
-        Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
-        testExtAuthzFilter(filter);
-      });
-    }
-    runOnAllWorkersBlocking(
-        [&]() { expectGrpcClientSentRequest(ext_authz_config, request_sent_per_thread); });
-  }
-
-  void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {
-    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
-    Http::FilterFactoryCb filter_factory;
-    runOnMainBlocking([&]() {
-      TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
-      filter_factory = createFilterFactory(ext_authz_config);
-    });
 
     int request_sent_per_thread = 5;
     // Initialize address instance to prepare for grpc traffic.
@@ -263,7 +241,7 @@ TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
       stat_prefix: google
   failure_mode_allow: false
   )EOF";
-  testFilterFactoryAndFilterWithGoogleGrpcClient(ext_authz_config_yaml);
+  testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml);
 }
 
 } // namespace ExtAuthz

@@ -44,11 +44,10 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
           context.clusterManager(), client_config);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
-  } else if (proto_config.grpc_service().has_google_grpc()) {
-    // Google gRPC client.
+  } else {
+    // Envoy or Google gRPC client.
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-
     Config::Utility::checkTransportVersion(proto_config);
     std::shared_ptr<ThreadLocal::TypedSlot<GetGrpcClient>> get_grpc_client =
         std::make_shared<ThreadLocal::TypedSlot<GetGrpcClient>>(context.threadLocal());
@@ -61,20 +60,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                 grpc_service, context.scope(), true);
           }),
           std::chrono::milliseconds(timeout_ms));
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
-    };
-  } else {
-    // Envoy gRPC client.
-    const uint32_t timeout_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    Config::Utility::checkTransportVersion(proto_config);
-    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config,
-                timeout_ms](Http::FilterChainFactoryCallbacks& callbacks) {
-      Grpc::RawAsyncClientSharedPtr raw_client =
-          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              grpc_service, context.scope(), true);
-      auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          raw_client, std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   }
