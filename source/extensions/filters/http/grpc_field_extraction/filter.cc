@@ -212,37 +212,37 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 void Filter::handleExtractionResult() {
   ABSL_DCHECK(extractor_);
 
-  const auto& result = extractor_->GetResult();
+//  const auto& result = extractor_->GetResult();
 
-  absl::flat_hash_map<absl::string_view, google::protobuf::Struct> new_headers;
+//  absl::flat_hash_map<absl::string_view, google::protobuf::Struct> new_headers;
 
-  for (const auto& req_field: result.req_fields) {
-    ABSL_DCHECK(req_field.destination != nullptr);
-
-    // For now, only support injecting extraction results into request headers.
-    ABSL_DCHECK(req_field.destination->has_request_header());
-    auto it = new_headers.find(req_field.destination->request_header());
-    if (it == new_headers.end()) {
-      it = new_headers.insert({req_field.destination->request_header(),
-                               {}}).first;
-    }
-
-    auto* list =
-        (*it->second.mutable_fields())[req_field.field_path].mutable_list_value();
-    for (const auto& value: req_field.values) {
-      list->add_values()->set_string_value(value);
-    }
-  }
-
-  for (const auto& it: new_headers) {
-    ENVOY_STREAM_LOG(debug,
-                     "add request header `{}: {}`",
-                     *decoder_callbacks_,
-                     it.first,
-                     it.second.DebugString());
-    headers_->setCopy(Envoy::Http::LowerCaseString(it.first),
-                      absl::Base64Escape(it.second.SerializeAsString()));
-  }
+//  for (const auto& req_field: result.req_fields) {
+//    ABSL_DCHECK(req_field.destination != nullptr);
+//
+//    // For now, only support injecting extraction results into request headers.
+//    ABSL_DCHECK(req_field.destination->has_request_header());
+//    auto it = new_headers.find(req_field.destination->request_header());
+//    if (it == new_headers.end()) {
+//      it = new_headers.insert({req_field.destination->request_header(),
+//                               {}}).first;
+//    }
+//
+//    auto* list =
+//        (*it->second.mutable_fields())[req_field.field_path].mutable_list_value();
+//    for (const auto& value: req_field.values) {
+//      list->add_values()->set_string_value(value);
+//    }
+//  }
+//
+//  for (const auto& it: new_headers) {
+//    ENVOY_STREAM_LOG(debug,
+//                     "add request header `{}: {}`",
+//                     *decoder_callbacks_,
+//                     it.first,
+//                     it.second.DebugString());
+//    headers_->setCopy(Envoy::Http::LowerCaseString(it.first),
+//                      absl::Base64Escape(it.second.SerializeAsString()));
+//  }
 }
 
 Envoy::Http::FilterFactoryCb

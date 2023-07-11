@@ -17,7 +17,7 @@ using TypeFinder = std::function<const google::protobuf::Type*(const std::string
 struct RequestField {
   absl::string_view field_path;
 
-  const envoy::extensions::filters::http::grpc_field_extraction::v3::RequestFieldExtraction*
+  const envoy::extensions::filters::http::grpc_field_extraction::v3::RequestFieldValueDisposition*
       destination;
 
   // The policy information for the proto field under extraction.

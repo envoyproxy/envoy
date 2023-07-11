@@ -30,7 +30,7 @@ FilterConfig::FilterConfig(
     ExtractorFactory& extractor_factory)
     : proto_config_(proto_config), extractor_factory_(extractor_factory) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
-  if (!descriptor_set.ParseFromString(proto_config_.proto_descriptor_bin())) {
+  if (!descriptor_set.ParseFromString(proto_config_.descriptor_set().inline_bytes())) {
     throw Envoy::EnvoyException("Unable to parse proto descriptor");
   }
 
