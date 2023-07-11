@@ -23,7 +23,7 @@ namespace GrpcFieldExtraction {
 namespace {
 using ::apikeys::CreateApiKeyRequest;
 using ::Envoy::StatusHelpers::StatusIs;
-using google::protobuf::field_extraction::CordMessageData;
+using Protobuf::field_extraction::CordMessageData;
 using Protobuf::util::MessageDifferencer;
 
 // Request body to populate runtime messages with.
@@ -36,7 +36,7 @@ CreateApiKeyRequest GetCreateApiKeyRequest() {
 
 std::unique_ptr<CreateMessageDataFunc> Factory() {
   return std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 }
 
 TEST(MessageConverterReadOnly, MessageLengthDoesNotOverflowFrame) {
