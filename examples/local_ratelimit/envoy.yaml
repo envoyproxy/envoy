@@ -86,9 +86,9 @@ static_resources:
                   denominator: HUNDRED
               filter_enforced:
                 runtime_key: local_rate_limit_enforced
-                default_value:
-                  numerator: 100
-                  denominator: HUNDRED
+                default_value: {}
+                  # numerator: 100
+                  # denominator: HUNDRED
               response_headers_to_add:
               - append_action: OVERWRITE_IF_EXISTS_OR_ADD
                 header:
