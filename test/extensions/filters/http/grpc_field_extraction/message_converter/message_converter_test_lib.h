@@ -21,7 +21,7 @@ namespace GrpcFieldExtraction {
 // Ensures that gRPC data in the Envoy HTTP/2 data streams can be deserialized
 // into the expected messages. Drains the underlying buffer.
 template <class MessageType>
-void CheckSerializedData(Envoy::Buffer::Instance& data,
+void checkSerializedData(Envoy::Buffer::Instance& data,
                          std::vector<MessageType> expected_requests) {
   ::Envoy::Grpc::Decoder grpc_decoder;
   std::vector<::Envoy::Grpc::Frame> frames_after_processing;
@@ -37,7 +37,7 @@ void CheckSerializedData(Envoy::Buffer::Instance& data,
   }
 }
 
-apikeys::CreateApiKeyRequest ParseFromStreamMessage(StreamMessage& msg) {
+apikeys::CreateApiKeyRequest parseFromStreamMessage(StreamMessage& msg) {
   apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
   parsed_request.ParseFromCord(c->Cord());
@@ -46,7 +46,7 @@ apikeys::CreateApiKeyRequest ParseFromStreamMessage(StreamMessage& msg) {
 
 // Serialize the request message into a pre-existing StreamMessage.
 // Serialization overwrites pre-existing date in the buffer.
-void SerializeToStreamMessage(StreamMessage& msg, apikeys::CreateApiKeyRequest& request) {
+void serializeToStreamMessage(StreamMessage& msg, apikeys::CreateApiKeyRequest& request) {
   apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
   request.SerializeToCord(&(c->Cord()));

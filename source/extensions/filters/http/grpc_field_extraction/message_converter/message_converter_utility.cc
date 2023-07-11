@@ -16,11 +16,9 @@ namespace GrpcFieldExtraction {
 
 namespace {
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
-using ::google::grpc::transcoding::MessageAndGrpcFrame;
-using ::google::grpc::transcoding::MessageReader;
 } // namespace
 
-absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& factory,
+absl::StatusOr<ParseGrpcMessageOutput> parseGrpcMessage(CreateMessageDataFunc& factory,
                                                         Envoy::Buffer::Instance& request_in) {
   // Parse the gRPC frame header.
   if (request_in.length() < kGrpcDelimiterByteSize) {
@@ -34,7 +32,7 @@ absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& f
   request_in.copyOut(0, kGrpcDelimiterByteSize, &frame_header);
 
   // Parse the message size.
-  auto message_size_status = DelimiterToSize(frame_header);
+  auto message_size_status = delimiterToSize(frame_header);
   if (!message_size_status.ok()) {
     return message_size_status.status();
   }
@@ -87,7 +85,7 @@ absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& f
   return output;
 }
 
-absl::StatusOr<std::string> SizeToDelimiter(size_t size) {
+absl::StatusOr<std::string> sizeToDelimiter(size_t size) {
   if (size > std::numeric_limits<uint32_t>::max()) {
     return absl::FailedPreconditionError(absl::StrCat(
         "Current input message size ", size, " is larger than max allowed gRPC message length of ",
@@ -109,7 +107,7 @@ absl::StatusOr<std::string> SizeToDelimiter(size_t size) {
   return std::string(reinterpret_cast<const char*>(delimiter), kGrpcDelimiterByteSize);
 }
 
-absl::StatusOr<uint64_t> DelimiterToSize(const unsigned char* delimiter) {
+absl::StatusOr<uint64_t> delimiterToSize(const unsigned char* delimiter) {
   if (delimiter[0] != 0) {
     // We do not support `Compressed-Flag = 1` case.
     return absl::InvalidArgumentError(

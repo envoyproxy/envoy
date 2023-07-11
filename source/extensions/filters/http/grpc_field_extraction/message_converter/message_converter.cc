@@ -24,18 +24,18 @@ MessageConverter::MessageConverter(std::unique_ptr<CreateMessageDataFunc> factor
       parsed_bytes_usage_(std::make_shared<uint64_t>(0)) {}
 
 absl::StatusOr<std::unique_ptr<StreamMessage>>
-MessageConverter::AccumulateMessage(Envoy::Buffer::Instance& data, bool end_stream) {
+MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data, bool end_stream) {
   // Append the input data to buffer that will be parsed.
   parsing_buffer_.move(data);
 
-  ENVOY_LOG_MISC(info, "Checking buffer limits: actual {} > limit {}?", BytesBuffered(),
+  ENVOY_LOG_MISC(info, "Checking buffer limits: actual {} > limit {}?", bytesBuffered(),
                  buffer_limit_);
-  if (BytesBuffered() > buffer_limit_) {
+  if (bytesBuffered() > buffer_limit_) {
     return absl::FailedPreconditionError("Rejected because internal buffer limits are exceeded.");
   }
 
   absl::StatusOr<ParseGrpcMessageOutput> parsed_output =
-      ParseGrpcMessage(*factory_, parsing_buffer_);
+      parseGrpcMessage(*factory_, parsing_buffer_);
   if (!parsed_output.ok()) {
     return parsed_output.status();
   }
@@ -55,9 +55,9 @@ MessageConverter::AccumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
   auto message_data =
       std::make_unique<StreamMessage>(std::move(parsed_output->message),
                                       std::move(parsed_output->owned_bytes), parsed_bytes_usage_);
-  message_data->set_is_first_message(is_first_message_);
+  message_data->setIsFirstMessage(is_first_message_);
   is_first_message_ = false;
-  message_data->set_is_final_message(is_final_message);
+  message_data->setIsFinalMessage(is_final_message);
   conversions_to_message_data_++;
 
   ENVOY_LOG_MISC(info, "len(parsing_buffer_)={}", parsing_buffer_.length());
@@ -69,10 +69,10 @@ MessageConverter::AccumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
 }
 
 absl::StatusOr<std::vector<std::unique_ptr<StreamMessage>>>
-MessageConverter::AccumulateMessages(Envoy::Buffer::Instance& data, bool end_stream) {
+MessageConverter::accumulateMessages(Envoy::Buffer::Instance& data, bool end_stream) {
   std::vector<std::unique_ptr<StreamMessage>> messages;
   while (true) {
-    auto message = AccumulateMessage(data, end_stream);
+    auto message = accumulateMessage(data, end_stream);
     if (!message.ok()) {
       return message.status();
     }
@@ -80,21 +80,21 @@ MessageConverter::AccumulateMessages(Envoy::Buffer::Instance& data, bool end_str
       return messages;
     }
     messages.push_back(std::move(*message));
-    if (messages.back()->is_final_message()) {
+    if (messages.back()->isFinalMessage()) {
       return messages;
     }
   }
 }
 
 absl::StatusOr<Envoy::Buffer::InstancePtr>
-MessageConverter::ConvertBackToBuffer(std::unique_ptr<StreamMessage> message) {
+MessageConverter::convertBackToBuffer(std::unique_ptr<StreamMessage> message) {
   ABSL_DCHECK(message != nullptr);
   conversions_to_envoy_buffer_++;
   if (conversions_to_envoy_buffer_ > conversions_to_message_data_) {
     return absl::FailedPreconditionError(absl::StrCat(
         "Data corruption! Number of conversions to StreamMessage = ", conversions_to_message_data_,
         ", but this is the ", conversions_to_envoy_buffer_,
-        " ConvertBackToBuffer call. Perhaps this StreamMessage"
+        " convertBackToBuffer call. Perhaps this StreamMessage"
         "belongs to a different MessageConverter?"));
   }
 
@@ -106,7 +106,7 @@ MessageConverter::ConvertBackToBuffer(std::unique_ptr<StreamMessage> message) {
 
   // Create gRPC frame header and add to output buffer.
   const uint64_t out_message_size = message->size();
-  auto delimiter = SizeToDelimiter(out_message_size);
+  auto delimiter = sizeToDelimiter(out_message_size);
   if (!delimiter.ok()) {
     return delimiter.status();
   }
@@ -148,7 +148,7 @@ MessageConverter::ConvertBackToBuffer(std::unique_ptr<StreamMessage> message) {
   return output_message;
 }
 
-uint64_t MessageConverter::BytesBuffered() const {
+uint64_t MessageConverter::bytesBuffered() const {
   ENVOY_LOG_MISC(info, "{} + {}", parsing_buffer_.length(), *parsed_bytes_usage_);
   return parsing_buffer_.length() + *parsed_bytes_usage_;
 }

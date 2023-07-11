@@ -40,13 +40,13 @@ public:
 
   int64_t size() { return message_ != nullptr ? message_->Size() : -1; }
 
-  void set_is_first_message(bool is_first_message) { is_first_message_ = is_first_message; }
+  void setIsFirstMessage(bool is_first_message) { is_first_message_ = is_first_message; }
 
-  void set_is_final_message(bool is_final_message) { is_final_message_ = is_final_message; }
+  void setIsFinalMessage(bool is_final_message) { is_final_message_ = is_final_message; }
 
-  bool is_first_message() { return is_first_message_; }
+  bool isFirstMessage() { return is_first_message_; }
 
-  bool is_final_message() { return is_final_message_; }
+  bool isFinalMessage() { return is_final_message_; }
 
   bool is_first_message_ = false;
   bool is_final_message_ = false;

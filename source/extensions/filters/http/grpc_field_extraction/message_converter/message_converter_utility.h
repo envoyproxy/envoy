@@ -20,7 +20,7 @@ namespace GrpcFieldExtraction {
 using CreateMessageDataFunc =
     std::function<std::unique_ptr<Protobuf::field_extraction::MessageData>()>;
 
-// The output for the ParseGrpcMessage function.
+// The output for the parseGrpcMessage function.
 struct ParseGrpcMessageOutput {
   // When true, parser needs more data. `request_in` was not changed and no
   // other members below are set.
@@ -50,14 +50,14 @@ struct ParseGrpcMessageOutput {
 // Returns OK with message and buffer owning parsed data if parsing succeeds.
 // Returns OK with flag if more data is needed.
 // Returns error if parsing fails.
-absl::StatusOr<ParseGrpcMessageOutput> ParseGrpcMessage(CreateMessageDataFunc& factory,
+absl::StatusOr<ParseGrpcMessageOutput> parseGrpcMessage(CreateMessageDataFunc& factory,
                                                         Envoy::Buffer::Instance& request_in);
 
 // Creates a gRPC frame header for the given message size.
-absl::StatusOr<std::string> SizeToDelimiter(size_t size);
+absl::StatusOr<std::string> sizeToDelimiter(size_t size);
 
 // Determines the gRPC message size based on the gRPC frame delimiter.
-absl::StatusOr<uint64_t> DelimiterToSize(const unsigned char* delimiter);
+absl::StatusOr<uint64_t> delimiterToSize(const unsigned char* delimiter);
 
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

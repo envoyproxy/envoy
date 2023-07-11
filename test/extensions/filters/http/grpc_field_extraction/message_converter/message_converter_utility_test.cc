@@ -24,9 +24,8 @@ namespace {
 
 using ::apikeys::CreateApiKeyRequest;
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
-using ::google::grpc::transcoding::MessageReader;
 
-CreateApiKeyRequest GetCreateApiKeyRequest() {
+CreateApiKeyRequest getCreateApiKeyRequest() {
   CreateApiKeyRequest req;
   *req.mutable_parent() = "projects/cloud-api-proxy-test-client";
   *(*req.mutable_key()).mutable_display_name() = "my-api-key";
@@ -35,7 +34,7 @@ CreateApiKeyRequest GetCreateApiKeyRequest() {
 
 TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Setup request data.
-  CreateApiKeyRequest request = GetCreateApiKeyRequest();
+  CreateApiKeyRequest request = getCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
@@ -44,7 +43,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   // Single message is parsed.
   Buffer::OwnedImpl request_in;
   request_in.move(*request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
@@ -53,7 +52,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
   Buffer::OwnedImpl request_out;
   request_out.move(parsed_output.frame_header);
   request_out.move(*parsed_output.owned_bytes);
-  CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
+  checkSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
 TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
@@ -61,7 +60,7 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   constexpr uint middle_data_size = 4;
 
   // Setup request data.
-  CreateApiKeyRequest request = GetCreateApiKeyRequest();
+  CreateApiKeyRequest request = getCreateApiKeyRequest();
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
@@ -80,15 +79,15 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   // are buffered internally.
   Buffer::OwnedImpl request_in;
   request_in.move(start_request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 
   request_in.move(middle_request_data);
-  ASSERT_OK_AND_ASSIGN(parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 
   request_in.move(end_request_data);
-  ASSERT_OK_AND_ASSIGN(parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
@@ -97,14 +96,14 @@ TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
   Buffer::OwnedImpl request_out;
   request_out.move(parsed_output.frame_header);
   request_out.move(*parsed_output.owned_bytes);
-  CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
+  checkSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
 TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   Buffer::OwnedImpl request_out;
 
   // Setup request data.
-  CreateApiKeyRequest request = GetCreateApiKeyRequest();
+  CreateApiKeyRequest request = getCreateApiKeyRequest();
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
@@ -114,7 +113,7 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   // Multiple messages are parsed individually.
   auto request_in = std::make_unique<Buffer::OwnedImpl>();
   request_in->move(*request_data1);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output1, ParseGrpcMessage(factory, *request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output1, parseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output1.needs_more_data);
   ASSERT_NE(parsed_output1.message, nullptr);
   ASSERT_NE(parsed_output1.owned_bytes, nullptr);
@@ -125,7 +124,7 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   // parsed (for the next message).
   request_in = std::make_unique<Buffer::OwnedImpl>();
   request_in->move(*request_data2);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output2, ParseGrpcMessage(factory, *request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output2, parseGrpcMessage(factory, *request_in));
   EXPECT_FALSE(parsed_output2.needs_more_data);
   ASSERT_NE(parsed_output2.message, nullptr);
   ASSERT_NE(parsed_output2.owned_bytes, nullptr);
@@ -133,7 +132,7 @@ TEST(ParseGrpcMessage, ParseMultipleMessagesSplitFrames) {
   request_out.move(*parsed_output2.owned_bytes);
 
   // Messages are correctly preserved.
-  CheckSerializedData<CreateApiKeyRequest>(request_out, {request, request});
+  checkSerializedData<CreateApiKeyRequest>(request_out, {request, request});
 }
 
 TEST(ParseGrpcMessage, ParseNeedsMoreData) {
@@ -143,7 +142,7 @@ TEST(ParseGrpcMessage, ParseNeedsMoreData) {
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
   };
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_TRUE(parsed_output.needs_more_data);
 }
 
@@ -151,7 +150,7 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
   Buffer::OwnedImpl request_in;
 
   // Setup request data.
-  CreateApiKeyRequest request = GetCreateApiKeyRequest();
+  CreateApiKeyRequest request = getCreateApiKeyRequest();
   Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   CreateMessageDataFunc factory = []() {
     return std::make_unique<Protobuf::field_extraction::CordMessageData>();
@@ -159,25 +158,25 @@ TEST(SizeToDelimiter, VerifyDelimiterIsPreserved) {
 
   // Single message is parsed, but `request_out` not provided.
   request_in.move(*request_data);
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);
 
   // Function under test used to fill in `request_out`.
   Buffer::OwnedImpl request_out;
-  ASSERT_OK_AND_ASSIGN(std::string delimiter, SizeToDelimiter(parsed_output.message->Size()));
+  ASSERT_OK_AND_ASSIGN(std::string delimiter, sizeToDelimiter(parsed_output.message->Size()));
   EXPECT_EQ(delimiter.length(), kGrpcDelimiterByteSize);
   request_out.add(delimiter);
 
   // Single message is correctly preserved.
   request_out.move(*parsed_output.owned_bytes);
-  CheckSerializedData<CreateApiKeyRequest>(request_out, {request});
+  checkSerializedData<CreateApiKeyRequest>(request_out, {request});
 }
 
 TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
   Buffer::OwnedImpl request_in;
-  auto delimiter = SizeToDelimiter(0);
+  auto delimiter = sizeToDelimiter(0);
   ASSERT_OK(delimiter);
   EXPECT_EQ(delimiter->length(), kGrpcDelimiterByteSize);
   request_in.add(*delimiter);
@@ -186,7 +185,7 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
   };
 
   // Single message (of length 0) to be parsed.
-  ASSERT_OK_AND_ASSIGN(auto parsed_output, ParseGrpcMessage(factory, request_in));
+  ASSERT_OK_AND_ASSIGN(auto parsed_output, parseGrpcMessage(factory, request_in));
   EXPECT_FALSE(parsed_output.needs_more_data);
   ASSERT_NE(parsed_output.message, nullptr);
   ASSERT_NE(parsed_output.owned_bytes, nullptr);

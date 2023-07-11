@@ -16,13 +16,13 @@ namespace GrpcFieldExtraction {
 // -> StreamMetadata -> Envoy's gRPC Buffer. API usage example:
 //
 // - Caller has `Envoy::Buffer::Instance` B
-// - Caller calls `AccumulateMessages(B)`, retrieving converted `StreamMessage`
+// - Caller calls `accumulateMessages(B)`, retrieving converted `StreamMessage`
 //   [SM1, SM2, SM3, ...]
-// - Caller is expected to call `ConvertBackToBuffer(SM1)`, then
-//   `ConvertBackToBuffer(SM2)`, etc... to retrieve back Envoy::Buffer
+// - Caller is expected to call `convertBackToBuffer(SM1)`, then
+//   `convertBackToBuffer(SM2)`, etc... to retrieve back Envoy::Buffer
 //   [CB1, CB2, CB3, ...]
 //
-// Note: The caller can run `ConvertBackToBuffer` in any order. They are allowed
+// Note: The caller can run `convertBackToBuffer` in any order. They are allowed
 // to convert back buffers out of order.
 //
 // It is invalid to destruct the `MessageConverter` while any data is in the
@@ -55,14 +55,14 @@ public:
   //         OK with the message and nullptr data, when it is the last message
   //         in a stream
   //         Otherwise, an error indicating the failure to create a message.
-  absl::StatusOr<std::unique_ptr<StreamMessage>> AccumulateMessage(Envoy::Buffer::Instance& data,
+  absl::StatusOr<std::unique_ptr<StreamMessage>> accumulateMessage(Envoy::Buffer::Instance& data,
                                                                    bool end_stream);
 
   // The same as `AccumulateMessage`, but returns a list of `StreamMessage`.
   // This should be used if the caller supports streaming, as one data buffer
   // maybe have multiple gRPC frames embedded.
   //
-  // Caller is expected to call `ConvertBackToBuffer` in the same order
+  // Caller is expected to call `convertBackToBuffer` in the same order
   // these StreamMessages are returned.
   //
   // Returns OK with `n-1` messages guaranteed to have data. Those messages
@@ -70,7 +70,7 @@ public:
   //         nullptr data if it is the last message in the stream.
   //         Otherwise, an error indicating the failure to create a message.
   absl::StatusOr<std::vector<std::unique_ptr<StreamMessage>>>
-  AccumulateMessages(Envoy::Buffer::Instance& data, bool end_stream);
+  accumulateMessages(Envoy::Buffer::Instance& data, bool end_stream);
 
   // Converts the StreamMessage back into an Envoy data buffer.
   //
@@ -80,13 +80,13 @@ public:
   // Returns an Envoy Buffer with the same data contents as the `message.`
   // Returns a status if conversion failed.
   absl::StatusOr<Envoy::Buffer::InstancePtr>
-  ConvertBackToBuffer(std::unique_ptr<StreamMessage> message);
+  convertBackToBuffer(std::unique_ptr<StreamMessage> message);
 
   // Returns the total number of bytes stored across all internal buffers.
   // Callers are not expected to explicitly check this, as we internally ensure
   // we do not go over buffer limits. But callers may use this for their own
   // watermarking.
-  [[nodiscard]] uint64_t BytesBuffered() const;
+  [[nodiscard]] uint64_t bytesBuffered() const;
 
 private:
   std::unique_ptr<CreateMessageDataFunc> factory_;
