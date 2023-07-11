@@ -112,6 +112,7 @@ void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) 
 
 void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
   dispatcher_.post([this, ready, end_stream, sz]() {
+    chunk_in_flight_ = false;
     if (aborting_) {
       // Parent filter was destroyed, so we can quit this operation.
       self_ownership_.reset();
@@ -149,6 +150,7 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       chunk->send(*insert_context_, [this](bool ready, bool end_stream, size_t sz) {
         onChunkComplete(ready, end_stream, sz);
       });
+      chunk_in_flight_ = true;
     }
   });
 }
