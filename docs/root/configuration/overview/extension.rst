@@ -10,12 +10,12 @@ optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
 
-.. literalinclude:: _include/extensions/without_type_url.yaml
+.. literalinclude:: _include/extensions/without-type-url.yaml
    :language: yaml
    :lines: 17-36
    :linenos:
    :lineno-start: 17
-   :caption: :download:`extensions_demo.yaml <_include/extensions/without_type_url.yaml>`
+   :caption: :download:`extensions-demo.yaml <_include/extensions/without-type-url.yaml>`
 
 In case the control plane lacks the schema definitions for an extension,
 ``xds.type.v3.TypedStruct`` should be used as a generic container. The type URL
@@ -23,12 +23,12 @@ inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
 
-.. literalinclude:: _include/extensions/with_type_url.yaml
+.. literalinclude:: _include/extensions/with-type-url.yaml
    :language: yaml
    :lines: 17-40
    :linenos:
    :lineno-start: 17
-   :caption: :download:`extensions_demo.yaml <_include/extensions/with_type_url.yaml>`
+   :caption: :download:`extensions-demo.yaml <_include/extensions/with-type-url.yaml>`
 
 .. _config_overview_extension_discovery:
 

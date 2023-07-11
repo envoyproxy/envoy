@@ -5,7 +5,6 @@ node:
   id: envoy_node
 
 static_resources:
-
   listeners:
   - address:
       socket_address:
@@ -90,7 +89,6 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-
   clusters:
   - name: sds_server_uds
     typed_extension_protocol_options:

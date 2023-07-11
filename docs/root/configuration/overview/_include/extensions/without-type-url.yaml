@@ -5,7 +5,6 @@ node:
   id: envoy_node
 
 static_resources:
-
   listeners:
   - name: listener_0
     address:
@@ -34,7 +33,6 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
               dynamic_stats: true
-
   clusters:
   - type: STRICT_DNS
     typed_extension_protocol_options:
@@ -52,4 +50,3 @@ static_resources:
               socket_address:
                 address: my-control-plane
                 port_value: 18000
-

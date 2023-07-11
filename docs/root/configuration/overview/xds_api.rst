@@ -21,12 +21,12 @@ gRPC streaming endpoints
 See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
-.. literalinclude:: __include/xds_api/dynamic_resources.yaml
+.. literalinclude:: __include/xds_api/dynamic-resources.yaml
    :language: yaml
    :lines: 14-21
    :linenos:
    :lineno-start: 14
-   :caption: :download:`xds_api_cds_demo.yaml <__include/xds_api/dynamic_resources.yaml>`
+   :caption: :download:`xds-api-cds-demo.yaml <__include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -59,12 +59,12 @@ See :repo:`lds.proto
 <api/envoy/service/listener/v3/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. literalinclude:: _include/xds_api/dynamic_resources.yaml
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
    :lines: 22-29
    :linenos:
    :lineno-start: 22
-   :caption: :download:`xds_api_lds_demo.yaml <_include/xds_api/dynamic_resources.yaml>`
+   :caption: :download:`xds-api-lds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -123,12 +123,12 @@ See :repo:`sds.proto
 <api/envoy/service/secret/v3/sds.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. literalinclude:: _include/xds_api/oauth_sds_example.yaml
+.. literalinclude:: _include/xds_api/oauth-sds-example.yaml
    :language: yaml
-   :lines: 52-61
+   :lines: 51-60
    :linenos:
-   :lineno-start: 52
-   :caption: :download:`oauth_sds_example.yaml <_include/xds_api/oauth_sds_example.yaml>`
+   :lineno-start: 51
+   :caption: :download:`oauth-sds-example.yaml <_include/xds_api/oauth-sds-example.yaml>`
 
 is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
 is used in various places such as the :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`.
@@ -278,12 +278,12 @@ See :repo:`discovery.proto
 <api/envoy/service/discovery/v3/discovery.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. literalinclude:: _include/xds_api/dynamic_resources.yaml
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
    :lines: 8-13
    :linenos:
    :lineno-start: 8
-   :caption: :download:`xds_api_ads_demo.yaml <_include/xds_api/dynamic_resources.yaml>`
+   :caption: :download:`xds-api-ads-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
