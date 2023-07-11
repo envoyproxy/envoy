@@ -134,7 +134,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
    :lines: 1-97
    :linenos:
    :lineno-start: 1
-   :caption: :download:`traffic_tapping_plain_text.yaml <_include/sds-source-example.yaml>`
+   :caption: :download:`sds-source-example.yaml <_include/sds-source-example.yaml>`
 
 For illustration, above example uses three methods to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path **/tmp/uds_path** and **127.0.0.1:8234** by mTLS. It provides three secrets, **client_cert**, **server_cert** and **validation_context**. In the config, cluster **example_cluster** certificate **client_cert** is configured to use Google gRPC with UDS to talk to the SDS server. The Listener needs to fetch **server_cert** and **validation_context** from the SDS server. The **server_cert** is using Envoy gRPC with cluster **sds_server_mtls** configured with client certificate to use mTLS to talk to SDS server. The **validate_context** is using Envoy gRPC with cluster **sds_server_uds** configured with UDS path to talk to the SDS server.
 
