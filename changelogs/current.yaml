@@ -20,10 +20,10 @@ behavior_changes:
     The proto field :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` type is string.
     This make it unable to support enconding non-utf8 characters in the HeaderValue message.
     To support sending header value with non-utf8 characters, a new proto field is added in the HeaderValue message:
-    :ref:`value_bytes <envoy_v3_api_field_config.core.v3.HeaderValue.value_bytes>`.
-    The header values are now encoded in this ``value_bytes`` field when Envoy ext_proc filter sending
+    :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>`.
+    The header values are now encoded in this ``raw_value`` field when Envoy ext_proc filter sending
     and receiving messages from the ext_proc server. This behavioral change can be temporarily
-    reverted by setting the runtime guard ``envoy_reloadable_features_send_header_value_in_bytes`` to false.
+    reverted by setting the runtime guard ``envoy_reloadable_features_send_header_raw_value`` to false.
 - area: ext_proc
   change: |
     Apply header mutation rules from the ext_proc config to the ImmediateResponse. This behavior change can be temporarily
@@ -33,6 +33,14 @@ behavior_changes:
     Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
     where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
     runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
+- area: stats tls
+  change: |
+    fixed metric tag extraction so that TLS parameters are properly extracted from the stats, both for listeners and clusters.
+    This changes the Prometheus names from
+    ``envoy_listener_ssl_ciphers_ECDHE_RSA_AES128_GCM_SHA256{envoy_listener_address="0.0.0.0_10000"}`` to
+    ``envoy_listener_ssl_ciphers{envoy_listener_address="0.0.0.0_10000", envoy_ssl_cipher="ECDHE_RSA_AES128_GCM_SHA256"}``, and
+    similar for ``envoy_listener_ssl_versions_TLSv1_2``, ``envoy_cluster_ssl_versions_TLSv1_2``, ``envoy_listener_ssl_curves_P_256``,
+    ``envoy_cluster_ssl_curves_P_256``, ``envoy_listener_ssl_sigalgs_rsa_pss_rsae_sha256``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -200,6 +208,9 @@ bug_fixes:
 - area: maglev loadbalancer
   change: |
     Fixes maglev stability problem. Previously, maglev returns slightly different backend assignment from the same backends and keys.
+- area: redis
+  change: |
+    Fixes a bug where redis transactions do not work properly when redis traffic is mirrored.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -456,6 +467,14 @@ new_features:
     Filter state is pulled from request context first (if available), then falls back to connection context. Added ability to pick host
     from dynamic metadata using :ref:`metadata_key <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.metadata_key>`.
     Same behavior - looks in request context first (if available), falls back to connection context.
+- area: tls
+  change: |
+    added support to configure the new config option
+    :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`.
+    This can be used to override its configuration in BoringSSL. It is currently default to false but expected to be changed
+    to true by default in a future release. ssl.was_key_usage_invalid is added to :ref:`listener metrics <config_listener_stats>`
+    and will be incremented for certificate configurations that would fail if this option were set to true.
+
 deprecated:
 - area: access_log
   change: |
