@@ -56,8 +56,8 @@ TEST(ParseGrpcMessage, ParseSingleMessageSingleFrame) {
 }
 
 TEST(ParseGrpcMessage, ParseSingleMessageSplitFrames) {
-  constexpr uint32_t start_data_size = 3;
-  constexpr uint32_t middle_data_size = 4;
+  const uint32_t start_data_size = 3;
+  const uint32_t middle_data_size = 4;
 
   // Setup request data.
   CreateApiKeyRequest request = getCreateApiKeyRequest();
