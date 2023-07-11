@@ -1,12 +1,11 @@
 node:
-  # set <cluster identifier>
   cluster: envoy_cluster
-  # set <node identifier>
   id: envoy_node
 
 static_resources:
   listeners:
-  - address:
+  - name: listener_0
+    address:
       socket_address:
         address: 0.0.0.0
         port_value: 8000
@@ -15,7 +14,6 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -45,7 +43,6 @@ static_resources:
                 signout_path:
                   path:
                     exact: "/signout"
-                forward_bearer_token: true
                 credentials:
                   client_id: "my-client-id"
                   token_secret:
@@ -68,24 +65,6 @@ static_resources:
                         grpc_services:
                         - envoy_grpc:
                             cluster_name: sds_server_uds
-                auth_scopes:
-                - openid
-          - name: envoy.filters.http.jwt_authn
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
-              providers:
-                provider1:
-                  remote_jwks:
-                    http_uri:
-                      uri: https://myoauthprovider.net/oauth2/default/v1/keys
-                      cluster: oauth
-                      timeout: 5s
-                    cache_duration: 600s
-              rules:
-              - match:
-                  prefix: "/"
-                requires:
-                  provider_name: provider1
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -105,9 +84,6 @@ static_resources:
               pipe:
                 path: /tmp/uds_path
   - name: upstream-service
-    connect_timeout: 2s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: upstream-service
       endpoints:
@@ -118,9 +94,7 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 8000
   - name: oauth
-    connect_timeout: 2s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
+    type: LOGICAL_DNS
     load_assignment:
       cluster_name: oauth
       endpoints:

@@ -23,9 +23,9 @@ as a client when
 
 .. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
-   :lines: 14-21
+   :lines: 12-19
    :linenos:
-   :lineno-start: 14
+   :lineno-start: 12
    :caption: :download:`xds-api-cds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
@@ -61,9 +61,9 @@ for the service definition. This is used by Envoy as a client when
 
 .. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
-   :lines: 22-29
+   :lines: 20-27
    :linenos:
-   :lineno-start: 22
+   :lineno-start: 20
    :caption: :download:`xds-api-lds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
@@ -125,9 +125,9 @@ for the service definition. This is used by Envoy as a client when
 
 .. literalinclude:: _include/xds_api/oauth-sds-example.yaml
    :language: yaml
-   :lines: 51-60
+   :lines: 48-57
    :linenos:
-   :lineno-start: 51
+   :lineno-start: 48
    :caption: :download:`oauth-sds-example.yaml <_include/xds_api/oauth-sds-example.yaml>`
 
 is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
@@ -280,9 +280,9 @@ for the service definition. This is used by Envoy as a client when
 
 .. literalinclude:: _include/xds_api/dynamic-resources.yaml
    :language: yaml
-   :lines: 8-13
+   :lines: 6-11
    :linenos:
-   :lineno-start: 8
+   :lineno-start: 6
    :caption: :download:`xds-api-ads-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources

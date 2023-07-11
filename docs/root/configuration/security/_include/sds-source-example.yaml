@@ -1,6 +1,14 @@
+node:
+  cluster: envoy_cluster
+  id: envoy_node
+
 static_resources:
   listeners:
   - name: listener_0
+    address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8000
     filter_chains:
     - transport_socket:
         name: envoy.transport_sockets.tls
@@ -96,3 +104,4 @@ static_resources:
                 grpc_services:
                 - google_grpc:
                     target_uri: unix:/tmp/uds_path
+                    stat_prefix: sds_uds_server

@@ -12,9 +12,9 @@ filter configuration snippet is permitted:
 
 .. literalinclude:: _include/extensions/without-type-url.yaml
    :language: yaml
-   :lines: 16-35
+   :lines: 14-33
    :linenos:
-   :lineno-start: 16
+   :lineno-start: 14
    :caption: :download:`extensions-demo.yaml <_include/extensions/without-type-url.yaml>`
 
 In case the control plane lacks the schema definitions for an extension,
@@ -25,9 +25,9 @@ follows:
 
 .. literalinclude:: _include/extensions/with-type-url.yaml
    :language: yaml
-   :lines: 16-39
+   :lines: 14-37
    :linenos:
-   :lineno-start: 16
+   :lineno-start: 14
    :caption: :download:`extensions-demo-with-type-url.yaml <_include/extensions/with-type-url.yaml>`
 
 .. _config_overview_extension_discovery:

@@ -1,7 +1,5 @@
 node:
-  # set <cluster identifier>
   cluster: envoy_cluster
-  # set <node identifier>
   id: envoy_node
 
 static_resources:
