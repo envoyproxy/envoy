@@ -26,7 +26,7 @@ to find out more about the origin story and design philosophy of Envoy
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture
 * [Blog](https://medium.com/@mattklein123/the-universal-data-plane-api-d15cec7a) about universal data plane API
 * [Blog](https://medium.com/@mattklein123/lyfts-envoy-dashboards-5c91738816b1) on Lyft's Envoy dashboards
-
+ 
 ## Related
 
 * [data-plane-api](https://github.com/envoyproxy/data-plane-api): v2 API definitions as a standalone
