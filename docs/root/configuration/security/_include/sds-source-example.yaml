@@ -41,10 +41,7 @@ static_resources:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http2_protocol_options:
-            connection_keepalive:
-              interval: 30s
-              timeout: 5s
+          http2_protocol_options: {}
     load_assignment:
       cluster_name: sds_server_mtls
       endpoints:
@@ -79,7 +76,6 @@ static_resources:
               pipe:
                 path: /tmp/uds_path
   - name: example_cluster
-    connect_timeout: 0.25s
     load_assignment:
       cluster_name: local_service_tls
       endpoints:
