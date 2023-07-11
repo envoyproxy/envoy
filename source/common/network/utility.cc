@@ -229,7 +229,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     const Api::SysCallIntResult rc =
         Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-    if (!rc.return_value_) {
+    if (rc.return_value_ != 0) {
       ENVOY_LOG_MISC(debug, fmt::format("getifaddrs error: {}", rc.errno_));
     } else {
       // man getifaddrs(3)
