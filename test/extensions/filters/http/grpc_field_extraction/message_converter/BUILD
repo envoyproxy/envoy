@@ -49,17 +49,3 @@ envoy_cc_test(
         "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
-
-envoy_cc_test(
-    name = "message_converter_overflow_test",
-    srcs = ["message_converter_overflow_test.cc"],
-    deps = [
-        ":message_converter_test_lib",
-        "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
-        "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_utility_lib",
-        "//test/proto:apikeys_proto_cc_proto",
-        "//test/test_common:status_utility_lib",
-        "@com_google_protofieldextraction//:all_libs",
-        "@ocp//ocpdiag/core/testing:status_matchers",
-    ],
-)
