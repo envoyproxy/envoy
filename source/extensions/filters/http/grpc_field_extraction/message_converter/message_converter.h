@@ -92,7 +92,7 @@ private:
   std::unique_ptr<CreateMessageDataFunc> factory_;
   // Internal buffer to move data to before parsing. Useful to wait until
   // Envoy passes us enough gRPC frame data.
-  Envoy::Buffer::OwnedImpl parsing_buffer_ = {};
+  Envoy::Buffer::OwnedImpl parsing_buffer_;
 
   // Max bytes this converter should store.
   const uint32_t buffer_limit_;

@@ -72,7 +72,7 @@ absl::StatusOr<std::vector<std::unique_ptr<StreamMessage>>>
 MessageConverter::accumulateMessages(Envoy::Buffer::Instance& data, bool end_stream) {
   std::vector<std::unique_ptr<StreamMessage>> messages;
   while (true) {
-    auto message = accumulateMessage(data, end_stream);
+    absl::StatusOr<std::unique_ptr<StreamMessage>> message = accumulateMessage(data, end_stream);
     if (!message.ok()) {
       return message.status();
     }
@@ -106,7 +106,7 @@ MessageConverter::convertBackToBuffer(std::unique_ptr<StreamMessage> message) {
 
   // Create gRPC frame header and add to output buffer.
   const uint64_t out_message_size = message->size();
-  auto delimiter = sizeToDelimiter(out_message_size);
+  absl::StatusOr<std::string> delimiter = sizeToDelimiter(out_message_size);
   if (!delimiter.ok()) {
     return delimiter.status();
   }

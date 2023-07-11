@@ -20,7 +20,7 @@ public:
       : message_(std::move(message)), owned_bytes_(std::move(owned_bytes)),
         ref_to_bytes_usage_(ref_to_bytes_usage) {
     if (owned_bytes_ != nullptr) {
-      ENVOY_LOG_MISC(info, "owned len(owned_bytes_)={}", owned_bytes_->length());
+      ENVOY_LOG_MISC(debug, "owned len(owned_bytes_)={}", owned_bytes_->length());
       *ref_to_bytes_usage_ += owned_bytes_->length();
     }
   }
@@ -31,10 +31,10 @@ public:
 
   ~StreamMessage() {
     if (owned_bytes_ != nullptr) {
-      ENVOY_LOG_MISC(info, "free len(owned_bytes_)={}", owned_bytes_->length());
+      ENVOY_LOG_MISC(debug, "free len(owned_bytes_)={}", owned_bytes_->length());
       *ref_to_bytes_usage_ -= owned_bytes_->length();
     } else {
-      ENVOY_LOG_MISC(info, "free final placeholder message in the stream");
+      ENVOY_LOG_MISC(debug, "free final placeholder message in the stream");
     }
   }
 
