@@ -8,14 +8,11 @@ Golang network filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`netcat <start_sandboxes_setup_netcat>`
-        Used to send ``TCP`` data.
+        Used to send TCP data.
 
-In this example, we show how the `Golang <https://go.dev/>`_ network filter can be used with the Envoy
-proxy.
+In this example, we show how the `Golang <https://go.dev/>`_ network filter can be used with the Envoy proxy. We also show how the Go plugins can be independently configured at runtime.
 
-The Go plugin proxies TCP network connections. Proxied responses are prefixed with "hello, ".
-
-It also shows how Go plugins can be independently configured at runtime.
+The example Go plugin proxies TCP network connections to an echo service retrieved from the configuration file. Meanwhile, the proxied responses are prefixed with "hello, " by the example Go plugin.
 
 Step 1: Compile the go plugin library
 *************************************
@@ -50,7 +47,7 @@ Start all the containers.
    golang-network-echo_service-1   "/tcp-echo"              echo_service        running
    golang-network-proxy-1          "/docker-entrypoint.…"   proxy               running             0.0.0.0:10000->10000/tcp
 
-In this example, we start up two containers - an echo service which simply responds what it received from its tcp connections, and a proxy service that utilizes a golang plugin to forward data to the echo service.
+In this example, we start up two containers - an echo service which simply responds to what it has received from its TCP connections, and a proxy service that utilizes a Golang plugin to forward data to the echo service.
 
 The destination to which the golang plugin proxies data is specified by custom configuration.
 
@@ -66,7 +63,7 @@ The destination to which the golang plugin proxies data is specified by custom c
 Step 3: Send some data to be handled by the Go plugin
 *****************************************************
 
-The output from the ``nc`` command below should include the "hello, " prefix added by the simple Go plugin.
+The response from the ``nc`` command below should include the "hello, " prefix which will be added by the example Go plugin.
 
 .. code-block:: console
 
