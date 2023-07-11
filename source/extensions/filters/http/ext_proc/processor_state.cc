@@ -1,3 +1,4 @@
+#include "processor_state.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -91,9 +92,11 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return mut_status;
       }
     }
+
     if (common_response.clear_route_cache()) {
-      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+      clearRouteCache(common_response);
     }
+
     onFinishProcessorCall(Grpc::Status::Ok);
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
@@ -321,9 +324,10 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
 
-    if (response.response().clear_route_cache()) {
-      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+    if (common_response.clear_route_cache()) {
+      clearRouteCache(common_response);
     }
+
     headers_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
@@ -359,6 +363,20 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("spurious message");
+}
+
+void ProcessorState::clearRouteCache(const CommonResponse& common_response) {
+  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+  if (filter_.config().disableClearRouteCache()) {
+    filter_.stats().clear_route_cache_disabled_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
+  } else if (common_response.has_header_mutation()) {
+    ENVOY_LOG(debug, "clearing route cache");
+    filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+  } else {
+    filter_.stats().clear_route_cache_ignored_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
+  }
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
