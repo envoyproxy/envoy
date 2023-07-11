@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.extensions.upstream.local_address_selector.v3;
+
+option java_package = "io.envoyproxy.envoy.extensions.upstream.local_address_selector.v3";
+option java_outer_classname = "DefaultLocalAddressSelectorV3";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstream/local_address_selector/v3;default_local_address_selectorv3";
+//option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message DefaultLocalAddressSelector {
+  string empty = 1;
+}

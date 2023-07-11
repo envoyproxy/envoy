@@ -70,7 +70,7 @@ public:
 
 using UpstreamLocalAddressSelectorPtr = std::shared_ptr<UpstreamLocalAddressSelector>;
 
-class UpstreamLocalAddressSelectorFactory : public Config::UntypedFactory {
+class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
 public:
   ~UpstreamLocalAddressSelectorFactory() override = default;
 
