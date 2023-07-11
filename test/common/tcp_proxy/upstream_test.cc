@@ -81,7 +81,7 @@ public:
         cluster_.info()->name(), tunnel_config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
-    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
+    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_,
                                     *tunnel_config_, downstream_stream_info_);
     if (typeid(T) == typeid(CombinedUpstream)) {
       auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
@@ -148,7 +148,7 @@ TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
   auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
   std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
   this->upstream_ = std::make_unique<TypeParam>(
-      *this->conn_pool_, this->callbacks_, this->decoder_callbacks_, *this->route_,
+      *this->conn_pool_, this->callbacks_, &this->decoder_callbacks_, *this->route_,
       *this->tunnel_config_, this->downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
 }
@@ -190,7 +190,7 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
   auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
   std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
   this->upstream_ = std::make_unique<TypeParam>(
-      *this->conn_pool_, this->callbacks_, this->decoder_callbacks_, *this->route_,
+      *this->conn_pool_, this->callbacks_, &this->decoder_callbacks_, *this->route_,
       *this->tunnel_config_, this->downstream_stream_info_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
@@ -317,9 +317,8 @@ public:
     route_ = std::make_unique<Http::NullRouteImpl>(
         cluster_.info()->name(), config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
-                                                // decoder_callbacks_, Http::CodecType::HTTP2,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
-    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_, *config_,
+    upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_, *config_,
                                     downstream_stream_info_);
     if (typeid(T) == typeid(CombinedUpstream)) {
       auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
@@ -505,7 +504,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
 
   Http::MockRequestEncoder another_encoder;
   auto another_upstream =
-      std::make_unique<TypeParam>(*this->conn_pool_, this->callbacks_, this->decoder_callbacks_,
+      std::make_unique<TypeParam>(*this->conn_pool_, this->callbacks_, &this->decoder_callbacks_,
                                   *this->route_, *this->config_, this->downstream_stream_info_);
 
   EXPECT_CALL(another_encoder, getStream()).Times(AnyNumber());
