@@ -471,8 +471,9 @@ public:
     ENVOY_TAGGED_LOG(info, tags_with_escaping_, "fake me\"ssage {}", "val");
   }
 
-  void logMessageWithConnection() { ENVOY_CONN_LOG(info, "fake message", connection_); }
-  void logMessageWithStream() { ENVOY_STREAM_LOG(info, "fake message", stream_); }
+  void logMessageWithConnection() { ENVOY_CONN_LOG(info, "fake message {}", connection_, "val"); }
+
+  void logMessageWithStream() { ENVOY_STREAM_LOG(info, "fake message {}", stream_, "val"); }
 
   void logTaggedMessageWithConnection(std::map<std::string, std::string>& tags) {
     ENVOY_TAGGED_CONN_LOG(info, tags, connection_, "fake message");
@@ -552,7 +553,7 @@ TEST(TaggedLogTest, TestConnLog) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message"));
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message val"));
       }));
 
   ClassForTaggedLog object;
@@ -601,7 +602,8 @@ TEST(TaggedLogTest, TestStreamLog) {
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_THAT(
-            msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\"] fake message"));
+            msg,
+            HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\"] fake message val"));
       }));
 
   ClassForTaggedLog object;
@@ -694,7 +696,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
-        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }));
 
@@ -757,7 +759,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
-        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }));
