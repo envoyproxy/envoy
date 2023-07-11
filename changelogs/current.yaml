@@ -482,7 +482,7 @@ new_features:
     and will be incremented for certificate configurations that would fail if this option were set to true.
 - area: aws
   change: |
-    added runtime key ``envoy_reloadable_features.lambda_sanitize_host_header``
+    added runtime key ``envoy_reloadable_features.lambda_sanitize_host_header``.
 
 deprecated:
 - area: access_log
