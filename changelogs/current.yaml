@@ -79,11 +79,11 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
-- area: aws
+- area: aws lambda
   change: |
     Default sanitize host header prior to direct invocation of a lambda.  This behavior can reverted by setting runtime guard
     ``envoy.reloadable_features.lambda_sanitize_host_headers`` to false, in which case requests will retain the originating header to the
-    AWS invocation lambda API, causing a signature mismatch error to be returned.  This is only applicable when using
+    AWS invocation lambda API, causing potential signature mismatches if a port is included in the initial request.  This is only applicable when using
     the Lambda Invocation Filter.
 - area: ext_proc
   change: |
@@ -480,9 +480,6 @@ new_features:
     This can be used to override its configuration in BoringSSL. It is currently default to false but expected to be changed
     to true by default in a future release. ssl.was_key_usage_invalid is added to :ref:`listener metrics <config_listener_stats>`
     and will be incremented for certificate configurations that would fail if this option were set to true.
-- area: aws
-  change: |
-    added runtime key ``envoy_reloadable_features.lambda_sanitize_host_header``.
 
 deprecated:
 - area: access_log
