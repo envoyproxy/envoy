@@ -34,8 +34,7 @@ MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
     return absl::FailedPreconditionError("Rejected because internal buffer limits are exceeded.");
   }
 
-  absl::StatusOr<ParseGrpcMessageOutput> parsed_output =
-      parseGrpcMessage(*factory_, parsing_buffer_);
+  absl::StatusOr<ParsedGrpcMessage> parsed_output = parseGrpcMessage(*factory_, parsing_buffer_);
   if (!parsed_output.ok()) {
     return parsed_output.status();
   }
@@ -129,15 +128,17 @@ MessageConverter::convertBackToBuffer(std::unique_ptr<StreamMessage> message) {
   const void* data = nullptr;
   int size = 0;
   Envoy::Buffer::BufferFragmentImpl* last_fragment = nullptr;
+  bool is_empty = true;
 
   while (input_stream->Next(&data, &size)) {
+    is_empty = false;
     last_fragment = new Envoy::Buffer::BufferFragmentImpl(data, size, fragment_releasor);
     output_message->addBufferFragment(*last_fragment);
   }
 
   // Edge case handling: If StreamMessage is empty, then just let it go out of
   // scope and return buffer with only delimiter.
-  if (last_fragment == nullptr) {
+  if (is_empty) {
     ENVOY_LOG_MISC(info, "converted back empty raw_message");
     ABSL_DCHECK_EQ(output_message->length(), google::grpc::transcoding::kGrpcDelimiterByteSize);
     return output_message;

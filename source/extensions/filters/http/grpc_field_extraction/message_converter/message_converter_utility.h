@@ -21,7 +21,7 @@ using CreateMessageDataFunc =
     std::function<std::unique_ptr<Protobuf::field_extraction::MessageData>()>;
 
 // The output for the parseGrpcMessage function.
-struct ParseGrpcMessageOutput {
+struct ParsedGrpcMessage {
   // When true, parser needs more data. `request_in` was not changed and no
   // other members below are set.
   bool needs_more_data = false;
@@ -44,14 +44,14 @@ struct ParseGrpcMessageOutput {
 //
 // Parsing occurs from `request_reader` and `request_in`. When a message is
 // successfully parsed, the entire gRPC frame will be removed from
-// `request_in` and moved to `ParseGrpcMessageOutput`. Otherwise,
+// `request_in` and moved to `ParsedGrpcMessage`. Otherwise,
 // `request_in` is left un-altered.
 //
 // Returns OK with message and buffer owning parsed data if parsing succeeds.
 // Returns OK with flag if more data is needed.
 // Returns error if parsing fails.
-absl::StatusOr<ParseGrpcMessageOutput> parseGrpcMessage(CreateMessageDataFunc& factory,
-                                                        Envoy::Buffer::Instance& request_in);
+absl::StatusOr<ParsedGrpcMessage> parseGrpcMessage(CreateMessageDataFunc& factory,
+                                                   Envoy::Buffer::Instance& request_in);
 
 // Creates a gRPC frame header for the given message size.
 absl::StatusOr<std::string> sizeToDelimiter(uint64_t size);
