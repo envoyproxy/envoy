@@ -7,6 +7,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/router/router_filter_interface.h"
 #include "test/mocks/router/upstream_request.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -79,8 +80,7 @@ public:
     route_ = std::make_unique<Http::NullRouteImpl>(
         cluster_.info()->name(), tunnel_config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
-                                                decoder_callbacks_, Http::CodecType::HTTP2,
-                                                downstream_stream_info_);
+                                                Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
                                     *tunnel_config_, downstream_stream_info_);
     if (typeid(T) == typeid(CombinedUpstream)) {
@@ -90,7 +90,7 @@ public:
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
       auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-          *upstream_, std::move(generic_conn_pool));
+          router_filter_interface_, std::move(generic_conn_pool));
       mock_router_upstream_request_ = mock_upst.get();
       upstream_->setRouterUpstreamRequest(std::move(mock_upst));
       EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
@@ -105,6 +105,7 @@ public:
   }
 
   Router::MockUpstreamRequest* mock_router_upstream_request_{};
+  NiceMock<Router::MockRouterFilterInterface> router_filter_interface_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -296,43 +297,6 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisab
   this->upstream_->cleanUp();
 }
 
-TYPED_TEST(HttpUpstreamTest, RouterFilterInterface) {
-  this->setupUpstream();
-  EXPECT_EQ(this->upstream_->startUpstreamSecureTransport(), false);
-  EXPECT_EQ(this->upstream_->getUpstreamConnectionSslInfo(), nullptr);
-  auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
-  std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
-  auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-      *this->upstream_, std::move(generic_conn_pool));
-  EXPECT_NO_THROW(this->upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
-  EXPECT_NO_THROW(this->upstream_->onUpstreamMetadata(nullptr));
-  EXPECT_NO_THROW(this->upstream_->onPerTryTimeout(*mock_upst.get()));
-  EXPECT_NO_THROW(this->upstream_->onPerTryIdleTimeout(*mock_upst.get()));
-  EXPECT_NO_THROW(this->upstream_->onStreamMaxDurationReached(*mock_upst.get()));
-  EXPECT_EQ(this->upstream_->dynamicMaxStreamDuration(), absl::nullopt);
-  EXPECT_EQ(this->upstream_->downstreamTrailers(), nullptr);
-  EXPECT_EQ(this->upstream_->downstreamResponseStarted(), false);
-  EXPECT_EQ(this->upstream_->downstreamEndStream(), false);
-  EXPECT_EQ(this->upstream_->attemptCount(), 0);
-  EXPECT_EQ(this->upstream_->requestVcluster(), nullptr);
-  EXPECT_EQ(this->upstream_->routeStatsContext(), Router::RouteStatsContextOptRef());
-  EXPECT_EQ(this->upstream_->finalUpstreamRequest(), nullptr);
-  EXPECT_NO_THROW(this->upstream_->upstreamRequests());
-  EXPECT_NO_THROW(this->upstream_->timeSource());
-  EXPECT_NO_THROW(this->upstream_->route());
-  EXPECT_NO_THROW(this->upstream_->onUpstreamReset(Http::StreamResetReason::ConnectionTermination,
-                                                   absl::string_view(""), *mock_upst.get()));
-  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
-      {Http::Headers::get().Status.get(), "200"},
-      {Http::Headers::get().ContentType.get(), "application/json"},
-  }};
-  EXPECT_NO_THROW(this->upstream_->onUpstreamHeaders(
-      uint64_t(200), std::move(mock_response_headers), *mock_upst.get(), false));
-  EXPECT_NO_THROW(this->upstream_->onUpstreamTrailers(nullptr, *mock_upst.get()));
-  Buffer::OwnedImpl data;
-  EXPECT_NO_THROW(this->upstream_->onUpstreamData(data, *mock_upst.get(), false));
-}
-
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
 public:
   HttpUpstreamRequestEncoderTest() {
@@ -353,8 +317,8 @@ public:
     route_ = std::make_unique<Http::NullRouteImpl>(
         cluster_.info()->name(), config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
-                                                decoder_callbacks_, Http::CodecType::HTTP2,
-                                                downstream_stream_info_);
+                                                // decoder_callbacks_, Http::CodecType::HTTP2,
+                                                Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, decoder_callbacks_, *route_, *config_,
                                     downstream_stream_info_);
     if (typeid(T) == typeid(CombinedUpstream)) {
@@ -364,19 +328,15 @@ public:
       filter_ = std::make_unique<Filter>(filter_config_, factory_context_.cluster_manager_);
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
       auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-          *upstream_, std::move(generic_conn_pool));
+          router_filter_interface_, std::move(generic_conn_pool));
       mock_router_upstream_request_ = mock_upst.get();
       upstream_->setRouterUpstreamRequest(std::move(mock_upst));
     }
   }
 
-  void setRequestEncoderAndVerifyHeaders(Http::RequestHeaderMapImpl* expected_headers,
-                                         bool end_stream = false) {
+  void setRequestEncoderAndVerifyHeaders(Http::RequestHeaderMapImpl*, bool end_stream = false) {
     if (typeid(T) == typeid(CombinedUpstream)) {
       upstream_->newStream(*filter_);
-      Router::RouterFilterInterface* router_filter =
-          dynamic_cast<Router::RouterFilterInterface*>(this->upstream_.get());
-      EXPECT_THAT(*router_filter->downstreamHeaders(), HeaderMapEqualRef(expected_headers));
     } else {
       upstream_->setRequestEncoder(encoder_, end_stream);
     }
@@ -397,7 +357,7 @@ public:
     fields_map[key] = ValueUtil::stringValue(value);
     (*metadata.mutable_filter_metadata())[ns] = struct_obj;
   }
-
+  NiceMock<Router::MockRouterFilterInterface> router_filter_interface_;
   Router::MockUpstreamRequest* mock_router_upstream_request_{};
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr filter_config_;
@@ -560,15 +520,6 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   if (typeid(TypeParam) == typeid(CombinedUpstream)) {
     auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
     std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
-    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-        *another_upstream, std::move(generic_conn_pool));
-    auto another_router_upstream_request = mock_upst.get();
-    another_upstream->setRouterUpstreamRequest(std::move(mock_upst));
-    EXPECT_CALL(*another_router_upstream_request, acceptHeadersFromRouter(false));
-    another_upstream->newStream(*this->filter_);
-    Router::RouterFilterInterface* router_filter =
-        dynamic_cast<Router::RouterFilterInterface*>(another_upstream.get());
-    EXPECT_THAT(*router_filter->downstreamHeaders(), HeaderMapEqualRef(expected_headers.get()));
   } else {
     EXPECT_CALL(another_encoder, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
     another_upstream->setRequestEncoder(another_encoder, false);

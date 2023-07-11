@@ -206,8 +206,7 @@ UpstreamDrainManager& Config::drainManager() {
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : tracing_config_(Tracing::EgressConfig::get()), config_(config),
       cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)),
-      upstream_decoder_filter_callbacks_(HttpStreamDecoderFilterCallbacks(this)) {
+      upstream_callbacks_(new UpstreamCallbacks(this)) {
   ASSERT(config != nullptr);
 }
 
@@ -519,9 +518,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
-      upstream_decoder_filter_callbacks_, getStreamInfo());
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
+                                                      this, *upstream_callbacks_, getStreamInfo());
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -913,9 +911,6 @@ void Filter::disableIdleTimer() {
     idle_timer_.reset();
   }
 }
-
-Filter::HttpStreamDecoderFilterCallbacks::HttpStreamDecoderFilterCallbacks(Filter* parent)
-    : parent_(parent), request_trailer_map_(Http::RequestTrailerMapImpl::create()) {}
 
 UpstreamDrainManager::~UpstreamDrainManager() {
   // If connections aren't closed before they are destructed an ASSERT fires,

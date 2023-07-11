@@ -475,112 +475,6 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
-
-  /**
-   * @class HttpStreamDecoderFilterCallbacks
-   * @brief Interface for callbacks provided to Router::UpstreamRequest.
-   *
-   * The `HttpStreamDecoderFilterCallbacks` class serves as an interface for providing callbacks to
-   * Router::UpstreamRequest via RouterFilterInterface. It inherits from the
-   * `Http::StreamDecoderFilterCallbacks` class, which provides a set of common callback functions
-   * for interacting with the downstream connection.
-   *
-   * Router::UpstreamRequest use these callbacks to get access to the downstream resources such as
-   * downstream connection, dispatcher, watermark manager, stream info, etc.
-   * This is required for setting up the upstream connection and also to communicate back to the
-   * downstream such as setting upstream info into the stream info, managing flow control, etc.
-   *
-   * @see Http::StreamDecoderFilterCallbacks
-   * @see Http::StreamDecoderFilter
-   */
-  class HttpStreamDecoderFilterCallbacks : public Http::StreamDecoderFilterCallbacks,
-                                           public ScopeTrackedObject {
-  public:
-    HttpStreamDecoderFilterCallbacks(Filter* parent);
-    // Http::StreamDecoderFilterCallbacks
-    OptRef<const Network::Connection> connection() override {
-      return parent_->read_callbacks_->connection();
-    }
-    StreamInfo::StreamInfo& streamInfo() override { return parent_->getStreamInfo(); }
-    const ScopeTrackedObject& scope() override { return *this; }
-    Event::Dispatcher& dispatcher() override {
-      return parent_->read_callbacks_->connection().dispatcher();
-    }
-    void resetStream(Http::StreamResetReason, absl::string_view) override {
-      IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
-    };
-    Router::RouteConstSharedPtr route() override { return nullptr; }
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
-      return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
-          ->info();
-    }
-    uint64_t streamId() const override {
-      return parent_->config_->tunnelingConfigHelper()->streamId();
-    }
-    Tracing::Span& activeSpan() override { return parent_->active_span_; }
-    OptRef<const Tracing::Config> tracingConfig() const override {
-      return makeOptRef<const Tracing::Config>(parent_->tracing_config_);
-    }
-    void continueDecoding() override {}
-    void addDecodedData(Buffer::Instance&, bool) override {}
-    void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
-    Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
-    Http::MetadataMapVector& addDecodedMetadata() override {
-      static Http::MetadataMapVector metadata_map_vector;
-      return metadata_map_vector;
-    }
-    const Buffer::Instance* decodingBuffer() override { return nullptr; }
-    void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
-    void sendLocalReply(Http::Code, absl::string_view,
-                        std::function<void(Http::ResponseHeaderMap& headers)>,
-                        const absl::optional<Grpc::Status::GrpcStatus>,
-                        absl::string_view) override {}
-    void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
-    Http::ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
-    void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
-    Http::ResponseHeaderMapOptRef responseHeaders() const override { return {}; }
-    void encodeData(Buffer::Instance&, bool) override {}
-    void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
-    Http::ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
-    void encodeMetadata(Http::MetadataMapPtr&&) override {}
-    // TODO(vikaschoudhary16): Implement watermark callbacks and test through flow control e2es.
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
-    void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void setDecoderBufferLimit(uint32_t) override {}
-    uint32_t decoderBufferLimit() override { return 0; }
-    bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
-    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
-    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
-      return nullptr;
-    }
-    Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
-    void setUpstreamOverrideHost(absl::string_view) override {}
-    void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
-      tracked_object_stack.add(*this);
-    }
-    void traversePerFilterConfig(
-        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
-    Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
-    OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
-    OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
-    void resetIdleTimer() override {}
-    absl::optional<absl::string_view> upstreamOverrideHost() const override {
-      return absl::nullopt;
-    }
-    absl::string_view filterConfigName() const override { return ""; }
-
-    // ScopeTrackedObject
-    void dumpState(std::ostream& os, int indent_level) const override {
-      const char* spaces = spacesForLevel(indent_level);
-      os << spaces << "TcpProxy " << this << DUMP_MEMBER(streamId()) << "\n";
-      DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
-    }
-    Filter* parent_{};
-    Http::RequestTrailerMapPtr request_trailer_map_;
-  };
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
 
@@ -661,7 +555,6 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
-  HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

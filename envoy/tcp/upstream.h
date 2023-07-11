@@ -183,7 +183,6 @@ public:
                         TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                        Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                         StreamInfo::StreamInfo& downstream_info) const PURE;
 };
 

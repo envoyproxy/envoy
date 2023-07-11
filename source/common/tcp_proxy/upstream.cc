@@ -77,14 +77,12 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   return nullptr;
 }
 
-HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool,
-                           Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                           Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks&,
+                           Router::Route&, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
                            StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
-      decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
-      upstream_callbacks_(callbacks) {}
+      response_decoder_(*this), upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() = default;
 
@@ -120,10 +118,6 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
-}
-
-void HttpUpstream::onUpstreamReset(Http::StreamResetReason, absl::string_view, UpstreamRequest&) {
-  upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
@@ -179,26 +173,6 @@ void HttpUpstream::doneWriting() {
   }
 }
 void HttpUpstream::cleanUp() { resetEncoder(Network::ConnectionEvent::LocalClose, false); }
-
-// Router::RouterFilterInterface
-void HttpUpstream::onUpstreamHeaders([[maybe_unused]] uint64_t response_code,
-                                     Http::ResponseHeaderMapPtr&& headers,
-                                     [[maybe_unused]] UpstreamRequest& upstream_request,
-                                     bool end_stream) {
-  responseDecoder().decodeHeaders(std::move(headers), end_stream);
-}
-
-void HttpUpstream::onUpstreamData(Buffer::Instance& data,
-                                  [[maybe_unused]] UpstreamRequest& upstream_request,
-                                  bool end_stream) {
-  responseDecoder().decodeData(data, end_stream);
-}
-
-void HttpUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers, UpstreamRequest&) {
-  responseDecoder().decodeTrailers(std::move(trailers));
-}
-
-Http::RequestHeaderMap* HttpUpstream::downstreamHeaders() { return downstream_headers_.get(); }
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
@@ -257,10 +231,9 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                           Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
-    : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
-      upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info),
+    : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
+      downstream_info_(downstream_info),
       route_(std::make_shared<Http::NullRouteImpl>(
           thread_local_cluster.info()->name(), config.serverFactoryContext().singletonManager())) {
   absl::optional<Http::Protocol> protocol;

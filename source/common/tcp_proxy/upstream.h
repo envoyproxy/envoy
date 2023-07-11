@@ -61,8 +61,7 @@ class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callba
 public:
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfigHelper& config,
-               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-               Http::StreamDecoderFilterCallbacks&, Http::CodecType type,
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type,
                StreamInfo::StreamInfo& downstream_info);
 
   using RouterUpstreamRequest = Router::UpstreamRequest;
@@ -149,9 +148,7 @@ private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
-class HttpUpstream : public GenericUpstream,
-                     public Envoy::Router::RouterFilterInterface,
-                     protected Http::StreamCallbacks {
+class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   using TunnelingConfig =
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
@@ -178,23 +175,6 @@ public:
   // socket from non-secure to secure mode.
   bool startUpstreamSecureTransport() override { return false; }
 
-  // Router::RouterFilterInterface
-  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
-                         UpstreamRequest& upstream_request, bool end_stream) override;
-  void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
-                      bool end_stream) override;
-  void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&&, UpstreamRequest&) override {}
-  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&&, UpstreamRequest&) override;
-  void onUpstreamMetadata(Http::MetadataMapPtr&&) override {}
-  void onUpstreamReset(Http::StreamResetReason stream_reset_reason,
-                       absl::string_view transport_failure_reason, UpstreamRequest&) override;
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
-    parent_.onUpstreamHostSelected(host);
-  }
-  void onPerTryTimeout(UpstreamRequest&) override {}
-  void onPerTryIdleTimeout(UpstreamRequest&) override {}
-  void onStreamMaxDurationReached(UpstreamRequest&) override {}
-
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override;
@@ -206,32 +186,6 @@ public:
     conn_pool_callbacks_ = std::move(callbacks);
   }
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
-  Http::StreamDecoderFilterCallbacks* callbacks() override { return &decoder_filter_callbacks_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() override {
-    return decoder_filter_callbacks_.clusterInfo();
-  }
-  Router::FilterConfig& config() override {
-    return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());
-  }
-  Router::FilterUtility::TimeoutData timeout() override { return {}; }
-  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
-    return absl::nullopt;
-  }
-  Http::RequestHeaderMap* downstreamHeaders() override;
-  Http::RequestTrailerMap* downstreamTrailers() override { return nullptr; }
-  bool downstreamResponseStarted() const override { return false; }
-  bool downstreamEndStream() const override { return false; }
-  uint32_t attemptCount() const override { return 0; }
-  const Router::VirtualCluster* requestVcluster() const override { return nullptr; }
-  const Router::RouteStatsContextOptRef routeStatsContext() const override {
-    return Router::RouteStatsContextOptRef();
-  }
-  const Router::Route* route() const override { return route_; }
-  const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
-    return upstream_requests_;
-  }
-  const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
-  TimeSource& timeSource() override { return config().timeSource(); }
 
 protected:
   HttpUpstream(HttpConnPool& http_conn_pool, Http::StreamDecoderFilterCallbacks& decoder_callbacks,
@@ -253,8 +207,6 @@ protected:
 
 private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
-  Router::Route* route_;
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}

@@ -23,7 +23,6 @@ public:
                         TcpProxy::TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
                         Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                        Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                         StreamInfo::StreamInfo& downstream_info) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
