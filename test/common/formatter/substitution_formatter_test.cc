@@ -2273,10 +2273,6 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
 
-  // Add the NaN test for number value. This behavior will be changed in the future Protobuf
-  // dependency upgrade, and the Json serialization will fail if the number value is NaN or
-  // Infinity. We need to change the `getJsonStringFromMessage` description, re-evaluate the use
-  // of ENVOY_BUG in the MetaDataFormatter::format method, and modify the following two tests.
   {
     ProtobufWkt::Value val;
     val.set_number_value(std::numeric_limits<double>::quiet_NaN());
@@ -2285,11 +2281,14 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
     (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 
     DynamicMetadataFormatter formatter("com.test", {"nan_val"}, absl::optional<size_t>());
-    EXPECT_EQ("\"NaN\"", formatter.format(request_headers, response_headers, response_trailers,
-                                          stream_info, body, AccessLog::AccessLogType::NotSet));
+    absl::optional<std::string> value =
+        formatter.format(request_headers, response_headers, response_trailers, stream_info, body,
+                         AccessLog::AccessLogType::NotSet);
+    EXPECT_EQ("google.protobuf.Value cannot encode double values for nan, because it would be "
+              "parsed as a string",
+              value.value());
   }
 
-  // Add the Infinity test for number value.
   {
     ProtobufWkt::Value val;
     val.set_number_value(std::numeric_limits<double>::infinity());
@@ -2298,9 +2297,12 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
     (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 
     DynamicMetadataFormatter formatter("com.test", {"inf_val"}, absl::optional<size_t>());
-    EXPECT_EQ("\"Infinity\"",
-              formatter.format(request_headers, response_headers, response_trailers, stream_info,
-                               body, AccessLog::AccessLogType::NotSet));
+    absl::optional<std::string> value =
+        formatter.format(request_headers, response_headers, response_trailers, stream_info, body,
+                         AccessLog::AccessLogType::NotSet);
+    EXPECT_EQ("google.protobuf.Value cannot encode double values for infinity, because it would be "
+              "parsed as a string",
+              value.value());
   }
 }
 

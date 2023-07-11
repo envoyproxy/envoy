@@ -353,7 +353,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Denied: {
-    ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: '{}",
+    ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: '{}'",
                      *decoder_callbacks_, enumToInt(response->status_code));
     stats_.denied_.inc();
 

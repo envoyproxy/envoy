@@ -3,6 +3,7 @@ services:
   # front-proxy
   front-envoy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service1:
