@@ -384,8 +384,7 @@ TEST_F(MessageConverterReadOnlyBehavior, ReachBufferLimit) {
   Buffer::OwnedImpl request_in;
   request_in.move(*request_data1);
 
-  // Convert the message.
-  // The converter is set with buffer_limit=0 so the accumlateMessage should fail.
+  // Convert the message which is larger than the buffer_limit=0;
   auto result = converter.accumulateMessage(request_in, true);
   ASSERT_FALSE(result.ok());
   EXPECT_EQ(result.status().ToString(),
