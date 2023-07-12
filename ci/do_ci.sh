@@ -345,7 +345,6 @@ case $CI_TARGET in
             "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
             "--remote_download_minimal"
             "--config=libc++20")
-        ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
