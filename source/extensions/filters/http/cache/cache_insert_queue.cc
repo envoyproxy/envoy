@@ -130,9 +130,9 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       if (sent_watermark_) {
         under_low_watermark_callback_();
       }
-      abort_callback_();
       chunks_.clear();
       self_ownership_.reset();
+      abort_callback_();
       return;
     }
     if (end_stream) {
@@ -147,10 +147,10 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       // If there's more in the queue, push the next chunk to the cache.
       auto chunk = std::move(chunks_.front());
       chunks_.pop_front();
+      chunk_in_flight_ = true;
       chunk->send(*insert_context_, [this](bool ready, bool end_stream, size_t sz) {
         onChunkComplete(ready, end_stream, sz);
       });
-      chunk_in_flight_ = true;
     }
   });
 }

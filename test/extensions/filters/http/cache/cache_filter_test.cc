@@ -1057,6 +1057,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
                                       formatter_.now(time_source_));
 
     filter->encodeHeaders(response_headers_, true);
+    filter->onDestroy();
   }
   // Make request 2 to test for added conditional headers
   {
@@ -1070,6 +1071,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+    filter->onDestroy();
   }
 }
 
@@ -1086,6 +1088,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
     response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
 
     filter->encodeHeaders(response_headers_, true);
+    filter->onDestroy();
   }
   // Make request 2 to test for added conditional headers
   {
@@ -1100,6 +1103,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+    filter->onDestroy();
   }
 }
 
@@ -1116,6 +1120,7 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
                                       formatter_.now(time_source_));
 
     filter->encodeHeaders(response_headers_, true);
+    filter->onDestroy();
   }
   // Make request 2 to test for added conditional headers
   {
@@ -1129,6 +1134,7 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+    filter->onDestroy();
   }
 }
 
@@ -1140,6 +1146,7 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
     filter->encodeHeaders(response_headers_, true);
+    filter->onDestroy();
   }
   // Make request 2 to test for added conditional headers
   {
@@ -1154,6 +1161,7 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+    filter->onDestroy();
   }
 }
 
@@ -1168,6 +1176,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
     // Add validation headers to the response
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, "invalid-date");
     filter->encodeHeaders(response_headers_, true);
+    filter->onDestroy();
   }
   // Make request 2 to test for added conditional headers
   {
@@ -1182,6 +1191,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+    filter->onDestroy();
   }
 }
 
