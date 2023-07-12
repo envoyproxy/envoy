@@ -4,6 +4,7 @@
 #include "google/protobuf/descriptor.h"
 #include "net/proto2/proto/descriptor.proto.h"
 
+// NOLINT(namespace-envoy)
 namespace cc_proto_descriptor_library {
 namespace internal {
 

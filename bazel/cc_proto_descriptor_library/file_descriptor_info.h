@@ -2,6 +2,7 @@
 
 #include "absl/strings/string_view.h"
 
+// NOLINT(namespace-envoy)
 namespace cc_proto_descriptor_library {
 namespace internal {
 

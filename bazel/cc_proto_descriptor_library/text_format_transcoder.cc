@@ -14,6 +14,7 @@
 #include "google/protobuf/message.h"
 #include "google/protobuf/text_format.h"
 
+// NOLINT(namespace-envoy)
 namespace cc_proto_descriptor_library {
 
 struct TextFormatTranscoder::InternalData {

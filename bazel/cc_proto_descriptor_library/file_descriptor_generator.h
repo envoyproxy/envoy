@@ -4,6 +4,7 @@
 
 #include "google/protobuf/compiler/code_generator.h"
 
+// NOLINT(namespace-envoy)
 namespace cc_proto_descriptor_library {
 
 class ProtoDescriptorGenerator : public google::protobuf::compiler::CodeGenerator {
