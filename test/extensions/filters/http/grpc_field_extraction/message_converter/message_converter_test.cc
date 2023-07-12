@@ -211,9 +211,8 @@ void verifyParsedStreamMessage(StreamMessage& message_data,
 
 // Read-only batch verification of the `StreamMessage` list. Ensures all the
 // stream messages match the original request messages.
-void batchVerifyParsedStreamMessages(
-    const std::vector<std::unique_ptr<StreamMessage>>& message_datas,
-    const std::vector<CreateApiKeyRequest>& request_messages) {
+void batchVerifyParsedStreamMessages(const std::vector<StreamMessagePtr>& message_datas,
+                                     const std::vector<CreateApiKeyRequest>& request_messages) {
   EXPECT_EQ(message_datas.size(), request_messages.size());
   for (unsigned long i = 0; i < message_datas.size(); i++) {
     ASSERT_NE(message_datas[i], nullptr);
@@ -239,7 +238,7 @@ void mutateMessage(StreamMessage& message_data, int index, int message_size) {
 }
 
 // Batch mutation of all underlying proto messages in `StreamMessage` list.
-void batchMutateStreamMessages(const std::vector<std::unique_ptr<StreamMessage>>& message_datas,
+void batchMutateStreamMessages(const std::vector<StreamMessagePtr>& message_datas,
                                int message_size) {
   for (unsigned long i = 0; i < message_datas.size(); i++) {
     ASSERT_NE(message_datas[i], nullptr);
@@ -901,7 +900,7 @@ void runBatch(const std::vector<Buffer::InstancePtr>& input_buffers,
               const std::vector<CreateApiKeyRequest>&, int message_size,
               std::vector<Buffer::InstancePtr>& output_data) {
   // Data should outlive the converter.
-  std::vector<std::unique_ptr<StreamMessage>> message_datas;
+  std::vector<StreamMessagePtr> message_datas;
   {
     // Process input.
     MessageConverter converter(factory());

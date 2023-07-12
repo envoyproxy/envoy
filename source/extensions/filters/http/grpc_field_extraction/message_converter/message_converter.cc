@@ -23,7 +23,7 @@ MessageConverter::MessageConverter(std::unique_ptr<CreateMessageDataFunc> factor
     : factory_(std::move(factory)), buffer_limit_(buffer_limit),
       parsed_bytes_usage_(std::make_shared<uint64_t>(0)) {}
 
-absl::StatusOr<std::unique_ptr<StreamMessage>>
+absl::StatusOr<StreamMessagePtr>
 MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data, bool end_stream) {
   // Append the input data to buffer that will be parsed.
   parsing_buffer_.move(data);
@@ -67,11 +67,11 @@ MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data, bool end_stre
   return message_data;
 }
 
-absl::StatusOr<std::vector<std::unique_ptr<StreamMessage>>>
+absl::StatusOr<std::vector<StreamMessagePtr>>
 MessageConverter::accumulateMessages(Envoy::Buffer::Instance& data, bool end_stream) {
-  std::vector<std::unique_ptr<StreamMessage>> messages;
+  std::vector<StreamMessagePtr> messages;
   while (true) {
-    absl::StatusOr<std::unique_ptr<StreamMessage>> message = accumulateMessage(data, end_stream);
+    absl::StatusOr<StreamMessagePtr> message = accumulateMessage(data, end_stream);
     if (!message.ok()) {
       return message.status();
     }
@@ -86,7 +86,7 @@ MessageConverter::accumulateMessages(Envoy::Buffer::Instance& data, bool end_str
 }
 
 absl::StatusOr<Envoy::Buffer::InstancePtr>
-MessageConverter::convertBackToBuffer(std::unique_ptr<StreamMessage> message) {
+MessageConverter::convertBackToBuffer(StreamMessagePtr message) {
   ABSL_DCHECK(message != nullptr);
   conversions_to_envoy_buffer_++;
   if (conversions_to_envoy_buffer_ > conversions_to_message_data_) {

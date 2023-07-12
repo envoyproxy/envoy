@@ -69,6 +69,8 @@ private:
   // A reference to the total number of bytes consumed by these messages.
   const std::shared_ptr<uint64_t> ref_to_bytes_usage_;
 };
+
+using StreamMessagePtr = std::unique_ptr<StreamMessage>;
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters
 } // namespace Extensions

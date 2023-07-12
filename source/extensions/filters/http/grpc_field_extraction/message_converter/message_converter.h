@@ -55,8 +55,8 @@ public:
   //         OK with the message and nullptr data, when it is the last message
   //         in a stream
   //         Otherwise, an error indicating the failure to create a message.
-  absl::StatusOr<std::unique_ptr<StreamMessage>> accumulateMessage(Envoy::Buffer::Instance& data,
-                                                                   bool end_stream);
+  absl::StatusOr<StreamMessagePtr> accumulateMessage(Envoy::Buffer::Instance& data,
+                                                     bool end_stream);
 
   // The same as `AccumulateMessage`, but returns a list of `StreamMessage`.
   // This should be used if the caller supports streaming, as one data buffer
@@ -69,8 +69,8 @@ public:
   //         were fully parsed. The last message may be a valid message with
   //         nullptr data if it is the last message in the stream.
   //         Otherwise, an error indicating the failure to create a message.
-  absl::StatusOr<std::vector<std::unique_ptr<StreamMessage>>>
-  accumulateMessages(Envoy::Buffer::Instance& data, bool end_stream);
+  absl::StatusOr<std::vector<StreamMessagePtr>> accumulateMessages(Envoy::Buffer::Instance& data,
+                                                                   bool end_stream);
 
   // Converts the StreamMessage back into an Envoy data buffer.
   //
@@ -79,8 +79,7 @@ public:
   //
   // Returns an Envoy Buffer with the same data contents as the `message.`
   // Returns a status if conversion failed.
-  absl::StatusOr<Envoy::Buffer::InstancePtr>
-  convertBackToBuffer(std::unique_ptr<StreamMessage> message);
+  absl::StatusOr<Envoy::Buffer::InstancePtr> convertBackToBuffer(StreamMessagePtr message);
 
   // Returns the total number of bytes stored across all internal buffers.
   // Callers are not expected to explicitly check this, as we internally ensure
