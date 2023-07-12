@@ -23,6 +23,10 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -35,4 +39,8 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/protobuf",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )

@@ -150,6 +150,7 @@ def envoy_cc_test(
         # List of pairs (Bazel shell script target, shell script args)
         repository = "",
         external_deps = [],
+        target_compatible_with = [],
         deps = [],
         tags = [],
         args = [],
@@ -179,6 +180,7 @@ def envoy_cc_test(
         ] + envoy_pch_deps(repository, "//test:test_pch"),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
+        target_compatible_with = target_compatible_with,
         args = args + ["--gmock_default_mock_behavior=2"],
         tags = coverage_tags,
         local = local,
