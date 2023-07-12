@@ -279,7 +279,6 @@ class FormatChecker:
         return (
             file_path.endswith(self.config.suffixes["proto"])
             or file_path.endswith(self.config.suffixes["repositories_bzl"])
-            or "cc_proto_descriptor_library" in file_path
             or any(file_path.startswith(path) for path in self.config.paths["protobuf"]["include"]))
 
     # Real-world time sources should not be instantiated in the source, except for a few
