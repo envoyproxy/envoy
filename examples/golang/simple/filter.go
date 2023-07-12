@@ -10,7 +10,7 @@ import (
 var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
 
 type filter struct {
-	api.DefaultStreamFilter
+	api.PassThroughStreamFilter
 
 	callbacks api.FilterCallbackHandler
 	path      string

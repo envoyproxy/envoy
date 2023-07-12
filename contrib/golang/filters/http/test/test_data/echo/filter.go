@@ -8,7 +8,7 @@ import (
 )
 
 type filter struct {
-	api.DefaultStreamFilter
+	api.PassThroughStreamFilter
 
 	callbacks api.FilterCallbackHandler
 	path      string

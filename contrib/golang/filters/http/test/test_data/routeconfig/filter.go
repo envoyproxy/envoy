@@ -5,7 +5,7 @@ import (
 )
 
 type filter struct {
-	api.DefaultStreamFilter
+	api.PassThroughStreamFilter
 
 	config    *config
 	callbacks api.FilterCallbackHandler

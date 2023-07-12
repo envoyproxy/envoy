@@ -20,14 +20,14 @@ package api
 import "google.golang.org/protobuf/types/known/anypb"
 
 type (
-	// DefaultStreamEncoderFilter provides the no-op implementation of the StreamEncoderFilter interface.
-	DefaultStreamEncoderFilter struct{}
-	// DefaultStreamDecoderFilter provides the no-op implementation of the StreamDecoderFilter interface.
-	DefaultStreamDecoderFilter struct{}
-	// DefaultStreamFilter provides the no-op implementation of the StreamFilter interface.
-	DefaultStreamFilter struct {
-		DefaultStreamDecoderFilter
-		DefaultStreamEncoderFilter
+	// PassThroughStreamEncoderFilter provides the no-op implementation of the StreamEncoderFilter interface.
+	PassThroughStreamEncoderFilter struct{}
+	// PassThroughStreamDecoderFilter provides the no-op implementation of the StreamDecoderFilter interface.
+	PassThroughStreamDecoderFilter struct{}
+	// PassThroughStreamFilter provides the no-op implementation of the StreamFilter interface.
+	PassThroughStreamFilter struct {
+		PassThroughStreamDecoderFilter
+		PassThroughStreamEncoderFilter
 	}
 )
 
@@ -38,15 +38,15 @@ type StreamDecoderFilter interface {
 	DecodeTrailers(RequestTrailerMap) StatusType
 }
 
-func (*DefaultStreamDecoderFilter) DecodeHeaders(RequestHeaderMap, bool) StatusType {
+func (*PassThroughStreamDecoderFilter) DecodeHeaders(RequestHeaderMap, bool) StatusType {
 	return Continue
 }
 
-func (*DefaultStreamDecoderFilter) DecodeData(BufferInstance, bool) StatusType {
+func (*PassThroughStreamDecoderFilter) DecodeData(BufferInstance, bool) StatusType {
 	return Continue
 }
 
-func (*DefaultStreamDecoderFilter) DecodeTrailers(RequestTrailerMap) StatusType {
+func (*PassThroughStreamDecoderFilter) DecodeTrailers(RequestTrailerMap) StatusType {
 	return Continue
 }
 
@@ -57,15 +57,15 @@ type StreamEncoderFilter interface {
 	EncodeTrailers(ResponseTrailerMap) StatusType
 }
 
-func (*DefaultStreamEncoderFilter) EncodeHeaders(ResponseHeaderMap, bool) StatusType {
+func (*PassThroughStreamEncoderFilter) EncodeHeaders(ResponseHeaderMap, bool) StatusType {
 	return Continue
 }
 
-func (*DefaultStreamEncoderFilter) EncodeData(BufferInstance, bool) StatusType {
+func (*PassThroughStreamEncoderFilter) EncodeData(BufferInstance, bool) StatusType {
 	return Continue
 }
 
-func (*DefaultStreamEncoderFilter) EncodeTrailers(ResponseTrailerMap) StatusType {
+func (*PassThroughStreamEncoderFilter) EncodeTrailers(ResponseTrailerMap) StatusType {
 	return Continue
 }
 
@@ -79,7 +79,7 @@ type StreamFilter interface {
 	// TODO add more for stream complete and log phase
 }
 
-func (*DefaultStreamFilter) OnDestroy(DestroyReason) {
+func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {

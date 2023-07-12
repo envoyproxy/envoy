@@ -22,7 +22,7 @@ import (
 )
 
 type passThroughFilter struct {
-	api.DefaultStreamFilter
+	api.PassThroughStreamFilter
 	callbacks api.FilterCallbackHandler
 }
 
