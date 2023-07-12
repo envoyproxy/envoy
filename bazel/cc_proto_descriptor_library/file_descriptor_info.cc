@@ -7,14 +7,14 @@
 namespace cc_proto_descriptor_library {
 namespace internal {
 
-void LoadFileDescriptors(const FileDescriptorInfo& descriptor_info,
+void loadFileDescriptors(const FileDescriptorInfo& descriptor_info,
                          google::protobuf::DescriptorPool* descriptor_pool) {
   if (descriptor_pool->FindFileByName(descriptor_info.file_name)) {
     return;
   }
 
   for (int i = 0; descriptor_info.deps[i] != nullptr; ++i) {
-    LoadFileDescriptors(*descriptor_info.deps[i], descriptor_pool);
+    loadFileDescriptors(*descriptor_info.deps[i], descriptor_pool);
   }
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;

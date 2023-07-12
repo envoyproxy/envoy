@@ -18,7 +18,7 @@ class TextFormatTranscoder;
 // been registered with the passed in TextFormatTranscoder. Returned messages
 // cannot outlive transcoder.
 std::unique_ptr<google::protobuf::Message>
-CreateDynamicMessage(const TextFormatTranscoder& transcoder,
+createDynamicMessage(const TextFormatTranscoder& transcoder,
                      const google::protobuf::MessageLite& message,
                      google::protobuf::io::ErrorCollector* error_collector = nullptr);
 

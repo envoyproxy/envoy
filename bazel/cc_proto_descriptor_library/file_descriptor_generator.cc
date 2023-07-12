@@ -19,7 +19,7 @@ namespace cc_proto_descriptor_library {
 
 namespace {
 
-absl::string_view GetFileBaseName(const google::protobuf::FileDescriptor* file) {
+absl::string_view getFileBaseName(const google::protobuf::FileDescriptor* file) {
   absl::string_view stripped_name = file->name();
   if (absl::ConsumeSuffix(&stripped_name, ".proto")) {
     return stripped_name;
@@ -29,33 +29,33 @@ absl::string_view GetFileBaseName(const google::protobuf::FileDescriptor* file) 
   return stripped_name;
 }
 
-std::string GetDescriptorHeaderName(const google::protobuf::FileDescriptor* file) {
-  return absl::StrCat(GetFileBaseName(file), "_descriptor.pb.h");
+std::string getDescriptorHeaderName(const google::protobuf::FileDescriptor* file) {
+  return absl::StrCat(getFileBaseName(file), "_descriptor.pb.h");
 }
 
-std::string GetDescriptorSourceName(const google::protobuf::FileDescriptor* file) {
-  return absl::StrCat(GetFileBaseName(file), "_descriptor.pb.cc");
+std::string getDescriptorSourceName(const google::protobuf::FileDescriptor* file) {
+  return absl::StrCat(getFileBaseName(file), "_descriptor.pb.cc");
 }
 
-std::string GetDescriptorNamespace(const google::protobuf::FileDescriptor* file) {
+std::string getDescriptorNamespace(const google::protobuf::FileDescriptor* file) {
   return absl::AsciiStrToLower(
-      absl::StrReplaceAll(GetFileBaseName(file), {{"/", "_"}, {"-", "_"}}));
+      absl::StrReplaceAll(getFileBaseName(file), {{"/", "_"}, {"-", "_"}}));
 }
 
-std::string GetDependencyFileDescriptorInfoSymbol(const google::protobuf::FileDescriptor* file) {
-  return absl::StrFormat("%s::kFileDescriptorInfo", GetDescriptorNamespace(file));
+std::string getDependencyFileDescriptorInfoSymbol(const google::protobuf::FileDescriptor* file) {
+  return absl::StrFormat("%s::kFileDescriptorInfo", getDescriptorNamespace(file));
 }
 
-std::string GetDependencyFileDescriptorHeaderGuard(const google::protobuf::FileDescriptor* file) {
-  std::string header_path = GetDescriptorHeaderName(file);
+std::string getDependencyFileDescriptorHeaderGuard(const google::protobuf::FileDescriptor* file) {
+  std::string header_path = getDescriptorHeaderName(file);
   return absl::AsciiStrToUpper(
       absl::StrReplaceAll(header_path, {{"/", "_"}, {".", "_"}, {"-", "_"}}));
 }
 
-bool GenerateHeader(const google::protobuf::FileDescriptor* file,
+bool generateHeader(const google::protobuf::FileDescriptor* file,
                     google::protobuf::io::ZeroCopyOutputStream* output_stream) {
-  auto header_guard = GetDependencyFileDescriptorHeaderGuard(file);
-  auto unique_namespace = GetDescriptorNamespace(file);
+  auto header_guard = getDependencyFileDescriptorHeaderGuard(file);
+  auto unique_namespace = getDescriptorNamespace(file);
 
   std::stringstream contents;
   contents << absl::StrFormat(R"text(
@@ -93,9 +93,9 @@ extern const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDe
   return !output.HadError();
 }
 
-bool GenerateSource(const google::protobuf::FileDescriptor* file,
+bool generateSource(const google::protobuf::FileDescriptor* file,
                     google::protobuf::io::ZeroCopyOutputStream* output_stream) {
-  auto unique_namespace = GetDescriptorNamespace(file);
+  auto unique_namespace = getDescriptorNamespace(file);
   std::stringstream contents;
 
   contents << absl::StrFormat("#include \"%s\"\n", GetDescriptorHeaderName(file));
@@ -155,11 +155,11 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
 }
 } // namespace
 
-bool ProtoDescriptorGenerator::Generate(
+bool ProtoDescriptorGenerator::generate(
     const google::protobuf::FileDescriptor* file, const std::string& parameter,
     google::protobuf::compiler::GeneratorContext* generator_context, std::string* error) const {
-  std::string header_path = GetDescriptorHeaderName(file);
-  std::string source_path = GetDescriptorSourceName(file);
+  std::string header_path = getDescriptorHeaderName(file);
+  std::string source_path = getDescriptorSourceName(file);
 
   std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> header_output(
       generator_context->Open(header_path));

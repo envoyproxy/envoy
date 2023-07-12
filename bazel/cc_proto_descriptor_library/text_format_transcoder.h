@@ -28,14 +28,14 @@ public:
       bool allow_global_fallback = true);
   ~TextFormatTranscoder();
 
-  bool ParseInto(absl::string_view text_format, google::protobuf::MessageLite* msg,
+  bool parseInto(absl::string_view text_format, google::protobuf::MessageLite* msg,
                  google::protobuf::io::ErrorCollector* error_collector = nullptr) const;
 
-  bool ParseInto(google::protobuf::io::ZeroCopyInputStream* input_stream,
+  bool parseInto(google::protobuf::io::ZeroCopyInputStream* input_stream,
                  google::protobuf::MessageLite* msg,
                  google::protobuf::io::ErrorCollector* error_collector = nullptr) const;
 
-  void LoadFileDescriptors(const internal::FileDescriptorInfo& file_descriptor_info);
+  void loadFileDescriptors(const internal::FileDescriptorInfo& file_descriptor_info);
 
 private:
   // This function needs the member function CreateEmptyDynamicMessage. The
@@ -47,10 +47,10 @@ private:
                        google::protobuf::io::ErrorCollector* error_collector);
 
   std::unique_ptr<google::protobuf::Message>
-  CreateEmptyDynamicMessage(absl::string_view type_name,
+  createEmptyDynamicMessage(absl::string_view type_name,
                             google::protobuf::io::ErrorCollector* error_collector) const;
 
-  bool ToBinarySerializationInternal(absl::string_view type_name,
+  bool toBinarySerializationInternal(absl::string_view type_name,
                                      google::protobuf::io::ZeroCopyInputStream* input_stream,
                                      std::string* binary_serializtion,
                                      google::protobuf::io::ErrorCollector* error_collector) const;
