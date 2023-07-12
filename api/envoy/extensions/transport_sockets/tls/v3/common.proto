@@ -258,7 +258,8 @@ message TlsCertificate {
   // must be specified when the `proviate_key_provider_list` field is used. The old :ref:`private_key_provider
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` field will be
   // deprecated. If both :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
-  // and `private_key_provider_list` are provided, the config will be rejected.
+  // and `private_key_provider_list` are provided, the old
+  // :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` will be ignored.
   PrivateKeyProviderList private_key_provider_list = 9;
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
