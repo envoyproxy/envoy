@@ -54,8 +54,7 @@ void StringErrorCollector::AddError(int line, ColumnNumber column, const std::st
 void StringErrorCollector::AddWarning(int line, ColumnNumber column, const std::string& message) {
   if (ignore_warnings_) {
     return;
-
-        }
+  }
   AddError(line, column, message);
 }
 
