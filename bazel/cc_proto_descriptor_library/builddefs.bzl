@@ -14,6 +14,7 @@ load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
 def use_cpp_toolchain():
     return ["@bazel_tools//tools/cpp:toolchain_type"]
+
 # end:github_only
 
 # Generic support code #########################################################
@@ -207,7 +208,7 @@ def _compile_protos(ctx, generator, proto_info, proto_sources):
     return GeneratedSrcsInfo(
         srcs = srcs,
         hdrs = hdrs,
-        includes = [_generate_include_path(proto_sources[0], hdrs[0],  "_descriptor.pb.h")],
+        includes = [_generate_include_path(proto_sources[0], hdrs[0], "_descriptor.pb.h")],
     )
 
 def _cc_proto_descriptor_rule_impl(ctx):

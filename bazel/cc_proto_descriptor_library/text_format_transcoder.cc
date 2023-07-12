@@ -107,7 +107,7 @@ std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::CreateEmptyDyna
   if (descriptor == nullptr) {
     if (error_collector) {
       error_collector->RecordError(0, 0,
-                                absl::StrFormat("Could not find descriptor for: %s", type_name));
+                                   absl::StrFormat("Could not find descriptor for: %s", type_name));
     }
     return nullptr;
   }
