@@ -555,7 +555,7 @@ public:
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
                           ##__VA_ARGS__);                                                          \
     }                                                                                              \
   } while (0)
@@ -565,7 +565,7 @@ public:
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       TAGS.emplace("ConnectionId", std::to_string((CONNECTION).id()));                             \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
                           ##__VA_ARGS__);                                                          \
     }                                                                                              \
   } while (0)
@@ -577,7 +577,7 @@ public:
                    (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0");     \
       TAGS.emplace("StreamId", std::to_string((STREAM).streamId()));                               \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          ::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT,               \
+                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
                           ##__VA_ARGS__);                                                          \
     }                                                                                              \
   } while (0)
