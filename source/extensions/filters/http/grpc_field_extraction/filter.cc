@@ -56,6 +56,8 @@ const char kRcDetailErrorRequestFieldExtractionFailed[] =
     "REQUEST_FIELD_EXTRACTION_FAILED";
 
 const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
+
+const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_field_extraction";
 } // namespace
 
 void Filter::rejectRequest(Status::GrpcStatus grpc_status,
@@ -212,43 +214,28 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 void Filter::handleExtractionResult() {
   ABSL_DCHECK(extractor_);
 
-//  const auto& result = extractor_->GetResult();
+  const auto& result = extractor_->GetResult();
 
-//  absl::flat_hash_map<absl::string_view, google::protobuf::Struct> new_headers;
 
-//  for (const auto& req_field: result.req_fields) {
-//    ABSL_DCHECK(req_field.destination != nullptr);
-//
-//    // For now, only support injecting extraction results into request headers.
-//    ABSL_DCHECK(req_field.destination->has_request_header());
-//    auto it = new_headers.find(req_field.destination->request_header());
-//    if (it == new_headers.end()) {
-//      it = new_headers.insert({req_field.destination->request_header(),
-//                               {}}).first;
-//    }
-//
-//    auto* list =
-//        (*it->second.mutable_fields())[req_field.field_path].mutable_list_value();
-//    for (const auto& value: req_field.values) {
-//      list->add_values()->set_string_value(value);
-//    }
-//  }
-//
-//  for (const auto& it: new_headers) {
-//    ENVOY_STREAM_LOG(debug,
-//                     "add request header `{}: {}`",
-//                     *decoder_callbacks_,
-//                     it.first,
-//                     it.second.DebugString());
-//    headers_->setCopy(Envoy::Http::LowerCaseString(it.first),
-//                      absl::Base64Escape(it.second.SerializeAsString()));
-//  }
+
+ google::protobuf::Struct dest_metadata;
+   for (const auto& req_field: result.req_fields) {
+    auto* list =
+        (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
+    for (const auto& value: req_field.values) {
+      list->add_values()->set_string_value(value);
+    }
+  }
+   if (dest_metadata.fields_size() > 0 ) {
+   decoder_callbacks_->streamInfo().setDynamicMetadata(kGrpcFieldExtractionDynamicMetadata,  dest_metadata);
+   }
 }
 
 Envoy::Http::FilterFactoryCb
 FilterFactory::createFilterFactoryFromProtoTyped(const GrpcFieldExtractionConfig& proto_config,
                                                  const std::string&,
                                                  Envoy::Server::Configuration::FactoryContext&) {
+  // It should be captured by the FilterFactoryCb in the end.
   auto extractor_factory = std::make_shared<ExtractorFactoryImpl>();
   auto filter_config =
       std::make_shared<FilterConfig>(proto_config, *extractor_factory);

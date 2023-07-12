@@ -49,18 +49,22 @@ extractions_by_method: {
     request_field_extractions: {
       key: "parent"
       value: {
-        request_header: "dest-header"
+      }
+    }
+    request_field_extractions: {
+      key: "key.name"
+      value: {
       }
     }
   }
 }
     )pb",
                                                       &proto_config_));
-    proto_config_.set_proto_descriptor_bin(api_->fileSystem().fileReadToEnd(
-        TestEnvironment::runfilesPath("test/proto/apikeys.descriptor")));
+    *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() = api_->fileSystem().fileReadToEnd(
+        TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
-    filter_config_ = std::make_unique<FilterConfig>(proto_config_, mock_extractor_factory_);
+    filter_config_ = std::make_unique<FilterConfig>(proto_config_, );
     filter_ = std::make_unique<Filter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
@@ -85,19 +89,16 @@ Envoy::Buffer::InstancePtr CreateApiKeyRequestEnvoyBuffer() {
   CreateApiKeyRequest request;
   Protobuf::TextFormat::ParseFromString(R"pb(
       parent: "project-id"
-      key { display_name: "my-api-key" }
+      key { name: "key-name" }
     )pb",
                                         &request);
   return Envoy::Grpc::Common::serializeToGrpcFrame(request);
 }
 
-void checkProtoStruct(absl::string_view got_encoded, absl::string_view wanted_in_pbtext) {
-  std::string decoded;
-  ASSERT(absl::Base64Unescape(got_encoded, &decoded));
-  google::protobuf::Struct got, wanted;
-  ASSERT(got.ParseFromString(decoded));
-  Protobuf::TextFormat::ParseFromString(wanted_in_pbtext, &wanted);
-  EXPECT_TRUE(TestUtility::protoEqual(got, wanted, true));
+void checkProtoStruct(Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+  google::protobuf::Struct  expected;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
+  EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n" <<got.DebugString() << "expected:\n" << expected_in_pbtext ;
 }
 
 TEST_F(FilterTest, SunnyPath) {
@@ -109,6 +110,9 @@ TEST_F(FilterTest, SunnyPath) {
   EXPECT_CALL(mock_extractor_factory_, CreateExtractor(_, _, _))
       .WillOnce(Invoke([this, &result](TypeFinder, absl::string_view request_type_url,
                                        const FieldExtractions& field_extractions) {
+
+
+
         EXPECT_EQ(request_type_url, "type.googleapis.com/apikeys.CreateApiKeyRequest");
         auto& extracted = result.req_fields.emplace_back();
         extracted.field_path = "parent";
@@ -118,7 +122,6 @@ TEST_F(FilterTest, SunnyPath) {
         mock_extractor_ = ret.get();
         return ret;
       }));
-
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
 
@@ -127,12 +130,11 @@ TEST_F(FilterTest, SunnyPath) {
 
   Envoy::Buffer::InstancePtr request_data = CreateApiKeyRequestEnvoyBuffer();
   Envoy::Buffer::InstancePtr request_data_old = CreateApiKeyRequestEnvoyBuffer();
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
-  EXPECT_TRUE(TestUtility::buffersEqual(*request_data, *request_data_old));
-
-  const auto injected_header = req_headers.get(Envoy::Http::LowerCaseString("dest-header"));
-  ASSERT(!injected_header.empty());
-  checkProtoStruct(injected_header[0]->value().getStringView(), R"pb(fields {
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns,
+                                           const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
+        checkProtoStruct(new_dynamic_metadata, R"pb(fields {
   key: "parent"
   value {
     list_value {
@@ -141,8 +143,12 @@ TEST_F(FilterTest, SunnyPath) {
       }
     }
   }
-}
-)pb");
+})pb");
+
+      }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+  EXPECT_TRUE(TestUtility::buffersEqual(*request_data, *request_data_old));
 }
 TEST_F(FilterTest, MultipleDecodeData) {}
 TEST_F(FilterTest, SunnyPathMultipleHeaders) {}
