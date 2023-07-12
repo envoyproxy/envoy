@@ -23,8 +23,8 @@ MessageConverter::MessageConverter(std::unique_ptr<CreateMessageDataFunc> factor
     : factory_(std::move(factory)), buffer_limit_(buffer_limit),
       parsed_bytes_usage_(std::make_shared<uint64_t>(0)) {}
 
-absl::StatusOr<StreamMessagePtr>
-MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data, bool end_stream) {
+absl::StatusOr<StreamMessagePtr> MessageConverter::accumulateMessage(Envoy::Buffer::Instance& data,
+                                                                     bool end_stream) {
   // Append the input data to buffer that will be parsed.
   parsing_buffer_.move(data);
 
