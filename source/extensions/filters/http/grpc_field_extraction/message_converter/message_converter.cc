@@ -116,7 +116,7 @@ MessageConverter::convertBackToBuffer(StreamMessagePtr message) {
 
   // Do NOT let StreamMessage and the current parsed data go out of scope and
   // automatically destruct. Manage destruction lazily via lambda capture.
-  auto message_lifetime = std::shared_ptr<StreamMessage>(message.release());
+  std::shared_ptr<StreamMessage> message_lifetime = std::move(message);
   auto fragment_releasor =
       [message_lifetime](const void*, size_t,
                          const Envoy::Buffer::BufferFragmentImpl* this_fragment) {
