@@ -15,6 +15,10 @@ envoy_cc_library(
     external_deps = [
         "luajit",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
@@ -23,24 +27,20 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
     ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )
 
 envoy_cc_library(
     name = "wrappers_lib",
     srcs = ["wrappers.cc"],
     hdrs = ["wrappers.h"],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":lua_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/common:hex_lib",
         "//source/common/protobuf",
     ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )

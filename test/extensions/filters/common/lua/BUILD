@@ -12,6 +12,10 @@ envoy_package()
 envoy_cc_test(
     name = "lua_test",
     srcs = ["lua_test.cc"],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/extensions/filters/common/lua:lua_lib",
@@ -19,15 +23,15 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )
 
 envoy_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
@@ -37,21 +41,17 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )
 
 envoy_cc_test_library(
     name = "lua_wrappers_lib",
     hdrs = ["lua_wrappers.h"],
-    deps = [
-        "//source/extensions/filters/common/lua:lua_lib",
-        "//test/mocks/thread_local:thread_local_mocks",
-    ],
     target_compatible_with = select({
         "@platforms//cpu:ppc": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    deps = [
+        "//source/extensions/filters/common/lua:lua_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
 )
