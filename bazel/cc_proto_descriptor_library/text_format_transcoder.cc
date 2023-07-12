@@ -106,7 +106,7 @@ std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::CreateEmptyDyna
   }
   if (descriptor == nullptr) {
     if (error_collector) {
-      error_collector->AddError(0, 0,
+      error_collector->RecordError(0, 0,
                                 absl::StrFormat("Could not find descriptor for: %s", type_name));
     }
     return nullptr;
@@ -116,7 +116,7 @@ std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::CreateEmptyDyna
       absl::WrapUnique(internals_->message_factory.GetPrototype(descriptor)->New());
   if (!dynamic_message) {
     if (error_collector) {
-      error_collector->AddError(
+      error_collector->RecordError(
           0, 0, absl::StrFormat("Could not create dynamic message for: %s", type_name));
     }
     return nullptr;

@@ -34,6 +34,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//src/google/protobuf/compiler:code_generator",
     ],
 )
 
@@ -44,6 +45,9 @@ cc_binary(
     deps = [
         ":file_descriptor_generator_lib",
         "@com_google_protobuf//:protoc_lib",
+        "@com_google_protobuf//:compiled_protoc",
+        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//src/google/protobuf/compiler:code_generator",
     ],
 )
 
