@@ -125,7 +125,7 @@ static_resources:
 TEST_F(ThriftTrdsIntegrationTest, Basic) {
   initialize();
 
-  constexpr absl::string_view test_route = R"EOF(
+  const char test_route[] = R"EOF(
 name: test_route
 routes:
   - match:
