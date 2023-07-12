@@ -1195,7 +1195,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     // Use a local stream info for these tests as as setSslConnection can only be called once.
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
@@ -1209,7 +1209,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
@@ -1220,7 +1220,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
@@ -1235,7 +1235,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_DNS_SAN");
     EXPECT_EQ(absl::nullopt,
               upstream_format.format(request_headers, response_headers, response_trailers,
                                      stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -1246,7 +1246,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     // Use a local stream info for these tests as as setSslConnection can only be called once.
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
@@ -1260,7 +1260,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
@@ -1271,7 +1271,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ipSansPeerCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
@@ -1286,7 +1286,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_IP_SAN");
     EXPECT_EQ(absl::nullopt,
               upstream_format.format(request_headers, response_headers, response_trailers,
                                      stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -1346,7 +1346,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
@@ -1359,7 +1359,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
@@ -1370,7 +1370,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
@@ -1385,7 +1385,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_DNS_SAN");
     EXPECT_EQ(absl::nullopt,
               upstream_format.format(request_headers, response_headers, response_trailers,
                                      stream_info, body, AccessLog::AccessLogType::NotSet));
@@ -1395,7 +1395,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
@@ -1408,7 +1408,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
@@ -1419,7 +1419,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ipSansLocalCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
@@ -1434,7 +1434,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SANS");
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SAN");
     EXPECT_EQ(absl::nullopt,
               upstream_format.format(request_headers, response_headers, response_trailers,
                                      stream_info, body, AccessLog::AccessLogType::NotSet));

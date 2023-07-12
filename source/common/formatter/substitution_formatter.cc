@@ -1424,7 +1424,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
-                          {"DOWNSTREAM_PEER_DNS_SANS",
+                          {"DOWNSTREAM_PEER_DNS_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
@@ -1433,7 +1433,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
-                          {"DOWNSTREAM_PEER_IP_SANS",
+                          {"DOWNSTREAM_PEER_IP_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
@@ -1451,7 +1451,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
-                          {"DOWNSTREAM_LOCAL_DNS_SANS",
+                          {"DOWNSTREAM_LOCAL_DNS_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
@@ -1460,7 +1460,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
-                          {"DOWNSTREAM_LOCAL_IP_SANS",
+                          {"DOWNSTREAM_LOCAL_IP_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(

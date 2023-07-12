@@ -491,5 +491,5 @@ deprecated:
     support for ClusterTrafficStats.
 - area: access_log
   change: |
-    Added %DOWNSTREAM_LOCAL_DNS_SANS%, %DOWNSTREAM_PEER_DNS_SANS%, %DOWNSTREAM_LOCAL_IP_SANS% and %DOWNSTREAM_PEER_IP_SANS% substitution
+    Added %DOWNSTREAM_LOCAL_DNS_SAN%, %DOWNSTREAM_PEER_DNS_SAN%, %DOWNSTREAM_LOCAL_IP_SAN% and %DOWNSTREAM_PEER_IP_SAN% substitution
     formatters.

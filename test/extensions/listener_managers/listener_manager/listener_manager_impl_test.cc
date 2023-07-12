@@ -3785,6 +3785,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   EXPECT_EQ(local_ip_sans.size(), 1);
   EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
 
+  // Assert twice to ensure a cached value is returned and still valid.
+  local_ip_sans = ssl_socket->ssl()->ipSansLocalCertificate();
+  EXPECT_EQ(local_ip_sans.size(), 1);
+  EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
+
   // UDS client - no match.
   filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   EXPECT_EQ(filter_chain, nullptr);
@@ -3853,6 +3858,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // Assert twice to ensure a cached value is returned and still valid.
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
