@@ -32,12 +32,10 @@ struct PerMethodExtraction {
 // The Envoy filter config for ESPv2 service control client.
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
  public:
-  FilterConfig(
+  explicit FilterConfig(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
       proto_config,
-      ExtractorFactory& extractor_factory);
-
-  google::grpc::transcoding::TypeHelper& type_helper() { return *type_helper_; }
+      ExtractorFactory& extractor_factory, Api::Api& api);
 
   TypeFinder createTypeFinder() ;
 
@@ -53,9 +51,6 @@ class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
       proto_config_;
   ExtractorFactory& extractor_factory_;
   google::protobuf::DescriptorPool descriptor_pool_;
-  // gRPC method to protobuf method.
-  // '/package.Service/method' to 'package.Service.method'.
-  absl::flat_hash_map<std::string, std::string> configured_grpc_methods_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 

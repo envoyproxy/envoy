@@ -9,6 +9,9 @@ service ApiKeys {
   // Creates a new API key.
   rpc CreateApiKey(CreateApiKeyRequest) returns (ApiKey) {
   }
+
+  rpc CreateApiKeyInStream(stream CreateApiKeyRequest) returns (ApiKey) {
+  }
 }
 
 // Message for an API key.

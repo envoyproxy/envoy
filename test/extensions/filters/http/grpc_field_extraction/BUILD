@@ -25,3 +25,19 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "filter_config_test",
+    srcs = ["filter_config_test.cc"],
+    data = ["//test/proto:apikeys_proto_descriptor"],
+    deps = [
+        "//source/extensions/filters/http/grpc_field_extraction:extractor",
+        "//source/extensions/filters/http/grpc_field_extraction:extractor_impl",
+        "//source/extensions/filters/http/grpc_field_extraction:filter_config",
+        "//test/mocks/http:http_mocks",
+        "//test/proto:apikeys_proto_cc_proto",
+        "//test/proto:bookstore_proto_cc_proto",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

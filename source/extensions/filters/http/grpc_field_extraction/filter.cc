@@ -22,18 +22,32 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-// #include "source/common/router/string_accessor_impl.h"
 #include "src/message_data/cord_message_data.h"
 #include "src/message_data/message_data.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
-using envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
-using envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
+using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
+using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Grpc::Utility;
 using ::Envoy::ProtobufMessage::MessageConverter;
+
+// The filter prefixes.
+const char kRcDetailFilterGrpcFieldExtraction[] = "grpc_field_extraction";
+
+const char kRcDetailErrorRequestBufferConversion[] =
+    "REQUEST_BUFFER_CONVERSION_FAIL";
+
+const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
+
+const char kRcDetailErrorRequestFieldExtractionFailed[] =
+    "REQUEST_FIELD_EXTRACTION_FAILED";
+
+const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
+
+const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_field_extraction";
 
 std::string generateRcDetails(absl::string_view filter_name,
                               absl::string_view error_type,
@@ -44,20 +58,22 @@ std::string generateRcDetails(absl::string_view filter_name,
   return absl::StrCat(filter_name, "_", error_type);
 }
 
-// The filter prefixes.
-const char kRcDetailFilterGrpcFieldExtraction[] = "grpc_field_extraction";
+// Turns a '/package.Service/method' to 'package.Service.method' which is
+// the form suitable for the proto db lookup.
+absl::StatusOr<std::string> GrpcPathToProtoPath(
+    absl::string_view  grpc_path) {
+  if (grpc_path.size() == 0 || grpc_path.at(0) != '/' ||
+      std::count(grpc_path.begin(), grpc_path.end(), '/') != 2) {
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "for grpc requests,  :path `%s` should be in form of `/package.Service/method`",
+        grpc_path));
+  }
 
-const char kRcDetailErrorRequestBufferConversion[] =
-    "REQUEST_BUFFER_CONVERSION_FAIL";
+  std::string clean_input = std::string(grpc_path.substr(1));
+  std::replace(clean_input.begin(), clean_input.end(), '/', '.');
+  return clean_input;
+}
 
-const char kRcDetailErrorTypeBadRequest[] = "bad_request";
-
-const char kRcDetailErrorRequestFieldExtractionFailed[] =
-    "REQUEST_FIELD_EXTRACTION_FAILED";
-
-const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
-
-const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_field_extraction";
 } // namespace
 
 void Filter::rejectRequest(Status::GrpcStatus grpc_status,
@@ -94,8 +110,16 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
     return Http::FilterHeadersStatus::Continue;
   }
 
-  path_ = std::string(path->value().getStringView());
-  auto per_method_extraction = filter_config_.FindPerMethodExtraction(path_);
+  auto proto_path = GrpcPathToProtoPath(path->value().getStringView());
+  if (!proto_path.ok()) {
+    ENVOY_STREAM_LOG(debug, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_, proto_path.status().ToString());
+                  generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
+                                    absl::StatusCodeToString(proto_path.status().code()),
+                                    kRcDetailErrorTypeBadRequest);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  auto per_method_extraction = filter_config_.FindPerMethodExtraction(*proto_path);
   if (!per_method_extraction.ok()) {
     ENVOY_STREAM_LOG(debug,
                      "{}",
@@ -231,20 +255,6 @@ void Filter::handleExtractionResult() {
    }
 }
 
-Envoy::Http::FilterFactoryCb
-FilterFactory::createFilterFactoryFromProtoTyped(const GrpcFieldExtractionConfig& proto_config,
-                                                 const std::string&,
-                                                 Envoy::Server::Configuration::FactoryContext&) {
-  // It should be captured by the FilterFactoryCb in the end.
-  auto extractor_factory = std::make_shared<ExtractorFactoryImpl>();
-  auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, *extractor_factory);
-  return [=](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(*filter_config));
-  };
-}
 
-REGISTER_FACTORY(FilterFactory,
-                 Envoy::Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction

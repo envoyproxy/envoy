@@ -44,7 +44,6 @@ ExtractorImpl::ProcessRequest(google::protobuf::field_extraction::MessageData& m
     if (!resource.ok()) {
       return resource.status();
     }
-    resource->destination = &it.second;
     result_.req_fields.push_back(*resource);
   }
 
@@ -56,7 +55,10 @@ ExtractorImpl::ExtractRequestField(FieldValueExtractorFactory& extractor_factory
                                    absl::string_view field_path,
                                    google::protobuf::field_extraction::MessageData& message) const {
   // Extract the resource values from proto.
-  RequestField request_field_values{};
+  RequestField request_field_values{
+    field_path,
+    /*values=*/{},
+  };
   auto extracted_values =
       ExtractFromPath(request_type_url_, field_path, message, extractor_factory);
   if (!extracted_values.ok()) {

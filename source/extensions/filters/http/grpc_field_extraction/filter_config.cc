@@ -1,81 +1,71 @@
 #include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
-namespace {
 
-// Turns a '/package.Service/method' to 'package.Service.method' which is
-// the form suitable for the proto db lookup.
-std::string GrpcMethodNameToFullMethodName(const std::string& method) {
-  std::string clean_input = method.substr(1);
-  size_t first_slash = method.find('/', 0);
-  if (first_slash == std::string::npos) {
-    ENVOY_LOG_MISC(info, "method does not contain second slash: {}", method);
-    return method;
-  }
-  size_t extra_slash = method.find('/', first_slash);
-  if (extra_slash != std::string::npos) {
-    ENVOY_LOG_MISC(info,
-                   "Method contains too many slashes:{}. Will convert all '/' to '.'.",
-                   method);
-  }
-
-  std::replace(clean_input.begin(), clean_input.end(), '/', '.');
-  return clean_input;
-}
-
-}
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-    proto_config,
-    ExtractorFactory& extractor_factory)
+        proto_config,
+    ExtractorFactory& extractor_factory, Api::Api& api)
     : proto_config_(proto_config), extractor_factory_(extractor_factory) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
-  if (!descriptor_set.ParseFromString(proto_config_.descriptor_set().inline_bytes())) {
-    throw Envoy::EnvoyException("Unable to parse proto descriptor");
+
+  auto& descriptor_config = proto_config.descriptor_set();
+
+  switch (descriptor_config.specifier_case()) {
+  case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
+    if (!descriptor_set.ParseFromString(api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
+      throw Envoy::EnvoyException("Unable to parse proto descriptor");
+    }
+    break;
+  }
+  case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
+    if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
+      throw Envoy::EnvoyException("Unable to parse proto descriptor");
+    }
+    break;
+  }
+  default: {
+    throw Envoy::EnvoyException(fmt::format("Unsupported DataSource case `{}` for configuring `descriptor_set`", descriptor_config.specifier_case()));
+    break;
+  }
   }
 
-  for (const auto& file: descriptor_set.file()) {
+  for (const auto& file : descriptor_set.file()) {
     if (descriptor_pool_.BuildFile(file) == nullptr) {
       throw Envoy::EnvoyException("Unable to build proto descriptor pool");
     }
   }
-
-  for (const auto& it: proto_config_.extractions_by_method()) {
-    auto proto_method_name = GrpcMethodNameToFullMethodName(it.first);
-    auto* method = descriptor_pool_.FindMethodByName(proto_method_name);
+  for (const auto& it : proto_config_.extractions_by_method()) {
+    auto* method = descriptor_pool_.FindMethodByName(it.first);
     if (method == nullptr) {
-      throw Envoy::EnvoyException(fmt::format(
-          "couldn't find the gRPC method `{}` defined in proto descriptor",
-          it.first));
+      throw Envoy::EnvoyException(
+          fmt::format("couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
-
-    configured_grpc_methods_.emplace(it.first, proto_method_name);
   }
 
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(
-          Envoy::Grpc::Common::typeUrlPrefix(), &descriptor_pool_));
+      google::protobuf::util::NewTypeResolverForDescriptorPool(Envoy::Grpc::Common::typeUrlPrefix(),
+                                                               &descriptor_pool_));
 }
 
-  TypeFinder FilterConfig::createTypeFinder()  {
-    return [this](absl::string_view type_url) -> const google::protobuf::Type* {
-      return type_helper_->Info()->GetTypeByTypeUrl(type_url);
-    };
-  }
+TypeFinder FilterConfig::createTypeFinder() {
+  return [this](absl::string_view type_url) -> const google::protobuf::Type* {
+    return type_helper_->Info()->GetTypeByTypeUrl(type_url);
+  };
+}
 
-absl::StatusOr<PerMethodExtraction>
-FilterConfig::FindPerMethodExtraction(absl::string_view path) {
-  auto it = configured_grpc_methods_.find(path);
-  if (it == configured_grpc_methods_.end()) {
-    return absl::UnavailableError(fmt::format(
-        "gRPC method `{}` isn't configured for field extraction",
-        path));
+absl::StatusOr<PerMethodExtraction> FilterConfig::FindPerMethodExtraction(absl::string_view proto_path) {
+  const auto* md = descriptor_pool_.FindMethodByName(proto_path);
+  if (md == nullptr) {
+     return absl::UnavailableError(
+        fmt::format("gRPC method with protobuf path `{}` isn't configured for field extraction", proto_path));
   }
 
   return PerMethodExtraction{
-       Envoy::Grpc::Common::typeUrlPrefix() + "/" +
-           descriptor_pool_.FindMethodByName(it->second)->input_type()->full_name(),
-      &proto_config_.extractions_by_method().at(path),
+      Envoy::Grpc::Common::typeUrlPrefix() + "/" +
+          md->input_type()->full_name(),
+      &proto_config_.extractions_by_method().at(proto_path),
   };
 }
-}
+} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
