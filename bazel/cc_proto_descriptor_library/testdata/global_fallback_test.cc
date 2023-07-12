@@ -8,6 +8,7 @@
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 
+// NOLINT(namespace-envoy)
 namespace {
 
 using ::testing::Eq;

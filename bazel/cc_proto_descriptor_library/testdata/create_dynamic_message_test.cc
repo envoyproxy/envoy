@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+// NOLINT(namespace-envoy)
 namespace {
 
 using ::testing::Eq;
