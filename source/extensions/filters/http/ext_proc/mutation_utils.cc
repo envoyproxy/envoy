@@ -49,10 +49,56 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
   });
 }
 
+absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& headers,
+                                                    const HeaderMutation& mutation,
+                                                    Counter& rejected_mutations) {
+  const uint32_t remove_size = mutation.remove_headers().size();
+  const uint32_t set_size = mutation.set_headers().size();
+  const uint32_t max_request_headers_count = headers.maxHeadersCount();
+
+  if (remove_size > max_request_headers_count || set_size > max_request_headers_count) {
+    ENVOY_LOG(debug,
+              "Header mutation remove header count {} or set header count {} exceed the "
+              "max header count limit {}. Returning error.",
+              remove_size, set_size, max_request_headers_count);
+    rejected_mutations.inc();
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Header mutation remove header count ", std::to_string(remove_size),
+        " or set header count ", std::to_string(set_size), " exceed the HCM header countlimit ",
+        std::to_string(max_request_headers_count)));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& headers,
+                                                      Counter& rejected_mutations) {
+  if (headers.byteSize() > headers.maxHeadersKb() * 1024 ||
+      headers.size() > headers.maxHeadersCount()) {
+    ENVOY_LOG(debug,
+              "After mutation, the total header count {} or total header size {} bytes, exceed the "
+              "count limit {} or the size limit {} kilobytes. Returning error.",
+              headers.size(), headers.byteSize(), headers.maxHeadersCount(),
+              headers.maxHeadersKb());
+    rejected_mutations.inc();
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Header mutation causes end result header count ", headers.size(), " or header size ",
+        headers.byteSize(), " bytes, exceeding the count limit ", headers.maxHeadersCount(),
+        " or the size limit ", headers.maxHeadersKb(), " kilobytes"));
+  }
+  return absl::OkStatus();
+}
+
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
                                                  Counter& rejected_mutations) {
+  // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
+  // Reject the mutation and return error status if either one does.
+  const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
+  if (!result.ok()) {
+    return result;
+  }
+
   for (const auto& hdr : mutation.remove_headers()) {
     if (!Http::HeaderUtility::headerNameIsValid(hdr)) {
       ENVOY_LOG(debug, "remove_headers contain invalid character, may not be removed.");
@@ -134,7 +180,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
           absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
     }
   }
-  return absl::OkStatus();
+
+  // After header mutation, check the ending headers are not exceeding the HCM limit.
+  return headerMutationResultCheck(headers, rejected_mutations);
 }
 
 void MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
