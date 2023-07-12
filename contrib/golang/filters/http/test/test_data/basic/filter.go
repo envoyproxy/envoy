@@ -11,6 +11,8 @@ import (
 )
 
 type filter struct {
+	api.PassThroughStreamFilter
+
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
@@ -85,7 +87,10 @@ func (f *filter) fail(msg string, a ...any) api.StatusType {
 }
 
 func (f *filter) sendLocalReply(phase string) api.StatusType {
-	headers := make(map[string]string)
+	headers := map[string]string{
+		"Content-type": "text/html",
+		"test-phase":   phase,
+	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
 	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
 	return api.LocalReply
@@ -108,7 +113,24 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	_, found := header.Get("x-set-metadata")
 	if found {
 		md := f.callbacks.StreamInfo().DynamicMetadata()
+		empty_metadata := md.Get("filter.go")
+		if len(empty_metadata) != 0 {
+			return f.fail("Metadata should be empty")
+		}
 		md.Set("filter.go", "foo", "bar")
+		metadata := md.Get("filter.go")
+		if len(metadata) == 0 {
+			return f.fail("Metadata should not be empty")
+		}
+
+		k, ok := metadata["foo"]
+		if !ok {
+			return f.fail("Metadata foo should be found")
+		}
+
+		if fmt.Sprint(k) != "bar" {
+			return f.fail("Metadata foo has unexpected value %v", k)
+		}
 	}
 
 	fs := f.callbacks.StreamInfo().FilterState()
@@ -124,6 +146,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Range(func(key, value string) bool {
 		if key == ":path" && value != f.path {
 			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
+
+	header.RangeWithCopy(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in RangeWithCopy")
 			return false
 		}
 		return true

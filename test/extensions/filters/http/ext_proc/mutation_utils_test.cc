@@ -49,7 +49,7 @@ TEST(MutationUtils, TestBuildHeaders) {
 
 TEST(MutationUtils, TestApplyMutations) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},
       {":method", "GET"},
@@ -158,7 +158,7 @@ TEST(MutationUtils, TestApplyMutations) {
 
 TEST(MutationUtils, TestNonAppendableHeaders) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
@@ -196,7 +196,7 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
 
 TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_value_in_bytes", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {"host", "localhost:1000"},
