@@ -63,7 +63,7 @@ public:
 };
 
 TEST_F(FilterTest, Disabled) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: false
@@ -92,7 +92,7 @@ TEST_F(FilterTest, Disabled) {
 }
 
 TEST_F(FilterTest, LimitOnDecode) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: true
@@ -215,7 +215,7 @@ TEST_F(FilterTest, LimitOnDecode) {
 }
 
 TEST_F(FilterTest, LimitOnEncode) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: true
@@ -339,7 +339,7 @@ TEST_F(FilterTest, LimitOnEncode) {
 }
 
 TEST_F(FilterTest, LimitOnDecodeAndEncode) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: true
@@ -477,7 +477,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
 }
 
 TEST_F(FilterTest, WithTrailers) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: true
@@ -553,7 +553,7 @@ TEST_F(FilterTest, WithTrailers) {
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
-  constexpr absl::string_view config_yaml = R"(
+  const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
     default_value: true
