@@ -14,13 +14,13 @@ using ::testing::Test;
 
 TEST(TextFormatTranscoderTest, CreateDynamicMessage) {
   cc_proto_descriptor_library::TextFormatTranscoder reserializer;
-  reserializer.LoadFileDescriptors(
+  reserializer.loadFileDescriptors(
       protobuf::reflection::bazel_cc_proto_descriptor_library_testdata_test::kFileDescriptorInfo);
 
   testdata::dynamic_descriptors::Foo concrete_message;
   concrete_message.set_bar("hello world");
   auto dynamic_message =
-      cc_proto_descriptor_library::CreateDynamicMessage(reserializer, concrete_message);
+      cc_proto_descriptor_library::createDynamicMessage(reserializer, concrete_message);
   ASSERT_THAT(dynamic_message, NotNull());
 
   // Access the descriptor.

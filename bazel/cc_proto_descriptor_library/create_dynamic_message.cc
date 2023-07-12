@@ -15,11 +15,11 @@
 namespace cc_proto_descriptor_library {
 
 std::unique_ptr<google::protobuf::Message>
-CreateDynamicMessage(const TextFormatTranscoder& transcoder,
+createDynamicMessage(const TextFormatTranscoder& transcoder,
                      const google::protobuf::MessageLite& message,
                      google::protobuf::io::ErrorCollector* error_collector /*= nullptr*/) {
   auto dynamic_message =
-      transcoder.CreateEmptyDynamicMessage(message.GetTypeName(), error_collector);
+      transcoder.createEmptyDynamicMessage(message.GetTypeName(), error_collector);
 
   if (dynamic_message) {
     dynamic_message->ParsePartialFromString(message.SerializePartialAsString());

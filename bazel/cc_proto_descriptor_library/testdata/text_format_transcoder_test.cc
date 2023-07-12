@@ -64,11 +64,11 @@ using ::testing::Test;
 
 TEST(TextFormatTranscoderTest, TextFormatWorks) {
   cc_proto_descriptor_library::TextFormatTranscoder reserializer;
-  reserializer.LoadFileDescriptors(
+  reserializer.loadFileDescriptors(
       protobuf::reflection::bazel_cc_proto_descriptor_library_testdata_test::kFileDescriptorInfo);
 
   testdata::dynamic_descriptors::Foo concrete_message;
-  ASSERT_TRUE(reserializer.ParseInto(R"text(
+  ASSERT_TRUE(reserializer.parseInto(R"text(
 bar: "hello world"
 )text",
                                      &concrete_message));
@@ -80,12 +80,12 @@ TEST(TextToBinaryReserializerTest, TextFormatWithExtensionWorks) {
   cc_proto_descriptor_library::TextFormatTranscoder reserializer;
   const auto& file_descriptor_info = protobuf::reflection::
       bazel_cc_proto_descriptor_library_testdata_test_extension::kFileDescriptorInfo;
-  reserializer.LoadFileDescriptors(file_descriptor_info);
+  reserializer.loadFileDescriptors(file_descriptor_info);
 
   std::string error_text;
   StringErrorCollector error_collector(error_text);
   testdata::dynamic_descriptors::Foo concrete_message;
-  ASSERT_TRUE(reserializer.ParseInto(R"text(
+  ASSERT_TRUE(reserializer.parseInto(R"text(
 bar: "hello world"
 [testdata.dynamic_descriptors.number]: 20
 )text",

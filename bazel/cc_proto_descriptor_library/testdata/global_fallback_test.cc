@@ -19,7 +19,7 @@ TEST(TextFormatTranscoderTest, GlobalFallbackAllowed) {
       /*allow_global_fallback=*/true);
 
   testdata::dynamic_descriptors::Foo concrete_message;
-  ASSERT_TRUE(reserializer.ParseInto(R"text(
+  ASSERT_TRUE(reserializer.parseInto(R"text(
 bar: "hello world"
 )text",
                                      &concrete_message));
@@ -32,7 +32,7 @@ TEST(TextFormatTranscoderTest, GlobalFallbackDisallowed) {
       /*allow_global_fallback=*/false);
 
   testdata::dynamic_descriptors::Foo concrete_message;
-  ASSERT_FALSE(reserializer.ParseInto(R"text(
+  ASSERT_FALSE(reserializer.parseInto(R"text(
 bar: "hello world"
 )text",
                                       &concrete_message));

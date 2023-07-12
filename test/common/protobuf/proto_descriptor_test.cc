@@ -13,7 +13,7 @@ namespace Envoy {
 
 TEST(ProtoDescriptorLibrary, CreateDynamicMessage) {
   cc_proto_descriptor_library::TextFormatTranscoder reserializer;
-  reserializer.LoadFileDescriptors(
+  reserializer.loadFileDescriptors(
       protobuf::reflection::envoy_config_core_v3_base::kFileDescriptorInfo);
 
   envoy::config::core::v3::Locality concrete_message;
@@ -22,7 +22,7 @@ TEST(ProtoDescriptorLibrary, CreateDynamicMessage) {
   concrete_message.set_sub_zone("Subzone");
 
   auto dynamic_message =
-      cc_proto_descriptor_library::CreateDynamicMessage(reserializer, concrete_message);
+      cc_proto_descriptor_library::createDynamicMessage(reserializer, concrete_message);
   ASSERT_THAT(dynamic_message, NotNull());
 
   // Access the descriptor.

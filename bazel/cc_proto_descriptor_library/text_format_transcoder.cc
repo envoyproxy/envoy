@@ -30,19 +30,19 @@ TextFormatTranscoder::TextFormatTranscoder(bool allow_global_fallback /*= true*/
 // destructor.
 TextFormatTranscoder::~TextFormatTranscoder() = default;
 
-bool TextFormatTranscoder::ParseInto(absl::string_view text_format,
+bool TextFormatTranscoder::parseInto(absl::string_view text_format,
                                      google::protobuf::MessageLite* msg,
                                      google::protobuf::io::ErrorCollector* error_collector) const {
   google::protobuf::io::ArrayInputStream input(text_format.data(), text_format.size());
-  return ParseInto(&input, msg, error_collector);
+  return parseInto(&input, msg, error_collector);
 }
 
-bool TextFormatTranscoder::ParseInto(google::protobuf::io::ZeroCopyInputStream* input_stream,
+bool TextFormatTranscoder::parseInto(google::protobuf::io::ZeroCopyInputStream* input_stream,
                                      google::protobuf::MessageLite* msg,
                                      google::protobuf::io::ErrorCollector* error_collector) const {
   std::string serialization;
 
-  if (!ToBinarySerializationInternal(msg->GetTypeName(), input_stream, &serialization,
+  if (!toBinarySerializationInternal(msg->GetTypeName(), input_stream, &serialization,
                                      error_collector)) {
     return false;
   }
@@ -50,14 +50,14 @@ bool TextFormatTranscoder::ParseInto(google::protobuf::io::ZeroCopyInputStream* 
   return msg->ParseFromString(serialization);
 }
 
-void TextFormatTranscoder::LoadFileDescriptors(
+void TextFormatTranscoder::loadFileDescriptors(
     const internal::FileDescriptorInfo& file_descriptor_info) {
   if (internals_->descriptor_pool.FindFileByName(std::string(file_descriptor_info.file_name))) {
     return;
   }
 
   for (int i = 0; file_descriptor_info.deps[i] != nullptr; ++i) {
-    LoadFileDescriptors(*file_descriptor_info.deps[i]);
+    loadFileDescriptors(*file_descriptor_info.deps[i]);
   }
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
@@ -67,12 +67,12 @@ void TextFormatTranscoder::LoadFileDescriptors(
   internals_->descriptor_pool.BuildFile(file_descriptor_proto);
 }
 
-bool TextFormatTranscoder::ToBinarySerializationInternal(
+bool TextFormatTranscoder::toBinarySerializationInternal(
     absl::string_view type_name, google::protobuf::io::ZeroCopyInputStream* input_stream,
     std::string* binary_serializtion, google::protobuf::io::ErrorCollector* error_collector) const {
-  auto dynamic_message = CreateEmptyDynamicMessage(type_name, error_collector);
+  auto dynamic_message = createEmptyDynamicMessage(type_name, error_collector);
   if (!dynamic_message) {
-    // CreateEmptyDynamicMessage already would have written to the
+    // createEmptyDynamicMessage already would have written to the
     // error_collector.
     return false;
   }
@@ -89,7 +89,7 @@ bool TextFormatTranscoder::ToBinarySerializationInternal(
   return dynamic_message->SerializePartialToString(binary_serializtion);
 }
 
-std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::CreateEmptyDynamicMessage(
+std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::createEmptyDynamicMessage(
     absl::string_view type_name, google::protobuf::io::ErrorCollector* error_collector) const {
   const google::protobuf::Descriptor* descriptor =
       internals_->descriptor_pool.FindMessageTypeByName(std::string(type_name));

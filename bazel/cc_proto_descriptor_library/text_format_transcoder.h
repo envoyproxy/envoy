@@ -43,7 +43,7 @@ private:
   // target the defines the function has its own visibility whitelist which
   // requires a dance with these declarations.
   friend std::unique_ptr<google::protobuf::Message>
-  CreateDynamicMessage(const TextFormatTranscoder& transcoder,
+  createDynamicMessage(const TextFormatTranscoder& transcoder,
                        const google::protobuf::MessageLite& message,
                        google::protobuf::io::ErrorCollector* error_collector);
 

@@ -99,9 +99,9 @@ bool generateSource(const google::protobuf::FileDescriptor* file,
   auto unique_namespace = getDescriptorNamespace(file);
   std::stringstream contents;
 
-  contents << absl::StrFormat("#include \"%s\"\n", GetDescriptorHeaderName(file));
+  contents << absl::StrFormat("#include \"%s\"\n", getDescriptorHeaderName(file));
   for (int i = 0; i < file->dependency_count(); ++i) {
-    contents << absl::StrFormat("#include \"%s\"\n", GetDescriptorHeaderName(file->dependency(i)));
+    contents << absl::StrFormat("#include \"%s\"\n", getDescriptorHeaderName(file->dependency(i)));
   }
   contents << R"text(#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 )text";
@@ -128,7 +128,7 @@ namespace %s {
               "FileDescriptorInfo* kDeps[] = {\n";
   for (int i = 0; i < file->dependency_count(); ++i) {
     contents << absl::StrFormat("&%s,\n",
-                                GetDependencyFileDescriptorInfoSymbol(file->dependency(i)));
+                                getDependencyFileDescriptorInfoSymbol(file->dependency(i)));
   }
   contents << "nullptr};\n";
 
@@ -156,7 +156,7 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
 }
 } // namespace
 
-bool ProtoDescriptorGenerator::generate(
+bool ProtoDescriptorGenerator::Generate(
     const google::protobuf::FileDescriptor* file, const std::string& parameter,
     google::protobuf::compiler::GeneratorContext* generator_context, std::string* error) const {
   std::string header_path = getDescriptorHeaderName(file);
@@ -167,10 +167,10 @@ bool ProtoDescriptorGenerator::generate(
   std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> source_output(
       generator_context->Open(source_path));
 
-  if (!GenerateHeader(file, header_output.get())) {
+  if (!generateHeader(file, header_output.get())) {
     return false;
   }
-  if (!GenerateSource(file, source_output.get())) {
+  if (!generateSource(file, source_output.get())) {
     return false;
   }
 
