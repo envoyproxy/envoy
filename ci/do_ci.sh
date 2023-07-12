@@ -343,8 +343,8 @@ case $CI_TARGET in
             "--@envoy//bazel:http3=False"
             "--@envoy//source/extensions/filters/http/kill_request:enabled"
             "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
-            "--remote_download_minimal")
-        ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
+            "--remote_download_minimal"
+            "--config=libc++20")
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
