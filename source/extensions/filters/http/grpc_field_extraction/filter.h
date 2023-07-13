@@ -36,6 +36,10 @@ private:
     Envoy::Http::FilterDataStatus filter_status;
   };
 
+  bool requireExtraction() {
+    return extractor_ && request_msg_converter_;
+  }
+
   HandleDecodeDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
   void handleExtractionResult();
@@ -45,11 +49,11 @@ private:
 
   FilterConfig& filter_config_;
 
-  Envoy::Http::RequestHeaderMap* headers_ = nullptr;
-
   ProtobufMessage::MessageConverterPtr request_msg_converter_;
-  std::string path_ = "";
+
   ExtractorPtr extractor_ = nullptr;
+
+  bool extraction_done_ = false;
 };
 
 class FilterFactory

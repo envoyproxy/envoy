@@ -15,26 +15,23 @@ FilterConfig::FilterConfig(
   switch (descriptor_config.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
     if (!descriptor_set.ParseFromString(api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
-      throw Envoy::EnvoyException("Unable to parse proto descriptor");
+      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from file `{}`", descriptor_config.filename()));
     }
     break;
   }
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
-      throw Envoy::EnvoyException("Unable to parse proto descriptor");
+      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from inline bytes: {}", descriptor_config.inline_bytes()));
     }
     break;
   }
   default: {
     throw Envoy::EnvoyException(fmt::format("Unsupported DataSource case `{}` for configuring `descriptor_set`", descriptor_config.specifier_case()));
-    break;
   }
   }
 
   for (const auto& file : descriptor_set.file()) {
-    if (descriptor_pool_.BuildFile(file) == nullptr) {
-      throw Envoy::EnvoyException("Unable to build proto descriptor pool");
-    }
+    descriptor_pool_.BuildFile(file);
   }
   for (const auto& it : proto_config_.extractions_by_method()) {
     auto* method = descriptor_pool_.FindMethodByName(it.first);

@@ -52,10 +52,7 @@ const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_fiel
 std::string generateRcDetails(absl::string_view filter_name,
                               absl::string_view error_type,
                               absl::string_view error_detail) {
-  if (error_detail.length() > 0) {
     return absl::StrCat(filter_name, "_", error_type, "{", error_detail, "}");
-  }
-  return absl::StrCat(filter_name, "_", error_type);
 }
 
 // Turns a '/package.Service/method' to 'package.Service.method' which is
@@ -65,7 +62,7 @@ absl::StatusOr<std::string> GrpcPathToProtoPath(
   if (grpc_path.size() == 0 || grpc_path.at(0) != '/' ||
       std::count(grpc_path.begin(), grpc_path.end(), '/') != 2) {
     return absl::InvalidArgumentError(absl::StrFormat(
-        "for grpc requests,  :path `%s` should be in form of `/package.Service/method`",
+        ":path `%s` should be in form of `/package.Service/method`",
         grpc_path));
   }
 
@@ -96,26 +93,22 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
                                                        bool) {
   if (!Grpc::Common::isGrpcRequestHeaders(headers)) {
     ENVOY_STREAM_LOG(debug,
-                     "Request isn't gRPC as its headers don't have application/grpc content-type. Request is passed through "
+                     "Request isn't gRPC as its headers don't have application/grpc content-type. Passed through the request "
                      "without extraction.",
                      *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto* path = headers.Path();
-  if (path == nullptr) {
-    ENVOY_STREAM_LOG(debug,
-                     "no `:path` header in request headers. Request is passed through without extraction",
-                     *decoder_callbacks_);
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  auto proto_path = GrpcPathToProtoPath(path->value().getStringView());
+  // Grpc::Common::isGrpcRequestHeaders above already ensures the existence of ":path" header.
+  auto proto_path = GrpcPathToProtoPath(headers.Path()->value().getStringView());
   if (!proto_path.ok()) {
-    ENVOY_STREAM_LOG(debug, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_, proto_path.status().ToString());
-                  generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
-                                    absl::StatusCodeToString(proto_path.status().code()),
-                                    kRcDetailErrorTypeBadRequest);
+    ENVOY_STREAM_LOG(info, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_, proto_path.status().ToString());
+                      auto& status = proto_path.status();
+                  rejectRequest(status.raw_code(),
+                    status.message(),
+                    generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
+                                      absl::StatusCodeToString(status.code()),
+                                      kRcDetailErrorTypeBadRequest));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -127,24 +120,23 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
                      per_method_extraction.status().ToString());
     return Http::FilterHeadersStatus::Continue;
   }
+
   extractor_ = filter_config_.extractor_factory().CreateExtractor(
       filter_config_.createTypeFinder(),
       per_method_extraction->request_type,
       *per_method_extraction->field_extractions);
-
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::make_unique<
           std::function<std::unique_ptr<google::protobuf::field_extraction::MessageData>()>>(
           []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); }),
       decoder_callbacks_->decoderBufferLimit());
-  headers_ = &headers;
 
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
 Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data,
                                                  bool end_stream) {
-  if (extractor_ == nullptr) {
+  if (!requireExtraction() || extraction_done_) {
     return Envoy::Http::FilterDataStatus::Continue;
   }
   ENVOY_STREAM_LOG(debug,
@@ -158,12 +150,13 @@ Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data,
   }
 
   handleExtractionResult();
+  extraction_done_ = true;
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
 Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
                                                         bool end_stream) {
-  ABSL_DCHECK(extractor_);
+  ABSL_DCHECK(requireExtraction());
 
   auto buffering = request_msg_converter_->AccumulateMessages(data, end_stream);
   if (!buffering.ok()) {
@@ -188,6 +181,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
     std::unique_ptr<ProtobufMessage::StreamMessage> message_data =
         std::move(buffering->at(msg_idx));
 
+    // MessageConverter uses a empty StreamMessage to denote the end.
     if (message_data->size() == -1) {
       ABSL_DCHECK(end_stream);
       ABSL_DCHECK(message_data->is_final_message());
@@ -226,9 +220,9 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   // buffer up any messages.
   if (!got_messages) {
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument,
-                  "filter did not receive enough data to form a message.",
+                  "Did not receive enough data to form a message.",
                   generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
-                                    kRcDetailErrorTypeBadRequest,
+                                    absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                                     kRcDetailErrorRequestOutOfData));
     return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
@@ -251,6 +245,10 @@ void Filter::handleExtractionResult() {
     }
   }
    if (dest_metadata.fields_size() > 0 ) {
+         ENVOY_STREAM_LOG(debug,
+                     "injected dynamic metadata `{}` with `{}`",
+                     *decoder_callbacks_,
+                     kGrpcFieldExtractionDynamicMetadata, dest_metadata.DebugString());
    decoder_callbacks_->streamInfo().setDynamicMetadata(kGrpcFieldExtractionDynamicMetadata,  dest_metadata);
    }
 }

@@ -29,7 +29,7 @@ struct PerMethodExtraction {
 
   const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions* field_extractions;
 };
-// The Envoy filter config for ESPv2 service control client.
+
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
  public:
   explicit FilterConfig(

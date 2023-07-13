@@ -12,7 +12,6 @@
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
-
 using ::apikeys::CreateApiKeyRequest;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
@@ -54,6 +53,7 @@ extractions_by_method: {
   std::unique_ptr<ExtractorFactory> extractor_factory_ = std::make_unique<ExtractorFactoryImpl>();
 };
 
+using FilterConfigTestSuccess = FilterConfigTest;
 TEST_F(FilterConfigTest, DescriptorInline) {
   *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() =
       api_->fileSystem().fileReadToEnd(
@@ -63,7 +63,7 @@ TEST_F(FilterConfigTest, DescriptorInline) {
   EXPECT_TRUE(filter_config_->FindPerMethodExtraction("apikeys.ApiKeys.CreateApiKey").ok());
 }
 
-TEST_F(FilterConfigTest, DescriptorAsFile) {
+TEST_F(FilterConfigTest, DescriptorFromFile) {
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
   filter_config_ = std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_);
@@ -71,14 +71,35 @@ TEST_F(FilterConfigTest, DescriptorAsFile) {
   EXPECT_TRUE(filter_config_->FindPerMethodExtraction("apikeys.ApiKeys.CreateApiKey").ok());
 }
 
-TEST_F(FilterConfigTest, ErrorForUnsupportedDataSourceForDescriptor) {
-  *proto_config_.mutable_descriptor_set()->mutable_inline_string() = "123";
+using FilterConfigTestError = FilterConfigTest;
+TEST_F(FilterConfigTestError, ErrorParsingDescriptorInline) {
+  *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() = "123";
+  EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
+      testing::HasSubstr("Unable to parse proto descriptor from inline bytes: "));
+}
+
+
+
+TEST_F(FilterConfigTestError, ErrorParsingDescriptorFromFile) {
+  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+      TestEnvironment::runfilesPath("wrong-file-path");
+    EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
+      testing::HasSubstr("Invalid path: "));
+}
+
+TEST_F(FilterConfigTestError, UnsupportedDescriptorSourceTyep) {
+    *proto_config_.mutable_descriptor_set()->mutable_inline_string() =
+      api_->fileSystem().fileReadToEnd(
+          TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
       testing::HasSubstr("Unsupported DataSource case `3` for configuring `descriptor_set`"));
 }
 
-TEST_F(FilterConfigTest, ErrorForPathNotFoundInProtoDescriptor) {
+
+TEST_F(FilterConfigTestError, PathNotFoundInProtoDescriptor) {
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(
 extractions_by_method: {
   key: "not-found-in-proto-descriptor"
@@ -88,16 +109,10 @@ extractions_by_method: {
       value: {
       }
     }
-    request_field_extractions: {
-      key: "key.name"
-      value: {
-      }
-    }
   }
 }
     )pb",
                                                     &proto_config_));
-
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
