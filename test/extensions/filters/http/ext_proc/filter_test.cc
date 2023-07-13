@@ -52,9 +52,7 @@ using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
-
 // using Protobuf::util::TimeUtil;
-
 using Http::Filter1xxHeadersStatus;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
@@ -336,13 +334,14 @@ protected:
 
   // Get the gRPC call stats data from the filter state.
   const ExtProcLoggingInfo::GrpcCalls&
-  getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
+      getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
+    // The number of processor grpc calls made in the encoding and decoding path.
     const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
         stream_info_.filterState()
-            ->getDataReadOnly<
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+        ->getDataReadOnly<
+            Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
                 filter_config_name)
-            ->grpcCalls(traffic_direction);
+        ->grpcCalls(traffic_direction);
     return grpc_calls;
   }
 
@@ -2918,6 +2917,54 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   stream_callbacks_->onGrpcClose();
 
   filter_->onDestroy();
+}
+
+// Set the HCM max request headers size limit to be 2kb. Test the
+// header mutation end result size check works for the trailer response.
+TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
+  Http::TestResponseTrailerMapImpl resp_trailers_({}, 2, 100);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+  // Construct a large trailer message to be close to the HCM size limit.
+  resp_trailers_.addCopy(LowerCaseString("x-some-trailer"), std::string(1950, 'a'));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(resp_trailers_));
+  processResponseTrailers(
+      [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailer_resp) {
+        auto headers_mut = trailer_resp.mutable_header_mutation();
+        // The trailer mutation in the response does not exceed the count limit 100 or the
+        // size limit 2kb. But the result header map size exceeds the count limit 2kb.
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header-0123456789");
+        add1->mutable_header()->set_value("new-header-0123456789");
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header-0123456789");
+        add2->mutable_header()->set_value("some-new-header-0123456789");
+      },
+      false);
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  // The header mutation rejection counter increments.
+  EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
 class HttpFilter2Test : public HttpFilterTest, public Http::HttpConnectionManagerImplMixin {};

@@ -211,6 +211,10 @@ bug_fixes:
 - area: redis
   change: |
     Fixes a bug where redis transactions do not work properly when redis traffic is mirrored.
+- area: http2
+  change: |
+    Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
+    upstream service.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -247,6 +251,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`` and legacy code paths.
+- area: grpc_stats
+  change: |
+    removed runtime key ``envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`` and legacy code paths.
 
 new_features:
 - area: golang
@@ -474,6 +481,9 @@ new_features:
     This can be used to override its configuration in BoringSSL. It is currently default to false but expected to be changed
     to true by default in a future release. ssl.was_key_usage_invalid is added to :ref:`listener metrics <config_listener_stats>`
     and will be incremented for certificate configurations that would fail if this option were set to true.
+- area: http
+  change: |
+    added OVERWRITE_IF_EXISTS header manipulation keyword to overwrite a header only when it exists before manipulation.
 
 deprecated:
 - area: access_log
