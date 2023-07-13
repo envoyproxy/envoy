@@ -125,7 +125,7 @@ MessageConverter::convertBackToBuffer(StreamMessagePtr message) {
 
   // Data owned in StreamMessage is appended to Envoy's Buffer via external
   // data reference (no copy).
-  // TODO(#28388): refactor grpc_field_extraction/messag_converter reading ZeroCopyInputStream to
+  // TODO(#28388): refactor grpc_field_extraction/message_converter reading ZeroCopyInputStream to
   // EnvoyBuffer.
   const void* data = nullptr;
   int size = 0;
