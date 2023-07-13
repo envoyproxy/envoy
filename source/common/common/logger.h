@@ -544,20 +544,6 @@ public:
 #define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
-/**
- * Convenience macros for logging with connection ID.
- */
-#define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
-
-/**
- * Convenience macros for logging with a stream ID and a connection ID.
- */
-#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT,                                         \
-                      (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
-                      (STREAM).streamId(), ##__VA_ARGS__)
-
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 /**
@@ -596,6 +582,30 @@ public:
     }                                                                                              \
   } while (0)
 
+#define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT,           \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId",                                                             \
+                       (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
+      log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT,           \
+                          ##__VA_ARGS__);                                                          \
+    }                                                                                              \
+  } while (0)
+
 /**
  * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
  * are serialized and prepended to the log message.
@@ -621,6 +631,12 @@ public:
  */
 #define ENVOY_TAGGED_STREAM_LOG(LEVEL, TAGS, STREAM, FORMAT, ...)                                  \
   ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, STREAM, FORMAT, ##__VA_ARGS__)
+
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);
+
+#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to
@@ -733,24 +749,6 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
       FINE_GRAIN_FLUSH_LOG();                                                                      \
     } else {                                                                                       \
       ENVOY_LOGGER().flush();                                                                      \
-    }                                                                                              \
-  } while (0)
-
-#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  do {                                                                                             \
-    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
-      FINE_GRAIN_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                               \
-    } else {                                                                                       \
-      ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
-    }                                                                                              \
-  } while (0)
-
-#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  do {                                                                                             \
-    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
-      FINE_GRAIN_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                 \
-    } else {                                                                                       \
-      ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
     }                                                                                              \
   } while (0)
 

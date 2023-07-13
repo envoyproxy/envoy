@@ -89,8 +89,19 @@ public:
    * @param allow_empty supplies whether to return an empty object if the key does not
    * exist.
    * @return ObjectObjectSharedPtr the sub-object.
+   * @throws Json::Exception if unable to get the attribute or the type is not an object.
    */
   virtual ObjectSharedPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
+
+  /**
+   * Get a sub-object by name.
+   * @param name supplies the key name.
+   * @param allow_empty supplies whether to return an empty object if the key does not
+   * exist.
+   * @return ObjectObjectSharedPtr the sub-object.
+   */
+  virtual absl::StatusOr<ObjectSharedPtr> getObjectNoThrow(const std::string& name,
+                                                           bool allow_empty = false) const PURE;
 
   /**
    * Determine if an object has type Object.

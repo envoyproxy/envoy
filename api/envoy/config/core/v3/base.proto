@@ -359,6 +359,10 @@ message HeaderValueOption {
     // the header already exists. If the header doesn't exist then this will add the header
     // with specified key and value.
     OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will be no-op.
+    OVERWRITE_IF_EXISTS = 3;
   }
 
   // Header name/value pair that this option applies to.
