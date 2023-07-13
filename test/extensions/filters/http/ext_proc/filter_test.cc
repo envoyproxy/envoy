@@ -98,6 +98,11 @@ protected:
             async_client_stream_info_.upstreamInfo());
     EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
 
+    EXPECT_CALL(dispatcher_, timeSource_()).WillRepeatedly(ReturnRef(time_system_));
+    EXPECT_CALL(time_system_, monotonicTime).WillRepeatedly(Invoke([this]() -> MonotonicTime {
+      // Return different time in consecutive calls to create latency.
+      return MonotonicTime(std::chrono::microseconds(10 * (++time_change_)));
+    }));
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](Unused) {
@@ -341,6 +346,27 @@ protected:
     return grpc_calls;
   }
 
+  // Check gRPC call stats for headers and trailers.
+  void checkGrpcCall(const ExtProcLoggingInfo::GrpcCall call,
+                     const std::chrono::microseconds latency,
+                     const Grpc::Status::GrpcStatus call_status) {
+    EXPECT_TRUE(call.latency_ == latency);
+    EXPECT_TRUE(call.call_status_ == call_status);
+  }
+
+  // Check gRPC call stats for body.
+  void checkGrpcCallBody(const ExtProcLoggingInfo::GrpcCallBody call, const uint32_t call_count,
+                         const Grpc::Status::GrpcStatus call_status,
+                         const std::chrono::microseconds total_latency,
+                         const std::chrono::microseconds max_latency,
+                         const std::chrono::microseconds min_latency) {
+    EXPECT_TRUE(call.call_count_ == call_count);
+    EXPECT_TRUE(call.last_call_status_ == call_status);
+    EXPECT_TRUE(call.total_latency_ == total_latency);
+    EXPECT_TRUE(call.max_latency_ == max_latency);
+    EXPECT_TRUE(call.min_latency_ == min_latency);
+  }
+
   // The metadata configured as part of ext_proc filter should be in the filter state.
   // In addition, bytes sent/received should also be stored.
   void expectFilterState(const Envoy::ProtobufWkt::Struct& expected_metadata) {
@@ -375,6 +401,8 @@ protected:
   Http::TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
+  testing::NiceMock<MockTimeSystem> time_system_;
+  uint32_t time_change_ = 0;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -444,8 +472,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
@@ -453,8 +480,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_out.body_stats_ == nullptr);
@@ -609,8 +635,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
@@ -1282,17 +1307,20 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
     processRequestBody(absl::nullopt, false);
   }
+
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   processRequestTrailers(absl::nullopt, true);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(true, absl::nullopt);
+
   for (uint32_t i = 0; i < chunk_number * 2; i++) {
     Buffer::OwnedImpl resp_data("bar");
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
     processResponseBody(absl::nullopt, false);
   }
+
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
   processResponseTrailers(absl::nullopt, false);
   filter_->onDestroy();
@@ -1306,37 +1334,28 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->call_count_ == chunk_number);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->last_call_status_ == Grpc::Status::Ok);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->total_latency_ >= grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
+                    std::chrono::microseconds(10) * chunk_number, std::chrono::microseconds(10),
+                    std::chrono::microseconds(10));
 
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_out.trailer_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_out.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->call_count_ == 2 * chunk_number);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->last_call_status_ == Grpc::Status::Ok);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->total_latency_ >=
-              grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_out.body_stats_, 2 * chunk_number, Grpc::Status::Ok,
+                    std::chrono::microseconds(10) * 2 * chunk_number, std::chrono::microseconds(10),
+                    std::chrono::microseconds(10));
 }
 
 // gRPC call fails when streaming sends small chunk request data.
@@ -1406,17 +1425,14 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
 
   EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->call_count_ == chunk_number + 1);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->last_call_status_ == Grpc::Status::Internal);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->total_latency_ >= grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number + 1, Grpc::Status::Internal,
+                    std::chrono::microseconds(10) * (chunk_number + 1),
+                    std::chrono::microseconds(10), std::chrono::microseconds(10));
 
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
@@ -1500,35 +1516,27 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->call_count_ == chunk_number);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->last_call_status_ == Grpc::Status::Ok);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->total_latency_ >= grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
+                    std::chrono::microseconds(10) * chunk_number, std::chrono::microseconds(10),
+                    std::chrono::microseconds(10));
 
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
 
   EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->call_count_ == chunk_number / 2 + 1);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->last_call_status_ == Grpc::Status::Internal);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->total_latency_ >=
-              grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_out.body_stats_, chunk_number / 2 + 1, Grpc::Status::Internal,
+                    std::chrono::microseconds(10) * (chunk_number / 2 + 1),
+                    std::chrono::microseconds(10), std::chrono::microseconds(10));
 }
 
 // Using a configuration with streaming set for the request and
@@ -1621,33 +1629,25 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
 
   EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->call_count_ == 1);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->last_call_status_ == Grpc::Status::Ok);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.body_stats_->max_latency_ == grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_in.body_stats_->total_latency_ == grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_in.body_stats_, 1, Grpc::Status::Ok, std::chrono::microseconds(10),
+                    std::chrono::microseconds(10), std::chrono::microseconds(10));
 
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
 
   EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->call_count_ == 6);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->last_call_status_ == Grpc::Status::Ok);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->min_latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.body_stats_->max_latency_ >= grpc_calls_in.body_stats_->min_latency_);
-  EXPECT_TRUE(grpc_calls_out.body_stats_->total_latency_ >=
-              grpc_calls_in.body_stats_->max_latency_);
+  checkGrpcCallBody(*grpc_calls_out.body_stats_, 6, Grpc::Status::Ok,
+                    std::chrono::microseconds(10) * 6, std::chrono::microseconds(10),
+                    std::chrono::microseconds(10));
 }
 
 // Using a configuration with streaming set for the request and
@@ -2045,8 +2045,8 @@ TEST_F(HttpFilterTest, PostAndFail) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Internal);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10),
+                Grpc::Status::Internal);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
@@ -2114,8 +2114,7 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_in.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_in.header_stats_->call_status_ == Grpc::Status::Ok);
+  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
 
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
@@ -2123,8 +2122,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   // Check outbound gRPC call stats.
   auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  EXPECT_TRUE(grpc_calls_out.header_stats_->latency_ >= std::chrono::microseconds(0));
-  EXPECT_TRUE(grpc_calls_out.header_stats_->call_status_ == Grpc::Status::Internal);
+  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10),
+                Grpc::Status::Internal);
 
   EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_out.body_stats_ == nullptr);
