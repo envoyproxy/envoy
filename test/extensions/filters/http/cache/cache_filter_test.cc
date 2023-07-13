@@ -252,6 +252,8 @@ TEST_F(CacheFilterTest, CacheMiss) {
 
     filter->onDestroy();
   }
+  // Clear events off the dispatcher.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(CacheFilterTest, Disabled) {
@@ -287,6 +289,8 @@ TEST_F(CacheFilterTest, CacheMissWithTrailers) {
 
     filter->onDestroy();
   }
+  // Clear events off the dispatcher.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(CacheFilterTest, CacheHitNoBody) {
