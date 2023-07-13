@@ -1,15 +1,16 @@
-#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
-
 #include <functional>
 #include <memory>
 
+#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
+
+#include "test/proto/apikeys.pb.h"
+
 #include "devtools/build/runtime/get_runfiles_dir.h"
 #include "experimental/users/taoxuy/grpc_field_extraction/cloudesf_cpe/extractor_test_base.h"
-#include "google/api/control.proto.h"
-#include "test/proto/apikeys.pb.h"
 #include "gmock/gmock.h"
+#include "google/api/control.proto.h"
 #include "gtest/gtest.h"
-#include "src/message_data/cord_message_data.h"
+#include "proto_field_extraction/message_data/cord_message_data.h"
 #include "third_party/protobuf/descriptor.h"
 #include "third_party/protobuf/util/type_resolver_util.h"
 

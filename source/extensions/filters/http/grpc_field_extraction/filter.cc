@@ -1,15 +1,13 @@
-#include "envoy/http/filter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/filter.h"
 
 #include <memory>
 #include <string>
 
-#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
-#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
-#include "source/extensions/filters/http/grpc_field_extraction/filter.h"
-#include "absl/strings/escaping.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
+
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/base64.h"
@@ -22,9 +20,13 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "src/message_data/cord_message_data.h"
-#include "src/message_data/message_data.h"
+#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
+
+#include "absl/strings/escaping.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "proto_field_extraction/message_data/cord_message_data.h"
+#include "proto_field_extraction/message_data/message_data.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
@@ -32,38 +34,32 @@ using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtrac
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Grpc::Utility;
-using ::Envoy::ProtobufMessage::MessageConverter;
 
 // The filter prefixes.
 const char kRcDetailFilterGrpcFieldExtraction[] = "grpc_field_extraction";
 
-const char kRcDetailErrorRequestBufferConversion[] =
-    "REQUEST_BUFFER_CONVERSION_FAIL";
+const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
 
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
 
-const char kRcDetailErrorRequestFieldExtractionFailed[] =
-    "REQUEST_FIELD_EXTRACTION_FAILED";
+const char kRcDetailErrorRequestFieldExtractionFailed[] = "REQUEST_FIELD_EXTRACTION_FAILED";
 
 const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
 
 const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_field_extraction";
 
-std::string generateRcDetails(absl::string_view filter_name,
-                              absl::string_view error_type,
+std::string generateRcDetails(absl::string_view filter_name, absl::string_view error_type,
                               absl::string_view error_detail) {
-    return absl::StrCat(filter_name, "_", error_type, "{", error_detail, "}");
+  return absl::StrCat(filter_name, "_", error_type, "{", error_detail, "}");
 }
 
 // Turns a '/package.Service/method' to 'package.Service.method' which is
 // the form suitable for the proto db lookup.
-absl::StatusOr<std::string> GrpcPathToProtoPath(
-    absl::string_view  grpc_path) {
+absl::StatusOr<std::string> GrpcPathToProtoPath(absl::string_view grpc_path) {
   if (grpc_path.size() == 0 || grpc_path.at(0) != '/' ||
       std::count(grpc_path.begin(), grpc_path.end(), '/') != 2) {
-    return absl::InvalidArgumentError(absl::StrFormat(
-        ":path `%s` should be in form of `/package.Service/method`",
-        grpc_path));
+    return absl::InvalidArgumentError(
+        absl::StrFormat(":path `%s` should be in form of `/package.Service/method`", grpc_path));
   }
 
   std::string clean_input = std::string(grpc_path.substr(1));
@@ -73,27 +69,21 @@ absl::StatusOr<std::string> GrpcPathToProtoPath(
 
 } // namespace
 
-void Filter::rejectRequest(Status::GrpcStatus grpc_status,
-                           absl::string_view error_msg,
+void Filter::rejectRequest(Status::GrpcStatus grpc_status, absl::string_view error_msg,
                            absl::string_view rc_detail) {
-  ENVOY_STREAM_LOG(debug,
-                   "Rejecting request: grpcStatus={}, message={}",
-                   *decoder_callbacks_,
-                   grpc_status,
-                   error_msg);
+  ENVOY_STREAM_LOG(debug, "Rejecting request: grpcStatus={}, message={}", *decoder_callbacks_,
+                   grpc_status, error_msg);
   decoder_callbacks_->sendLocalReply(
-      static_cast<Envoy::Http::Code>(Utility::grpcToHttpStatus(grpc_status)),
-      error_msg,
-      nullptr,
-      grpc_status,
-      rc_detail);
+      static_cast<Envoy::Http::Code>(Utility::grpcToHttpStatus(grpc_status)), error_msg, nullptr,
+      grpc_status, rc_detail);
 }
 
 Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                        bool) {
   if (!Grpc::Common::isGrpcRequestHeaders(headers)) {
     ENVOY_STREAM_LOG(debug,
-                     "Request isn't gRPC as its headers don't have application/grpc content-type. Passed through the request "
+                     "Request isn't gRPC as its headers don't have application/grpc content-type. "
+                     "Passed through the request "
                      "without extraction.",
                      *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
@@ -102,28 +92,24 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   // Grpc::Common::isGrpcRequestHeaders above already ensures the existence of ":path" header.
   auto proto_path = GrpcPathToProtoPath(headers.Path()->value().getStringView());
   if (!proto_path.ok()) {
-    ENVOY_STREAM_LOG(info, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_, proto_path.status().ToString());
-                      auto& status = proto_path.status();
-                  rejectRequest(status.raw_code(),
-                    status.message(),
-                    generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
-                                      absl::StatusCodeToString(status.code()),
-                                      kRcDetailErrorTypeBadRequest));
+    ENVOY_STREAM_LOG(info, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_,
+                     proto_path.status().ToString());
+    auto& status = proto_path.status();
+    rejectRequest(status.raw_code(), status.message(),
+                  generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
+                                    absl::StatusCodeToString(status.code()),
+                                    kRcDetailErrorTypeBadRequest));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   auto per_method_extraction = filter_config_.FindPerMethodExtraction(*proto_path);
   if (!per_method_extraction.ok()) {
-    ENVOY_STREAM_LOG(debug,
-                     "{}",
-                     *decoder_callbacks_,
-                     per_method_extraction.status().ToString());
+    ENVOY_STREAM_LOG(debug, "{}", *decoder_callbacks_, per_method_extraction.status().ToString());
     return Http::FilterHeadersStatus::Continue;
   }
 
   extractor_ = filter_config_.extractor_factory().CreateExtractor(
-      filter_config_.createTypeFinder(),
-      per_method_extraction->request_type,
+      filter_config_.createTypeFinder(), per_method_extraction->request_type,
       *per_method_extraction->field_extractions);
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::make_unique<
@@ -134,16 +120,12 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
-Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data,
-                                                 bool end_stream) {
+Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, bool end_stream) {
   if (!requireExtraction() || extraction_done_) {
     return Envoy::Http::FilterDataStatus::Continue;
   }
-  ENVOY_STREAM_LOG(debug,
-                   "decodeData: data size={} end_stream={}",
-                   *decoder_callbacks_,
-                   data.length(),
-                   end_stream);
+  ENVOY_STREAM_LOG(debug, "decodeData: data size={} end_stream={}", *decoder_callbacks_,
+                   data.length(), end_stream);
 
   if (auto status = handleDecodeData(data, end_stream); !status.got_messages) {
     return status.filter_status;
@@ -158,11 +140,10 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                                                         bool end_stream) {
   ABSL_DCHECK(requireExtraction());
 
-  auto buffering = request_msg_converter_->AccumulateMessages(data, end_stream);
+  auto buffering = request_msg_converter_->accumulateMessages(data, end_stream);
   if (!buffering.ok()) {
     const absl::Status& status = buffering.status();
-    rejectRequest(status.raw_code(),
-                  status.message(),
+    rejectRequest(status.raw_code(), status.message(),
                   generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
                                     absl::StatusCodeToString(status.code()),
                                     kRcDetailErrorRequestBufferConversion));
@@ -178,13 +159,13 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   // Buffering returns a list of messages.
   bool got_messages = false;
   for (size_t msg_idx = 0; msg_idx < buffering->size(); ++msg_idx) {
-    std::unique_ptr<ProtobufMessage::StreamMessage> message_data =
+    std::unique_ptr<StreamMessage> message_data =
         std::move(buffering->at(msg_idx));
 
     // MessageConverter uses a empty StreamMessage to denote the end.
     if (message_data->size() == -1) {
       ABSL_DCHECK(end_stream);
-      ABSL_DCHECK(message_data->is_final_message());
+      ABSL_DCHECK(message_data->isFinalMessage());
       // This is the last one in the vector.
       ABSL_DCHECK(msg_idx == buffering->size() - 1);
       // Skip the empty message
@@ -195,24 +176,19 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 
     const auto status = extractor_->ProcessRequest(*message_data->message());
     if (!status.ok()) {
-      rejectRequest(status.raw_code(),
-                    status.message(),
+      rejectRequest(status.raw_code(), status.message(),
                     generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
                                       absl::StatusCodeToString(status.code()),
                                       kRcDetailErrorRequestFieldExtractionFailed));
       return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
     }
 
-    auto buf_convert_status =
-        request_msg_converter_->ConvertBackToBuffer(std::move(message_data));
+    auto buf_convert_status = request_msg_converter_->convertBackToBuffer(std::move(message_data));
     // The message_data is not modified, ConvertBack should return OK.
-    RELEASE_ASSERT(buf_convert_status.ok(),
-                   "request message convert back should work");
+    RELEASE_ASSERT(buf_convert_status.ok(), "request message convert back should work");
 
     data.move(*buf_convert_status.value());
-    ENVOY_STREAM_LOG(debug,
-                     "decodeData: convert back data size={}",
-                     *decoder_callbacks_,
+    ENVOY_STREAM_LOG(debug, "decodeData: convert back data size={}", *decoder_callbacks_,
                      data.length());
   }
 
@@ -234,25 +210,19 @@ void Filter::handleExtractionResult() {
 
   const auto& result = extractor_->GetResult();
 
-
-
- google::protobuf::Struct dest_metadata;
-   for (const auto& req_field: result.req_fields) {
-    auto* list =
-        (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
-    for (const auto& value: req_field.values) {
+  google::protobuf::Struct dest_metadata;
+  for (const auto& req_field : result.req_fields) {
+    auto* list = (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
+    for (const auto& value : req_field.values) {
       list->add_values()->set_string_value(value);
     }
   }
-   if (dest_metadata.fields_size() > 0 ) {
-         ENVOY_STREAM_LOG(debug,
-                     "injected dynamic metadata `{}` with `{}`",
-                     *decoder_callbacks_,
+  if (dest_metadata.fields_size() > 0) {
+    ENVOY_STREAM_LOG(debug, "injected dynamic metadata `{}` with `{}`", *decoder_callbacks_,
                      kGrpcFieldExtractionDynamicMetadata, dest_metadata.DebugString());
-   decoder_callbacks_->streamInfo().setDynamicMetadata(kGrpcFieldExtractionDynamicMetadata,  dest_metadata);
-   }
+    decoder_callbacks_->streamInfo().setDynamicMetadata(kGrpcFieldExtractionDynamicMetadata,
+                                                        dest_metadata);
+  }
 }
-
-
 
 } // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction

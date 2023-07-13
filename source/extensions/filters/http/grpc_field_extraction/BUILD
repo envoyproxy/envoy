@@ -33,12 +33,10 @@ envoy_cc_library(
     ],
     deps = [
         "extractor",
-        #        "//source/common/grpc:common_lib",
-        "@com_google_absl//absl/status",
         "//source/common/common:minimal_logger_lib",
+        "@com_google_absl//absl/status",
         "@com_google_protofieldextraction//:all_libs",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
-        #        "@ocp//ocpdiag/core/compat:status_macros",
     ],
 )
 
@@ -67,8 +65,9 @@ envoy_cc_library(
         "extractor_impl",
         "filter_config",
         "//source/common/http:codes_lib",
-        "//source/common/protobuf:message_converter_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
     ],
 )
 
@@ -80,5 +79,6 @@ envoy_cc_extension(
         "extractor_impl",
         "filter",
         "filter_config",
+        "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
     ],
 )

@@ -38,8 +38,7 @@ message ApiKey {
   // The expiration time of the key
   google.protobuf.Timestamp expire_time = 8;
 
-
-  bool   type_bool = 10;
+  bool type_bool = 10;
 
   repeated string type_repeated_string = 11;
 }

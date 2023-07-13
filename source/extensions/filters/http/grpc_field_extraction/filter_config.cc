@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
+
 #include "source/common/common/fmt.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
@@ -14,19 +15,25 @@ FilterConfig::FilterConfig(
 
   switch (descriptor_config.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
-    if (!descriptor_set.ParseFromString(api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
-      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from file `{}`", descriptor_config.filename()));
+    if (!descriptor_set.ParseFromString(
+            api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
+      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from file `{}`",
+                                              descriptor_config.filename()));
     }
     break;
   }
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
-      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from inline bytes: {}", descriptor_config.inline_bytes()));
+      throw Envoy::EnvoyException(
+          fmt::format("Unable to parse proto descriptor from inline bytes: {}",
+                      descriptor_config.inline_bytes()));
     }
     break;
   }
   default: {
-    throw Envoy::EnvoyException(fmt::format("Unsupported DataSource case `{}` for configuring `descriptor_set`", descriptor_config.specifier_case()));
+    throw Envoy::EnvoyException(
+        fmt::format("Unsupported DataSource case `{}` for configuring `descriptor_set`",
+                    descriptor_config.specifier_case()));
   }
   }
 
@@ -36,8 +43,8 @@ FilterConfig::FilterConfig(
   for (const auto& it : proto_config_.extractions_by_method()) {
     auto* method = descriptor_pool_.FindMethodByName(it.first);
     if (method == nullptr) {
-      throw Envoy::EnvoyException(
-          fmt::format("couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
+      throw Envoy::EnvoyException(fmt::format(
+          "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
   }
 
@@ -52,16 +59,16 @@ TypeFinder FilterConfig::createTypeFinder() {
   };
 }
 
-absl::StatusOr<PerMethodExtraction> FilterConfig::FindPerMethodExtraction(absl::string_view proto_path) {
+absl::StatusOr<PerMethodExtraction>
+FilterConfig::FindPerMethodExtraction(absl::string_view proto_path) {
   const auto* md = descriptor_pool_.FindMethodByName(proto_path);
   if (md == nullptr) {
-     return absl::UnavailableError(
-        fmt::format("gRPC method with protobuf path `{}` isn't configured for field extraction", proto_path));
+    return absl::UnavailableError(fmt::format(
+        "gRPC method with protobuf path `{}` isn't configured for field extraction", proto_path));
   }
 
   return PerMethodExtraction{
-      Envoy::Grpc::Common::typeUrlPrefix() + "/" +
-          md->input_type()->full_name(),
+      Envoy::Grpc::Common::typeUrlPrefix() + "/" + md->input_type()->full_name(),
       &proto_config_.extractions_by_method().at(proto_path),
   };
 }

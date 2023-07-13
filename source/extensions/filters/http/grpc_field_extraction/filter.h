@@ -3,13 +3,14 @@
 #include <memory>
 #include <string>
 
-#include "source/common/protobuf/message_converter.h"
-#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
+
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
@@ -36,9 +37,7 @@ private:
     Envoy::Http::FilterDataStatus filter_status;
   };
 
-  bool requireExtraction() {
-    return extractor_ && request_msg_converter_;
-  }
+  bool requireExtraction() { return extractor_ && request_msg_converter_; }
 
   HandleDecodeDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
@@ -49,7 +48,7 @@ private:
 
   FilterConfig& filter_config_;
 
-  ProtobufMessage::MessageConverterPtr request_msg_converter_;
+  MessageConverterPtr request_msg_converter_;
 
   ExtractorPtr extractor_ = nullptr;
 

@@ -7,9 +7,10 @@
 
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
+
 #include "absl/status/status.h"
 #include "grpc_transcoding/type_helper.h"
-#include "src/message_data/message_data.h"
+#include "proto_field_extraction/message_data/message_data.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 

@@ -1,10 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -18,7 +15,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:filter",
-        "//test/common/protobuf:message_converter_test_lib",
+        "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/mocks/http:http_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",

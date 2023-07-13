@@ -2,13 +2,15 @@
 
 #include <string>
 
-#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
+
+#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+
 #include "absl/status/status.h"
-#include "grpc_transcoding/type_helper.h"
 #include "google/protobuf/descriptor.pb.h"
-#include "src/field_value_extractor/field_value_extractor_factory.h"
+#include "grpc_transcoding/type_helper.h"
+#include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
@@ -29,7 +31,6 @@ private:
   absl::StatusOr<RequestField> ExtractRequestField(
       google::protobuf::field_extraction::FieldValueExtractorFactory& extractor_factory,
       absl::string_view field_path, google::protobuf::field_extraction::MessageData& message) const;
-
 
   TypeFinder type_finder_;
 

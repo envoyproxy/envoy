@@ -1,14 +1,15 @@
-#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
+#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
@@ -79,25 +80,22 @@ TEST_F(FilterConfigTestError, ErrorParsingDescriptorInline) {
       testing::HasSubstr("Unable to parse proto descriptor from inline bytes: "));
 }
 
-
-
 TEST_F(FilterConfigTestError, ErrorParsingDescriptorFromFile) {
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("wrong-file-path");
-    EXPECT_THAT_THROWS_MESSAGE(
+  EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
       testing::HasSubstr("Invalid path: "));
 }
 
 TEST_F(FilterConfigTestError, UnsupportedDescriptorSourceTyep) {
-    *proto_config_.mutable_descriptor_set()->mutable_inline_string() =
+  *proto_config_.mutable_descriptor_set()->mutable_inline_string() =
       api_->fileSystem().fileReadToEnd(
           TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
       testing::HasSubstr("Unsupported DataSource case `3` for configuring `descriptor_set`"));
 }
-
 
 TEST_F(FilterConfigTestError, PathNotFoundInProtoDescriptor) {
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(
@@ -118,7 +116,8 @@ extractions_by_method: {
 
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_), EnvoyException,
-      testing::HasSubstr("couldn't find the gRPC method `not-found-in-proto-descriptor` defined in the proto descriptor"));
+      testing::HasSubstr("couldn't find the gRPC method `not-found-in-proto-descriptor` defined in "
+                         "the proto descriptor"));
 }
 
 } // namespace

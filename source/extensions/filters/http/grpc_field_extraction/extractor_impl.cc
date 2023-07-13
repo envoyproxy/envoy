@@ -5,9 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "src/field_value_extractor/field_value_extractor_factory.h"
-#include "src/field_value_extractor/field_value_extractor_interface.h"
 #include "source/common/common/logger.h"
+
+#include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
+#include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
@@ -56,8 +57,8 @@ ExtractorImpl::ExtractRequestField(FieldValueExtractorFactory& extractor_factory
                                    google::protobuf::field_extraction::MessageData& message) const {
   // Extract the resource values from proto.
   RequestField request_field_values{
-    field_path,
-    /*values=*/{},
+      field_path,
+      /*values=*/{},
   };
   auto extracted_values =
       ExtractFromPath(request_type_url_, field_path, message, extractor_factory);

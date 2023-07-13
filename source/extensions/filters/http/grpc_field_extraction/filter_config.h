@@ -6,47 +6,46 @@
 #include <string>
 #include <utility>
 
-#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/filter_config.h"
-#include "source/common/common/logger.h"
-#include "source/common/grpc/common.h"
-#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
-
 struct PerMethodExtraction {
   std::string request_type;
 
-  const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions* field_extractions;
+  const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions*
+      field_extractions;
 };
 
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
- public:
+public:
   explicit FilterConfig(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-      proto_config,
+          proto_config,
       ExtractorFactory& extractor_factory, Api::Api& api);
 
-  TypeFinder createTypeFinder() ;
+  TypeFinder createTypeFinder();
 
   ExtractorFactory& extractor_factory() { return extractor_factory_; }
 
-  absl::StatusOr<PerMethodExtraction>
-  FindPerMethodExtraction(absl::string_view path);
+  absl::StatusOr<PerMethodExtraction> FindPerMethodExtraction(absl::string_view path);
 
- private:
-
-
+private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;
   ExtractorFactory& extractor_factory_;

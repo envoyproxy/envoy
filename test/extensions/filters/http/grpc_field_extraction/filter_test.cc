@@ -1,15 +1,16 @@
-#include "source/extensions/filters/http/grpc_field_extraction/filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
+#include "source/extensions/filters/http/grpc_field_extraction/filter.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "test/common/protobuf/message_converter_test_lib.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 namespace {
@@ -91,7 +92,7 @@ CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
   return request;
 }
 
-void checkProtoStruct(Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+void checkProtoStruct(ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
   google::protobuf::Struct expected;
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
   EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n"
@@ -118,7 +119,7 @@ TEST_F(FilterTestUnaryExtractSuccess, UnarySingleBuffer) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(*request_data, {request});
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
 TEST_F(FilterTestUnaryExtractSuccess, EmptyFields) {
@@ -146,7 +147,7 @@ fields {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(*request_data, {request});
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
 TEST_F(FilterTestUnaryExtractSuccess, UnaryMultipeBuffers) {
@@ -188,7 +189,7 @@ TEST_F(FilterTestUnaryExtractSuccess, UnaryMultipeBuffers) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(end_request_data, true));
 
   // Inject data back and no data modification.
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(end_request_data, {request});
+  checkSerializedData<CreateApiKeyRequest>(end_request_data, {request});
 }
 
 class FilterTestStreamingExtractSuccess : public FilterTest {
@@ -248,7 +249,7 @@ TEST_F(FilterTestStreamingExtractSuccess, StreamingMultipleMessageSingleBuffer) 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(request_data, false));
 
   // Inject data back and no data modification.
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(request_data,
+  checkSerializedData<CreateApiKeyRequest>(request_data,
                                                             {request1, request2, request3});
 
   // No op for the following messages.
@@ -258,7 +259,7 @@ TEST_F(FilterTestStreamingExtractSuccess, StreamingMultipleMessageSingleBuffer) 
 )pb");
   Envoy::Buffer::InstancePtr request_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(request4);
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data4, true));
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
+  checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
 }
 
 // Only test several field types. For all the primitive types, they are covered in
@@ -320,7 +321,7 @@ fields {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
-  ProtobufMessage::CheckSerializedData<CreateApiKeyRequest>(*request_data, {request});
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
 using FilterTestExtractFailRejected = FilterTest;

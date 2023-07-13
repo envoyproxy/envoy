@@ -114,7 +114,6 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-
 // Send the same GET request with body and trailers twice, then check that the response
 // doesn't have an age header, to confirm that it wasn't served from cache.
 TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
@@ -147,8 +146,6 @@ TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
     EXPECT_EQ(response->body(), std::string(42, 'a'));
   }
 }
-
-
 
 } // namespace
 } // namespace Cache

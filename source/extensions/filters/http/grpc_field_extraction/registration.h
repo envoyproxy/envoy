@@ -3,11 +3,12 @@
 #include <memory>
 #include <string>
 
-#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
+
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
