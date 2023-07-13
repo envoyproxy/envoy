@@ -42,6 +42,7 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         ":default_local_address_selector",
         "//envoy/registry",

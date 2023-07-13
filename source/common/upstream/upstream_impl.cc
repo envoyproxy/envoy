@@ -19,6 +19,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
@@ -168,27 +169,34 @@ Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelec
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
   const std::string empty;
-  UpstreamLocalAddressSelectorFactory* local_address_selector;
-  const std::string& local_address_selector_name =
+  UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
+  const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
       cluster_config.has_upstream_bind_config() &&
-              !cluster_config.upstream_bind_config().local_address_selector_name().empty()
-          ? cluster_config.upstream_bind_config().local_address_selector_name()
-      : bootstrap_bind_config.has_value() ? bootstrap_bind_config->local_address_selector_name()
-                                          : empty;
-  if (local_address_selector_name.empty()) {
-    local_address_selector =
-        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
-            kDefaultLocalAddressSelectorName);
+              cluster_config.upstream_bind_config().has_local_address_selector()
+          ? &cluster_config.upstream_bind_config().local_address_selector()
+      : bootstrap_bind_config.has_value() && bootstrap_bind_config->has_local_address_selector()
+          ? &bootstrap_bind_config->local_address_selector()
+          : nullptr;
+  if (local_address_selector_config) {
+    local_address_selector_factory =
+        Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(
+            *local_address_selector_config, true);
   } else {
-    local_address_selector =
-        Registry::FactoryRegistry<UpstreamLocalAddressSelectorFactory>::getFactory(
-            local_address_selector_name);
+    envoy::extensions::upstream::local_address_selector::v3::DefaultLocalAddressSelector
+        default_config;
+    envoy::config::core::v3::TypedExtensionConfig typed_extension;
+    typed_extension.mutable_typed_config()->PackFrom(default_config);
+    local_address_selector_factory =
+        Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
+                                                                                 true);
   }
-  if (local_address_selector == nullptr) {
-    throw EnvoyException(
-        fmt::format("Unknown local address selector: {}", local_address_selector_name));
+  if (local_address_selector_factory == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Unknown local address selector: {}",
+        local_address_selector_config ? local_address_selector_config->DebugString() : ""));
   }
-  return local_address_selector->createLocalAddressSelector(cluster_config, bootstrap_bind_config);
+  return local_address_selector_factory->createLocalAddressSelector(cluster_config,
+                                                                    bootstrap_bind_config);
 }
 
 } // namespace

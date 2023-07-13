@@ -403,6 +403,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstream/local_address_selector/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:dns_interface",
@@ -427,6 +428,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/server:transport_socket_config_lib",
+        "//source/extensions/upstream/local_address_selector:config",
     ],
 )
 

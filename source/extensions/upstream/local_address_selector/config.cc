@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 constexpr absl::string_view kDefaultLocalAddressSelectorName =
-    "envoy.upstream.default_local_address_selector";
+    "envoy.upstream.local_address_selector.default_local_address_selector";
 }
 
 std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {

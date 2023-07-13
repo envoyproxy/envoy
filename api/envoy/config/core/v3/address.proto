@@ -7,6 +7,7 @@ import "envoy/config/core/v3/socket_option.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "envoy/config/core/v3/extension.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -152,16 +153,16 @@ message BindConfig {
 
   // Extra source addresses appended to the address specified in the `source_address`
   // field. This enables to specify multiple source addresses.
-  // When :ref:`local_address_selector_name
-  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector_name>` is not
+  // When :ref:`local_address_selector
+  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>` is not
   // specified, only one extra address can be supported, and the extra address should have a different
   // IP version with the address in the `source_address` field. The address which has the same IP
   // version with the target host's address IP version will be used as bind address. If more
   // than one extra address specified, only the first address matched IP version will be
   // returned. If there is no same IP version address found, the address in the `source_address`
   // will be returned.
-  // This behavior can be overridden by specifying :ref:`local_address_selector_name
-  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector_name>`.
+  // This behavior can be overridden by specifying :ref:`local_address_selector
+  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
   repeated ExtraSourceAddress extra_source_addresses = 5;
 
   // Deprecated by
@@ -173,7 +174,8 @@ message BindConfig {
   // registered with Envoy. If this is empty, the default applies. See
   // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
   // for an explanation of the behavior of the default selector.
-  string local_address_selector_name = 6;
+  // [#extension-category: envoy.upstream.local_address_selector]
+  core.v3.TypedExtensionConfig local_address_selector = 6;
 }
 
 // Addresses specify either a logical or physical address and port, which are

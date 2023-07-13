@@ -3223,6 +3223,9 @@ class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelec
     return std::make_shared<TestUpstreamLocalAddressSelector>(cluster_config,
                                                               bootstrap_bind_config);
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<google::protobuf::Empty>();
+  }
 
   std::string name() const override { return "test.upstream.local.address.selector"; }
 };
@@ -3235,9 +3238,11 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
-
-  server_context_.cluster_manager_.mutableBindConfig().set_local_address_selector_name(
-      "test.upstream.local.address.selector");
+  google::protobuf::Empty empty;
+  auto address_selector_config =
+      server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
+  address_selector_config->mutable_typed_config()->PackFrom(empty);
+  address_selector_config->set_name("test.upstream.local.address.selector");
   server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
       "1.2.3.5");
   server_context_.cluster_manager_.mutableBindConfig()
