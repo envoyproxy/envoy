@@ -6,12 +6,14 @@ import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_field_extraction.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_field_extraction/v3;grpc_field_extractionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: gRPC Field Extraction]
 // gRPC Field Extraction :ref:`configuration overview
