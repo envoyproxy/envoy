@@ -24,7 +24,7 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
   quic::QuicSocketAddress quic_uninitialized_addr;
   EXPECT_EQ(nullptr, quicAddressToEnvoyAddressInstance(quic_uninitialized_addr));
 
-  for (const std::string& ip_str : {"fd00:0:0:1::1", "1.2.3.4"}) {
+  for (const std::string ip_str : {"fd00:0:0:1::1", "1.2.3.4"}) {
     quic::QuicIpAddress quic_ip;
     quic_ip.FromString(ip_str);
     quic::QuicSocketAddress quic_addr(quic_ip, 12345);
