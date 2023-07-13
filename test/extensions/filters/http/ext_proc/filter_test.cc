@@ -334,14 +334,14 @@ protected:
 
   // Get the gRPC call stats data from the filter state.
   const ExtProcLoggingInfo::GrpcCalls&
-      getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
+  getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
     // The number of processor grpc calls made in the encoding and decoding path.
     const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
         stream_info_.filterState()
-        ->getDataReadOnly<
-            Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
                 filter_config_name)
-        ->grpcCalls(traffic_direction);
+            ->grpcCalls(traffic_direction);
     return grpc_calls;
   }
 
