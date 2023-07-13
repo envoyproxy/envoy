@@ -16,7 +16,7 @@ static void BM_InlineMapFind(benchmark::State& state) {
 
   InlineMapDescriptor<std::string> descriptor_200;
   // Create 200 inline keys.
-  std::vector<InlineMapDescriptor<std::string>::InlineKey> inline_handles_200;
+  std::vector<InlineMapDescriptor<std::string>::Handle> inline_handles_200;
   for (size_t i = 0; i < 200; ++i) {
     const std::string key = "key_" + std::to_string(i);
     inline_handles_200.push_back(descriptor_200.addInlineKey(key));

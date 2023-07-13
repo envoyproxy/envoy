@@ -17,15 +17,15 @@
 namespace Envoy {
 
 /**
- * This library provide inline map templates which could be used as an alternative of normal hash
- * map to store the key/value pairs. But by these templates, you can add some frequently used
+ * This library provide inline map templates which could be used as an alternative to normal hash
+ * maps. But by these templates, you can add some frequently used
  * keys as inline keys and get the handle for the key. Then you can use the handle to access the
  * key/value pair in the map without even one time hash searching.
  *
  * This is useful when some keys are frequently used and the keys are known at compile time or
- * bootstrap time. You can get superior performance by using the inline handle. For example, the
+ * bootstrap time. You can get superior performance by using the handle. For example, the
  * filter state always uses the filter name as the key and the filter name is known at compile time.
- * By using the inline handle, the filter state could get the key/value pair without any hash.
+ * By using the handle, the filter state could get the key/value pair without any hash.
  *
  * This class also provides the interface to access the key/value pair by the normal key and the
  * interface has similar searching performance as the normal hash map. But the insertion and removal
@@ -40,9 +40,9 @@ namespace Envoy {
  *   // required. A local descriptor is also fine if the inline map is only used in the local scope.
  *   InlineMapDescriptor<std::string> descriptor;
  *
- *   // Create the inline key. We should never do this after bootstrapping. Typically, we can
- *   // do this by define a global variable.
- *   InlineMapDescriptor<std::string>::InlineKey inline_key = descriptor.addInlineKey("inline_key");
+ *   // Create the handle for inline key. We should never do this after bootstrapping. Typically, we
+ *   // can do this by define a global variable.
+ *   InlineMapDescriptor<std::string>::Handle handle = descriptor.addHandle("inline_key");
  *
  *   // Finalize the descriptor. No further changes are allowed to the descriptor after this point.
  *   descriptor.finalize();
@@ -51,9 +51,9 @@ namespace Envoy {
  *   InlineMapPtr<std::string, std::string> inline_map = InlineMap<std::string,
  *     std::string>::create(descriptor);
  *
- *   // Get value by inline handle.
- *   inline_map->insert(inline_key, "value");
- *   EXPECT_EQ(*inline_map->lookup(inline_key), "value");
+ *   // Get value by handle.
+ *   inline_map->insert(handle, "value");
+ *   EXPECT_EQ(*inline_map->lookup(handle), "value");
  */
 
 /**
@@ -66,7 +66,7 @@ public:
    * This is the handle used to access the key/value pair in the inline map. The handle is
    * lightweight and could be copied and passed by value.
    */
-  class InlineKey {
+  class Handle {
   public:
     /**
      * Get the id of the inline entry in the inline array. This could be used to access the
@@ -78,80 +78,54 @@ public:
     friend class InlineMapDescriptor;
 
     // This constructor should only be called by InlineMapDescriptor.
-    InlineKey(uint64_t inline_id) : inline_id_(inline_id) {}
+    Handle(uint64_t inline_id) : inline_id_(inline_id) {}
 
     uint64_t inline_id_{};
-
-#ifndef NDEBUG
-  public:
-    // This is the descriptor id that the inline key created by. This is used to validate the
-    // inline key validity.
-    uint64_t descriptorId() const { return descriptor_id_; }
-
-  private:
-    InlineKey(uint64_t inline_id, uint64_t descriptor_id)
-        : inline_id_(inline_id), descriptor_id_(descriptor_id) {}
-    uint64_t descriptor_id_{};
-#endif
   };
 
-  using InlineKeysMap = absl::flat_hash_map<Key, uint64_t>;
+  using InlineKeysMap = absl::flat_hash_map<Key, Handle>;
   using InlineKeys = std::vector<Key>;
 
   InlineMapDescriptor() = default;
 
   /**
-   * Add and create an custom inline key. May only be called before finalize().
+   * Add an inline key and return related handle. May only be called before finalize().
    */
-  template <class ArgK> InlineKey addInlineKey(const ArgK& key) {
+  template <class ArgK> Handle addInlineKey(const ArgK& key) {
     RELEASE_ASSERT(!finalized_, "Cannot create new inline key after finalize()");
 
-    uint64_t inline_id = 0;
-
     if (auto it = inline_keys_map_.find(key); it != inline_keys_map_.end()) {
-      // If the key is already added, return the existing key.
-      inline_id = it->second;
+      // If the key is already added, return related inline handle directly.
+      return it->second;
     } else {
-      // If the key is not added yet, then create a new inline key.
-      inline_id = inline_keys_map_.size();
+      // If the key is not added yet, then create a new handle for this key.
+      Handle handle{inline_keys_map_.size()};
       inline_keys_.push_back(Key(key));
-      inline_keys_map_[key] = inline_id;
+      inline_keys_map_.emplace(key, handle);
+      return handle;
     }
-
-#ifndef NDEBUG
-    return {inline_id, descriptor_id_};
-#else
-    return {inline_id};
-#endif
   }
 
   /**
-   * Fetch the inline key for the given key. May only be called after finalize(). This should be
-   * used to get the inline key for the key added by addInlineKey(). This function could used to
-   * determine if the key is added as inline key or not at runtime or xDS config loading time and
-   * decide if the key should be used as inline key or normal key.
+   * Fetch the handle for the given key. Return handle if the given key is inline key and return
+   * absl::nullopt if the given key is normal key. May only be called after finalize(). This should
+   * be used to get the handle of the inline keys that added by addHandle(). This function could
+   * used to determine if a key is added as inline key or not at runtime or xDS config loading time
+   * and decide if the key should be used as inline key or normal key.
    */
-  template <class ArgK> absl::optional<InlineKey> getInlineKey(const ArgK& key) const {
+  template <class ArgK> absl::optional<Handle> getHandleByKey(const ArgK& key) const {
     ASSERT(finalized_, "Cannot get inline handle before finalize()");
-
-    uint64_t inline_id = 0;
 
     if (auto it = inline_keys_map_.find(key); it == inline_keys_map_.end()) {
       return absl::nullopt;
     } else {
-      inline_id = it->second;
+      return it->second;
     }
-
-#ifndef NDEBUG
-    return InlineKey{inline_id, descriptor_id_};
-#else
-    return InlineKey{inline_id};
-#endif
   }
 
   /**
-   * Get the inline keys map that contains all inline keys and their index. May only be called after
-   * finalize().
+   * Get the inline keys map that contains all inline keys and their handle. May only be called
+   * after finalize().
    */
   const InlineKeysMap& inlineKeysMap() const {
     ASSERT(finalized_, "Cannot fetch registration map before finalize()");
@@ -179,21 +153,6 @@ public:
   // function could be called multiple times safely and only the first call will have effect.
   void finalize() { finalized_ = true; }
 
-#ifndef NDEBUG
-public:
-  // This is the descriptor id that the inline map created by. This is used to validate the inline
-  // key validity.
-  uint64_t descriptorId() const { return descriptor_id_; }
-
-private:
-  static uint64_t generateDescriptorId() {
-    static std::atomic<uint64_t> next_id{0};
-    return next_id++;
-  }
-
-  uint64_t descriptor_id_{generateDescriptorId()};
-#endif
-
 private:
   bool finalized_{};
   InlineKeys inline_keys_;
@@ -207,11 +166,16 @@ private:
 template <class Key, class Value> class InlineMap : public InlineStorage {
 public:
   using TypedInlineMapDescriptor = InlineMapDescriptor<Key>;
-  using InlineKey = typename TypedInlineMapDescriptor::InlineKey;
+  using Handle = typename TypedInlineMapDescriptor::Handle;
 
   using UnderlayHashMap = absl::flat_hash_map<Key, Value>;
+  using ValueRef = std::reference_wrapper<Value>;
 
-  // Get the entry for the given key. If the key is not found, return nullptr.
+  /**
+   * Get the entry by the given key. Heterogeneous lookup is supported here.
+   * @param key the key to lookup.
+   * @return the entry if the key is found, otherwise return null reference.
+   */
   template <class ArgK> OptRef<const Value> lookup(const ArgK& key) const {
     // Because the normal string view key is used here, try the normal map entry first.
     if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
@@ -227,6 +191,11 @@ public:
     return {};
   }
 
+  /**
+   * Get the entry by the given key. Heterogeneous lookup is supported here.
+   * @param key the key to lookup.
+   * @return the entry if the key is found, otherwise return null reference.
+   */
   template <class ArgK> OptRef<Value> lookup(const ArgK& key) {
     // Because the normal string view key is used here, try the normal map entry first.
     if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
@@ -242,62 +211,75 @@ public:
     return {};
   }
 
-  // Get the entry for the given inline key. If the handle is not valid, return nullptr.
-  OptRef<const Value> lookup(InlineKey key) const {
-#ifndef NDEBUG
-    ASSERT(key.descriptorId() == descriptor_.descriptorId(), "Invalid inline key");
-#endif
-    if (inlineEntryValid(key.inlineId())) {
-      return inline_entries_[key.inlineId()];
+  /**
+   * Get the entry by the given handle.
+   * @param handle the handle to lookup.
+   * @return the entry if the handle is valid, otherwise return null reference.
+   */
+  OptRef<const Value> lookup(Handle handle) const {
+    if (inlineEntryValid(handle.inlineId())) {
+      return inline_entries_[handle.inlineId()];
     }
     return {};
   }
 
-  OptRef<Value> lookup(InlineKey key) {
-#ifndef NDEBUG
-    ASSERT(key.descriptorId() == descriptor_.descriptorId(), "Invalid inline key");
-#endif
-    if (inlineEntryValid(key.inlineId())) {
-      return inline_entries_[key.inlineId()];
+  /**
+   * Get the entry by the given handle.
+   * @param handle the handle to lookup.
+   * @return the entry if the handle is valid, otherwise return null reference.
+   */
+  OptRef<Value> lookup(Handle handle) {
+    if (inlineEntryValid(handle.inlineId())) {
+      return inline_entries_[handle.inlineId()];
     }
     return {};
   }
 
-  // Set the entry for the given key. If the key is already present, insert will fail and
-  // return false. Otherwise, insert will succeed and return true.
-  template <class ArgK, class ArgV> bool insert(ArgK&& key, ArgV&& value) {
+  /**
+   * Set the entry by the given key.
+   * @param key the key to set.
+   * @param value the value to set.
+   * @return pair consisting of a reference to the inserted element, or the already-existing element
+   * if no insertion happened, and a bool denoting whether the insertion took place (true if
+   * insertion happened, false if it did not).
+   */
+  template <class ArgK, class ArgV> std::pair<ValueRef, bool> insert(ArgK&& key, ArgV&& value) {
     if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to insert the value to the inline array.
 
-      // If the entry is already valid, insert will fail and return false.
+      // If the entry is already valid, insert will fail and return the ref of exist value.
       if (inlineEntryValid(*entry_id)) {
-        return false;
+        return {inline_entries_[*entry_id], false};
       }
 
       resetInlineMapEntry(*entry_id, std::forward<ArgV>(value));
-      return true;
+      return {inline_entries_[*entry_id], true};
     } else {
       // This key is not registered as inline key and try to insert the value to the normal map.
-      return dynamic_entries_.emplace(std::forward<ArgK>(key), std::forward<ArgV>(value)).second;
+      auto result = dynamic_entries_.emplace(std::forward<ArgK>(key), std::forward<ArgV>(value));
+      return {result.first->second, result.second};
     }
   }
 
-  // Set the entry for the given handle. If the handle is not valid, do nothing.
-  template <class ArgV> bool insert(InlineKey key, ArgV&& value) {
-#ifndef NDEBUG
-    ASSERT(key.descriptorId() == descriptor_.descriptorId(), "Invalid inline key");
-#endif
-
+  /**
+   * Set the entry by the given handle.
+   * @param handle the handle to set.
+   * @param value the value to set.
+   * @return pair consisting of a reference to the inserted element, or the already-existing element
+   * if no insertion happened, and a bool denoting whether the insertion took place (true if
+   * insertion happened, false if it did not).
+   */
+  template <class ArgV> std::pair<ValueRef, bool> insert(Handle handle, ArgV&& value) {
     // If the entry is already valid, insert will fail and return false.
-    if (inlineEntryValid(key.inlineId())) {
-      return false;
+    if (inlineEntryValid(handle.inlineId())) {
+      return {inline_entries_[handle.inlineId()], false};
     }
 
-    resetInlineMapEntry(key.inlineId(), std::forward<ArgV>(value));
-    return true;
+    resetInlineMapEntry(handle.inlineId(), std::forward<ArgV>(value));
+    return {inline_entries_[handle.inlineId()], true};
   }
 
-  // Remove the entry for the given key. If the key is not found, do nothing.
+  // Remove the entry by the given key. If the key is not found, do nothing.
   template <class ArgK> void remove(const ArgK& key) {
     if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
       clearInlineMapEntry(*entry_id);
@@ -306,13 +288,8 @@ public:
     }
   }
 
-  // Remove the entry for the given handle. If the handle is not valid, do nothing.
-  void remove(InlineKey key) {
-#ifndef NDEBUG
-    ASSERT(key.descriptorId() == descriptor_.descriptorId(), "Invalid inline key");
-#endif
-    clearInlineMapEntry(key.inlineId());
-  }
+  // Remove the entry by the given handle. If the handle is not valid, do nothing.
+  void remove(Handle handle) { clearInlineMapEntry(handle.inlineId()); }
 
   void iterate(std::function<bool(const Key&, const Value&)> callback) const {
     for (const auto& entry : dynamic_entries_) {
@@ -358,16 +335,12 @@ public:
     }
   }
 
-  // Override operator [] to support the inline key assignment.
-  Value& operator[](InlineKey key) {
-#ifndef NDEBUG
-    ASSERT(key.descriptorId() == descriptor_.descriptorId(), "Invalid inline key");
-#endif
-
-    if (!inlineEntryValid(key.inlineId())) {
-      resetInlineMapEntry(key.inlineId(), Value());
+  // Override operator [] to support the handle of inline key assignment.
+  Value& operator[](Handle handle) {
+    if (!inlineEntryValid(handle.inlineId())) {
+      resetInlineMapEntry(handle.inlineId(), Value());
     }
-    return inline_entries_[key.inlineId()];
+    return inline_entries_[handle.inlineId()];
   }
 
   static std::unique_ptr<InlineMap> create(TypedInlineMapDescriptor& registry) {
@@ -413,7 +386,7 @@ private:
   template <class ArgK> absl::optional<uint64_t> inlineLookup(const ArgK& key) const {
     const auto& map_ref = descriptor_.inlineKeysMap();
     if (auto iter = map_ref.find(key); iter != map_ref.end()) {
-      return iter->second;
+      return iter->second.inlineId();
     }
     return absl::nullopt;
   }

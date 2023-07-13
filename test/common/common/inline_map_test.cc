@@ -18,7 +18,7 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 
   // Insert duplicate keys will fail.
   for (size_t i = 0; i < 100; ++i) {
-    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
   }
 
   // Use operator[] to insert keys could overwrite existing keys.
@@ -44,16 +44,16 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   InlineMapDescriptor<std::string> descriptor;
 
-  std::vector<InlineMapDescriptor<std::string>::InlineKey> inline_keys;
+  std::vector<InlineMapDescriptor<std::string>::Handle> handles;
 
   // Create 20 inline keys.
   for (size_t i = 0; i < 20; ++i) {
-    inline_keys.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
+    handles.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
   }
 
   // Add repeated inline keys will make no effect and return the same handle.
   for (size_t i = 0; i < 20; ++i) {
-    EXPECT_EQ(inline_keys[i].inlineId(),
+    EXPECT_EQ(handles[i].inlineId(),
               descriptor.addInlineKey("key_" + std::to_string(i)).inlineId());
   }
 
@@ -63,39 +63,39 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Insert entries by normal keys. But these keys are registered as inline keys.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
   }
 
   // Insert duplicate keys will fail.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
   }
 
   // Insert entries by typed inline handle.
   for (size_t i = 10; i < 20; ++i) {
-    auto handle = inline_keys[i];
-    EXPECT_TRUE(map->insert(handle, "value_" + std::to_string(i)));
+    auto handle = handles[i];
+    EXPECT_TRUE(map->insert(handle, "value_" + std::to_string(i)).second);
   }
 
   // Insert duplicate keys will fail.
   for (size_t i = 0; i < 20; ++i) {
-    auto handle = inline_keys[i];
-    EXPECT_FALSE(map->insert(handle, "value_" + std::to_string(i)));
+    auto handle = handles[i];
+    EXPECT_FALSE(map->insert(handle, "value_" + std::to_string(i)).second);
   }
 
   // Insert entries by normal keys.
   for (size_t i = 20; i < 100; ++i) {
-    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+    EXPECT_TRUE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
   }
 
   // Insert duplicate keys will fail.
   for (size_t i = 20; i < 100; ++i) {
-    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)));
+    EXPECT_FALSE(map->insert("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
   }
 
   // Use operator[] to insert keys with typed inline handle could overwrite existing keys.
   for (size_t i = 0; i < 10; ++i) {
-    (*map)[inline_keys[i]] = "value_" + std::to_string(i) + "_new";
+    (*map)[handles[i]] = "value_" + std::to_string(i) + "_new";
   }
 
   // Use operator[] to insert keys could overwrite existing keys (10-20 will be the keys that
@@ -110,9 +110,9 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   // Lookup by typed inline handle.
-  for (size_t i = 0; i < inline_keys.size(); ++i) {
+  for (size_t i = 0; i < handles.size(); ++i) {
     const std::string key = "key_" + std::to_string(i);
-    auto handle = inline_keys[i];
+    auto handle = handles[i];
     EXPECT_EQ(handle.inlineId(), i);
     EXPECT_EQ(*map->lookup(handle), "value_" + std::to_string(i) + "_new");
   }
@@ -123,7 +123,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   // Remove keys by typed inline handle.
   for (size_t i = 0; i < 10; ++i) {
     const std::string key = "key_" + std::to_string(i);
-    auto handle = inline_keys[i];
+    auto handle = handles[i];
     map->remove(handle);
   }
 
@@ -140,13 +140,13 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   // Lookup empty map by typed inline handle will return nothing.
-  for (auto handle : inline_keys) {
+  for (auto handle : handles) {
     EXPECT_EQ(map->lookup(handle), OptRef<std::string>{});
   }
 
   // Operator[] will insert new entry if the key does not exist.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_EQ((*map)[inline_keys[i]], "");
+    EXPECT_EQ((*map)[handles[i]], "");
   }
 
   for (size_t i = 10; i < 100; ++i) {
