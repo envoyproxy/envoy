@@ -118,6 +118,8 @@ public:
                                        shadow_writer, close_downstream_on_error);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
+    router_->onAboveWriteBufferHighWatermark();
+    router_->onBelowWriteBufferLowWatermark();
 
     router_->setDecoderFilterCallbacks(callbacks_);
   }
