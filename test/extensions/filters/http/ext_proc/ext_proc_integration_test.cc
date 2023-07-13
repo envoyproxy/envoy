@@ -383,6 +383,23 @@ protected:
     verifyDownstreamResponse(*response, 500);
   }
 
+  void addMutationSetHeaders(const int count,
+                             envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+    for (int i = 0; i < count; i++) {
+      auto* headers = mutation.add_set_headers();
+      auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
+      headers->mutable_header()->set_key(str);
+      headers->mutable_header()->set_value(str);
+    }
+  }
+
+  void addMutationRemoveHeaders(const int count,
+                                envoy::service::ext_proc::v3::HeaderMutation& mutation) {
+    for (int i = 0; i < count; i++) {
+      mutation.add_remove_headers(absl::StrCat("x-test-header-internal-", std::to_string(i)));
+    }
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -2266,6 +2283,264 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
         return true;
       });
   verifyDownstreamResponse(*response, 200);
+}
+
+// Applying header mutations for request|response headers|body|trailers. This test verifies
+// the HCM limits are plumbed into the HeaderMap correctly in different scenarios.
+TEST_P(ExtProcIntegrationTest, HeaderMutationCheckPassWithHcmSizeConfig) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  initializeConfig();
+
+  // Change the HCM max header config to limit the request header size.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(30);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(50);
+      });
+
+  // Change the cluster max header config to limit the response header size.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(50);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 10, false);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& header_resp) {
+        addMutationSetHeaders(20, *header_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        addMutationSetHeaders(20, *body_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  processRequestTrailersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+        addMutationSetHeaders(20, *trailer_resp.mutable_header_mutation());
+        return true;
+      });
+
+  handleUpstreamRequestWithTrailer();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpHeaders&, HeadersResponse& header_resp) {
+        addMutationSetHeaders(20, *header_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        addMutationSetHeaders(20, *body_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+        addMutationSetHeaders(20, *trailer_resp.mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// ext_proc server set_header count exceeds the HCM limit when responding to the request header.
+TEST_P(ExtProcIntegrationTest, SetHeaderMutationFailWithRequestHeader) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(30);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(50);
+      });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The set header count 60 > HCM limit 50.
+        addMutationSetHeaders(60, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+// ext_proc server remove_header count exceeds the HCM limit when responding to the response header.
+TEST_P(ExtProcIntegrationTest, RemoveHeaderMutationFailWithResponseHeader) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(50);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+        addMutationRemoveHeaders(60, *headers_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+// ext_proc server set_header count exceeds the HCM limit when responding to the request body.
+TEST_P(ExtProcIntegrationTest, SetHeaderMutationFailWithRequestBody) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(30);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(50);
+      });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse& body_resp) {
+        addMutationSetHeaders(60, *body_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+// ext_proc server remove_header count exceeds the HCM limit when responding to the response body.
+TEST_P(ExtProcIntegrationTest, RemoveHeaderMutationFailWithResponseBody) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(50);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse& body_resp) {
+        addMutationRemoveHeaders(60, *body_resp.mutable_response()->mutable_header_mutation());
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+}
+
+// ext_proc server header mutation ends up exceeding the HCM header size limit
+// when responding to the request trailer.
+TEST_P(ExtProcIntegrationTest, HeaderMutationResultSizeFailWithRequestTrailer) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(1);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(50);
+      });
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // Sending a large trailer to help the header mutation eventually exceed the size limit.
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", std::string(950, 'a')}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestTrailersMessage(*grpc_upstreams_[0], true,
+                                [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+                                  // The set header counter 5 is smaller than HCM header count
+                                  // limit 50, add size is smaller than the size limit 1kb. It
+                                  // passed the mutation check, but failed the end result size
+                                  // check.
+                                  addMutationSetHeaders(5, *trailer_resp.mutable_header_mutation());
+                                  return true;
+                                });
+  verifyDownstreamResponse(*response, 500);
+}
+
+// ext_proc server header mutation ends up exceeding the HCM header count limit
+// when responding to the response trailer.
+TEST_P(ExtProcIntegrationTest, HeaderMutationResultSizeFailWithResponseTrailer) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(50);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, false);
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-trailer-foo-1", "foo-1"},
+                                                     {"x-trailer-foo-2", "foo-2"},
+                                                     {"x-trailer-foo-3", "foo-3"},
+                                                     {"x-trailer-foo-4", "foo-4"},
+                                                     {"x-trailer-foo-5", "foo-5"}};
+  upstream_request_->encodeTrailers(response_trailers);
+  processResponseBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpTrailers&, TrailersResponse& trailer_resp) {
+        // End result header count 46 + 5 > header count limit 50.
+        addMutationSetHeaders(46, *trailer_resp.mutable_header_mutation());
+        return true;
+      });
+  // Prior response headers have already been sent. The stream is reset.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
 }
 
 } // namespace Envoy

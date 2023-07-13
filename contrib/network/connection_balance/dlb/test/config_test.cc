@@ -6,6 +6,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 #include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 #include "gtest/gtest.h"
 
@@ -42,6 +43,8 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeDefaultConfig) {
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(0, dlb.id());
   EXPECT_EQ(0, dlb.max_retries());
+  EXPECT_EQ(envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::None,
+            dlb.fallback_policy());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
@@ -50,11 +53,16 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   dlb.set_id(10);
   dlb.set_max_retries(12);
+  dlb.set_fallback_policy(
+      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::ExactConnectionBalance);
 
   makeDlbConnectionBalanceConfig(typed_config, dlb);
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(10, dlb.id());
   EXPECT_EQ(12, dlb.max_retries());
+  EXPECT_EQ(
+      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::ExactConnectionBalance,
+      dlb.fallback_policy());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, EmptyProto) {
@@ -94,6 +102,38 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeFromDefaultProto) {
                              EnvoyException, HasSubstr("no available dlb hardware"));
 }
 
+TEST_F(DlbConnectionBalanceFactoryTest, MakeFromNopFallbackProto) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  DlbConnectionBalanceFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  dlb.set_fallback_policy(
+      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::NopConnectionBalance);
+  makeDlbConnectionBalanceConfig(typed_config, dlb);
+
+  EXPECT_LOG_CONTAINS("warn", "fallback to Nop Connection Balance",
+                      factory.createConnectionBalancerFromProto(typed_config, context));
+  EXPECT_TRUE(dynamic_cast<Network::NopConnectionBalancerImpl*>(
+      factory.createConnectionBalancerFromProto(typed_config, context).get()));
+}
+
+TEST_F(DlbConnectionBalanceFactoryTest, MakeFromExactFallbackProto) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  DlbConnectionBalanceFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  dlb.set_fallback_policy(
+      envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::ExactConnectionBalance);
+  makeDlbConnectionBalanceConfig(typed_config, dlb);
+
+  EXPECT_LOG_CONTAINS("warn", "fallback to Exact Connection Balance",
+                      factory.createConnectionBalancerFromProto(typed_config, context));
+  EXPECT_TRUE(dynamic_cast<Network::ExactConnectionBalancerImpl*>(
+      factory.createConnectionBalancerFromProto(typed_config, context).get()));
+}
+
 TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   DlbConnectionBalanceFactory factory;
@@ -102,7 +142,6 @@ TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
 
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   makeDlbConnectionBalanceConfig(typed_config, dlb);
-
   EXPECT_THAT_THROWS_MESSAGE(
       factory.createConnectionBalancerFromProto(typed_config, context), EnvoyException,
       HasSubstr("Dlb connection balanncer only supports up to 32 worker threads"));

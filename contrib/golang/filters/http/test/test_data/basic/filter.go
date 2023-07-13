@@ -11,6 +11,8 @@ import (
 )
 
 type filter struct {
+	api.PassThroughStreamFilter
+
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
