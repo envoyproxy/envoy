@@ -14,6 +14,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_field_extraction/v3;grpc_field_extractionv3";
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: gRPC Field Extraction]
 // gRPC Field Extraction :ref:`configuration overview
 // <config_http_filters_grpc_field_extraction>`.
