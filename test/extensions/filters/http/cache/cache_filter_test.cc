@@ -1065,7 +1065,13 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
         // While the lookup callback is still on the dispatcher, simulate an idle timeout.
         EXPECT_EQ(filter->encodeHeaders(local_response_headers, true),
                   Envoy::Http::FilterHeadersStatus::Continue);
-        FAIL() << "Death test should already have exited at this point.";
+        // As a death test when ENVOY_BUG crashes, as in debug builds, this will exit here,
+        // so we must not perform any required cleanup operations below this point in the block.
+        // When ENVOY_BUG does not crash, we can still validate additional things.
+        dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+        filter->onStreamComplete();
+        EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestIncomplete));
       },
       "Request timed out while cache lookup was outstanding.");
 
