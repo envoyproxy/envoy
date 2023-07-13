@@ -634,7 +634,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), true,
                      false, false, false, false, false, {}, context.api().timeSource(),
                      context.httpContext(), context.routerContext()),
-      stream_id_(context.api().randomGenerator().random()), server_factory_context_(context) {
+      stream_id_(context.api().randomGenerator().random()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }

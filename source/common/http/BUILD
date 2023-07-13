@@ -13,10 +13,7 @@ envoy_package()
 envoy_cc_library(
     name = "async_client_lib",
     srcs = ["async_client_impl.cc"],
-    hdrs = [
-        "async_client_impl.h",
-        "null_route_impl.h",
-    ],
+    hdrs = ["async_client_impl.h"],
     deps = [
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",

@@ -76,9 +76,8 @@ public:
   }
 
   void setupUpstream() {
+    route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
     tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
-    route_ = std::make_unique<Http::NullRouteImpl>(
-        cluster_.info()->name(), tunnel_config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_,
@@ -126,7 +125,7 @@ public:
   NiceMock<Stats::MockStore> store_;
   Stats::MockScope& scope_{store_.mockScope()};
   std::unique_ptr<TunnelingConfigHelper> tunnel_config_;
-  std::unique_ptr<Http::NullRouteImpl> route_;
+  std::unique_ptr<HttpConnPool::RouteImpl> route_;
   std::unique_ptr<HttpUpstream> upstream_;
 };
 
@@ -314,9 +313,8 @@ public:
   }
 
   void setupUpstream() {
+    route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
     config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
-    route_ = std::make_unique<Http::NullRouteImpl>(
-        cluster_.info()->name(), config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_, *config_,
@@ -380,7 +378,7 @@ public:
   NiceMock<Upstream::MockLoadBalancerContext> lb_context_;
   NiceMock<Stats::MockStore> store_;
   Stats::MockScope& scope_{store_.mockScope()};
-  std::unique_ptr<Http::NullRouteImpl> route_;
+  std::unique_ptr<HttpConnPool::RouteImpl> route_;
   std::unique_ptr<HttpUpstream> upstream_;
 };
 
