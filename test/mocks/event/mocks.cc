@@ -11,6 +11,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -24,6 +25,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
   }));
+  ON_CALL(*this, timeSource_()).WillByDefault(ReturnRef(mock_time_system_));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTypedTimer_(_, _))

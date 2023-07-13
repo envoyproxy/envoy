@@ -22,6 +22,7 @@
 #include "source/common/common/scope_tracker.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
@@ -37,7 +38,7 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
-  TimeSource& timeSource() override { return *time_system_; }
+  TimeSource& timeSource() override { return timeSource_(); }
   GlobalTimeSystem& globalTimeSystem() {
     return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
   }
@@ -131,6 +132,7 @@ public:
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
+  MOCK_METHOD(TimeSource&, timeSource_, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
@@ -166,6 +168,7 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
+  testing::NiceMock<MockTimeSystem> mock_time_system_;
   std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;

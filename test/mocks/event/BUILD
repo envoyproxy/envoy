@@ -25,6 +25,7 @@ envoy_cc_mock(
         "//envoy/network:dns_interface",
         "//envoy/network:listener_interface",
         "//envoy/ssl:context_interface",
+        "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:test_time_lib",
     ],
