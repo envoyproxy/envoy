@@ -861,12 +861,8 @@ public:
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
     expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
-    if (!ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
-                            listener)) {
-      *listener << "\nActual headers:\n" << headers;
-      return false;
-    }
-    return true;
+    return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
+                              listener);
   }
 
   void DescribeTo(std::ostream* os) const override {
