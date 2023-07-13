@@ -1241,6 +1241,8 @@ enovy.upstream.local_address_selector.default_local_address_selector:
   - envoy.upstream.local_address_selector
   security_posture: unknown
   status: alpha
+  type_urls:
+  - envoy.extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
