@@ -42,7 +42,7 @@ public:
 
   const ExtractorFactory& extractor_factory() const { return *extractor_factory_; }
 
-  absl::StatusOr<PerMethodExtraction> FindPerMethodExtraction(absl::string_view path)const ;
+  absl::StatusOr<PerMethodExtraction> FindPerMethodExtraction(absl::string_view proto_path)const ;
 
 private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
