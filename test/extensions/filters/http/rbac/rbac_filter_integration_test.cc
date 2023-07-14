@@ -117,7 +117,7 @@ typed_config:
           - any: true
 )EOF";
 
-const std::string RBAC_CONFIG_HEADER_MATCH_CONDITION = R"EOF(
+constexpr absl::string_view RBAC_CONFIG_HEADER_MATCH_CONDITION = R"EOF(
 name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC

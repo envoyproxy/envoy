@@ -177,6 +177,7 @@ proto_library(
         "//envoy/extensions/filters/http/file_system_buffer/v3:pkg",
         "//envoy/extensions/filters/http/gcp_authn/v3:pkg",
         "//envoy/extensions/filters/http/geoip/v3:pkg",
+        "//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg",
         "//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg",
         "//envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3:pkg",
         "//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg",

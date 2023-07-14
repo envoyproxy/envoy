@@ -27,6 +27,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+# grpc_field_extraction http filter extension
+/*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
