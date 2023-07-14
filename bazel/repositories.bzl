@@ -192,6 +192,8 @@ def envoy_repo():
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
     external_http_archive("com_google_protoconverter")
+    external_http_archive("com_google_protofieldextraction")
+    external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
         actual = "@grpc_httpjson_transcoding//src:path_matcher",
