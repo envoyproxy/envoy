@@ -3,6 +3,10 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -37,5 +41,21 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    size = "large",
+    srcs = [
+        "integration_test.cc",
+    ],
+    data = ["//test/proto:apikeys_proto_descriptor"],
+    extension_names = ["envoy.filters.http.grpc_field_extraction"],
+    shard_count = 2,
+    deps = [
+        "//source/extensions/filters/http/grpc_field_extraction:config",
+        "//test/integration:http_protocol_integration_lib",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )

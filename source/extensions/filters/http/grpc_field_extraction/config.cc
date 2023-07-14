@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/grpc_field_extraction/registration.h"
+#include "source/extensions/filters/http/grpc_field_extraction/config.h"
 
 #include <memory>
 

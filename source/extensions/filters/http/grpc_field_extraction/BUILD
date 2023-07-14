@@ -72,9 +72,9 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "registration",
-    srcs = ["registration.cc"],
-    hdrs = ["registration.h"],
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
         "extractor_impl",
         "filter",
