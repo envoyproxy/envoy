@@ -250,4 +250,74 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetad
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
 }
 
+// Tests that overriding the overprovisioning factor works as expected when using subset
+// load balancing.
+TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerOverrideOverprovisioningFactor) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+
+    // We specifically don't want to use a load balancing policy that does consistent
+    // hashing because we want our requests to be load balanced across all hosts.
+    cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+    cluster->mutable_lb_subset_config()->set_fallback_policy(
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+
+    cluster->clear_load_assignment();
+
+    // Create a load assignment with two priorities. Add all but one host to p0.
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name(cluster->name());
+    // Set the overprovisioning value to something less than 100. This will cause traffic
+    // to spill over from priority 0 to priority 1.
+    load_assignment->mutable_policy()->mutable_overprovisioning_factor()->set_value(50);
+    for (uint32_t i = 0; i < 2; i++) {
+      auto* endpoints = load_assignment->add_endpoints();
+      endpoints->set_priority(i);
+    }
+
+    for (uint32_t i = 0; i < num_hosts_; i++) {
+      uint32_t priority;
+      if (i < num_hosts_ - 1) {
+        priority = 0;
+      } else {
+        priority = 1;
+      }
+
+      auto* endpoints = load_assignment->mutable_endpoints(priority);
+      auto* lb_endpoint = endpoints->add_lb_endpoints();
+
+      // ConfigHelper will fill in ports later.
+      auto* endpoint = lb_endpoint->mutable_endpoint();
+      auto* addr = endpoint->mutable_address()->mutable_socket_address();
+      addr->set_address(
+          Network::Test::getLoopbackAddressString(TestEnvironment::getIpVersionsForTest().front()));
+      addr->set_port_value(0);
+    }
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::set<std::string> hosts;
+  for (int i = 0; i < 100; i++) {
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+    // Send header only request.
+    auto response = codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+
+    // Record the upstream address.
+    hosts.emplace(response->headers()
+                      .get(Envoy::Http::LowerCaseString{host_header_})[0]
+                      ->value()
+                      .getStringView());
+  }
+
+  // If the overprovisioning override is respected, traffic will be sent to all 4 hosts,
+  // else traffic will only be sent to the 3 hosts in p0.
+  EXPECT_EQ(hosts.size(), 4);
+}
+
 } // namespace Envoy
