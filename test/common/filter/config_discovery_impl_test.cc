@@ -315,10 +315,10 @@ class NetworkUpstreamFilterConfigDiscoveryImplTest
 public:
   const std::string getFilterType() const override { return "network"; }
   const std::string getConfigReloadCounter() const override {
-    return "extension_config_discovery.network_filter.foo.config_reload";
+    return "extension_config_discovery.upstream_network_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
-    return "extension_config_discovery.network_filter.foo.config_fail";
+    return "extension_config_discovery.upstream_network_filter.foo.config_fail";
   }
 };
 

@@ -687,7 +687,7 @@ class UpstreamNetworkFilterConfigProviderManagerImpl
               Server::Configuration::CommonFactoryContext,
               Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>> {
 public:
-  absl::string_view statPrefix() const override { return "network_filter."; }
+  absl::string_view statPrefix() const override { return "upstream_network_filter."; }
 
 protected:
   bool
