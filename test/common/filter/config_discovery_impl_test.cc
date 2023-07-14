@@ -585,11 +585,11 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
 }
 
 // Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test is HTTP filter specific.
+// filter. This test does not apply to listener filter.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  if (config_discovery_test.getFilterType() != "http") {
+  if (config_discovery_test.getFilterType() == "listener") {
     return;
   }
 
@@ -612,7 +612,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
                                                        response.version_info()),
       EnvoyException,
       "Error: terminal filter named foo of type envoy.test.filter must be the last filter "
-      "in a http filter chain.");
+      "in a " +
+          config_discovery_test.getFilterType() + " filter chain.");
   EXPECT_EQ(
       0UL,
       config_discovery_test.store_.counter("extension_config_discovery.foo.config_reload").value());
