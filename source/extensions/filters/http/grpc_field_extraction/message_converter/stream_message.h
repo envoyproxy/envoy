@@ -15,8 +15,7 @@ namespace GrpcFieldExtraction {
 class StreamMessage {
 public:
   StreamMessage(std::unique_ptr<Protobuf::field_extraction::MessageData> message,
-                std::unique_ptr<Envoy::Buffer::Instance> owned_bytes,
-                std::shared_ptr<uint64_t> ref_to_bytes_usage)
+                Buffer::InstancePtr owned_bytes, std::shared_ptr<uint64_t> ref_to_bytes_usage)
       : message_(std::move(message)), owned_bytes_(std::move(owned_bytes)),
         ref_to_bytes_usage_(ref_to_bytes_usage) {
     if (owned_bytes_ != nullptr) {
@@ -64,7 +63,7 @@ private:
 
   // Envoy buffer that owns the underlying data.
   // This data can NOT be mutated during the lifetime of this message.
-  std::unique_ptr<Envoy::Buffer::Instance> owned_bytes_;
+  Buffer::InstancePtr owned_bytes_;
 
   // A reference to the total number of bytes consumed by these messages.
   const std::shared_ptr<uint64_t> ref_to_bytes_usage_;
