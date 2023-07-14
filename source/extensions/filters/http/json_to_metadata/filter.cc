@@ -288,13 +288,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
     const auto& keys = rule.keys();
     Json::ObjectSharedPtr node = body_json;
     for (unsigned long i = 0; i < keys.size(); i++) {
-      if (i == keys.size() - 1) {
-        absl::Status result = handleOnPresent(std::move(node), keys[i], rule, struct_map);
-        if (!result.ok()) {
-          ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys[i]));
-          handleOnMissing(rule, struct_map);
-        }
-      } else {
+      if (i < keys.size() - 1) {
         absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObjectNoThrow(keys[i]);
         if (!next_node_result.ok()) {
           ENVOY_LOG(warn, result.status().message());
@@ -302,6 +296,12 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
           break;
         }
         node = std::move(next_node_result.value());
+      } else {
+        absl::Status result = handleOnPresent(std::move(node), keys[i], rule, struct_map);
+        if (!result.ok()) {
+          ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys[i]));
+          handleOnMissing(rule, struct_map);
+        }
       }
     }
   }
