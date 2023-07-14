@@ -2,6 +2,7 @@
 #include <optional>
 
 #include "envoy/common/optref.h"
+#include "test/proto/apikeys.pb.h"
 
 #include "absl/strings/str_format.h"
 #include "test/integration/http_protocol_integration.h"
@@ -11,94 +12,77 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
+using ::apikeys::ApiKey;
+using ::apikeys::CreateApiKeyRequest;
 
 class IntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  void SetUp() override { useAccessLog("%DYNAMIC_METADATA(envoy.filters.http.grpc_field_extraction)%"); }
+  void SetUp() override {
+    HttpProtocolIntegrationTest::SetUp();
+
+    config_helper_.prependFilter(filter());
+    useAccessLog("%DYNAMIC_METADATA(envoy.filters.http.grpc_field_extraction)%");
+
+    initialize();
+  }
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();
     HttpProtocolIntegrationTest::TearDown();
   }
 
-  void initializeFilter(const std::string& config) {
-    config_helper_.prependFilter(config);
-    initialize();
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  }
-
-  IntegrationStreamDecoderPtr sendHeaderOnlyRequestAwaitResponse(
-      const Http::TestRequestHeaderMapImpl& headers,
-      std::function<void()> simulate_upstream = []() {}) {
-    IntegrationStreamDecoderPtr response_decoder = codec_client_->makeHeaderOnlyRequest(headers);
-    simulate_upstream();
-    // Wait for the response to be read by the codec client.
-    EXPECT_TRUE(response_decoder->waitForEndStream());
-    EXPECT_TRUE(response_decoder->complete());
-    return response_decoder;
-  }
-
-
-
   std::string filter() {
     return absl::StrFormat(R"EOF(
 name: grpc_field_extraction
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_field_extraction.v3.GrpcFieldExtractionConfig
-  descriptor_set : {filename: %s}
-)EOF", TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
+  descriptor_set:
+    filename: %s
+  extractions_by_method:
+    apikeys.ApiKeys.CreateApiKey:
+      request_field_extractions:
+        parent:
+)EOF",
+                           TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   }
-
-  OptRef<const Http::TestResponseTrailerMapImpl> empty_trailers_;
 };
 
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, IntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
+      parent: "project-id"
+    )pb") {
+  CreateApiKeyRequest request;
+  Protobuf::TextFormat::ParseFromString(pb, &request);
+  return request;
+}
 
 TEST_P(IntegrationTest, SunnyPath) {
-  initializeFilter(filter());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto request = MakeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                        {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                                                        {"content-type", "application/grpc"},
+                                                        {":authority", "host"},
+                                                        {":scheme", "http"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, request_data->toString());
+  waitForNextUpstreamRequest();
 
-  // Include test name and params in URL to make each test's requests unique.
-  ;
+  // Make sure that the body was properly propagated (with no modification).
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), request_data->toString());
 
-
-      auto encoder_decoder =
-        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
-                               {"content-type", "application/grpc"}});
-    request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-    codec_client_->sendData(*request_encoder_, 1, false);
-    codec_client_->sendTrailers(*request_encoder_, request_trailers);
-    waitForNextUpstreamRequest();
-
-    // Sending back non gRPC-Web response.
-    if (remove_content_type) {
-      default_response_headers_.removeContentType();
-    } else {
-      default_response_headers_.setReferenceContentType(
-          Http::Headers::get().ContentTypeValues.Json);
-    }
-    upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
-    upstream_request_->encodeData(start, /*end_stream=*/false);
-    upstream_request_->encodeData(end, /*end_stream=*/true);
-    ASSERT_TRUE(response->waitForEndStream());
-
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ(expected, response->headers().getGrpcMessageValue());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ(absl::StrCat(accept_, "+proto"), response->headers().getContentTypeValue());
-    EXPECT_EQ(0U, response->body().length());
-    codec_client_->close();
-
-    const std::string response_body(10, 'a');
-     Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "0"}};
-
-
+  // Send response with no trailers.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("response_body", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), R"({"parent":["project-id"]})");
 }
+INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             /*downstream_protocols=*/{Http::CodecType::HTTP2},
+                             /*upstream_protocols=*/{Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace GrpcFieldExtraction

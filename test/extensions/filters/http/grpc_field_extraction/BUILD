@@ -56,6 +56,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
         "//test/integration:http_protocol_integration_lib",
+        "//test/proto:apikeys_proto_cc_proto",
         "@com_google_absl//absl/strings:str_format",
     ],
 )

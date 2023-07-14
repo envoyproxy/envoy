@@ -19,11 +19,10 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
         proto_config,
     const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
-  // It should be captured by the FilterFactoryCb in the end.
   auto extractor_factory = std::make_shared<ExtractorFactoryImpl>();
   auto filter_config =
       std::make_shared<FilterConfig>(proto_config, *extractor_factory, context.api());
-  return [=](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [filter_config, extractor_factory](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(*filter_config));
   };
 }

@@ -6,7 +6,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -249,8 +248,7 @@ TEST_F(FilterTestStreamingExtractSuccess, StreamingMultipleMessageSingleBuffer) 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(request_data, false));
 
   // Inject data back and no data modification.
-  checkSerializedData<CreateApiKeyRequest>(request_data,
-                                                            {request1, request2, request3});
+  checkSerializedData<CreateApiKeyRequest>(request_data, {request1, request2, request3});
 
   // No op for the following messages.
   CreateApiKeyRequest request4 = MakeCreateApiKeyRequest(
