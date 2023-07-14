@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -10,10 +11,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.pb.h"
 
 namespace Envoy {
 namespace Extensions {

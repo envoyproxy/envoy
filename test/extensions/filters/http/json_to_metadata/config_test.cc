@@ -1,9 +1,9 @@
+#include "source/extensions/filters/http/json_to_metadata/config.h"
+
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "source/extensions/filters/http/json_to_metadata/config.h"
 
 namespace Envoy {
 namespace Extensions {

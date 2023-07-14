@@ -1,16 +1,16 @@
 #include <memory>
 
 #include "envoy/http/header_map.h"
+
 #include "source/common/json/json_loader.h"
-
-#include "test/mocks/http/mocks.h"
-#include "test/test_common/utility.h"
-
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
+
 #include "test/common/stream_info/test_util.h"
-#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

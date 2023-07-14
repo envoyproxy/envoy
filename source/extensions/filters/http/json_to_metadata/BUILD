@@ -30,5 +30,6 @@ envoy_cc_extension(
         ":json_to_metadata_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/json_to_metadata/v3:pkg_cc_proto",
     ],
 )

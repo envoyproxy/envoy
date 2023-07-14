@@ -4,7 +4,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
 
 namespace Envoy {
