@@ -3,8 +3,9 @@
 #include <string>
 
 #include "envoy/network/socket.h"
-#include "source/common/network/socket_option_factory.h"
+
 #include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
 namespace Upstream {

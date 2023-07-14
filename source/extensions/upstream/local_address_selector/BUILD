@@ -28,7 +28,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -45,6 +44,8 @@ envoy_cc_extension(
     deps = [
         ":default_local_address_selector",
         "//envoy/registry",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
 )

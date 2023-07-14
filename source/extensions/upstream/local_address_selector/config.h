@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
-#include "envoy/upstream/upstream.h"
 #include "envoy/registry/registry.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {

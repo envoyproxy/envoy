@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 #include "envoy/upstream/upstream.h"
