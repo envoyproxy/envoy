@@ -168,7 +168,6 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
-  testing::NiceMock<MockTimeSystem> mock_time_system_;
   std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;

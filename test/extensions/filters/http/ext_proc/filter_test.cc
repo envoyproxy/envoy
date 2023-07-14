@@ -52,7 +52,6 @@ using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
-// using Protobuf::util::TimeUtil;
 using Http::Filter1xxHeadersStatus;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
