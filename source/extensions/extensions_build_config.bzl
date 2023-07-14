@@ -277,6 +277,11 @@ EXTENSIONS = {
     "envoy.upstreams.http.udp": "//source/extensions/upstreams/http/udp:config",
 
     #
+    # Upstream local addresss selectors
+    #
+    "envoy.upstream.local_address_selector.default_local_address_selector": "//source/extensions/upstream/local_address_selector:config",
+
+    #
     # Watchdog actions
     #
     "envoy.watchdog.profile_action": "//source/extensions/watchdog/profile_action:config",
