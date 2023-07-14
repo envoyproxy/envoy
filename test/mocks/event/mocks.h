@@ -22,7 +22,6 @@
 #include "source/common/common/scope_tracker.h"
 
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/common.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
