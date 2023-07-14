@@ -215,6 +215,9 @@ bug_fixes:
   change: |
     Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
     upstream service.
+- area: http_router
+  change: |
+    Fixes a bug where CONNECT and CONNECT-UDP requests are always downgraded when per route upgrade config is present.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

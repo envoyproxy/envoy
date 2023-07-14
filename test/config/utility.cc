@@ -865,6 +865,8 @@ void ConfigHelper::setConnectUdpConfig(
   if (terminate_connect) {
     auto* upgrade = route->mutable_route()->add_upgrade_configs();
     upgrade->set_upgrade_type("connect-udp");
+    upgrade->set_allocated_connect_config(
+        new envoy::config::route::v3::RouteAction_UpgradeConfig_ConnectConfig{});
   }
 
   hcm.add_upgrade_configs()->set_upgrade_type("connect-udp");
