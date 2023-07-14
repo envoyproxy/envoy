@@ -91,9 +91,9 @@ parameters:
   type: string
   default: false
 - name: publishGithubReleaseDryRun
-  displayName: "Publish Github release (dry run)"
+  displayName: "Publish (dry run) Github release"
   type: string
-  default: false
+  default: true
 
 
 jobs:
@@ -398,7 +398,32 @@ jobs:
   condition: |
     and(not(canceled()),
         in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
-        eq(${{ parameters.publishGithubRelease }}, 'true'))
+        eq(${{ parameters.publishGithubRelease }}, 'true'),
+        ne(${{ parameters.publishGithubReleaseDryRun }}, 'true'))
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "release.signed"
+      itemPattern: "release.signed/release.signed.tar.zst"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: publish
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+
+- job: github_dryrun
+  displayName: Publish (dry-run) release tag
+  dependsOn: ["success"]
+  condition: |
+    and(not(canceled()),
+        in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
+        eq(${{ parameters.publishGithubRelease }}, 'true'),
+        eq(${{ parameters.publishGithubReleaseDryRun }}, 'true'))
   pool:
     vmImage: $(agentUbuntu)
   steps:
@@ -415,4 +440,4 @@ jobs:
       publishEnvoy: false
       publishTestResults: false
       env:
-        ENVOY_PUBLISH_DRY_RUN: ${{ parameters.publishGithubReleaseDryRun }}
+        ENVOY_PUBLISH_DRY_RUN: true
