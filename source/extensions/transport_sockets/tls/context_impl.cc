@@ -517,12 +517,12 @@ ValidationResults ContextImpl::customVerifyCertChain(
 
   auto callbacks =
       static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
-  CertValidator::ExtraValidationContext validator_ctx = {
+  CertValidator::ExtraValidationContext validation_ctx = {
       *callbacks->connection().connectionInfoProvider().localAddress()};
 
   ValidationResults result = cert_validator_->doVerifyCertChain(
       *cert_chain, extended_socket_info->createValidateResultCallback(), transport_socket_options,
-      *SSL_get_SSL_CTX(ssl), validator_ctx, SSL_is_server(ssl),
+      *SSL_get_SSL_CTX(ssl), validation_ctx, SSL_is_server(ssl),
       absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
