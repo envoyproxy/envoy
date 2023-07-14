@@ -1,9 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_package",
-)
-load(
-    "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
@@ -22,6 +18,8 @@ envoy_cc_library(
         "default_local_address_selector.h",
     ],
     external_deps = ["abseil_optional"],
+    # This is core Envoy extension.
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/network:address_interface",
         "//envoy/network:socket_interface",
@@ -42,6 +40,7 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
         ":default_local_address_selector",
