@@ -175,7 +175,7 @@ message BindConfig {
   // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
   // for an explanation of the behavior of the default selector.
   // [#extension-category: envoy.upstream.local_address_selector]
-  core.v3.TypedExtensionConfig local_address_selector = 6;
+  TypedExtensionConfig local_address_selector = 6;
 }
 
 // Addresses specify either a logical or physical address and port, which are
