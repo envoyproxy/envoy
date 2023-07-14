@@ -261,8 +261,7 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return {factory->name(),
-            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_)};
+    return {factory->name(), factory->createFilterFactoryFromProto(message, factory_context_)};
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -683,9 +682,9 @@ protected:
 class UpstreamNetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
-          NamedNetworkFilterFactoryCb, Server::Configuration::FactoryContext,
+          NamedNetworkFilterFactoryCb, Server::Configuration::CommonFactoryContext,
           NetworkDynamicFilterConfigProviderImpl<
-              Server::Configuration::FactoryContext,
+              Server::Configuration::CommonFactoryContext,
               Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "network_filter."; }
