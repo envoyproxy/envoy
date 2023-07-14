@@ -46,7 +46,7 @@ envoy_cc_extension(
     hdrs = ["filter_config.h"],
     external_deps = ["protobuf"],
     deps = [
-        ":extractor",
+        ":extractor_impl",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",

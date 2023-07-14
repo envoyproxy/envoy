@@ -49,7 +49,7 @@ protected:
             TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
-    filter_config_ = std::make_unique<FilterConfig>(proto_config_, *extractor_factory_, *api_);
+    filter_config_ = std::make_unique<FilterConfig>(proto_config_, *api_);
     filter_ = std::make_unique<Filter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
@@ -76,10 +76,7 @@ extractions_by_method: {
   Api::ApiPtr api_;
   GrpcFieldExtractionConfig proto_config_;
   std::unique_ptr<FilterConfig> filter_config_;
-
-  std::unique_ptr<ExtractorFactory> extractor_factory_ = std::make_unique<ExtractorFactoryImpl>();
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
-
   std::unique_ptr<Filter> filter_;
 };
 

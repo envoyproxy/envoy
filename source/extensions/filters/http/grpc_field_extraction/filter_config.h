@@ -13,7 +13,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
-#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -36,19 +36,18 @@ class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   explicit FilterConfig(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-          proto_config,
-      ExtractorFactory& extractor_factory, Api::Api& api);
+          proto_config, Api::Api& api);
 
-  TypeFinder createTypeFinder();
+  TypeFinder createTypeFinder() const ;
 
-  ExtractorFactory& extractor_factory() { return extractor_factory_; }
+  const ExtractorFactory& extractor_factory() const { return *extractor_factory_; }
 
-  absl::StatusOr<PerMethodExtraction> FindPerMethodExtraction(absl::string_view path);
+  absl::StatusOr<PerMethodExtraction> FindPerMethodExtraction(absl::string_view path)const ;
 
 private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;
-  ExtractorFactory& extractor_factory_;
+  std::unique_ptr<ExtractorFactory> extractor_factory_ = std::make_unique<ExtractorFactoryImpl>();
   google::protobuf::DescriptorPool descriptor_pool_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };

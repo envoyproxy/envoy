@@ -6,9 +6,8 @@ namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-        proto_config,
-    ExtractorFactory& extractor_factory, Api::Api& api)
-    : proto_config_(proto_config), extractor_factory_(extractor_factory) {
+        proto_config,Api::Api& api)
+    : proto_config_(proto_config){
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
 
   auto& descriptor_config = proto_config.descriptor_set();
@@ -53,14 +52,14 @@ FilterConfig::FilterConfig(
                                                                &descriptor_pool_));
 }
 
-TypeFinder FilterConfig::createTypeFinder() {
+TypeFinder FilterConfig::createTypeFinder() const {
   return [this](absl::string_view type_url) -> const google::protobuf::Type* {
     return type_helper_->Info()->GetTypeByTypeUrl(type_url);
   };
 }
 
 absl::StatusOr<PerMethodExtraction>
-FilterConfig::FindPerMethodExtraction(absl::string_view proto_path) {
+FilterConfig::FindPerMethodExtraction(absl::string_view proto_path) const {
   const auto* md = descriptor_pool_.FindMethodByName(proto_path);
   if (md == nullptr) {
     return absl::UnavailableError(fmt::format(

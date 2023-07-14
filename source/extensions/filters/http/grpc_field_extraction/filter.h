@@ -17,7 +17,7 @@ namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 class Filter : public Envoy::Http::PassThroughDecoderFilter,
                Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  Filter(FilterConfig& config) : filter_config_(config) {}
+  Filter(const FilterConfig& config) : filter_config_(config) {}
 
   Envoy::Http::FilterDataStatus decodeData(Envoy::Buffer::Instance& data, bool end_stream) override;
 
@@ -46,7 +46,7 @@ private:
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
 
-  FilterConfig& filter_config_;
+  const FilterConfig& filter_config_;
 
   MessageConverterPtr request_msg_converter_;
 
