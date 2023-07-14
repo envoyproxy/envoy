@@ -55,6 +55,7 @@ const (
 	ValueDownstreamRemoteAddress = 8
 	ValueUpstreamHostAddress     = 9
 	ValueUpstreamClusterName     = 10
+	ValueVirtualClusterName      = 11
 )
 
 type httpCApiImpl struct{}
