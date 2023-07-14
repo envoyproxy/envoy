@@ -13,6 +13,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -60,7 +62,7 @@ public:
   bool doRequest() const { return !request_rules_.empty(); }
   const Rules& requestRules() const { return request_rules_; }
   uint32_t requestBufferLimitBytes() const { return request_buffer_limit_bytes_; }
-  bool requestContentTypeAllowed(std::string_view) const;
+  bool requestContentTypeAllowed(absl::string_view) const;
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;

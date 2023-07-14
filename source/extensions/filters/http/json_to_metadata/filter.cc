@@ -55,7 +55,7 @@ FilterConfig::FilterConfig(
 
 Filter::~Filter() = default;
 
-bool FilterConfig::requestContentTypeAllowed(std::string_view content_type) const {
+bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
     return request_allow_empty_content_type_;
   }

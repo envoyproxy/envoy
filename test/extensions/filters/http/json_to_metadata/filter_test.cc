@@ -1084,7 +1084,7 @@ request_rules:
       key: version
 )EOF");
 
-  std::string value(1024 * 1024 - 40, 'z');
+  std::string value(1024 * 1024 - 44, 'z');
   std::string request_body =
       absl::StrCat(R"delimiter({"version":"good version", "placeholder":")delimiter", value,
                    R"delimiter("})delimiter");
