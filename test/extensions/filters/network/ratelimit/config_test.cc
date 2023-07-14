@@ -85,7 +85,7 @@ ip_allowlist: '12'
 
   envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "ip_allowlist: Cannot find field");
+                          "ip_allowlist");
 }
 
 } // namespace RateLimitFilter

@@ -208,9 +208,9 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x0c\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x0c, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
     EXPECT_EQ(static_cast<uint8_t>(observed_data[26]), listener_port >> 8);
     EXPECT_EQ(static_cast<uint8_t>(observed_data[27]), listener_port & 0xFF);
@@ -220,10 +220,11 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x24\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
     EXPECT_EQ(static_cast<uint8_t>(observed_data[50]), listener_port >> 8);
     EXPECT_EQ(static_cast<uint8_t>(observed_data[51]), listener_port & 0xFF);
@@ -508,9 +509,9 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x16\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x11, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x11, 0x12 is sent to upstream.
@@ -538,10 +539,11 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x2E\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x09, 0x0A is sent to upstream.
@@ -561,7 +563,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ;
+
   std::string observed_data;
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
     // 2 TLVs are included:
@@ -579,9 +581,9 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x16\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x16, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x11, 0x12 is sent to upstream.
@@ -614,10 +616,11 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x2E\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x09, 0x0A is sent to upstream.

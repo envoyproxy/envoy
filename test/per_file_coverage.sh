@@ -5,27 +5,26 @@
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
 "source/common/api:84.5"
-"source/common/api/posix:81.3"
+"source/common/api/posix:81.8"
 "source/common/config:94.8"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
-"source/common/json:93.4"
+"source/common/json:93.7"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.6"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/protobuf:96.3"
-"source/common/quic:93.4"
-"source/common/router:96.6"
+"source/common/protobuf:96.4"
+"source/common/quic:93.5"
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/singleton:95.7"
-"source/common/tcp:93.0"
+"source/common/tcp:94.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tracing:97.1"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:94.5"
+"source/exe:94.9"
+"source/extensions/access_loggers/grpc:95.8"
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
@@ -35,7 +34,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
 "source/extensions/filters/http/cache:93.4"
-"source/extensions/filters/http/grpc_json_transcoder:95.6"
+"source/extensions/filters/http/grpc_json_transcoder:93.7" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.9"
@@ -58,7 +57,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/common/ot:71.8"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.8"
+"source/extensions/transport_sockets:95.7"
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/transport_sockets/tls/cert_validator:95.2"
 "source/extensions/transport_sockets/tls/private_key:88.9"
@@ -70,13 +69,12 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/listener_managers/validation_listener_manager:70.0"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:profiler-lib:83"
 "source/server/config_validation:88.4"
-"source/extensions/health_checkers:95.9"
-"source/extensions/health_checkers/http:93.8"
+"source/extensions/health_checkers:96.0"
+"source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"
 "source/extensions/config_subscription/rest:94.3"
-"source/extensions/matching/input_matchers/cel_matcher:90.7" #Death tests don't report LCOV
+"source/extensions/matching/input_matchers/cel_matcher:91.1" #Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

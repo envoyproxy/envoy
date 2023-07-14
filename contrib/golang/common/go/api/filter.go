@@ -19,6 +19,18 @@ package api
 
 import "google.golang.org/protobuf/types/known/anypb"
 
+type (
+	// PassThroughStreamEncoderFilter provides the no-op implementation of the StreamEncoderFilter interface.
+	PassThroughStreamEncoderFilter struct{}
+	// PassThroughStreamDecoderFilter provides the no-op implementation of the StreamDecoderFilter interface.
+	PassThroughStreamDecoderFilter struct{}
+	// PassThroughStreamFilter provides the no-op implementation of the StreamFilter interface.
+	PassThroughStreamFilter struct {
+		PassThroughStreamDecoderFilter
+		PassThroughStreamEncoderFilter
+	}
+)
+
 // request
 type StreamDecoderFilter interface {
 	DecodeHeaders(RequestHeaderMap, bool) StatusType
@@ -26,13 +38,36 @@ type StreamDecoderFilter interface {
 	DecodeTrailers(RequestTrailerMap) StatusType
 }
 
-type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) (interface{}, error)
-	Merge(parentConfig interface{}, childConfig interface{}) interface{}
+func (*PassThroughStreamDecoderFilter) DecodeHeaders(RequestHeaderMap, bool) StatusType {
+	return Continue
 }
 
-type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
-type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
+func (*PassThroughStreamDecoderFilter) DecodeData(BufferInstance, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamDecoderFilter) DecodeTrailers(RequestTrailerMap) StatusType {
+	return Continue
+}
+
+// response
+type StreamEncoderFilter interface {
+	EncodeHeaders(ResponseHeaderMap, bool) StatusType
+	EncodeData(BufferInstance, bool) StatusType
+	EncodeTrailers(ResponseTrailerMap) StatusType
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeHeaders(ResponseHeaderMap, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeData(BufferInstance, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeTrailers(ResponseTrailerMap) StatusType {
+	return Continue
+}
 
 type StreamFilter interface {
 	// http request
@@ -44,12 +79,16 @@ type StreamFilter interface {
 	// TODO add more for stream complete and log phase
 }
 
-// response
-type StreamEncoderFilter interface {
-	EncodeHeaders(ResponseHeaderMap, bool) StatusType
-	EncodeData(BufferInstance, bool) StatusType
-	EncodeTrailers(ResponseTrailerMap) StatusType
+func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
+
+type StreamFilterConfigParser interface {
+	Parse(any *anypb.Any) (interface{}, error)
+	Merge(parentConfig interface{}, childConfig interface{}) interface{}
+}
+
+type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
+type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
