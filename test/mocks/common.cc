@@ -26,11 +26,7 @@ MockRandomGenerator::~MockRandomGenerator() = default;
 ReadyWatcher::ReadyWatcher() = default;
 ReadyWatcher::~ReadyWatcher() = default;
 
-MockTimeSystem::MockTimeSystem() {
-  ON_CALL(*this, systemTime()).WillByDefault(Return(real_time_.systemTime()));
-  ON_CALL(*this, monotonicTime()).WillByDefault(Return(real_time_.monotonicTime()));
-}
-
+MockTimeSystem::MockTimeSystem() = default;
 MockTimeSystem::~MockTimeSystem() = default;
 
 MockKeyValueStoreFactory::MockKeyValueStoreFactory() {
