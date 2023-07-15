@@ -54,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 2. parse the gRPC message binary directly without deserialization.
 // though buffering the first message introduces some latency.
 //
-// # Example,
+// # Example
 // we have the following request definition for the gRPC method `pkg.svc.Method`.
 //
 // message MethodRequest {
@@ -82,8 +82,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //            }
 //         }
 //      }
-//   },
-//   ...
+//   }
 // }
 //
 //
