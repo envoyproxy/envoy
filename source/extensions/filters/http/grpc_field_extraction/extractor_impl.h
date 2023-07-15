@@ -28,7 +28,7 @@ public:
       : type_finder_(type_finder), request_type_url_(request_type_url),
         field_extractions_(field_extractions) {}
 
-  // The init() should be called right after being constructed and before processRequest.
+  // The init() should be called right after starting processRequest.
   absl::Status init();
 
   absl::StatusOr<ExtractionResult>
