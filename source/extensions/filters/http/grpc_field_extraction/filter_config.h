@@ -15,12 +15,12 @@
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
-#include "grpc_transcoding/type_helper.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "grpc_transcoding/type_helper.h"
 
 namespace Envoy {
 namespace Extensions {

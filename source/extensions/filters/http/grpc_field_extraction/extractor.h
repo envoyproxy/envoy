@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 
 #include "source/common/protobuf/protobuf.h"
+
 #include "absl/status/status.h"
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/message_data.h"

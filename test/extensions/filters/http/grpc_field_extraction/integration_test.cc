@@ -3,9 +3,9 @@
 
 #include "envoy/common/optref.h"
 
+#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
-#include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 
 #include "absl/strings/str_format.h"
 
@@ -34,9 +34,9 @@ public:
   }
 
   void sendResponse(IntegrationStreamDecoder* response) {
-      upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData("response_body", true);
-  ASSERT_TRUE(response->waitForEndStream());
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    upstream_request_->encodeData("response_body", true);
+    ASSERT_TRUE(response->waitForEndStream());
   }
 
   std::string filter() {
@@ -91,13 +91,14 @@ TEST_P(IntegrationTest, Unary) {
 
 TEST_P(IntegrationTest, Streaming) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                        {":path", "/apikeys.ApiKeys/CreateApiKeyInStream"},
-                                                        {"content-type", "application/grpc"},
-                                                        {":authority", "host"},
-                                                        {":scheme", "http"}};
+  auto request_headers =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/apikeys.ApiKeys/CreateApiKeyInStream"},
+                                     {"content-type", "application/grpc"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"}};
 
-   CreateApiKeyRequest request1 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request1 = MakeCreateApiKeyRequest(
       R"pb(
       parent: "from-req1"
 )pb");
@@ -128,7 +129,8 @@ TEST_P(IntegrationTest, Streaming) {
   // Make sure that the body was properly propagated (with no modification).
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(upstream_request_->receivedData());
- checkSerializedData<CreateApiKeyRequest>(upstream_request_->body(), {request1, request2, request3});
+  checkSerializedData<CreateApiKeyRequest>(upstream_request_->body(),
+                                           {request1, request2, request3});
 
   // Send response.
   sendResponse(response.get());
