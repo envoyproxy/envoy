@@ -42,13 +42,13 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // # Config Requirements
 // 1. the target field should be one of the following primitive types:
-//    string, uint32, uint64, int32, int64, sint32, sint64, fixed32, fixed64, sfixed32, sixed64, float, double.
+//    string, uint32, uint64, int32, int64, sint32, sint64, fixed32, fixed64, sfixed32, sfixed64, float, double.
 // 2. the target field could be repeated.
 // 3. the intermediate type could also be repeated.
 //
 // # Output Format
-// 1. the result format will be `field<StringValue>` -> `values<ListValue of StringValue>` in the dynamic metadata<google.protobuf.Struct>.
-// 2. if the field is empty, a empty `<ListValue>` will be set.
+// 1. the extracted field names/values will be wrapped in be `field<StringValue>` -> `values<ListValue of StringValue>`, which will be added in the dynamic metadata<google.protobuf.Struct>.
+// 2. if the field value is empty, a empty `<ListValue>` will be set.
 //
 // # Performance
 // This filter should be performant as it
