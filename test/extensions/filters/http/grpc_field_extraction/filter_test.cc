@@ -41,9 +41,9 @@ fields {
 }
 )pb";
 
-class FilterTest : public ::testing::Test {
+class FilterTestBase : public ::testing::Test {
  protected:
-  FilterTest() : api_(Api::createApiForTest()) {}
+  FilterTestBase() : api_(Api::createApiForTest()) {}
 
   void setUp(absl::string_view config = "") {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(config.empty()?protoConfig() : config, &proto_config_));
@@ -103,8 +103,8 @@ void checkProtoStruct(ProtobufWkt::Struct got,
                                                             << expected_in_pbtext;
 }
 
-using FilterTestUnaryExtractSuccess = FilterTest;
-TEST_F(FilterTestUnaryExtractSuccess, UnarySingleBuffer) {
+using FilterTestExtractOk = FilterTestBase;
+TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -129,7 +129,7 @@ TEST_F(FilterTestUnaryExtractSuccess, UnarySingleBuffer) {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-TEST_F(FilterTestUnaryExtractSuccess, EmptyFields) {
+TEST_F(FilterTestExtractOk, EmptyFields) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -161,7 +161,7 @@ fields {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-TEST_F(FilterTestUnaryExtractSuccess, UnaryMultipeBuffers) {
+TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -207,8 +207,7 @@ TEST_F(FilterTestUnaryExtractSuccess, UnaryMultipeBuffers) {
   checkSerializedData<CreateApiKeyRequest>(end_request_data, {request});
 }
 
-using FilterTestStreamingExtractSuccess = FilterTest;
-TEST_F(FilterTestStreamingExtractSuccess,
+TEST_F(FilterTestExtractOk,
        StreamingMultipleMessageSingleBuffer) {
   setUp(R"pb(
 extractions_by_method: {
@@ -279,8 +278,8 @@ extractions_by_method: {
   checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
 }
 
-using FilterTestSingularFieldTypes = FilterTest;
-TEST_F(FilterTestSingularFieldTypes, SingularType) {
+using FilterTestFieldTypes = FilterTestBase;
+TEST_F(FilterTestFieldTypes, SingularType) {
   setUp(R"pb(
 extractions_by_method: {
   key: "apikeys.ApiKeys.CreateApiKey"
@@ -522,8 +521,7 @@ fields {
 }
 
 
-using FilterTestRepeatedIntermediate = FilterTest;
-TEST_F(FilterTestRepeatedIntermediate, SingularType) {
+TEST_F(FilterTestFieldTypes, RepeatedIntermediate) {
   setUp(R"pb(
 extractions_by_method: {
   key: "apikeys.ApiKeys.CreateApiKey"
@@ -602,8 +600,7 @@ fields {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-using FilterTestRepeatedFieldTypes=FilterTest;
-TEST_F(FilterTestRepeatedFieldTypes, RepeatedTypes) {
+TEST_F(FilterTestFieldTypes, RepeatedTypes) {
   setUp(R"pb(
 extractions_by_method: {
   key: "apikeys.ApiKeys.CreateApiKey"
@@ -898,7 +895,7 @@ fields {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-using FilterTestExtractRejected = FilterTest;
+using FilterTestExtractRejected = FilterTestBase;
 TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   setUp();
   ON_CALL(mock_decoder_callbacks_,
@@ -966,7 +963,7 @@ TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
             filter_->decodeHeaders(req_headers, false));
 }
 
-using FilterTestPassThrough = FilterTest;
+using FilterTestPassThrough = FilterTestBase;
 TEST_F(FilterTestPassThrough, NotGrpc) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
