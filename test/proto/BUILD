@@ -18,6 +18,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "helloworld_proto",
+    srcs = [":helloworld.proto"],
+)
+
+envoy_proto_library(
     name = "apikeys_proto",
     srcs = [":apikeys.proto"],
 )
