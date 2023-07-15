@@ -7,9 +7,6 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# L7 HTTP filter that implements binary gRPC to JSON transcoding
-# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter
-
 envoy_extension_package()
 
 envoy_cc_library(
@@ -45,8 +42,8 @@ envoy_cc_extension(
     hdrs = ["filter_config.h"],
     deps = [
         ":extractor_impl",
+        "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
     ],
 )

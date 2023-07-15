@@ -28,10 +28,11 @@ public:
       : type_finder_(type_finder), request_type_url_(request_type_url),
         field_extractions_(field_extractions) {}
 
-  absl::StatusOr<ExtractionResult>
-  ProcessRequest(Protobuf::field_extraction::MessageData& message) const override;
+  // The init() should be called right after being constructed and before processRequest.
+  absl::Status init();
 
-  absl::Status Init();
+  absl::StatusOr<ExtractionResult>
+  processRequest(Protobuf::field_extraction::MessageData& message) const override;
 
 private:
   TypeFinder type_finder_;
@@ -52,10 +53,11 @@ public:
           field_extractions) const {
     auto extractor =
         std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
-    auto status = extractor->Init();
+    auto status = extractor->init();
     if (!status.ok()) {
       return status;
     }
+
     return extractor;
   }
 };

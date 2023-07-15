@@ -156,7 +156,6 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   }
 
   // Buffering returns a list of messages.
-  bool got_messages = false;
   for (size_t msg_idx = 0; msg_idx < buffering->size(); ++msg_idx) {
     std::unique_ptr<StreamMessage> message_data = std::move(buffering->at(msg_idx));
 
@@ -170,11 +169,10 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
       continue;
     }
 
-    if (!got_messages) {
-      got_messages = true;
+    if (!extraction_done_) {
       extraction_done_ = true;
 
-      auto result = extractor_->ProcessRequest(*message_data->message());
+      auto result = extractor_->processRequest(*message_data->message());
       if (!result.ok()) {
         const absl::Status& status = result.status();
         rejectRequest(status.raw_code(), status.message(),
@@ -197,7 +195,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 
   // Reject the request if  extraction is required but could not
   // buffer up any messages.
-  if (!got_messages) {
+  if (!extraction_done_) {
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument,
                   "did not receive enough data to form a message.",
                   generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
@@ -213,7 +211,7 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
 
   ProtobufWkt::Struct dest_metadata;
   for (const auto& req_field : result) {
-    auto* list = (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
+    auto* list = (*dest_metadata.mutable_fields())[req_field.path].mutable_list_value();
     for (const auto& value : req_field.values) {
       list->add_values()->set_string_value(value);
     }

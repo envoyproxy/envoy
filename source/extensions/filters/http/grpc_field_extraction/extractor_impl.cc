@@ -21,7 +21,7 @@ using Protobuf::field_extraction::FieldValueExtractorInterface;
 
 } // namespace
 
-absl::Status ExtractorImpl::Init() {
+absl::Status ExtractorImpl::init() {
   FieldValueExtractorFactory extractor_factory(type_finder_);
   for (const auto& it : field_extractions_.request_field_extractions()) {
     auto extractor = extractor_factory.Create(request_type_url_, it.first);
@@ -35,7 +35,7 @@ absl::Status ExtractorImpl::Init() {
 }
 
 absl::StatusOr<ExtractionResult>
-ExtractorImpl::ProcessRequest(Protobuf::field_extraction::MessageData& message) const {
+ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) const {
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors) {

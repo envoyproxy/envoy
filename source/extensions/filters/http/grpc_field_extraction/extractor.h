@@ -20,15 +20,10 @@ namespace GrpcFieldExtraction {
 
 using TypeFinder = std::function<const Protobuf::Type*(const std::string&)>;
 struct RequestField {
-  absl::string_view field_path;
+  // The request field path.
+  absl::string_view path;
 
-  // The policy information for the proto field under extraction.
-  // The lifetime of this field is tied to the `method_info` argument of the
-  // `GrpcExtractor` constructor.
-
-  // A list of resource name (with container) and resource location.
-  // Repeated proto fields may have more than 1 extracted pair.
-  // Resource location may be empty, but resource name is always present.
+  // The request field values.
   std::vector<std::string> values;
 };
 
@@ -38,11 +33,9 @@ class Extractor {
 public:
   virtual ~Extractor() = default;
 
-  // Process a request message to extract resource info.
-  // This should be called once, and its extracted result can be fetched
-  // by GetResult() if this call is successful.
+  // Process a request message to extract targeted fields.
   virtual absl::StatusOr<ExtractionResult>
-  ProcessRequest(Protobuf::field_extraction::MessageData& message) const = 0;
+  processRequest(Protobuf::field_extraction::MessageData& message) const = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;
