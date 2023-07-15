@@ -365,6 +365,8 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: release.signed
+      env:
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -402,18 +404,24 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "release.signed"
-      itemPattern: "release.signed/release.signed.tar.zst"
-      targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
       ciTarget: publish
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          cp -a release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release
 
 - job: github_dryrun
   displayName: Publish (dry-run) release tag
@@ -426,12 +434,6 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "release.signed"
-      itemPattern: "release.signed/release.signed.tar.zst"
-      targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
       ciTarget: publish
@@ -440,3 +442,15 @@ jobs:
       publishTestResults: false
       env:
         ENVOY_PUBLISH_DRY_RUN: true
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          cp -a release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release
