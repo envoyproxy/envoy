@@ -13,5 +13,7 @@ services:
     - "${PORT_PROXY:-10000}:10000"
 
   echo_service:
-    image: cjimti/go-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: echo_service

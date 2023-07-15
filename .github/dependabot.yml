@@ -82,6 +82,12 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "docker"
+  directory: "/examples/golang-network"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "docker"
   directory: "/examples/grpc-bridge"
   schedule:
     interval: daily

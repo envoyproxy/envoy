@@ -12,7 +12,7 @@ Golang network filter
 
 In this example, we show how the `Golang <https://go.dev/>`_ network filter can be used with the Envoy proxy. We also show how the Go plugins can be independently configured at runtime.
 
-The example Go plugin adds a "hello, " prefix to the requests received from its TCP connections. These modified requests are then proxied to an echo service that is retrieved from the configuration file.
+The example Go plugin adds a ``hello, `` prefix to the requests received from its TCP connections. These modified requests are then proxied to an echo service that is retrieved from the configuration file.
 
 .. code-block:: yaml
    :emphasize-lines: 4
@@ -61,7 +61,7 @@ In this example, we start up two containers - an echo service which simply respo
 Step 3: Send some data to be handled by the Go plugin
 *****************************************************
 
-The response from the ``nc`` command below should include the "hello, " prefix which will be added by the example Go plugin.
+The response from the ``nc`` command below should include the ``hello, `` prefix which will be added by the example Go plugin.
 
 .. code-block:: console
 

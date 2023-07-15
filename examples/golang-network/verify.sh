@@ -3,7 +3,7 @@
 export NAME=golang-network
 export UID
 export MANUAL=true
-export PORT_PROXY="${GOLANG_PORT_PROXY:-10720}"
+export PORT_PROXY="${GOLANG_NETWORK_PORT_PROXY:-10720}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
