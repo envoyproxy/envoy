@@ -375,7 +375,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
-    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie}");
+    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
     return true;
   }
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
