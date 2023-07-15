@@ -109,7 +109,7 @@ diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.b
 +        "//conditions:default": ["//external:zlib"],
      }),
  )
-
+ 
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 --- a/src/google/protobuf/port_def.inc	2023-06-27 01:17:34.917105764 +0000
 +++ b/src/google/protobuf/port_def.inc	2023-06-27 01:18:12.069060142 +0000
@@ -138,11 +138,11 @@ diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
 --- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
 +++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
 @@ -345,7 +345,7 @@
-
+ 
   protected:
    // "protected" stops users from deleting a `MapFieldBase *`
 -  ~MapFieldBase();
 +  virtual ~MapFieldBase();
-
+ 
   public:
    // Returns reference to internal repeated field. Data written using
