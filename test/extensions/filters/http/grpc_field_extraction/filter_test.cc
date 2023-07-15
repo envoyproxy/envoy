@@ -74,8 +74,7 @@ extractions_by_method: {
       }
     }
   }
-})pb";
-  }
+})pb";}
 
   Api::ApiPtr api_;
   GrpcFieldExtractionConfig proto_config_;
@@ -261,10 +260,9 @@ TEST_F(FilterTestStreamingExtractSuccess, StreamingMultipleMessageSingleBuffer) 
   checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
 }
 
-// Only test several field types. For all the primitive types, they are covered in
-class FilterTestFieldTypes : public FilterTest {
+class FilterTestSingularFieldTypes : public FilterTest {
 protected:
-  FilterTestFieldTypes() : FilterTest() {}
+  FilterTestSingularFieldTypes() : FilterTest() {}
 
   std::string protoConfig() override {
     return R"pb(
@@ -272,17 +270,77 @@ extractions_by_method: {
   key: "apikeys.ApiKeys.CreateApiKey"
   value: {
     request_field_extractions: {
-      key: "key.type_repeated_string"
+      key: "supported_types.string"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.uint32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.uint64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.int32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.int64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.sint32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.sint64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.fixed32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.fixed64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.sfixed32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.sfixed64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.float"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "supported_types.double"
       value: {
       }
     }
   }
-}
-    )pb";
+})pb";
   }
 };
 
-TEST_F(FilterTestFieldTypes, NestedRepeatedString) {
+
+TEST_F(FilterTestSingularFieldTypes, SingularType) {
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -292,30 +350,156 @@ TEST_F(FilterTestFieldTypes, NestedRepeatedString) {
 
   CreateApiKeyRequest request = MakeCreateApiKeyRequest(
       R"pb(
-key: {
-type_repeated_string: "str1"
-type_repeated_string: "str2"
+supported_types: {
+  string: "1"
+  uint32: 2
+  uint64: 3
+  int32: 4
+  int64: 5
+  sint32: 6
+  sint64: 7
+  fixed32: 8
+  fixed64: 9
+  sfixed32: 10
+  sfixed64: 11
+  float: 1.2
+  double: 1.3
 }
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "key.type_repeated_string"
+        checkProtoStruct(new_dynamic_metadata, R"pb(fields {
+  key: "supported_types.double"
   value {
     list_value {
       values {
-        string_value: "str1"
-      }
-      values {
-        string_value: "str2"
+        string_value: "1.3"
       }
     }
   }
 }
-)pb");
+fields {
+  key: "supported_types.fixed32"
+  value {
+    list_value {
+      values {
+        string_value: "8"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.fixed64"
+  value {
+    list_value {
+      values {
+        string_value: "9"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.float"
+  value {
+    list_value {
+      values {
+        string_value: "1.2"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.int32"
+  value {
+    list_value {
+      values {
+        string_value: "4"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.int64"
+  value {
+    list_value {
+      values {
+        string_value: "5"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.sfixed32"
+  value {
+    list_value {
+      values {
+        string_value: "10"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.sfixed64"
+  value {
+    list_value {
+      values {
+        string_value: "11"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.sint32"
+  value {
+    list_value {
+      values {
+        string_value: "6"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.sint64"
+  value {
+    list_value {
+      values {
+        string_value: "7"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.string"
+  value {
+    list_value {
+      values {
+        string_value: "1"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.uint32"
+  value {
+    list_value {
+      values {
+        string_value: "2"
+      }
+    }
+  }
+}
+fields {
+  key: "supported_types.uint64"
+  value {
+    list_value {
+      values {
+        string_value: "3"
+      }
+    }
+  }
+})pb");
       }));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
@@ -323,8 +507,309 @@ fields {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-using FilterTestExtractFailRejected = FilterTest;
-TEST_F(FilterTestExtractFailRejected, BufferLimitedExceeded) {
+class FilterTestRepeatedFieldTypes : public FilterTest {
+protected:
+  FilterTestRepeatedFieldTypes() : FilterTest() {}
+
+  std::string protoConfig() override {
+    return R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_field_extractions: {
+      key: "repeated_supported_types.string"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.uint32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.uint64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.int32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.int64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.sint32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.sint64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.fixed32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.fixed64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.sfixed32"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.sfixed64"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.float"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "repeated_supported_types.double"
+      value: {
+      }
+    }
+  }
+})pb";
+  }
+};
+
+
+TEST_F(FilterTestRepeatedFieldTypes, RepeatedTypes) {
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = MakeCreateApiKeyRequest(
+      R"pb(
+repeated_supported_types: {
+  string: "1"
+  uint32: 2
+  uint64: 3
+  int32: 4
+  int64: 5
+  sint32: 6
+  sint64: 7
+  fixed32: 8
+  fixed64: 9
+  sfixed32: 10
+  sfixed64: 11
+  float: 1.2
+  double: 1.3
+  string: "11"
+  uint32: 22
+  uint64: 33
+  int32: 44
+  int64: 55
+  sint32: 66
+  sint64: 77
+  fixed32: 88
+  fixed64: 99
+  sfixed32: 1010
+  sfixed64: 1111
+  float: 1.212
+  double: 1.313
+}
+
+)pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "repeated_supported_types.double"
+  value {
+    list_value {
+      values {
+        string_value: "1.3"
+      }
+      values {
+        string_value: "1.313"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.fixed32"
+  value {
+    list_value {
+      values {
+        string_value: "8"
+      }
+      values {
+        string_value: "88"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.fixed64"
+  value {
+    list_value {
+      values {
+        string_value: "9"
+      }
+      values {
+        string_value: "99"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.float"
+  value {
+    list_value {
+      values {
+        string_value: "1.2"
+      }
+      values {
+        string_value: "1.212"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.int32"
+  value {
+    list_value {
+      values {
+        string_value: "4"
+      }
+      values {
+        string_value: "44"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.int64"
+  value {
+    list_value {
+      values {
+        string_value: "5"
+      }
+      values {
+        string_value: "55"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.sfixed32"
+  value {
+    list_value {
+      values {
+        string_value: "10"
+      }
+      values {
+        string_value: "1010"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.sfixed64"
+  value {
+    list_value {
+      values {
+        string_value: "11"
+      }
+      values {
+        string_value: "1111"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.sint32"
+  value {
+    list_value {
+      values {
+        string_value: "6"
+      }
+      values {
+        string_value: "66"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.sint64"
+  value {
+    list_value {
+      values {
+        string_value: "7"
+      }
+      values {
+        string_value: "77"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.string"
+  value {
+    list_value {
+      values {
+        string_value: "1"
+      }
+      values {
+        string_value: "11"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.uint32"
+  value {
+    list_value {
+      values {
+        string_value: "2"
+      }
+      values {
+        string_value: "22"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.uint64"
+  value {
+    list_value {
+      values {
+        string_value: "3"
+      }
+      values {
+        string_value: "33"
+      }
+    }
+  }
+})pb");
+      }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+using FilterTestExtractRejected = FilterTest;
+TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
@@ -346,7 +831,7 @@ TEST_F(FilterTestExtractFailRejected, BufferLimitedExceeded) {
             filter_->decodeData(*request_data, true));
 }
 
-TEST_F(FilterTestExtractFailRejected, NotEnoughData) {
+TEST_F(FilterTestExtractRejected, NotEnoughData) {
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -364,7 +849,7 @@ TEST_F(FilterTestExtractFailRejected, NotEnoughData) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, true));
 }
 
-TEST_F(FilterTestExtractFailRejected, MisformedGrpcPath) {
+TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
   ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -387,7 +872,7 @@ TEST_F(FilterTestPassThrough, NotGrpc) {
                                {"content-type", "not-grpc"}};
 
   // Pass through headers directly.
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
 TEST_F(FilterTestPassThrough, PathNotExist) {
@@ -395,7 +880,7 @@ TEST_F(FilterTestPassThrough, PathNotExist) {
       TestRequestHeaderMapImpl{{":method", "POST"}, {"content-type", "application/grpc"}};
 
   // Pass through headers directly.
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
 TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
@@ -405,7 +890,7 @@ TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
                                {"content-type", "application/grpc"}};
 
   // Pass through headers directly.
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
 } // namespace

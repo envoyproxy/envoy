@@ -35,18 +35,20 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // 1. if the request is gRPC request with a protobuf body, the filter tries to:
 //    a. block the incoming data before decoding the first complete gRPC message
 //    b. look up the target field from the buffered gRPC message
-//    c. if the extraction result isn't empty, write it into the dynamic metadata and resume the request propagation.
+//    c. write the extraction result into the dynamic metadata and resume the request propagation.
 // 2. otherwise, pass through the request.
 //
 // If the request is a malformed one found during 1.a or 1.b, the filter will reject the request.
 //
 // # Config Requirements
-// 1. the target field should be of a singular primitive type or a repeated primitive type
-// and its value will be extracted in string format.
-// 2. the intermediate type could also be repeated.
+// 1. the target field should be one of the following primitive types:
+//    string, uint32, uint64, int32, int64, sint32, sint64, fixed32, fixed64, sfixed32, sixed64, float, double.
+// 2. the target field could be repeated.
+// 3. the intermediate type could also be repeated.
 //
 // # Output Format
-// The result format will be `field<StringValue>` -> `values<ListValue of StringValue>` in the dynamic metadata<google.protobuf.Struct>.
+// 1. the result format will be `field<StringValue>` -> `values<ListValue of StringValue>` in the dynamic metadata<google.protobuf.Struct>.
+// 2. if the field is
 //
 // # Performance
 // This filter should be performant as it
@@ -60,6 +62,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // message MethodRequest {
 //   string foo = 1;
 //   Nested nested = 2;
+//   uint32 baz = 3;
 //   ...
 // }
 //
@@ -76,6 +79,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //            "foo":{
 //            },
 //            "nested.bar":{
+//            }
+//            "baz":{
 //            }
 //         }
 //      }
@@ -98,6 +103,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   ],
 //   "nested.bar":[
 //      "val_bar1", "val_bar2"
+//   ]
+//   "baz":[
 //   ]
 // }
 

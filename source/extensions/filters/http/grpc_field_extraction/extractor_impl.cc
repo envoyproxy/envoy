@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "source/common/common/logger.h"
+#include "absl/strings/str_format.h"
 
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
@@ -45,10 +46,10 @@ ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) 
     }
 
     ENVOY_LOG_MISC(
-        debug, "extracted the following resource values from the {} field: {}", request_type_url_,
+        debug, "extracted the following resource values from the {} field: {}", it.first,
         std::accumulate(extracted_values.value().begin(), extracted_values.value().end(),
                         std::string(),
-                        [](const std::string& lhs, const std::string& rhs) { return lhs + rhs; }));
+                        [](const std::string& lhs, const std::string& rhs) { return absl::StrFormat("%s, %s", lhs, rhs); }));
     result.push_back({it.first, std::move(extracted_values.value())});
   }
 
