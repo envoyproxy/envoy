@@ -13,6 +13,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
@@ -20,10 +21,11 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "google/protobuf/descriptor.h"
-#include "google/protobuf/descriptor.pb.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -39,10 +41,13 @@ private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;
   absl::flat_hash_map<std::string, std::unique_ptr<Extractor>> proto_path_to_extractor_;
-  google::protobuf::DescriptorPool descriptor_pool_;
+  Protobuf::DescriptorPool descriptor_pool_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

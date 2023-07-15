@@ -10,11 +10,14 @@
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 
-using google::protobuf::field_extraction::FieldValueExtractorFactory;
-using google::protobuf::field_extraction::FieldValueExtractorInterface;
+using Protobuf::field_extraction::FieldValueExtractorFactory;
+using Protobuf::field_extraction::FieldValueExtractorInterface;
 
 } // namespace
 
@@ -32,7 +35,7 @@ absl::Status ExtractorImpl::Init() {
 }
 
 absl::StatusOr<ExtractionResult>
-ExtractorImpl::ProcessRequest(google::protobuf::field_extraction::MessageData& message) const {
+ExtractorImpl::ProcessRequest(Protobuf::field_extraction::MessageData& message) const {
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors) {
@@ -52,4 +55,7 @@ ExtractorImpl::ProcessRequest(google::protobuf::field_extraction::MessageData& m
   return result;
 }
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

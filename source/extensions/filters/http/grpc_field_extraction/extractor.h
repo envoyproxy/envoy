@@ -8,13 +8,17 @@
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "absl/status/status.h"
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
-using TypeFinder = std::function<const google::protobuf::Type*(const std::string&)>;
+using TypeFinder = std::function<const Protobuf::Type*(const std::string&)>;
 struct RequestField {
   absl::string_view field_path;
 
@@ -38,7 +42,7 @@ public:
   // This should be called once, and its extracted result can be fetched
   // by GetResult() if this call is successful.
   virtual absl::StatusOr<ExtractionResult>
-  ProcessRequest(google::protobuf::field_extraction::MessageData& message) const = 0;
+  ProcessRequest(Protobuf::field_extraction::MessageData& message) const = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;
@@ -53,4 +57,7 @@ public:
           field_extractions) const = 0;
 };
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

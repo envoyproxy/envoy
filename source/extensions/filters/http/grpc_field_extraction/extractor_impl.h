@@ -5,17 +5,20 @@
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 
 #include "absl/status/status.h"
-#include "google/protobuf/descriptor.pb.h"
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 using FieldValueExtractorPtr =
-    std::unique_ptr<google::protobuf::field_extraction::FieldValueExtractorInterface>;
+    std::unique_ptr<Protobuf::field_extraction::FieldValueExtractorInterface>;
 class ExtractorImpl : public Extractor {
 public:
   explicit ExtractorImpl(
@@ -26,7 +29,7 @@ public:
         field_extractions_(field_extractions) {}
 
   absl::StatusOr<ExtractionResult>
-  ProcessRequest(google::protobuf::field_extraction::MessageData& message) const override;
+  ProcessRequest(Protobuf::field_extraction::MessageData& message) const override;
 
   absl::Status Init();
 
@@ -57,4 +60,7 @@ public:
   }
 };
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

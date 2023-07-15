@@ -11,7 +11,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::ApiKey;
@@ -90,7 +93,7 @@ CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
 }
 
 void checkProtoStruct(ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
-  google::protobuf::Struct expected;
+  ProtobufWkt::Struct expected;
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
   EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n"
                                                             << got.DebugString() << "expected:\n"
@@ -407,4 +410,7 @@ TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
 
 } // namespace
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

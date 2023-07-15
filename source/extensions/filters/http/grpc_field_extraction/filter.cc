@@ -20,15 +20,18 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
-#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
@@ -111,9 +114,8 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
 
   extractor_ = extractor;
   request_msg_converter_ = std::make_unique<MessageConverter>(
-      std::make_unique<
-          std::function<std::unique_ptr<google::protobuf::field_extraction::MessageData>()>>(
-          []() { return std::make_unique<google::protobuf::field_extraction::CordMessageData>(); }),
+      std::make_unique<std::function<std::unique_ptr<Protobuf::field_extraction::MessageData>()>>(
+          []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); }),
       decoder_callbacks_->decoderBufferLimit());
 
   return Envoy::Http::FilterHeadersStatus::StopIteration;
@@ -209,7 +211,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 void Filter::handleExtractionResult(const ExtractionResult& result) {
   ABSL_DCHECK(extractor_);
 
-  google::protobuf::Struct dest_metadata;
+  ProtobufWkt::Struct dest_metadata;
   for (const auto& req_field : result) {
     auto* list = (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
     for (const auto& value : req_field.values) {
@@ -224,4 +226,7 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
   }
 }
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

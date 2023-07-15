@@ -11,7 +11,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 namespace {
 using ::apikeys::CreateApiKeyRequest;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
@@ -152,4 +155,7 @@ extractions_by_method: {
 
 } // namespace
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

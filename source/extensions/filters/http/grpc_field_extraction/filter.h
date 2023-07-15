@@ -12,7 +12,10 @@
 #include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 class Filter : public Envoy::Http::PassThroughDecoderFilter,
                Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
@@ -65,4 +68,7 @@ private:
           proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 };
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

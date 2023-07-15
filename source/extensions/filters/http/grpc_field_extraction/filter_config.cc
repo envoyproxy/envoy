@@ -2,7 +2,10 @@
 
 #include "source/common/common/fmt.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
@@ -10,8 +13,8 @@ FilterConfig::FilterConfig(
     std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api)
     : proto_config_(proto_config) {
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(Envoy::Grpc::Common::typeUrlPrefix(),
-                                                               &descriptor_pool_));
+      Protobuf::util::NewTypeResolverForDescriptorPool(Envoy::Grpc::Common::typeUrlPrefix(),
+                                                       &descriptor_pool_));
 
   initDescriptorPool(api);
 
@@ -23,7 +26,7 @@ FilterConfig::FilterConfig(
     }
 
     auto extractor = extractor_factory->CreateExtractor(
-        [this](absl::string_view type_url) -> const google::protobuf::Type* {
+        [this](absl::string_view type_url) -> const Protobuf::Type* {
           return type_helper_->Info()->GetTypeByTypeUrl(type_url);
         },
         Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->input_type()->full_name(), it.second);
@@ -77,4 +80,7 @@ const Extractor* FilterConfig::FindExtractor(absl::string_view proto_path) const
   return proto_path_to_extractor_.find(proto_path)->second.get();
 }
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

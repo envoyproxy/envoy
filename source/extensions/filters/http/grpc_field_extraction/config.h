@@ -10,7 +10,10 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/grpc_field_extraction/filter_config.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 class FilterFactoryCreator
     : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
@@ -24,4 +27,7 @@ private:
           proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 };
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

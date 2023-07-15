@@ -29,7 +29,6 @@ envoy_cc_library(
     hdrs = ["extractor_impl.h"],
     external_deps = [
         "grpc_transcoding",
-        "protobuf",
     ],
     deps = [
         "extractor",
@@ -44,7 +43,6 @@ envoy_cc_extension(
     name = "filter_config",
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
-    external_deps = ["protobuf"],
     deps = [
         ":extractor_impl",
         "//source/extensions/filters/http/common:factory_base_lib",
@@ -59,7 +57,6 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     external_deps = [
         "grpc_transcoding",
-        "protobuf",
     ],
     deps = [
         "extractor_impl",

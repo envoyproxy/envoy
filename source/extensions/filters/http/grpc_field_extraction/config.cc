@@ -12,7 +12,10 @@
 
 #include "proto_field_extraction/message_data/cord_message_data.h"
 
-namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcFieldExtraction {
 
 Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
@@ -28,4 +31,7 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
 
 REGISTER_FACTORY(FilterFactoryCreator, Envoy::Server::Configuration::NamedHttpFilterConfigFactory);
 
-} // namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction
+} // namespace GrpcFieldExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
