@@ -7,7 +7,6 @@
 
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
-#include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
 #include "source/extensions/filters/http/grpc_field_extraction/filter.h"
 
@@ -21,7 +20,7 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
     const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
 
   auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.api());
+      std::make_shared<FilterConfig>(proto_config,std::make_unique<ExtractorFactoryImpl>(), context.api());
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(*filter_config));
   };

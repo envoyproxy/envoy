@@ -49,7 +49,8 @@ protected:
             TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
-    filter_config_ = std::make_unique<FilterConfig>(proto_config_, *api_);
+    filter_config_ = std::make_unique<FilterConfig>(
+        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
     filter_ = std::make_unique<Filter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
@@ -354,7 +355,7 @@ TEST_F(FilterTestExtractFailRejected, NotEnoughData) {
 
   EXPECT_CALL(mock_decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "Did not receive enough data to form a message.", Eq(nullptr),
+                             "did not receive enough data to form a message.", Eq(nullptr),
                              Eq(Envoy::Grpc::Status::InvalidArgument),
                              "grpc_field_extraction_INVALID_ARGUMENT{REQUEST_OUT_OF_DATA}"));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, true));

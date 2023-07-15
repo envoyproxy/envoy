@@ -14,6 +14,7 @@
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
+using FieldValueExtractorPtr = std::unique_ptr<google::protobuf::field_extraction::FieldValueExtractorInterface>;
 class ExtractorImpl : public Extractor {
 public:
   explicit ExtractorImpl(
@@ -23,15 +24,11 @@ public:
       : type_finder_(type_finder), request_type_url_(request_type_url),
         field_extractions_(field_extractions) {}
 
-  absl::Status ProcessRequest(google::protobuf::field_extraction::MessageData& message) override;
+  absl::StatusOr<ExtractionResult> ProcessRequest(google::protobuf::field_extraction::MessageData& message) const override;
 
-  const ExtractionResult& GetResult() const override { return result_; }
+  absl::Status Init();
 
 private:
-  absl::StatusOr<RequestField> ExtractRequestField(
-      google::protobuf::field_extraction::FieldValueExtractorFactory& extractor_factory,
-      absl::string_view field_path, google::protobuf::field_extraction::MessageData& message) const;
-
   TypeFinder type_finder_;
 
   std::string request_type_url_;
@@ -39,18 +36,21 @@ private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
       field_extractions_;
 
-  ExtractionResult result_;
-
-  int message_count_ = 0;
+  absl::flat_hash_map<absl::string_view, FieldValueExtractorPtr> per_field_extractors;
 };
 
 class ExtractorFactoryImpl : public ExtractorFactory {
 public:
-  ExtractorPtr CreateExtractor(
+  absl::StatusOr<ExtractorPtr>  CreateExtractor(
       TypeFinder type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const {
-    return std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
+    auto extractor = std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
+    auto status = extractor->Init();
+    if (!status.ok()) {
+      return  status;
+    }
+    return extractor;
   }
 };
 

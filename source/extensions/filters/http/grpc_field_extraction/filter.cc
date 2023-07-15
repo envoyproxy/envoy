@@ -21,9 +21,8 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
-#include "source/extensions/filters/http/grpc_field_extraction/extractor_impl.h"
-
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_format.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
@@ -102,15 +101,14 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  auto per_method_extraction = filter_config_.FindPerMethodExtraction(*proto_path);
-  if (!per_method_extraction.ok()) {
-    ENVOY_STREAM_LOG(debug, "{}", *decoder_callbacks_, per_method_extraction.status().ToString());
+
+  auto* extractor = filter_config_.FindExtractor(*proto_path);
+  if (!extractor) {
+    ENVOY_STREAM_LOG(debug, "gRPC method `{}` isn't configured for field extraction", *decoder_callbacks_, *proto_path);
     return Http::FilterHeadersStatus::Continue;
   }
 
-  extractor_ = filter_config_.extractor_factory().CreateExtractor(
-      filter_config_.createTypeFinder(), per_method_extraction->request_type,
-      *per_method_extraction->field_extractions);
+  extractor_ = extractor;
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::make_unique<
           std::function<std::unique_ptr<google::protobuf::field_extraction::MessageData>()>>(
@@ -121,24 +119,22 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
 }
 
 Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!requireExtraction() || extraction_done_) {
-    return Envoy::Http::FilterDataStatus::Continue;
-  }
   ENVOY_STREAM_LOG(debug, "decodeData: data size={} end_stream={}", *decoder_callbacks_,
                    data.length(), end_stream);
+  if (!extractor_ || extraction_done_) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
 
   if (auto status = handleDecodeData(data, end_stream); !status.got_messages) {
     return status.filter_status;
   }
 
-  handleExtractionResult();
-  extraction_done_ = true;
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
 Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
                                                         bool end_stream) {
-  ABSL_DCHECK(requireExtraction());
+  ABSL_DCHECK(extractor_ && request_msg_converter_);
 
   auto buffering = request_msg_converter_->accumulateMessages(data, end_stream);
   if (!buffering.ok()) {
@@ -172,15 +168,20 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
       continue;
     }
 
-    got_messages = true;
+    if (!got_messages) {
+      got_messages = true;
+      extraction_done_ = true;
 
-    const auto status = extractor_->ProcessRequest(*message_data->message());
-    if (!status.ok()) {
-      rejectRequest(status.raw_code(), status.message(),
-                    generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
-                                      absl::StatusCodeToString(status.code()),
-                                      kRcDetailErrorRequestFieldExtractionFailed));
-      return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+      auto result = extractor_->ProcessRequest(*message_data->message());
+      if (!result.ok()) {
+        const absl::Status& status = result.status();
+        rejectRequest(status.raw_code(), status.message(),
+                      generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
+                                        absl::StatusCodeToString(status.code()),
+                                        kRcDetailErrorRequestFieldExtractionFailed));
+        return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+      }
+      handleExtractionResult(*result);
     }
 
     auto buf_convert_status = request_msg_converter_->convertBackToBuffer(std::move(message_data));
@@ -196,7 +197,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   // buffer up any messages.
   if (!got_messages) {
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument,
-                  "Did not receive enough data to form a message.",
+                  "did not receive enough data to form a message.",
                   generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
                                     absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                                     kRcDetailErrorRequestOutOfData));
@@ -205,13 +206,11 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   return HandleDecodeDataStatus();
 }
 
-void Filter::handleExtractionResult() {
-  ABSL_DCHECK(extractor_);
-
-  const auto& result = extractor_->GetResult();
+void Filter::handleExtractionResult(const ExtractionResult& result) {
+  ABSL_DCHECK(extractor_ );
 
   google::protobuf::Struct dest_metadata;
-  for (const auto& req_field : result.req_fields) {
+  for (const auto& req_field : result) {
     auto* list = (*dest_metadata.mutable_fields())[req_field.field_path].mutable_list_value();
     for (const auto& value : req_field.values) {
       list->add_values()->set_string_value(value);

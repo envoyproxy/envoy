@@ -37,20 +37,19 @@ private:
     Envoy::Http::FilterDataStatus filter_status;
   };
 
-  bool requireExtraction() { return extractor_ && request_msg_converter_; }
 
   HandleDecodeDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
-  void handleExtractionResult();
+  void handleExtractionResult(const ExtractionResult& result);
 
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
 
   const FilterConfig& filter_config_;
 
-  MessageConverterPtr request_msg_converter_;
+  MessageConverterPtr request_msg_converter_ = nullptr;
 
-  ExtractorPtr extractor_ = nullptr;
+  const Extractor* extractor_ = nullptr;
 
   bool extraction_done_ = false;
 };

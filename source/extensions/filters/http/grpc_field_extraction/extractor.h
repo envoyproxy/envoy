@@ -28,10 +28,7 @@ struct RequestField {
   std::vector<std::string> values;
 };
 
-struct ExtractionResult {
-  // A list of extracted resources, one per field.
-  std::vector<RequestField> req_fields;
-};
+using ExtractionResult = std::vector<RequestField>;
 
 class Extractor {
 public:
@@ -40,10 +37,7 @@ public:
   // Process a request message to extract resource info.
   // This should be called once, and its extracted result can be fetched
   // by GetResult() if this call is successful.
-  virtual absl::Status ProcessRequest(google::protobuf::field_extraction::MessageData& message) = 0;
-
-  // Return the extracted result if ProcessRequest is successful.
-  virtual const ExtractionResult& GetResult() const = 0;
+  virtual absl::StatusOr<ExtractionResult> ProcessRequest(google::protobuf::field_extraction::MessageData& message) const = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;
@@ -52,7 +46,7 @@ class ExtractorFactory {
 public:
   virtual ~ExtractorFactory() = default;
 
-  virtual ExtractorPtr CreateExtractor(
+  virtual absl::StatusOr<ExtractorPtr> CreateExtractor(
       TypeFinder type_finder_, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const = 0;
