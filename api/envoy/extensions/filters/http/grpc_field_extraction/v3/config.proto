@@ -48,7 +48,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // # Output Format
 // 1. the result format will be `field<StringValue>` -> `values<ListValue of StringValue>` in the dynamic metadata<google.protobuf.Struct>.
-// 2. if the field is
+// 2. if the field is empty, a empty `<ListValue>` will be set.
 //
 // # Performance
 // This filter should be performant as it

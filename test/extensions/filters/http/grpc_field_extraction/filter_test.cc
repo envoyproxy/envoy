@@ -339,7 +339,6 @@ extractions_by_method: {
   }
 };
 
-
 TEST_F(FilterTestSingularFieldTypes, SingularType) {
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -500,6 +499,91 @@ fields {
     }
   }
 })pb");
+      }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+
+class FilterTestRepeatedIntermediate : public FilterTest {
+protected:
+  FilterTestRepeatedIntermediate() : FilterTest() {}
+
+  std::string protoConfig() override {
+    return R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_field_extractions: {
+      key: "repeated_intermediate.values.list_value.values.string_value"
+      value: {
+      }
+    }
+  }
+})pb";
+  }
+};
+
+TEST_F(FilterTestRepeatedIntermediate, SingularType) {
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = MakeCreateApiKeyRequest(
+      R"pb(
+repeated_intermediate: {
+  values: {
+    list_value: {
+      values: {
+        string_value: "1"
+      }
+      values: {
+        string_value: "2"
+      }
+    }
+  }
+  values: {
+    list_value: {
+      values: {
+        string_value: "3"
+      }
+      values: {
+        string_value: "4"
+      }
+    }
+  }
+}
+)pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "repeated_intermediate.values.list_value.values.string_value"
+  value {
+    list_value {
+      values {
+        string_value: "1"
+      }
+      values {
+        string_value: "2"
+      }
+      values {
+        string_value: "3"
+      }
+      values {
+        string_value: "4"
+      }
+    }
+  }
+}
+)pb");
       }));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 

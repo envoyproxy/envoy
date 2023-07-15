@@ -3,6 +3,7 @@ syntax = "proto3";
 package apikeys;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 service ApiKeys {
 
@@ -108,7 +109,10 @@ message CreateApiKeyRequest {
   ApiKey key = 2;
 
   SupportedTypes supported_types = 3;
+
   RepeatedSupportedTypes  repeated_supported_types = 4;
 
   UnsupportedTypes unsupported_types = 5;
+
+  google.protobuf.ListValue repeated_intermediate = 6;
 }

@@ -55,6 +55,7 @@ envoy_extension_cc_test(
     shard_count = 2,
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
+        "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
         "@com_google_absl//absl/strings:str_format",
