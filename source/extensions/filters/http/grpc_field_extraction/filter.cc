@@ -21,6 +21,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
@@ -101,10 +102,10 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-
   auto* extractor = filter_config_.FindExtractor(*proto_path);
   if (!extractor) {
-    ENVOY_STREAM_LOG(debug, "gRPC method `{}` isn't configured for field extraction", *decoder_callbacks_, *proto_path);
+    ENVOY_STREAM_LOG(debug, "gRPC method `{}` isn't configured for field extraction",
+                     *decoder_callbacks_, *proto_path);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -155,8 +156,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
   // Buffering returns a list of messages.
   bool got_messages = false;
   for (size_t msg_idx = 0; msg_idx < buffering->size(); ++msg_idx) {
-    std::unique_ptr<StreamMessage> message_data =
-        std::move(buffering->at(msg_idx));
+    std::unique_ptr<StreamMessage> message_data = std::move(buffering->at(msg_idx));
 
     // MessageConverter uses a empty StreamMessage to denote the end.
     if (message_data->size() == -1) {
@@ -207,7 +207,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 }
 
 void Filter::handleExtractionResult(const ExtractionResult& result) {
-  ABSL_DCHECK(extractor_ );
+  ABSL_DCHECK(extractor_);
 
   google::protobuf::Struct dest_metadata;
   for (const auto& req_field : result) {

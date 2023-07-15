@@ -37,7 +37,8 @@ public:
   // Process a request message to extract resource info.
   // This should be called once, and its extracted result can be fetched
   // by GetResult() if this call is successful.
-  virtual absl::StatusOr<ExtractionResult> ProcessRequest(google::protobuf::field_extraction::MessageData& message) const = 0;
+  virtual absl::StatusOr<ExtractionResult>
+  ProcessRequest(google::protobuf::field_extraction::MessageData& message) const = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;

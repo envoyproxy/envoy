@@ -14,7 +14,8 @@
 
 namespace Envoy::Extensions::HttpFilters::GrpcFieldExtraction {
 
-using FieldValueExtractorPtr = std::unique_ptr<google::protobuf::field_extraction::FieldValueExtractorInterface>;
+using FieldValueExtractorPtr =
+    std::unique_ptr<google::protobuf::field_extraction::FieldValueExtractorInterface>;
 class ExtractorImpl : public Extractor {
 public:
   explicit ExtractorImpl(
@@ -24,7 +25,8 @@ public:
       : type_finder_(type_finder), request_type_url_(request_type_url),
         field_extractions_(field_extractions) {}
 
-  absl::StatusOr<ExtractionResult> ProcessRequest(google::protobuf::field_extraction::MessageData& message) const override;
+  absl::StatusOr<ExtractionResult>
+  ProcessRequest(google::protobuf::field_extraction::MessageData& message) const override;
 
   absl::Status Init();
 
@@ -41,14 +43,15 @@ private:
 
 class ExtractorFactoryImpl : public ExtractorFactory {
 public:
-  absl::StatusOr<ExtractorPtr>  CreateExtractor(
+  absl::StatusOr<ExtractorPtr> CreateExtractor(
       TypeFinder type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const {
-    auto extractor = std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
+    auto extractor =
+        std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
     auto status = extractor->Init();
     if (!status.ok()) {
-      return  status;
+      return status;
     }
     return extractor;
   }

@@ -118,11 +118,12 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_), EnvoyException,
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
       testing::HasSubstr("couldn't find the gRPC method `not-found-in-proto-descriptor` defined in "
                          "the proto descriptor"));
 }
-
 
 TEST_F(FilterConfigTestError, UndefinedPath) {
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(
@@ -142,8 +143,11 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_), EnvoyException,
-      testing::HasSubstr(R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)"));
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
+      testing::HasSubstr(
+          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)"));
 }
 
 } // namespace

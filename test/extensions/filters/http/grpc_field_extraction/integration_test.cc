@@ -2,10 +2,11 @@
 #include <optional>
 
 #include "envoy/common/optref.h"
+
+#include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
 
 #include "absl/strings/str_format.h"
-#include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -13,8 +13,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
-#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -29,14 +29,13 @@ class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   explicit FilterConfig(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-          proto_config, std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api);
+          proto_config,
+      std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api);
 
-
-  const Extractor* FindExtractor(absl::string_view proto_path)const ;
+  const Extractor* FindExtractor(absl::string_view proto_path) const;
 
 private:
-
-  void initDescriptorPool(Api::Api& );
+  void initDescriptorPool(Api::Api&);
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;
   absl::flat_hash_map<std::string, std::unique_ptr<Extractor>> proto_path_to_extractor_;

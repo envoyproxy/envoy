@@ -37,7 +37,6 @@ private:
     Envoy::Http::FilterDataStatus filter_status;
   };
 
-
   HandleDecodeDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
   void handleExtractionResult(const ExtractionResult& result);
