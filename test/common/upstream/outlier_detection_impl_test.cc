@@ -1802,7 +1802,7 @@ max_ejection_time_jitter: 13s
 }
 
 TEST_F(OutlierDetectorImplTest, MaxEjectionPercentageSingleHost) {
-  // Single host should not be ejected with a mep<100% .
+  // Single host should not be ejected with a max ejection percent <100% .
   const std::string yaml = R"EOF(
 max_ejection_percent: 90
 max_ejection_time_jitter: 13s
