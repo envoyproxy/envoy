@@ -222,7 +222,6 @@ class FastFailOrderingTest : public OrderingTest {
                                      const envoy::config::core::v3::GrpcService&,
                                      const StreamInfo::StreamInfo&) override {
     auto stream = std::make_unique<MockStream>();
-    EXPECT_CALL(*stream, close());
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     callbacks.onGrpcError(Grpc::Status::Internal);
     return stream;
