@@ -26,7 +26,7 @@ jobs:
           && (!contains(github.actor, '[bot]')
               || github.actor == 'trigger-workflow-envoy[bot]')
       }}
-    uses: ./.github/workflows/workflow-start.yml
+    uses: ./.github/workflows/_workflow-start.yml
     permissions:
       contents: read
       statuses: write
