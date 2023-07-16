@@ -35,25 +35,15 @@ namespace Server {
 namespace Configuration {
 namespace {
 
-class TestExtensionConfigProvider
-    : public Config::ExtensionConfigProvider<Network::FilterFactoryCb> {
-public:
-  TestExtensionConfigProvider(Network::FilterFactoryCb& cb) : cb_(cb) {}
-  const std::string& name() override { return name_; }
-  OptRef<Network::FilterFactoryCb> config() override { return {cb_}; }
-
-private:
-  const std::string name_ = "x";
-  Network::FilterFactoryCb& cb_;
-};
-
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
   Filter::NetworkFilterFactoriesList factories;
   ReadyWatcher watcher;
   Network::FilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
-  factories.push_back(std::make_unique<TestExtensionConfigProvider>(factory));
-  factories.push_back(std::make_unique<TestExtensionConfigProvider>(factory));
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
 
   EXPECT_CALL(watcher, ready()).Times(2);
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(true));

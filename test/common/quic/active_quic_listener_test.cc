@@ -100,18 +100,6 @@ public:
   }
 };
 
-class TestExtensionConfigProvider
-    : public Config::ExtensionConfigProvider<Network::FilterFactoryCb> {
-public:
-  TestExtensionConfigProvider(Network::FilterFactoryCb cb) : cb_(cb) {}
-  const std::string& name() override { return name_; }
-  OptRef<Network::FilterFactoryCb> config() override { return {cb_}; }
-
-private:
-  const std::string name_ = "x";
-  Network::FilterFactoryCb cb_;
-};
-
 class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ActiveQuicListenerTest()
@@ -220,12 +208,13 @@ protected:
     for (int i = 0; i < connection_count; ++i) {
       auto read_filter = std::make_shared<Network::MockReadFilter>();
       Filter::NetworkFilterFactoriesList factories;
-      factories.push_back(std::make_unique<TestExtensionConfigProvider>(
-          [read_filter, this](Network::FilterManager& filter_manager) {
-            filter_manager.addReadFilter(read_filter);
-            read_filter->callbacks_->connection().addConnectionCallbacks(
-                network_connection_callbacks_);
-          }));
+      factories.push_back(
+          std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+              [read_filter, this](Network::FilterManager& filter_manager) {
+                filter_manager.addReadFilter(read_filter);
+                read_filter->callbacks_->connection().addConnectionCallbacks(
+                    network_connection_callbacks_);
+              }));
 
       filter_factories_.push_back(std::move(factories));
       // Stop iteration to avoid calling getRead/WriteBuffer().

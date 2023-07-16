@@ -56,18 +56,6 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class TestExtensionConfigProvider
-    : public Config::ExtensionConfigProvider<Network::FilterFactoryCb> {
-public:
-  TestExtensionConfigProvider(Network::FilterFactoryCb cb) : cb_(cb) {}
-  const std::string& name() override { return name_; }
-  OptRef<Network::FilterFactoryCb> config() override { return {cb_}; }
-
-private:
-  const std::string name_ = "x";
-  Network::FilterFactoryCb cb_;
-};
-
 class ListenerManagerImplTest : public testing::TestWithParam<bool> {
 public:
   // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
@@ -178,8 +166,9 @@ protected:
               }
 
               Filter::NetworkFilterFactoriesList factories;
-              factories.push_back(std::make_unique<TestExtensionConfigProvider>(
-                  [notifier](Network::FilterManager&) -> void {}));
+              factories.push_back(
+                  std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+                      [notifier](Network::FilterManager&) -> void {}));
               return factories;
             }));
 
@@ -209,8 +198,9 @@ protected:
               }
 
               Filter::NetworkFilterFactoriesList factories;
-              factories.push_back(std::make_unique<TestExtensionConfigProvider>(
-                  [notifier](Network::FilterManager&) -> void {}));
+              factories.push_back(
+                  std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+                      [notifier](Network::FilterManager&) -> void {}));
               return factories;
             }));
 
