@@ -291,7 +291,7 @@ public:
 // Network filter test
 class NetworkFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedNetworkFilterFactoryCb, Server::Configuration::FactoryContext,
+          Network::FilterFactoryCb, Server::Configuration::FactoryContext,
           NetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
           Server::Configuration::NamedNetworkFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
@@ -308,7 +308,7 @@ public:
 // Network upstream filter test
 class NetworkUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedNetworkFilterFactoryCb, Server::Configuration::CommonFactoryContext,
+          Network::FilterFactoryCb, Server::Configuration::CommonFactoryContext,
           UpstreamNetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {

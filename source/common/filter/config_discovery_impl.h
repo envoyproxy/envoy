@@ -223,17 +223,9 @@ private:
   FactoryCtx& factory_context_;
 };
 
-// Struct of canonical filter name and network filter factory callback.
-struct NamedNetworkFilterFactoryCb {
-  // Canonical filter name.
-  std::string name;
-  // Factory function used to create filter instances.
-  Network::FilterFactoryCb factory_cb;
-};
-
 template <class FactoryCtx, class NeutralNetworkFilterConfigFactory>
 class NetworkDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<NamedNetworkFilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<Network::FilterFactoryCb> {
 public:
   NetworkDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -257,11 +249,11 @@ public:
   }
 
 private:
-  NamedNetworkFilterFactoryCb
+  Network::FilterFactoryCb
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return {factory->name(), factory->createFilterFactoryFromProto(message, factory_context_)};
+    return factory->createFilterFactoryFromProto(message, factory_context_);
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -654,7 +646,7 @@ protected:
 // Network filter
 class NetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedNetworkFilterConfigFactory, NamedNetworkFilterFactoryCb,
+          Server::Configuration::NamedNetworkFilterConfigFactory, Network::FilterFactoryCb,
           Server::Configuration::FactoryContext,
           NetworkDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
@@ -681,8 +673,8 @@ protected:
 // Upstream network filter
 class UpstreamNetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
-          NamedNetworkFilterFactoryCb, Server::Configuration::CommonFactoryContext,
+          Server::Configuration::NamedUpstreamNetworkFilterConfigFactory, Network::FilterFactoryCb,
+          Server::Configuration::CommonFactoryContext,
           NetworkDynamicFilterConfigProviderImpl<
               Server::Configuration::CommonFactoryContext,
               Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>> {
