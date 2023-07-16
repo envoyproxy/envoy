@@ -100,6 +100,18 @@ public:
   }
 };
 
+class TestExtensionConfigProvider
+    : public Config::ExtensionConfigProvider<Network::FilterFactoryCb> {
+public:
+  TestExtensionConfigProvider(Network::FilterFactoryCb cb) : cb_(cb) {}
+  const std::string& name() override { return name_; }
+  OptRef<Network::FilterFactoryCb> config() override { return {cb_}; }
+
+private:
+  const std::string name_ = "x";
+  Network::FilterFactoryCb cb_;
+};
+
 class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ActiveQuicListenerTest()
@@ -192,7 +204,7 @@ protected:
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Invoke([](Network::Connection& connection,
-                                  const std::vector<Network::FilterFactoryCb>& filter_factories) {
+                                  const Filter::NetworkFilterFactoriesList& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
@@ -207,12 +219,15 @@ protected:
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
       auto read_filter = std::make_shared<Network::MockReadFilter>();
-      filter_factories_.push_back(
-          {Network::FilterFactoryCb([read_filter, this](Network::FilterManager& filter_manager) {
+      Filter::NetworkFilterFactoriesList factories;
+      factories.push_back(std::make_unique<TestExtensionConfigProvider>(
+          [read_filter, this](Network::FilterManager& filter_manager) {
             filter_manager.addReadFilter(read_filter);
             read_filter->callbacks_->connection().addConnectionCallbacks(
                 network_connection_callbacks_);
-          })});
+          }));
+
+      filter_factories_.push_back(std::move(factories));
       // Stop iteration to avoid calling getRead/WriteBuffer().
       EXPECT_CALL(*read_filter, onNewConnection())
           .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -337,7 +352,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   // The following two containers must guarantee pointer stability as addresses
   // of elements are saved in expectations before new elements are added.
-  std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
+  std::list<Filter::NetworkFilterFactoriesList> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
   QuicServerTransportSocketFactory transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
