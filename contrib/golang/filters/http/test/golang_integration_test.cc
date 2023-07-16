@@ -247,6 +247,10 @@ typed_config:
     codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
+
+    EXPECT_EQ("go_state_test_value",
+              getHeader(upstream_request_->headers(), "go-state-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 
@@ -461,6 +465,12 @@ typed_config:
     // forbidden from go in %s\r\n
     auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go in %s\r\n", phase));
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    // verify phase
+    EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
+
+    // verify content-type
+    EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
     cleanup();
   }

@@ -405,6 +405,18 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
 }
 
+TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+  Http::TestRequestHeaderMapImpl empty_header = {};
+  // Perform request matching.
+  auto match = filter_->requestMatching(empty_header);
+  // Not_OK status is expected to be returned because the matching failed due to empty headers.
+  EXPECT_FALSE(match.ok());
+  EXPECT_EQ(match.status().message(),
+            "Unable to match due to the required data not being available.");
+}
+
 TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter(/*set_callback*/ false);

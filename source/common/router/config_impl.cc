@@ -626,7 +626,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (!route.route().rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), factory_context);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -649,7 +649,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
-    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
+    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect ||
+        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+         upgrade_config.upgrade_type() == Http::Headers::get().UpgradeValues.ConnectUdp)) {
       connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
       throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
@@ -1600,7 +1602,9 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
-  if (Http::HeaderUtility::isConnect(headers) &&
+  if ((Http::HeaderUtility::isConnect(headers) ||
+       (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+        Http::HeaderUtility::isConnectUdp(headers))) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }
@@ -1682,7 +1686,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   if (!virtual_host.rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), factory_context);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());

@@ -35,7 +35,7 @@ message ClusterLoadAssignment {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.ClusterLoadAssignment";
 
   // Load balancing policy settings.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message Policy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.ClusterLoadAssignment.Policy";
@@ -99,6 +99,16 @@ message ClusterLoadAssignment {
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
+
+    // If true, use the :ref:`load balancing weight
+    // <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` of healthy and unhealthy
+    // hosts to determine the health of the priority level. If false, use the number of healthy and unhealthy hosts
+    // to determine the health of the priority level, or in other words assume each host has a weight of 1 for
+    // this calculation.
+    //
+    // Note: this is not currently implemented for
+    // :ref:`locality weighted load balancing <arch_overview_load_balancing_locality_weighted_lb>`.
+    bool weighted_priority_health = 6;
   }
 
   // Name of the cluster. This will be the :ref:`service_name

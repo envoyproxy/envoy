@@ -780,10 +780,10 @@ void InstanceImpl::onRuntimeReady() {
   // Initializing can throw exceptions, so catch these.
   TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
-  }
+  });
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
@@ -799,10 +799,10 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_, *ssl_context_manager_, info_factory_);
     }
     END_TRY
-    catch (const EnvoyException& e) {
+    CATCH(const EnvoyException& e, {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
-    }
+    });
   }
 
   // If there is no global limit to the number of active connections, warn on startup.

@@ -2,6 +2,7 @@ services:
 
   front-envoy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-ext_authz
       args:
@@ -34,6 +35,7 @@ services:
 
   ext_authz-opa-service:
     build:
+      context: .
       dockerfile: Dockerfile-opa
     volumes:
     - ./config/opa-service/policy.rego:/etc/policy.rego
