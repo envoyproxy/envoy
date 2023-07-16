@@ -4,3 +4,7 @@ package test.integration.filters;
 
 message TestNetworkFilterConfig {
 }
+
+message TestTrimmerNetworkFilterConfig {
+  uint32 bytes_to_trim = 1;
+}
