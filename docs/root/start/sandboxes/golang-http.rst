@@ -97,5 +97,5 @@ The output from the ``curl`` command below should include the body that contains
       Further information about the Envoy Go filter.
    :ref:`Go extension API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`
       The Go extension filter API.
-   :repo:`Go plugin API <https://github.com/envoyproxy/envoy/blob/main/contrib/golang/common/go/api/filter.go>`
+   `Go plugin API <https://github.com/envoyproxy/envoy/blob/main/contrib/golang/common/go/api/filter.go>`_
       Overview of Envoy's Go plugin APIs.

@@ -74,5 +74,5 @@ The response from the ``nc`` command below should include the :literal:`hello, \
       Further information about the Envoy Go network filter.
    :ref:`Envoy Go HTTP filter <config_http_filters_golang>`
       Further information about the Envoy Go HTTP filter.
-   :repo:`Go plugin API <https://github.com/envoyproxy/envoy/blob/main/contrib/golang/common/go/api/filter.go>`
+   `Go plugin API <https://github.com/envoyproxy/envoy/blob/main/contrib/golang/common/go/api/filter.go>`_
       Overview of Envoy's Go plugin APIs.
