@@ -654,6 +654,7 @@ decompressors
 decrement
 decrypt
 decrypted
+decrypts
 dedup
 dedupe
 deduplicate
@@ -706,6 +707,7 @@ enablement
 encodings
 encrypt
 encrypted
+encrypts
 endian
 endianness
 endl
