@@ -466,6 +466,12 @@ typed_config:
     auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go in %s\r\n", phase));
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
 
+    // verify phase
+    EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
+
+    // verify content-type
+    EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
+
     cleanup();
   }
 

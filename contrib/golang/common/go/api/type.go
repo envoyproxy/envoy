@@ -124,6 +124,9 @@ type HeaderMap interface {
 	// When there are multiple values of a key, f will be invoked multiple times with the same key and each value.
 	Range(f func(key, value string) bool)
 
+	// RangeWithCopy calls f sequentially for each key and value copied from the map.
+	RangeWithCopy(f func(key, value string) bool)
+
 	// ByteSize return size of HeaderMap
 	ByteSize() uint64
 }

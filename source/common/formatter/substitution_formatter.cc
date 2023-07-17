@@ -998,8 +998,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()
-                                        ->headerBytesReceived();
+                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
@@ -1077,7 +1077,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->wireBytesSent();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
                           {"UPSTREAM_HEADER_BYTES_SENT",
@@ -1085,7 +1086,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
@@ -1094,7 +1095,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
@@ -1103,7 +1104,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
@@ -1958,11 +1959,12 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     str = value.string_value();
   } else {
 #ifdef ENVOY_ENABLE_YAML
-    ProtobufUtil::StatusOr<std::string> json_or_error =
+    absl::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(value, false, true);
-    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {
       str = json_or_error.value();
+    } else {
+      str = json_or_error.status().message();
     }
 #else
     IS_ENVOY_BUG("Json support compiled out");

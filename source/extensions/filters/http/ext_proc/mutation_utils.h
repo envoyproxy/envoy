@@ -44,6 +44,14 @@ private:
   // Check whether header:key is in header_matchers.
   static bool headerInAllowList(absl::string_view key,
                                 const std::vector<Matchers::StringMatcherPtr>& header_matchers);
+  // Check whether the header mutations in the response is over the HCM size config.
+  static absl::Status
+  responseHeaderSizeCheck(const Http::HeaderMap& headers,
+                          const envoy::service::ext_proc::v3::HeaderMutation& mutation,
+                          Stats::Counter& rejected_mutations);
+  // Check whether the header size after mutation is over the HCM size config.
+  static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
+                                                Stats::Counter& rejected_mutations);
 };
 
 } // namespace ExternalProcessing

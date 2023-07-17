@@ -93,7 +93,7 @@ std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool si
 
 std::string SignerImpl::createCredentialScope(absl::string_view short_date,
                                               absl::string_view override_region) const {
-  return fmt::format(SignatureConstants::get().CredentialScopeFormat, short_date,
+  return fmt::format(fmt::runtime(SignatureConstants::get().CredentialScopeFormat), short_date,
                      override_region.empty() ? region_ : override_region, service_name_);
 }
 
@@ -102,7 +102,7 @@ std::string SignerImpl::createStringToSign(absl::string_view canonical_request,
                                            absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
+      fmt::runtime(SignatureConstants::get().StringToSignFormat), long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -129,8 +129,8 @@ SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
                                       const std::map<std::string, std::string>& canonical_headers,
                                       absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(SignatureConstants::get().AuthorizationHeaderFormat, access_key_id,
-                     credential_scope, signed_headers, signature);
+  return fmt::format(fmt::runtime(SignatureConstants::get().AuthorizationHeaderFormat),
+                     access_key_id, credential_scope, signed_headers, signature);
 }
 
 } // namespace Aws
