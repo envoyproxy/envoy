@@ -9,6 +9,6 @@ jobs:
     name: Retest
     runs-on: ubuntu-latest
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.0.2
+    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.0.5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
