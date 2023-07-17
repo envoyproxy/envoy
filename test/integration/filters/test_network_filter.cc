@@ -71,49 +71,48 @@ static Registry::RegisterFactory<TestNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     register_;
 
-class TestTrimmerNetworkFilter : public Network::ReadFilter {
+class TestDrainerNetworkFilter : public Network::ReadFilter {
 public:
-  TestTrimmerNetworkFilter(const test::integration::filters::TestTrimmerNetworkFilterConfig& config)
-      : bytes_to_trim_(config.bytes_to_trim()) {}
+  TestDrainerNetworkFilter(const test::integration::filters::TestDrainerNetworkFilterConfig& config)
+      : bytes_to_drain_(config.bytes_to_drain()) {}
 
   Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
-    buffer.drain(bytes_to_trim_);
+    buffer.drain(bytes_to_drain_);
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
-
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
   }
 
 private:
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
-  int bytes_to_trim_;
+  int bytes_to_drain_;
 };
 
-class TestTrimmerNetworkFilterConfigFactory
+class TestDrainerNetworkFilterConfigFactory
     : public Extensions::NetworkFilters::Common::FactoryBase<
-          test::integration::filters::TestTrimmerNetworkFilterConfig> {
+          test::integration::filters::TestDrainerNetworkFilterConfig> {
 public:
-  TestTrimmerNetworkFilterConfigFactory()
+  TestDrainerNetworkFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            test::integration::filters::TestTrimmerNetworkFilterConfig>(
-            "envoy.test.test_trimmer_network_filter") {}
+            test::integration::filters::TestDrainerNetworkFilterConfig>(
+            "envoy.test.test_drainer_network_filter") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::TestTrimmerNetworkFilterConfig& config,
+      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
       Server::Configuration::FactoryContext&) override {
     return [config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestTrimmerNetworkFilter>(config));
+      filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
     };
   }
 };
 
-static Registry::RegisterFactory<TestTrimmerNetworkFilterConfigFactory,
+static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
-    trimmer_register_;
+    drainer_register_;
 
 } // namespace
 } // namespace Envoy
