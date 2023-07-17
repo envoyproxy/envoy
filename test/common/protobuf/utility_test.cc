@@ -2143,13 +2143,13 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            ));
 
 TEST(StatusCode, Strings) {
-  int last_code = static_cast<int>(ProtobufUtil::StatusCode::kUnauthenticated);
+  int last_code = static_cast<int>(absl::StatusCode::kUnauthenticated);
   for (int i = 0; i < last_code; ++i) {
-    EXPECT_NE(MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(i)), "");
+    EXPECT_NE(MessageUtil::codeEnumToString(static_cast<absl::StatusCode>(i)), "");
   }
-  ASSERT_EQ("UNKNOWN",
-            MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(last_code + 1)));
-  ASSERT_EQ("OK", MessageUtil::codeEnumToString(ProtobufUtil::StatusCode::kOk));
+  ASSERT_EQ("UNKNOWN: ",
+            MessageUtil::codeEnumToString(static_cast<absl::StatusCode>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::codeEnumToString(absl::StatusCode::kOk));
 }
 
 TEST(TypeUtilTest, TypeUrlHelperFunction) {
