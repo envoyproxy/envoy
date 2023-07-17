@@ -96,7 +96,7 @@ protected:
             async_client_stream_info_.upstreamInfo());
     EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
 
-    //  Let the dispatcher_.time_system_ pointing to a MockTimeSystem object.
+    // Let the dispatcher_.time_system_ pointing to a MockTimeSystem object.
     mock_time_system_ = new testing::NiceMock<MockTimeSystem>();
     dispatcher_.time_system_.reset(mock_time_system_);
     if (!random_latency_) {
@@ -133,6 +133,21 @@ protected:
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
+  }
+
+  void initializeTestSendAll() {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
   }
 
   void TearDown() override {
@@ -371,21 +386,40 @@ protected:
     EXPECT_TRUE(call.min_latency_ == min_latency);
   }
 
-  void initializeTestSendAll() {
-    initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SEND"
-    request_body_mode: "STREAMED"
-    response_body_mode: "STREAMED"
-    request_trailer_mode: "SEND"
-    response_trailer_mode: "SEND"
-  )EOF");
+  // Verify gRPC calls only happened on headers.
+  void
+  checkGrpcCallHeaderOnlyStats(const envoy::config::core::v3::TrafficDirection traffic_direction,
+                               const Grpc::Status::GrpcStatus call_status = Grpc::Status::Ok) {
+    auto& grpc_calls = getGrpcCalls(traffic_direction);
+    EXPECT_TRUE(grpc_calls.header_stats_ != nullptr);
+    checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), call_status);
+    EXPECT_TRUE(grpc_calls.trailer_stats_ == nullptr);
+    EXPECT_TRUE(grpc_calls.body_stats_ == nullptr);
   }
 
+  // Verify gRPC calls for  headers, body, and trailer.
+  void checkGrpcCallStatsAll(const envoy::config::core::v3::TrafficDirection traffic_direction,
+                             const uint32_t body_chunk_number,
+                             const Grpc::Status::GrpcStatus body_call_status = Grpc::Status::Ok,
+                             const bool trailer_stats = true) {
+    auto& grpc_calls = getGrpcCalls(traffic_direction);
+    EXPECT_TRUE(grpc_calls.header_stats_ != nullptr);
+    checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+
+    if (trailer_stats) {
+      EXPECT_TRUE(grpc_calls.trailer_stats_ != nullptr);
+      checkGrpcCall(*grpc_calls.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+    } else {
+      EXPECT_TRUE(grpc_calls.trailer_stats_ == nullptr);
+    }
+
+    EXPECT_TRUE(grpc_calls.body_stats_ != nullptr);
+    checkGrpcCallBody(*grpc_calls.body_stats_, body_chunk_number, body_call_status,
+                      std::chrono::microseconds(10) * body_chunk_number,
+                      std::chrono::microseconds(10), std::chrono::microseconds(10));
+  }
+
+  // Verify no gRPC call happened.
   void expectNoGrpcCall(const envoy::config::core::v3::TrafficDirection traffic_direction) {
     auto& grpc_calls = getGrpcCalls(traffic_direction);
     EXPECT_TRUE(grpc_calls.header_stats_ == nullptr);
@@ -516,21 +550,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
-
-  // Check outbound gRPC call stats.
-  auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_out.body_stats_ == nullptr);
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 
   Envoy::ProtobufWkt::Struct filter_metadata;
   (*filter_metadata.mutable_fields())["scooby"].set_string_value("doo");
@@ -679,15 +700,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
-
-  // Verify no gRPC call stats in outbound direction.
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 
   expectFilterState(Envoy::ProtobufWkt::Struct());
@@ -1333,19 +1346,15 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, absl::nullopt);
-
   const uint32_t chunk_number = 100;
   sendChunkRequestData(chunk_number, true);
-
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   processRequestTrailers(absl::nullopt, true);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(true, absl::nullopt);
-
   sendChunkResponseData(chunk_number * 2, true);
-
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
   processResponseTrailers(absl::nullopt, false);
   filter_->onDestroy();
@@ -1356,31 +1365,8 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
-                    std::chrono::microseconds(10) * chunk_number, std::chrono::microseconds(10),
-                    std::chrono::microseconds(10));
-
-  // Check outbound gRPC call stats.
-  auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_out.body_stats_, 2 * chunk_number, Grpc::Status::Ok,
-                    std::chrono::microseconds(10) * 2 * chunk_number, std::chrono::microseconds(10),
-                    std::chrono::microseconds(10));
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
 }
 
 // gRPC call fails when streaming sends small chunk request data.
@@ -1431,19 +1417,8 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   EXPECT_EQ(total_msg - 1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-
-  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number + 1, Grpc::Status::Internal,
-                    std::chrono::microseconds(10) * (chunk_number + 1),
-                    std::chrono::microseconds(10), std::chrono::microseconds(10));
-
-  // Verify no gRPC call stats in outbound direction.
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number + 1,
+                        Grpc::Status::Internal, false);
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
@@ -1459,16 +1434,13 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
-
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   processRequestTrailers(absl::nullopt, true);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(true, absl::nullopt);
-
   sendChunkResponseData(chunk_number / 2, true);
-
   // When sends one more chunk of data, gRPC call fails.
   Buffer::OwnedImpl resp_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -1483,7 +1455,6 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
                            Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
-
   // Sending 40 more chunks of data. No more gRPC calls.
   sendChunkRequestData(chunk_number * 2, false);
 
@@ -1499,30 +1470,9 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   EXPECT_EQ(total_msg - 1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
-                    std::chrono::microseconds(10) * chunk_number, std::chrono::microseconds(10),
-                    std::chrono::microseconds(10));
-
-  // Check outbound gRPC call stats.
-  auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
-
-  EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_out.body_stats_, chunk_number / 2 + 1, Grpc::Status::Internal,
-                    std::chrono::microseconds(10) * (chunk_number / 2 + 1),
-                    std::chrono::microseconds(10), std::chrono::microseconds(10));
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, chunk_number / 2 + 1,
+                        Grpc::Status::Internal, false);
 }
 
 // Sending gRPC calls with random latency To test max and min latency update logic.
@@ -1583,17 +1533,14 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   EXPECT_EQ(0, config_->stats().streams_failed_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
-  // Check inbound gRPC call stats.
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
   EXPECT_TRUE(grpc_calls_in.header_stats_ == nullptr);
   EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-
   EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
   checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
                     std::chrono::microseconds(320), std::chrono::microseconds(100),
                     std::chrono::microseconds(30));
 
-  // Verify no gRPC call stats in outbound direction.
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
@@ -1684,28 +1631,10 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-
-  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_in.body_stats_, 1, Grpc::Status::Ok, std::chrono::microseconds(10),
-                    std::chrono::microseconds(10), std::chrono::microseconds(10));
-
-  // Check outbound gRPC call stats.
-  auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
-
-  EXPECT_TRUE(grpc_calls_out.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_out.body_stats_, 6, Grpc::Status::Ok,
-                    std::chrono::microseconds(10) * 6, std::chrono::microseconds(10),
-                    std::chrono::microseconds(10));
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, 1, Grpc::Status::Ok,
+                        false);
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 6, Grpc::Status::Ok,
+                        false);
 }
 
 // Using a configuration with streaming set for the request and
@@ -2100,16 +2029,8 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10),
-                Grpc::Status::Internal);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
-
-  // Verify no gRPC call stats in outbound direction.
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND,
+                               Grpc::Status::Internal);
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
@@ -2166,22 +2087,9 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 
-  // Check inbound gRPC call stats.
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
-
-  // Check outbound gRPC call stats.
-  auto& grpc_calls_out = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  EXPECT_TRUE(grpc_calls_out.header_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_out.header_stats_, std::chrono::microseconds(10),
-                Grpc::Status::Internal);
-
-  EXPECT_TRUE(grpc_calls_out.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_out.body_stats_ == nullptr);
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
+  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::OUTBOUND,
+                               Grpc::Status::Internal);
 }
 
 // Using the default configuration, test the filter with a processor that
