@@ -65,7 +65,6 @@ stages:
     parameters:
       concurrencyPrechecks: ${{ parameters.concurrencyPrechecks }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
-      authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGCP: $(GcpServiceAccountKey)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
@@ -130,7 +129,6 @@ stages:
       authDockerUser: $(DockerUsername)
       authDockerPassword: $(DockerPassword)
       authGCP: $(GcpServiceAccountKey)
-      authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
       authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
       authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
