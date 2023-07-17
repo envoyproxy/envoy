@@ -10,4 +10,3 @@ Upstream configuration
   ../../extensions/upstreams/tcp/v3/**
   ../../extensions/upstreams/tcp/*/v3/**
   ../../extensions/upstream/local_address_selector/v3/**
-  ../../extensions/upstream/local_address_selector/*/v3/**

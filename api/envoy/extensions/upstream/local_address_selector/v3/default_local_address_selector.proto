@@ -13,5 +13,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Default Local Address Selector]
 // [#extension: envoy.upstream.local_address_selector.default_local_address_selector]
 
+// Default implementation of a local address selector. For more details of how
+// this behaves see documentation for :ref:`extra_source_addresses
+// <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`.
 message DefaultLocalAddressSelector {
 }
