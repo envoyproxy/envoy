@@ -28,10 +28,9 @@ ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
 
   if (stream->startStream(std::move(client), stream_info)) {
     return stream;
-  } else {
-    // Return nullptr on the start failure.
-    return nullptr;
   }
+  // Return nullptr on the start failure.
+  return nullptr;
 }
 
 bool ExternalProcessorStreamImpl::startStream(
@@ -44,7 +43,7 @@ bool ExternalProcessorStreamImpl::startStream(
   options.setParentContext(grpc_context_);
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
-  return (stream_ != nullptr);
+  return stream_ != nullptr;
 }
 
 void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
