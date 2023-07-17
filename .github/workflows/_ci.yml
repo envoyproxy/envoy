@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: do_ci.sh ${{ inputs.target }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@e6cfe0f035611bfb18126985263fff8f35aa430d
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.5
       with:
         image_tag: ${{ inputs.cache_build_image }}
     - uses: actions/checkout@v3
