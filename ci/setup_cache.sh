@@ -31,9 +31,6 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     if [[ -z "${ENVOY_RBE}" ]]; then
         export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
         echo "using local build cache."
-    fi
-
-    if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]] || [[ -z "${ENVOY_RBE}" ]]; then
         # Normalize branches - `release/vX.xx`, `vX.xx`, `vX.xx.x` -> `vX.xx`
         BRANCH_NAME="$(echo "${CI_TARGET_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
         if [[ "$BRANCH_NAME" == "merge" ]]; then
