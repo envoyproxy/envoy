@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/router.h"
@@ -603,9 +604,10 @@ public:
   /**
    * Starts the shadow request by requesting an upstream connection.
    */
-  virtual absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-         TransportType original_transport, ProtocolType original_protocol) PURE;
+  virtual OptRef<ShadowRouterHandle> submit(const std::string& cluster_name,
+                                            MessageMetadataSharedPtr metadata,
+                                            TransportType original_transport,
+                                            ProtocolType original_protocol) PURE;
 };
 
 } // namespace Router

@@ -10,28 +10,12 @@ optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
 
-.. code-block:: yaml
-
-  name: front-http-proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-    stat_prefix: ingress_http
-    codec_type: AUTO
-    rds:
-      route_config_name: local_route
-      config_source:
-        resource_api_version: V3
-        api_config_source:
-          api_type: GRPC
-          transport_api_version: V3
-          grpc_services:
-            envoy_grpc:
-              cluster_name: xds_cluster
-    http_filters:
-    - name: front-router
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-        dynamic_stats: true
+.. literalinclude:: _include/extensions/without-type-url.yaml
+   :language: yaml
+   :lines: 14-33
+   :linenos:
+   :lineno-start: 14
+   :caption: :download:`extensions-demo.yaml <_include/extensions/without-type-url.yaml>`
 
 In case the control plane lacks the schema definitions for an extension,
 ``xds.type.v3.TypedStruct`` should be used as a generic container. The type URL
@@ -39,30 +23,12 @@ inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
 
-.. code-block:: yaml
-
-  name: front-http-proxy
-  typed_config:
-    "@type": type.googleapis.com/xds.type.v3.TypedStruct
-    type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-    value:
-      stat_prefix: ingress_http
-      codec_type: AUTO
-      rds:
-        route_config_name: local_route
-        resource_api_version: V3
-        config_source:
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: xds_cluster
-      http_filters:
-      - name: front-router
-        typed_config:
-          "@type": type.googleapis.com/xds.type.v3.TypedStruct
-          type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
+.. literalinclude:: _include/extensions/with-type-url.yaml
+   :language: yaml
+   :lines: 14-37
+   :linenos:
+   :lineno-start: 14
+   :caption: :download:`extensions-demo-with-type-url.yaml <_include/extensions/with-type-url.yaml>`
 
 .. _config_overview_extension_discovery:
 

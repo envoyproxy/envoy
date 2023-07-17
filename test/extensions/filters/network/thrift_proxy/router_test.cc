@@ -118,6 +118,8 @@ public:
                                        shadow_writer, close_downstream_on_error);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
+    router_->onAboveWriteBufferHighWatermark();
+    router_->onBelowWriteBufferLowWatermark();
 
     router_->setDecoderFilterCallbacks(callbacks_);
   }
@@ -1686,7 +1688,7 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
   std::tie(downstream_transport_type, downstream_protocol_type, upstream_transport_type,
            upstream_protocol_type) = GetParam();
 
-  const std::string yaml_string = R"EOF(
+  constexpr absl::string_view yaml_string = R"EOF(
   transport: {}
   protocol: {}
   )EOF";

@@ -31,6 +31,8 @@ filegroup(
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
+            "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
+            "root/configuration/security/_include/sds-source-example.yaml",
         ],
     ) + select({
         "//bazel:windows_x86_64": [],

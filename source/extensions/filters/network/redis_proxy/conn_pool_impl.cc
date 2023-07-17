@@ -283,15 +283,15 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
+  uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
-    transaction.client_ =
+    transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
     if (transaction.connection_cb_) {
-      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+      transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }
-    transaction.connection_established_ = true;
   }
 
   pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
@@ -309,7 +309,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     pending_request.request_handler_ = client->redis_client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   } else {
-    pending_request.request_handler_ = transaction.client_->makeRequest(
+    pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   }
 

@@ -11,6 +11,8 @@ import (
 )
 
 type filter struct {
+	api.PassThroughStreamFilter
+
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
@@ -80,14 +82,17 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
-	f.callbacks.SendLocalReply(500, body, nil, -1, "")
+	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
 
 func (f *filter) sendLocalReply(phase string) api.StatusType {
-	headers := make(map[string]string)
+	headers := map[string]string{
+		"Content-type": "text/html",
+		"test-phase":   phase,
+	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
-	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+	f.callbacks.SendLocalReply(403, body, headers, 0, "")
 	return api.LocalReply
 }
 
@@ -141,6 +146,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Range(func(key, value string) bool {
 		if key == ":path" && value != f.path {
 			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
+
+	header.RangeWithCopy(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in RangeWithCopy")
 			return false
 		}
 		return true
