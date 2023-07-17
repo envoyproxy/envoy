@@ -180,7 +180,21 @@ message PrivateKeyProvider {
   }
 }
 
-// [#next-free-field: 9]
+// [#not-implemented-hide:]
+// Provides a list of private key providers. Envoy will find out an available private
+// key provider from the list on order. If there is none of available private key provider,
+// it may fallback to BoringSSL default implementation based on the `fallback` fallback.
+message PrivateKeyProviderList {
+  // A list of private key providers, and at least one private key provider provided.
+  repeated PrivateKeyProvider private_key_provider = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // If there is no available private key provider from the list, Envoy will fallback to
+  // the BoringSSL default implementation when the `fallback` is true. The default value
+  // is `false`.
+  bool fallback = 2;
+}
+
+// [#next-free-field: 10]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -234,6 +248,19 @@ message TlsCertificate {
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` fields will result in an
   // error.
   PrivateKeyProvider private_key_provider = 6;
+
+  // [#not-implemented-hide:]
+  // This provides a list of BoringSSL private key method provider. Envoy will find out
+  // an available private key method provider. It may fallback to BoringSSL default implementation
+  // when there is no available one. All the private key provider will share the same private key
+  // in the :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field,
+  // so the :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field
+  // must be specified when the `proviate_key_provider_list` field is used. The old :ref:`private_key_provider
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` field will be
+  // deprecated. If both :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+  // and `private_key_provider_list` are provided, the old
+  // :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` will be ignored.
+  PrivateKeyProviderList private_key_provider_list = 9;
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
   // TLS private key is not password encrypted.
