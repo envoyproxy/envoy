@@ -11,7 +11,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnPointee;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -37,7 +36,6 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(*this, isThreadSafe()).WillByDefault(Return(true));
-  EXPECT_CALL(*this, timeSource_()).WillRepeatedly(ReturnRef(*time_system_));
 }
 
 MockDispatcher::~MockDispatcher() = default;
