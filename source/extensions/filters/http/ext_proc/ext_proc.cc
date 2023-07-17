@@ -129,9 +129,10 @@ Filter::StreamOpenState Filter::openStream() {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
     if (processing_complete_) {
-      // Reset `stream_` to nullptr. It is not valid to be used any further.
-      stream_.reset();
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // beyond this point.
+      ASSERT(stream_ == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
