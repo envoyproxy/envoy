@@ -653,6 +653,7 @@ decompressor
 decompressors
 decrement
 decrypt
+decrypted
 dedup
 dedupe
 deduplicate
@@ -703,6 +704,8 @@ emscripten
 emsdk
 enablement
 encodings
+encrypt
+encrypted
 endian
 endianness
 endl
