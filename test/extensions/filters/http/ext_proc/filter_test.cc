@@ -1475,6 +1475,55 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
                         Grpc::Status::Internal, false);
 }
 
+// Grpc fails when sending request trailer message.
+TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_trailer_mode: "SEND"
+  )EOF");
+
+  EXPECT_FALSE(config_->failureModeAllow());
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
+                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  server_closed_stream_ = true;
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+  EXPECT_EQ(1, config_->stats().streams_failed_.value());
+
+  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
+  EXPECT_TRUE(grpc_calls_in.header_stats_ == nullptr);
+  EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
+  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10),
+                Grpc::Status::Internal);
+  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
+
+  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+}
+
 // Sending gRPC calls with random latency To test max and min latency update logic.
 TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   random_latency_ = true;

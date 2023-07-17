@@ -2237,6 +2237,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithHeaderScrubbing) {
 // Send a request with headers, large body with small chunks, and trailers.
 TEST_P(ExtProcIntegrationTest, SendHeaderAndSmallChunkBodyStreamedMode) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -2257,6 +2258,8 @@ TEST_P(ExtProcIntegrationTest, SendHeaderAndSmallChunkBodyStreamedMode) {
   }
   Http::TestRequestTrailerMapImpl request_trailers{{"request", "trailer"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
