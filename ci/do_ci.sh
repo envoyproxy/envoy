@@ -693,6 +693,7 @@ case $CI_TARGET in
         cp -a /build/bazel.*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release
         ;;
 
     sizeopt)
