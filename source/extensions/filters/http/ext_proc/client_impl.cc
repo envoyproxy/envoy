@@ -23,13 +23,14 @@ ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
     ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info) {
-  ExternalProcessorStreamImpl* stream_ptr = new ExternalProcessorStreamImpl(callbacks);
-  if (stream_ptr->startStream(std::move(client), stream_info) == false) {
-    // On the start failure, free up the memory that was allocated above and return nullptr.
-    delete stream_ptr;
-    return nullptr;
+  auto stream =
+      std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
+
+  if (stream->startStream(std::move(client), stream_info)) {
+    return stream;
   } else {
-    return absl::WrapUnique(stream_ptr);
+    // Return nullptr on the start failure.
+    return nullptr;
   }
 }
 
