@@ -110,6 +110,12 @@ private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
 
+    ~LoadBalancerFactory() override {
+      // Ensure that the parent cluster and its timer are destroyed on the main thread.
+      std::shared_ptr<OriginalDstCluster> cluster = std::move(cluster_);
+      cluster->dispatcher_.post([cluster]() mutable { cluster.reset(); });
+    }
+
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LoadBalancer>(cluster_);
