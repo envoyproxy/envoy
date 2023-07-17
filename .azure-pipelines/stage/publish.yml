@@ -420,7 +420,7 @@ jobs:
           fi
           curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
           mkdir -p $(Build.StagingDirectory)/release.signed
-          cp -a release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
         displayName: Fetch signed release
 
 - job: github_dryrun
@@ -452,5 +452,5 @@ jobs:
           fi
           curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
           mkdir -p $(Build.StagingDirectory)/release.signed
-          cp -a release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
         displayName: Fetch signed release
