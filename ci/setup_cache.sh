@@ -28,11 +28,6 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_cache=${BAZEL_REMOTE_CACHE}"
     echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
 
-    if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
-        export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
-        echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
-    fi
-
     if [[ -z "${ENVOY_RBE}" ]]; then
         export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
         echo "using local build cache."
@@ -44,6 +39,11 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
             BRANCH_NAME=main
         fi
         BAZEL_REMOTE_INSTANCE="branch/${BRANCH_NAME}"
+    fi
+
+    if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
+        export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
+        echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
     fi
 else
     echo "No remote cache is set, skipping setup remote cache."
