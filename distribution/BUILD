@@ -101,17 +101,18 @@ genrule(
     outs = ["release.signed.tar.zst"],
     cmd = """
     # Sign the packages
-    $(location //tools/distribution:sign) \
+    VERSION=%s \
+    && $(location //tools/distribution:sign) \
         "deb.x64:$(location :x64-packages)" \
         "deb.arm64:$(location :arm64-packages)" \
         "x64:$(location :x64-release)" \
         "arm64:$(location :arm64-release)" \
-        -m x64/envoy:bin/envoy-x86_64 \
-        -m x64/envoy-contrib:bin/envoy-contrib-x86_64 \
-        -m arm64/envoy:bin/envoy-aarch_64 \
-        -m arm64/envoy-contrib:bin/envoy-contrib-aarch_64 \
+        -m x64/envoy:bin/envoy-$${VERSION}-linux-x86_64 \
+        -m x64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-x86_64 \
+        -m arm64/envoy:bin/envoy-$${VERSION}-linux-aarch_64 \
+        -m arm64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-aarch_64 \
            --out $@
-    """,
+    """ % VERSION,
     exec_tools = [
         ":arm64-packages",
         ":x64-packages",

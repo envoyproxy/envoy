@@ -1,0 +1,31 @@
+name: Cache (docker)
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        type: string
+
+concurrency:
+  group: cache_docker-${{ inputs.image_tag }}
+
+## Docker cache
+#
+# This workflow will only prime the cache, and should be done separately first, prior
+# to any jobs that require it.
+#
+# For a job that does, you can restore with something like:
+#
+#    steps:
+#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.5
+#      with:
+#        key: "${{ needs.env.outputs.build_image_ubuntu }}"
+#
+
+jobs:
+  docker:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.5
+      with:
+        image_tag: "${{ inputs.image_tag }}"

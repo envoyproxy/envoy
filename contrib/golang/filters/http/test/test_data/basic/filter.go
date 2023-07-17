@@ -82,7 +82,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
-	f.callbacks.SendLocalReply(500, body, nil, -1, "")
+	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
 
@@ -92,7 +92,7 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 		"test-phase":   phase,
 	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
-	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+	f.callbacks.SendLocalReply(403, body, headers, 0, "")
 	return api.LocalReply
 }
 

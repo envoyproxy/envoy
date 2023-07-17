@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package apikeys;
+
+import "google/protobuf/timestamp.proto";
+
+service ApiKeys {
+
+  // Creates a new API key.
+  rpc CreateApiKey(CreateApiKeyRequest) returns (ApiKey) {
+  }
+}
+
+// Message for an API key.
+message ApiKey {
+
+  string name = 1;
+
+  string display_name = 2;
+
+  // The encrypted and signed value held by the key.
+  string current_key = 3;
+
+  // The creation time of the key.
+  google.protobuf.Timestamp create_time = 4;
+
+  // The last update time of the key.
+  google.protobuf.Timestamp update_time = 5;
+
+  // The location of the key.
+  string location = 6;
+
+  string kms_key = 7;
+
+  // The expiration time of the key
+  google.protobuf.Timestamp expire_time = 8;
+}
+
+message CreateApiKeyRequest {
+  string parent = 1;
+
+  ApiKey key = 2;
+}
