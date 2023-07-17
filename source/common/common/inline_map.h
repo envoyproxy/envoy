@@ -94,7 +94,8 @@ public:
       return it->second;
     } else {
       // If the key is not added yet, then create a new handle for this key.
-      Handle handle{inline_keys_map_.size()};
+      ASSERT(inline_keys_map_.size() < std::numeric_limits<uint32_t>::max());
+      Handle handle{static_cast<uint32_t>(inline_keys_map_.size())};
       inline_keys_.push_back(StorageKey(key));
       inline_keys_map_.emplace(key, handle);
       return handle;
