@@ -517,6 +517,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
 
   auto callbacks =
       static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
+  ASSERT(callbacks != nullptr);
   CertValidator::ExtraValidationContext validation_ctx = {
       *callbacks->connection().connectionInfoProvider().localAddress()};
 
