@@ -27,6 +27,21 @@ struct VerificationOutput {
   std::string error_message_;
 };
 
+struct EncryptionDecryptionOutput {
+  /**
+   * Result of the encryption/decryption operation. If this is false, then we populate the data
+   * field with the error message returned by the function or otherwise we populate the data field
+   * with the encrypted/decrypted text.
+   */
+  bool result_;
+
+  /**
+   * It contains the encrypted/decrypted text if the operation succeeds or otherwise the error
+   * message.
+   */
+  std::string data_;
+};
+
 class Utility {
 public:
   virtual ~Utility() = default;
@@ -61,11 +76,38 @@ public:
                                                    const std::vector<uint8_t>& text) PURE;
 
   /**
+   * Decrypt cipher text using the provided private key.
+   * @param key pointer to EVP_PKEY private key
+   * @param cipher_text cipher text
+   * @return Returns the result of the decrypt operation with the decrypted message or error message
+   * if unsuccessful.
+   */
+  virtual const EncryptionDecryptionOutput decrypt(CryptoObject& key,
+                                                   const std::vector<uint8_t>& cipher_text) PURE;
+
+  /**
+   * Encrypt plaintext using the provided public key.
+   * @param key pointer to EVP_PKEY public key
+   * @param plaintext plaintext message
+   * @return Returns the result of the encrypt operation with the encrypted message or error message
+   * if unsuccessful.
+   */
+  virtual const EncryptionDecryptionOutput encrypt(CryptoObject& key,
+                                                   const std::vector<uint8_t>& cipher_text) PURE;
+
+  /**
    * Import public key.
    * @param key key string
    * @return pointer to EVP_PKEY public key
    */
   virtual CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) PURE;
+
+  /**
+   * Import private key.
+   * @param key key string
+   * @return pointer to EVP_PKEY private key
+   */
+  virtual CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) PURE;
 };
 
 using UtilitySingleton = InjectableSingleton<Utility>;

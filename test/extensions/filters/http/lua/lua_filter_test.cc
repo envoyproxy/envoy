@@ -2427,6 +2427,165 @@ TEST_F(LuaHttpFilterTest, InvalidPublicKey) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+TEST_F(LuaHttpFilterTest, DecryptTextSuccess) {
+  const std::string SCRIPT{R"EOF(
+    -- this function converts hex to string
+    function string.from_hex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+
+    -- this function converts base64 to string
+    function from_base64(data)
+        local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        data = string.gsub(data, '[^'..b..'=]', '')
+        return (data:gsub('.', function(x)
+            if (x == '=') then return '' end
+            local r,f='',(b:find(x)-1)
+            for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
+            return r;
+        end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+            if (#x ~= 8) then return '' end
+            local c=0
+            for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
+            return string.char(c)
+        end))
+    end
+
+    function envoy_on_request(request_handle)
+      private_key = "30820274020100300D06092A864886F70D01010105000482025E3082025A02010002818076C5C24261612C013B0ABD92938A16E1856E874C1D74B37F09A944D53E8135E953B279656B230108FB52F159B625423264E336E43050A7DFC49AAA293A27FF458FE8B00EE9089796C1778FB323BD5FBA67137EABDF49BF7FA68D81C089C8867096B964136CEFD8C531992E2A06E1674F834516011EDC64528204169715B3FFE9020301000102818027E21A6C5DF4DA69036184ED0E7C2558CF8CA1042F33FBFE61C92463131D22745A75A90C2460D9BD215FE5C9C13F5BAE3E708A033032355D0FD0FBE8E22D822B6A55C14D3D6E21211A745F4F6BCAA59CA312C10839C4DC0C02FD2AECCA8E629A220143840C17E5E837183B92B99E0742EE111E2AD2E084350323EB769BDCE30D024100DCDBFC39215B4694F22B9D1A9A2B40D12F8E81F80540A8275E1498AFFDED6C24C046945651CB0A251ADF113B8A8ED9716E729F700E0DA0801EC009763D1284EF02410089AB95EA7A44DC395C4D6195E24AD4C2D82978C3DF47E5E85476A798B3768958E4E4423F3BC9214F1A27471CB33255466C28DB309B6B244F01222B81B52538A702403B656A128F36F5E76EAD6E05CE7A5D67248C05C606DB999D64BED345595BF59E789B429F6845DB87990F6E99FDAC672C0B510631E385A4A9701BA32FCA42E5BF0240120C7CCB10DC9642AEE736340046EF3DDC3913AC1A49C2CA82C84B90A97690EB2697065863EE2A7FC45E01E4B15997F47399A7A2E7BD54354760C3736DDC436102407C3C60AFD6E862BAD626BDF43C189BBB1C50D03932B5B567131EEDB0D06B2DD4EFC81CA07C755FE2687D8B13A05015A4EAA82DF2844CA3C4579A6B08B231A95F"
+
+      raw_private_key = private_key:from_hex()
+      private_key_o = request_handle:importPrivateKey(raw_private_key, string.len(raw_private_key)):get()
+      if private_key_o == nil then
+        request_handle:logTrace("failed to import private key")
+      else
+        request_handle:logTrace("successfully imported private key")
+      end
+
+      data = from_base64("VjZ2GqLl6BBpFgbUkXBfwF5cNqOlsfORzIzrUVJalEpgv4QILBNVsiE7JHj47dlOSVZXY5MpfDEb1rVngmDYf1QsCtFpv/HzbHGNeS3qGEKgmL6SWObVD6ikBDsm3X4l+cyiTetu1KGXWGcF+gijWDhcTfaWAPuH2lugRQpJFWo=")
+      ok, out = request_handle:decryptText(private_key_o, data, string.len(data))
+      if ok then
+        request_handle:logTrace("decryption successful! Result: "..out)
+      else
+        request_handle:logTrace("decryption failed! error: "..out)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("successfully imported private key")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace,
+                                  StrEq("decryption successful! Result: Hello, World!")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, EncryptTextSuccess) {
+  const std::string SCRIPT{R"EOF(
+    -- this function converts hex to string
+    function string.from_hex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+
+    function envoy_on_request(request_handle)
+      public_key = "30819E300D06092A864886F70D010101050003818C0030818802818076C5C24261612C013B0ABD92938A16E1856E874C1D74B37F09A944D53E8135E953B279656B230108FB52F159B625423264E336E43050A7DFC49AAA293A27FF458FE8B00EE9089796C1778FB323BD5FBA67137EABDF49BF7FA68D81C089C8867096B964136CEFD8C531992E2A06E1674F834516011EDC64528204169715B3FFE90203010001"
+
+      raw_public_key = public_key:from_hex()
+      public_key_o = request_handle:importPublicKey(raw_public_key, string.len(raw_public_key)):get()
+      if public_key_o == nil then
+        request_handle:logTrace("failed to import public key")
+      else
+        request_handle:logTrace("successfully imported public key")
+      end
+
+      private_key = "30820274020100300D06092A864886F70D01010105000482025E3082025A02010002818076C5C24261612C013B0ABD92938A16E1856E874C1D74B37F09A944D53E8135E953B279656B230108FB52F159B625423264E336E43050A7DFC49AAA293A27FF458FE8B00EE9089796C1778FB323BD5FBA67137EABDF49BF7FA68D81C089C8867096B964136CEFD8C531992E2A06E1674F834516011EDC64528204169715B3FFE9020301000102818027E21A6C5DF4DA69036184ED0E7C2558CF8CA1042F33FBFE61C92463131D22745A75A90C2460D9BD215FE5C9C13F5BAE3E708A033032355D0FD0FBE8E22D822B6A55C14D3D6E21211A745F4F6BCAA59CA312C10839C4DC0C02FD2AECCA8E629A220143840C17E5E837183B92B99E0742EE111E2AD2E084350323EB769BDCE30D024100DCDBFC39215B4694F22B9D1A9A2B40D12F8E81F80540A8275E1498AFFDED6C24C046945651CB0A251ADF113B8A8ED9716E729F700E0DA0801EC009763D1284EF02410089AB95EA7A44DC395C4D6195E24AD4C2D82978C3DF47E5E85476A798B3768958E4E4423F3BC9214F1A27471CB33255466C28DB309B6B244F01222B81B52538A702403B656A128F36F5E76EAD6E05CE7A5D67248C05C606DB999D64BED345595BF59E789B429F6845DB87990F6E99FDAC672C0B510631E385A4A9701BA32FCA42E5BF0240120C7CCB10DC9642AEE736340046EF3DDC3913AC1A49C2CA82C84B90A97690EB2697065863EE2A7FC45E01E4B15997F47399A7A2E7BD54354760C3736DDC436102407C3C60AFD6E862BAD626BDF43C189BBB1C50D03932B5B567131EEDB0D06B2DD4EFC81CA07C755FE2687D8B13A05015A4EAA82DF2844CA3C4579A6B08B231A95F"
+
+      raw_private_key = private_key:from_hex()
+      private_key_o = request_handle:importPrivateKey(raw_private_key, string.len(raw_private_key)):get()
+      if private_key_o == nil then
+        request_handle:logTrace("failed to import private key")
+      else
+        request_handle:logTrace("successfully imported private key")
+      end
+
+      data = "Hello, World!"
+      enc_ok, enc_out = request_handle:encryptText(public_key_o, data, string.len(data))
+      if enc_ok then
+        request_handle:logTrace("encryption successful!")
+        dec_ok, dec_out = request_handle:decryptText(private_key_o, enc_out, string.len(enc_out))
+        if dec_ok then
+          request_handle:logTrace("decryption successful! Result: "..dec_out)
+        else
+          request_handle:logTrace("decryption failed! error: "..dec_out)
+        end
+      else
+        request_handle:logTrace("encryption failed! error: "..enc_out)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("successfully imported public key")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("successfully imported private key")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("encryption successful!")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace,
+                                  StrEq("decryption successful! Result: Hello, World!")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, ImportKeys) {
+  const std::string SCRIPT{R"EOF(
+    -- this function converts hex to string
+    function string.from_hex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+
+    function envoy_on_request(request_handle)
+      public_key = "30819E300D06092A864886F70D010101050003818C0030818802818076C5C24261612C013B0ABD92938A16E1856E874C1D74B37F09A944D53E8135E953B279656B230108FB52F159B625423264E336E43050A7DFC49AAA293A27FF458FE8B00EE9089796C1778FB323BD5FBA67137EABDF49BF7FA68D81C089C8867096B964136CEFD8C531992E2A06E1674F834516011EDC64528204169715B3FFE90203010001"
+      private_key = "30820274020100300D06092A864886F70D01010105000482025E3082025A02010002818076C5C24261612C013B0ABD92938A16E1856E874C1D74B37F09A944D53E8135E953B279656B230108FB52F159B625423264E336E43050A7DFC49AAA293A27FF458FE8B00EE9089796C1778FB323BD5FBA67137EABDF49BF7FA68D81C089C8867096B964136CEFD8C531992E2A06E1674F834516011EDC64528204169715B3FFE9020301000102818027E21A6C5DF4DA69036184ED0E7C2558CF8CA1042F33FBFE61C92463131D22745A75A90C2460D9BD215FE5C9C13F5BAE3E708A033032355D0FD0FBE8E22D822B6A55C14D3D6E21211A745F4F6BCAA59CA312C10839C4DC0C02FD2AECCA8E629A220143840C17E5E837183B92B99E0742EE111E2AD2E084350323EB769BDCE30D024100DCDBFC39215B4694F22B9D1A9A2B40D12F8E81F80540A8275E1498AFFDED6C24C046945651CB0A251ADF113B8A8ED9716E729F700E0DA0801EC009763D1284EF02410089AB95EA7A44DC395C4D6195E24AD4C2D82978C3DF47E5E85476A798B3768958E4E4423F3BC9214F1A27471CB33255466C28DB309B6B244F01222B81B52538A702403B656A128F36F5E76EAD6E05CE7A5D67248C05C606DB999D64BED345595BF59E789B429F6845DB87990F6E99FDAC672C0B510631E385A4A9701BA32FCA42E5BF0240120C7CCB10DC9642AEE736340046EF3DDC3913AC1A49C2CA82C84B90A97690EB2697065863EE2A7FC45E01E4B15997F47399A7A2E7BD54354760C3736DDC436102407C3C60AFD6E862BAD626BDF43C189BBB1C50D03932B5B567131EEDB0D06B2DD4EFC81CA07C755FE2687D8B13A05015A4EAA82DF2844CA3C4579A6B08B231A95F"
+
+      raw_public_key = public_key:from_hex()
+      public_key_o = request_handle:importPublicKey(raw_public_key, string.len(raw_public_key)):get()
+      if public_key_o == nil then
+        request_handle:logTrace("failed to import public key!")
+      else
+        request_handle:logTrace("successfully imported public key!")
+      end
+
+      raw_private_key = private_key:from_hex()
+      private_key_o = request_handle:importPrivateKey(raw_private_key, string.len(raw_private_key)):get()
+      if private_key_o == nil then
+        request_handle:logTrace("failed to import private key!")
+      else
+        request_handle:logTrace("successfully imported private key!")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("successfully imported public key!")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("successfully imported private key!")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 TEST_F(LuaHttpFilterTest, SignatureVerify) {
   const std::string SCRIPT{R"EOF(
     function string.fromhex(str)

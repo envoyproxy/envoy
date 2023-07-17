@@ -543,6 +543,20 @@ Returns the current request's underlying :repo:`connection <envoy/network/connec
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
+.. _config_http_filters_lua_stream_handle_api_import_private_key:
+
+importPrivateKey()
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local private_key = handle:importPrivateKey(keyder, keyderLength)
+
+Returns private key which could be used by :ref:`decrypt <config_http_filters_lua_stream_handle_api_decrypt>` to
+decrypt a given cipher text.
+
+.. _config_http_filters_lua_stream_handle_api_import_public_key:
+
 importPublicKey()
 ^^^^^^^^^^^^^^^^^
 
@@ -550,7 +564,8 @@ importPublicKey()
 
   local pubkey = handle:importPublicKey(keyder, keyderLength)
 
-Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature.
+Returns public key which could be used by :ref:`verifySignature <verify_signature>` to verify digital signature or
+:ref:`encrypt <config_http_filters_lua_stream_handle_api_encrypt>` to encrypt a given plaintext message.
 
 .. _verify_signature:
 
@@ -568,6 +583,38 @@ the length of the signature. *data* is the content which will be hashed. *dataLe
 
 The function returns a pair. If the first element is *true*, the second element will be empty
 which means signature is verified; otherwise, the second element will store the error message.
+
+.. _config_http_filters_lua_stream_handle_api_decrypt:
+
+decrypt()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  local ok, response = handle:decrypt(private_key, cipher_text, cipher_text_length)
+
+Decrypt function can be used to decrypt a given cipher text using the provided private key. It can be called using the
+following parameters. *private_key* is the private key. *cipher_text* is the data which needs to be decrypted.
+*cipher_text_length* is the length of cipher text.
+
+This function returns a pair. If the first element is *true*, the second element will be the decrypted data; otherwise,
+the second element will store the error message.
+
+.. _config_http_filters_lua_stream_handle_api_encrypt:
+
+encrypt()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  local ok, response = handle:encrypt(public_key, plaintext, plaintext_length)
+
+Encrypt function can be used to encrypt a given plaintext string using the provided public key. It can be called using
+the following parameters. *public_key* is the public key. *plaintext* is the data which needs to be encrypted.
+*plaintext_length* is the length of plaintext.
+
+This function returns a pair. If the first element is *true*, the second element will be the encrypted data; otherwise,
+the second element will store the error message.
 
 .. _config_http_filters_lua_stream_handle_api_base64_escape:
 

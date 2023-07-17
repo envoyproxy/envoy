@@ -35,6 +35,94 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
+const EncryptionDecryptionOutput UtilityImpl::decrypt(CryptoObject& key,
+                                                      const std::vector<uint8_t>& cipher_text) {
+  // Step 1: get private key
+  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(key);
+  EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
+  if (pkey == nullptr) {
+    return {false, "failed to get private key for decryption"};
+  }
+
+  // Step 2: initialize EVP_PKEY_CTX
+  EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
+  if (!ctx) {
+    return {false, "failed to create context for decryption"};
+  }
+
+  int ok = EVP_PKEY_decrypt_init(ctx);
+  if (!ok) {
+    EVP_PKEY_CTX_free(ctx);
+    return {false, "failed to initialize private key for decryption"};
+  }
+
+  // Step 3: decrypt cipher text
+  size_t plaintext_size;
+  ok = EVP_PKEY_decrypt(ctx, nullptr, &plaintext_size, cipher_text.data(), cipher_text.size());
+  if (!ok) {
+    EVP_PKEY_CTX_free(ctx);
+    return {false, "failed to get plaintext size"};
+  }
+
+  std::vector<uint8_t> plaintext(plaintext_size);
+  ok = EVP_PKEY_decrypt(ctx, plaintext.data(), &plaintext_size, cipher_text.data(),
+                        cipher_text.size());
+
+  // Step 4: check result
+  std::string p_text(plaintext.begin(), plaintext.begin() + plaintext_size);
+
+  EVP_PKEY_CTX_free(ctx);
+  if (ok == 1) {
+    return {true, p_text};
+  }
+
+  return {false, "decryption failed"};
+}
+
+const EncryptionDecryptionOutput UtilityImpl::encrypt(CryptoObject& key,
+                                                      const std::vector<uint8_t>& plaintext) {
+  // Step 1: get public key
+  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(key);
+  EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
+  if (pkey == nullptr) {
+    return {false, "failed to get public key for encryption"};
+  }
+
+  // Step 2: initialize EVP_PKEY_CTX
+  EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
+  if (!ctx) {
+    return {false, "failed to create context for encryption"};
+  }
+
+  int ok = EVP_PKEY_encrypt_init(ctx);
+  if (!ok) {
+    EVP_PKEY_CTX_free(ctx);
+    return {false, "failed to initialize public key for encryption"};
+  }
+
+  // Step 3: encrypt plaintext
+  size_t cipher_text_size;
+  ok = EVP_PKEY_encrypt(ctx, nullptr, &cipher_text_size, plaintext.data(), plaintext.size());
+  if (!ok) {
+    EVP_PKEY_CTX_free(ctx);
+    return {false, "failed to get cipher text size"};
+  }
+
+  std::vector<uint8_t> cipher_text(cipher_text_size);
+  ok = EVP_PKEY_encrypt(ctx, cipher_text.data(), &cipher_text_size, plaintext.data(),
+                        plaintext.size());
+
+  // Step 4: check result
+  std::string p_text(cipher_text.begin(), cipher_text.begin() + cipher_text_size);
+
+  EVP_PKEY_CTX_free(ctx);
+  if (ok == 1) {
+    return {true, p_text};
+  }
+
+  return {false, "encryption failed"};
+}
+
 const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
                                                       const std::vector<uint8_t>& signature,
                                                       const std::vector<uint8_t>& text) {
@@ -75,6 +163,12 @@ CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
   return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+}
+
+CryptoObjectPtr UtilityImpl::importPrivateKey(const std::vector<uint8_t>& key) {
+  CBS cbs({key.data(), key.size()});
+
+  return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs));
 }
 
 const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {

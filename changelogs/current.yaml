@@ -484,6 +484,12 @@ new_features:
 - area: http
   change: |
     added OVERWRITE_IF_EXISTS header manipulation keyword to overwrite a header only when it exists before manipulation.
+- area: lua
+  change: |
+    added three new functions :ref:`importPrivateKey <config_http_filters_lua_stream_handle_api_import_private_key>` to
+    import the private key and :ref:`encrypt <config_http_filters_lua_stream_handle_api_encrypt>` to encrypt and
+    :ref:`decrypt <config_http_filters_lua_stream_handle_api_decrypt>` to decrypt the data using imported public and
+    private keys.
 
 deprecated:
 - area: access_log

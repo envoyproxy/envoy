@@ -283,6 +283,24 @@ private:
   const std::string public_key_;
 };
 
+/**
+ * Lua wrapper for key for accessing the imported private keys.
+ */
+class PrivateKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PrivateKeyWrapper> {
+public:
+  explicit PrivateKeyWrapper(absl::string_view key) : private_key_(key) {}
+  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+
+private:
+  /**
+   * Get private key value.
+   * @return private key value or nil if key is empty.
+   */
+  DECLARE_LUA_FUNCTION(PrivateKeyWrapper, luaGet);
+
+  const std::string private_key_;
+};
+
 class Timestamp {
 public:
   enum Resolution { Millisecond, Microsecond, Undefined };

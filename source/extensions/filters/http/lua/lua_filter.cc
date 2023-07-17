@@ -202,6 +202,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<PrivateKeyWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -702,6 +703,50 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   return 2;
 }
 
+int StreamHandleWrapper::luaDecryptText(lua_State* state) {
+  // Step 1: Get the private key pointer.
+  auto key = luaL_checkstring(state, 2);
+  auto ptr = private_key_storage_.find(key);
+  if (ptr == private_key_storage_.end()) {
+    luaL_error(state, "invalid private key");
+    return 0;
+  }
+
+  // Step 2: Get encrypted text from args.
+  const char* cipher_text = luaL_checkstring(state, 3);
+  int cipher_text_len = luaL_checknumber(state, 4);
+  const std::vector<uint8_t> cipher_text_vec(cipher_text, cipher_text + cipher_text_len);
+
+  // Step 3: Decrypt cipher text using private key.
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  auto output = crypto_util.decrypt(*ptr->second, cipher_text_vec);
+  lua_pushboolean(state, output.result_);
+  lua_pushlstring(state, output.data_.data(), output.data_.size());
+  return 2;
+}
+
+int StreamHandleWrapper::luaEncryptText(lua_State* state) {
+  // Step 1: Get the public key pointer.
+  auto key = luaL_checkstring(state, 2);
+  auto ptr = public_key_storage_.find(key);
+  if (ptr == public_key_storage_.end()) {
+    luaL_error(state, "invalid public key");
+    return 0;
+  }
+
+  // Step 2: Get plaintext string text from args.
+  const char* plaintext = luaL_checkstring(state, 3);
+  int plaintext_len = luaL_checknumber(state, 4);
+  const std::vector<uint8_t> plaintext_vec(plaintext, plaintext + plaintext_len);
+
+  // Step 3: Encrypt plaintext using public key.
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  auto output = crypto_util.encrypt(*ptr->second, plaintext_vec);
+  lua_pushboolean(state, output.result_);
+  lua_pushlstring(state, output.data_.data(), output.data_.size());
+  return 2;
+}
+
 int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   // Get byte array and the length.
   const char* str = luaL_checkstring(state, 2);
@@ -724,6 +769,33 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 
     public_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
     public_key_wrapper_.reset(PublicKeyWrapper::create(state, str), true);
+  }
+
+  return 1;
+}
+
+int StreamHandleWrapper::luaImportPrivateKey(lua_State* state) {
+  // Get byte array and the length.
+  const char* str = luaL_checkstring(state, 2);
+  int n = luaL_checknumber(state, 3);
+  std::vector<uint8_t> key(str, str + n);
+  if (private_key_wrapper_.get() != nullptr) {
+    private_key_wrapper_.pushStack();
+  } else {
+    auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+    Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPrivateKey(key);
+    auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PrivateKeyObject>(
+        *crypto_ptr);
+    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+    if (pkey == nullptr) {
+      // TODO(dio): Call luaL_error here instead of failing silently. However, the current behavior
+      // is to return nil (when calling get() to the wrapped object, hence we create a wrapper
+      // initialized by an empty string here) when importing a private key is failed.
+      private_key_wrapper_.reset(PrivateKeyWrapper::create(state, EMPTY_STRING), true);
+    }
+
+    private_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
+    private_key_wrapper_.reset(PrivateKeyWrapper::create(state, str), true);
   }
 
   return 1;

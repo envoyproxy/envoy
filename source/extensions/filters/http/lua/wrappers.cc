@@ -276,6 +276,15 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
   return 1;
 }
 
+int PrivateKeyWrapper::luaGet(lua_State* state) {
+  if (private_key_.empty()) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlstring(state, private_key_.data(), private_key_.size());
+  }
+  return 1;
+}
+
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions
