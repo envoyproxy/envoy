@@ -13,7 +13,7 @@ std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
   return std::string(kDefaultLocalAddressSelectorName);
 }
 
-UpstreamLocalAddressSelectorPtr
+UpstreamLocalAddressSelectorConstSharedPtr
 DefaultUpstreamLocalAddressSelectorFactory::createLocalAddressSelector(
     ::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
     Network::ConnectionSocket::OptionsSharedPtr base_socket_options,

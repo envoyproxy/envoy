@@ -68,7 +68,7 @@ public:
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
 };
 
-using UpstreamLocalAddressSelectorPtr = std::shared_ptr<UpstreamLocalAddressSelector>;
+using UpstreamLocalAddressSelectorConstSharedPtr = std::shared_ptr<const UpstreamLocalAddressSelector>;
 
 class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
 public:
@@ -86,7 +86,7 @@ public:
    *   from cluster config. If the bind config from the cluster manager, the param
    *   is empty.
    */
-  virtual UpstreamLocalAddressSelectorPtr
+  virtual UpstreamLocalAddressSelectorConstSharedPtr
   createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                              Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
                              Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
@@ -1147,7 +1147,7 @@ public:
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual std::shared_ptr<UpstreamLocalAddressSelector>
+  virtual UpstreamLocalAddressSelectorConstSharedPtr
   getUpstreamLocalAddressSelector() const PURE;
 
   /**

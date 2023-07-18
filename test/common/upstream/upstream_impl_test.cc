@@ -3206,7 +3206,7 @@ private:
 };
 
 class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
-  UpstreamLocalAddressSelectorPtr
+  UpstreamLocalAddressSelectorConstSharedPtr
   createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                              Network::ConnectionSocket::OptionsSharedPtr,
                              Network::ConnectionSocket::OptionsSharedPtr,

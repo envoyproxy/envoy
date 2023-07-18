@@ -165,7 +165,7 @@ message BindConfig {
   // The name of the custom local address selector. This must have been
   // registered with Envoy. If this is empty, the default (i.e.
   // :ref:`DefaultLocalAddressSelector
-  // <envoy_v3_api_field_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`)
+  // <envoy_v3_api_msg_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`)
   // applies.
   // [#extension-category: envoy.upstream.local_address_selector]
   TypedExtensionConfig local_address_selector = 6;

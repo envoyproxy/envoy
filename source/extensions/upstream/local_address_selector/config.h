@@ -13,7 +13,7 @@ class DefaultUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSe
 public:
   std::string name() const override;
 
-  UpstreamLocalAddressSelectorPtr
+  UpstreamLocalAddressSelectorConstSharedPtr
   createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                              Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
                              Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
