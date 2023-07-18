@@ -6,7 +6,7 @@ Generic proxy
 
 The network filter could be used to add multiple protocols support to Envoy. The community has implemented lots of this kind of
 network filters, such as :ref:`Dubbo proxy <config_network_filters_dubbo_proxy>`, :ref:`Thrift proxy <config_network_filters_thrift_proxy>`, etc.
-And the developers could also implement their own protocol proxying by implement new specific network filter.
+And the developers could also implement their own protocol proxying by creating a new network filter.
 
 
 However, adding new network filter to support new protocol is not easy. The developers need to implement the codec to parse the binary, to implement the
