@@ -61,6 +61,10 @@ on:
         type: string
         default:
 
+      skip:
+        type: boolean
+        default: false
+
       env:
         type: string
 
@@ -70,6 +74,7 @@ concurrency:
 
 jobs:
   do_ci:
+    if: ${{ ! inputs.skip }}
     runs-on: ubuntu-22.04
     name: do_ci.sh ${{ inputs.target }}
     steps:
