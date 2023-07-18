@@ -11,7 +11,7 @@ runs:
         echo "base=https://storage.googleapis.com/${BUCKET}/${REF:0:7}/docker" \
             >> "$GITHUB_OUTPUT"
     env:
-      BUCKET: envoy-${{ github.event_name == 'pull_request' && 'pr' || 'postsubmit' }}
+      BUCKET: envoy-${{ github.actor != 'trigger-release-envoy[bot]' && 'pr' || 'postsubmit' }}
       REF: ${{ inputs.ref }}
     shell: bash
   - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.8
