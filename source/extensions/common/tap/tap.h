@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/common/matcher/matcher.h"

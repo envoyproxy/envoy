@@ -82,6 +82,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tap
+  change: |
+    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.OutputConfig.record_headers_received_time>`
+    to control writing request and response headers received time in trace output.
 
 deprecated:
 - area: tracing
