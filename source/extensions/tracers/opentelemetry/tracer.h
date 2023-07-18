@@ -14,19 +14,12 @@
 
 #include "absl/strings/escaping.h"
 #include "span_context.h"
+#include "tracer_stats.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
-
-#define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
-  COUNTER(spans_sent)                                                                              \
-  COUNTER(timer_flushed)
-
-struct OpenTelemetryTracerStats {
-  OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.

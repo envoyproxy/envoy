@@ -10,8 +10,9 @@ namespace OpenTelemetry {
 
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
     Upstream::ClusterManager& cluster_manager,
-    envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config)
-    : cluster_manager_(cluster_manager), http_config_(http_config) {}
+    envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config,
+    OpenTelemetryTracerStats& tracing_stats)
+    : cluster_manager_(cluster_manager), http_config_(http_config), tracing_stats_(tracing_stats) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
 
@@ -46,12 +47,14 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
       std::chrono::nanoseconds(http_config_.http_uri().timeout().nanos()));
   Http::AsyncClient::Request* http_request = thread_local_cluster->httpAsyncClient().send(
       std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  tracing_stats_.http_reports_sent_.inc();
 
   return http_request;
 }
 
 void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&,
                                                Http::ResponseMessagePtr&& message) {
+  tracing_stats_.http_reports_success_.inc();
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
     ENVOY_LOG(warn, "response code: {}", response_code);
@@ -61,6 +64,7 @@ void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&
 void OpenTelemetryHttpTraceExporter::onFailure(const Http::AsyncClient::Request&,
                                                Http::AsyncClient::FailureReason) {
   ENVOY_LOG(debug, "Request failed.");
+  tracing_stats_.http_reports_failed_.inc();
 }
 
 } // namespace OpenTelemetry

@@ -89,5 +89,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )

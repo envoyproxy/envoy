@@ -34,6 +34,7 @@ envoy_cc_library(
         "span_context.h",
         "span_context_extractor.h",
         "tracer.h",
+        "tracer_stats.h",
     ],
     deps = [
         ":trace_exporter",
@@ -56,6 +57,7 @@ envoy_cc_library(
         "grpc_trace_exporter.h",
         "http_trace_exporter.h",
         "trace_exporter.h",
+        "tracer_stats.h",
     ],
     deps = [
         "//envoy/grpc:async_client_manager_interface",

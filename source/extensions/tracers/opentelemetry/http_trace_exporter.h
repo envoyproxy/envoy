@@ -14,6 +14,7 @@
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "trace_exporter.h"
+#include "tracer_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +29,8 @@ class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
 public:
   OpenTelemetryHttpTraceExporter(
       Upstream::ClusterManager& cluster_manager,
-      envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config);
+      envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config,
+      OpenTelemetryTracerStats& tracing_stats);
 
   bool log(const ExportTraceServiceRequest& request) override;
 
@@ -40,6 +42,7 @@ public:
 private:
   Upstream::ClusterManager& cluster_manager_;
   envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config_;
+  OpenTelemetryTracerStats& tracing_stats_;
 };
 
 } // namespace OpenTelemetry
