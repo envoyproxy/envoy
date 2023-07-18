@@ -5,6 +5,8 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
@@ -34,12 +36,16 @@ public:
     cluster_manager_.initializeClusters({"fake_collector"}, {});
 
     trace_exporter_ =
-        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_config);
+        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_config, stats_);
   }
 
 protected:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
+  NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
+  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.store_;
+  OpenTelemetryTracerStats stats_{OpenTelemetryTracerStats{
+          OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.opentelemetry."))}};
 };
 
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
@@ -88,6 +94,17 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   span.set_name("test");
   *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(trace_exporter_->log(export_trace_service_request));
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  callback->onSuccess(request, std::move(msg));
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_sent").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_success").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
+
+  callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
 }
 
 TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalCluster) {
