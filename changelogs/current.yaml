@@ -128,6 +128,10 @@ minor_behavior_changes:
   change: |
     Changed behavior of the unpausing connect with 2xx status codes. This change can be reverted temporarily by
     setting the runtime guard ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` to false.
+- area: http
+  change: |
+    Round trip time will not be refreshed for every request by default. And if this is necessary, it can be
+    enabled by setting runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` to true.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
