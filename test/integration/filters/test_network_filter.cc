@@ -108,6 +108,12 @@ private:
       filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
     };
   }
+
+  bool isTerminalFilterByProtoTyped(
+      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      Server::Configuration::ServerFactoryContext&) override {
+    return config.is_terminal_filter();
+  }
 };
 
 static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,

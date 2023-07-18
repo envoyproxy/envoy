@@ -171,7 +171,7 @@ public:
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version, uint32_t bytes_to_drain,
-                       bool ttl = false, bool second_connection = false) {
+                       bool ttl = false, bool second_connection = false, bool is_terminal = false) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
@@ -182,6 +182,7 @@ public:
 
     auto configuration = test::integration::filters::TestDrainerNetworkFilterConfig();
     configuration.set_bytes_to_drain(bytes_to_drain);
+    configuration.set_is_terminal_filter(is_terminal);
     typed_config.mutable_typed_config()->PackFrom(configuration);
     resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
@@ -515,6 +516,35 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   auto result = ecds_connection_->waitForDisconnect();
   ASSERT_TRUE(result);
   ecds_connection_.reset();
+}
+
+// Validate that a listener update should fail if the subscribed extension configuration make filter
+// terminal but the filter position is not at the last position at filter chain.
+// There would be total of 2 filters in the chain: 'foo' and 'tcp_proxy' and both are marked
+// terminal.
+TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilterChain) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addFilterChain();
+  addDynamicFilter(filter_name_, false, false);
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  sendXdsResponse(filter_name_, "1", 5, false, false, true);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.network_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  // New connections will close since there's no valid configuration.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+  auto result = tcp_client->write(data_);
+  if (result) {
+    tcp_client->waitForDisconnect();
+  }
 }
 
 // Basic ECDS config dump test with one filter.
