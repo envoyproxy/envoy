@@ -6,7 +6,7 @@ on:
   # Do not run untrusted code here
   workflow_run:
     workflows:
-    - Verify/examples
+    - Publish & verify
     types:
     - completed
 
