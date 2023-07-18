@@ -2,16 +2,18 @@ inputs:
   ref:
     type: string
     required: true
+  bucket:
+    type: string
+    default: envoy-pr
 
 runs:
   using: composite
   steps:
   - id: url
     run: |
-        echo "base=https://storage.googleapis.com/${BUCKET}/${REF:0:7}/docker" \
+        echo "base=https://storage.googleapis.com/${{ inputs.bucket }}/${REF:0:7}/docker" \
             >> "$GITHUB_OUTPUT"
     env:
-      BUCKET: envoy-${{ github.actor != 'trigger-release-envoy[bot]' && 'pr' || 'postsubmit' }}
       REF: ${{ inputs.ref }}
     shell: bash
   - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.8
