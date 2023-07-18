@@ -45,7 +45,7 @@ protected:
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.store_;
   OpenTelemetryTracerStats stats_{OpenTelemetryTracerStats{
-          OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.opentelemetry."))}};
+      OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.opentelemetry."))}};
 };
 
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
