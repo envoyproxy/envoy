@@ -47,8 +47,8 @@ class CertValidator {
 public:
   // Wraps cert validation parameters added from time to time.
   struct ExtraValidationContext {
-    // Optional reference to local address instance.
-    Envoy::OptRef<const Envoy::Network::Address::Instance> local_address;
+    // Local socket address of caller that connects to remote validation server (optional field).
+    Envoy::Network::Address::InstanceConstSharedPtr local_address;
   };
 
   virtual ~CertValidator() = default;
