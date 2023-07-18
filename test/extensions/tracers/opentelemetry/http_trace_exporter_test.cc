@@ -96,7 +96,11 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   EXPECT_TRUE(trace_exporter_->log(export_trace_service_request));
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
+  // onBeforeFinalizeUpstreamSpan is a noop — included for coverage
+  Tracing::NullSpan null_span;
+  callback->onBeforeFinalizeUpstreamSpan(null_span, nullptr);
+
   callback->onSuccess(request, std::move(msg));
   EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_sent").value());
   EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_success").value());
@@ -140,6 +144,8 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_FALSE(trace_exporter_->log(export_trace_service_request));
 }
+
+
 
 } // namespace OpenTelemetry
 } // namespace Tracers
