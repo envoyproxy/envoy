@@ -483,7 +483,6 @@ protected:
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
-  uint32_t time_change_ = 0;
 };
 
 // Using the default configuration, test the filter with a processor that
