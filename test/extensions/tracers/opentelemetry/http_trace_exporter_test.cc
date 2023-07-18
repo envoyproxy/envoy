@@ -145,8 +145,6 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   EXPECT_FALSE(trace_exporter_->log(export_trace_service_request));
 }
 
-
-
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions
