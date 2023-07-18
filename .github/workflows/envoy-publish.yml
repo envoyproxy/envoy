@@ -35,18 +35,14 @@ jobs:
 
   env:
     uses: ./.github/workflows/_env.yml
-  cache:
-    needs:
-    - env
-    uses: ./.github/workflows/_cache_docker.yml
     with:
-      image_tag: "${{ needs.env.outputs.build_image_ubuntu }}"
+      prime_build_image: true
+      check_mobile_run: false
 
   ci:
     needs:
     - check
     - env
-    - cache
     strategy:
       fail-fast: false
       matrix:
