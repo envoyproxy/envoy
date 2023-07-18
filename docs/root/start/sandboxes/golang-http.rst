@@ -10,7 +10,8 @@ Golang HTTP filter
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
-In this example, we show how the `Golang <https://go.dev/>`_ filter can be used with the Envoy proxy.
+In this example, we show how the `Golang <https://go.dev/>`_ filter can be used with the Envoy
+proxy.
 
 The example demonstrates a Go plugin that can respond directly to requests and also update responses provided by an upstream server.
 
