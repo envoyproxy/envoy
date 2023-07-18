@@ -60,8 +60,6 @@ stages:
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
-  variables:
-    CHECK_DEPS: $[stageDependencies.env.repo.outputs['changed.requirements']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
@@ -73,7 +71,6 @@ stages:
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
-      checkDeps: variables['CHECK_DEPS']
 
 - stage: linux_x64
   displayName: Linux x64
