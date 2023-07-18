@@ -2,6 +2,14 @@ name: Environment
 
 on:
   workflow_call:
+    inputs:
+      check_mobile_run:
+        type: boolean
+        default: true
+      prime_build_image:
+        type: boolean
+        default: false
+
     outputs:
       agent_ubuntu:
         value: ubuntu-22.04
@@ -36,6 +44,11 @@ on:
       mobile_tsan:
         value: ${{ jobs.repo.outputs.mobile_tsan }}
 
+      version_dev:
+        value: ${{ jobs.repo.outputs.version_dev }}
+      version_patch:
+        value: ${{ jobs.repo.outputs.version_patch }}
+
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-env
   cancel-in-progress: true
@@ -60,10 +73,12 @@ jobs:
       mobile_ios_tests: ${{ steps.should_run.outputs.mobile_ios_tests }}
       mobile_release_validation: ${{ steps.should_run.outputs.mobile_release_validation }}
       mobile_tsan: ${{ steps.should_run.outputs.mobile_tsan }}
+      version_dev: ${{ steps.context.outputs.version_dev }}
+      version_patch: ${{ steps.context.outputs.version_patch }}
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 0
+        fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
 
@@ -81,7 +96,34 @@ jobs:
         BUILD_IMAGE_UBUNTU_SHA: 50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
         BUILD_IMAGE_UBUNTU_MOBILE_SHA: ca26ff05bd3f3a09468242faaf38ae48315e57f0a87c102352162f95ac620e6f
 
-    - id: should_run
+    - if: ${{ inputs.check_mobile_run }}
+      id: should_run
       name: 'Check what to run'
       run: |
         ./mobile/tools/what_to_run.sh
+
+    - id: context
+      name: 'CI context'
+      run: |
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
+        {
+            echo "version_dev=$VERSION_DEV"
+            echo "version_patch=$VERSION_PATCH"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: 'Print env'
+      run: |
+        echo "version_dev=${{ steps.context.outputs.version_dev }}"
+        echo "version_patch=${{ steps.context.outputs.version_patch }}"
+        echo "build_image_ubuntu=${{ steps.build_image.outputs.build_image_ubuntu }}"
+        echo "build_image_ubuntu_mobile=${{ steps.build_image.outputs.build_image_ubuntu_mobile }}"
+
+  cache:
+    if: ${{ inputs.prime_build_image }}
+    needs:
+    - repo
+    # This uses a separate job to ensure correct concurrency
+    uses: ./.github/workflows/_cache_docker.yml
+    with:
+      image_tag: "${{ needs.repo.outputs.build_image_ubuntu }}"
