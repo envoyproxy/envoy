@@ -720,7 +720,7 @@ case $CI_TARGET in
 
     verify.trigger)
         setup_clang_toolchain
-        WORKFLOW="envoy-verify.yml"
+        WORKFLOW="envoy-publish.yml"
         # * Note on vars *
         # `ENVOY_REPO`: Should always be envoyproxy/envoy unless testing
         # `ENVOY_BRANCH`: Target branch for PRs, source branch for others
