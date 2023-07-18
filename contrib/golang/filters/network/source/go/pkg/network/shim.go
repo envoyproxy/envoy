@@ -63,14 +63,13 @@ var (
 
 func CreateUpstreamConn(addr string, filter api.UpstreamFilter) {
 	h := uint64(uintptr(cgoAPI.UpstreamConnect(libraryID, addr)))
+	// TODO: handle error
+	_ = UpstreamFilters.StoreFilter(h, filter)
 
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(filter, func(f api.UpstreamFilter) {
 		cgoAPI.UpstreamFinalize(unsafe.Pointer(uintptr(h)), api.NormalFinalize)
 	})
-
-	// TODO: handle error
-	_ = UpstreamFilters.StoreFilter(h, filter)
 }
 
 //export envoyGoFilterOnNetworkFilterConfig

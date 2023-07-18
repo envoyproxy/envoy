@@ -6,7 +6,6 @@
 
 #include "envoy/common/platform.h"
 
-#include "fmt/ostream.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
