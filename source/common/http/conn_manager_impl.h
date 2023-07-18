@@ -585,6 +585,8 @@ private:
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
   const std::string proxy_name_; // for Proxy-Status.
+
+  const bool refresh_rtt_after_request_{};
 };
 
 } // namespace Http

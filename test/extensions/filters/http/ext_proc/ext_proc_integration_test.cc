@@ -67,14 +67,15 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig() {
+  void initializeConfig(bool valid_grpc_server = true) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
     scoped_runtime_.mergeValues(
         {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
 
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, valid_grpc_server](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
           *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
@@ -88,10 +89,16 @@ protected:
         server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
       }
 
-      // Load configuration of the server from YAML and use a helper to add a grpc_service
-      // stanza pointing to the cluster that we just made
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server_0",
-                     grpc_upstreams_[0]->localAddress());
+      if (valid_grpc_server) {
+        // Load configuration of the server from YAML and use a helper to add a grpc_service
+        // stanza pointing to the cluster that we just made
+        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server_0",
+                       grpc_upstreams_[0]->localAddress());
+      } else {
+        // Set up the gRPC service with wrong cluster name and address.
+        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
+                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+      }
 
       // Construct a configuration proto for our filter and then re-write it
       // to JSON so that we can add it to the overall config
@@ -446,6 +453,18 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
   verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidSever) {
+  initializeConfig(/*valid_grpc_server=*/false);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  ProcessingRequest request_headers_msg;
+  // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
+  // is not used here.
+  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
+                                                         std::chrono::milliseconds(25000)));
 }
 
 // Test the filter using the default configuration by connecting to

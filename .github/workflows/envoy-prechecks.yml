@@ -1,0 +1,51 @@
+name: Envoy/prechecks
+
+on:
+  push:
+    branches:
+    - main
+    - release/v*
+  pull_request:
+    paths:
+    - '**/requirements*.txt'
+    - '**/go.mod'
+    - '**/*.bzl'
+    - 'WORKSPACE'
+    - '.github/workflows/envoy-prechecks.yml'
+    - '.github/workflows/_*.yml'
+
+concurrency:
+  group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  env:
+    uses: ./.github/workflows/_env.yml
+  cache:
+    needs:
+    - env
+    uses: ./.github/workflows/_cache_docker.yml
+    with:
+      image_tag: "${{ needs.env.outputs.build_image_ubuntu }}"
+
+  prechecks:
+    needs:
+    - env
+    - cache
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: deps
+          rbe: false
+          managed: true
+    uses: ./.github/workflows/_ci.yml
+    name: CI ${{ matrix.target }}
+    with:
+      target: ${{ matrix.target }}
+      rbe: ${{ matrix.rbe }}
+      managed: ${{ matrix.managed }}
+      cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}

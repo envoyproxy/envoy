@@ -161,11 +161,14 @@ Filter::StreamOpenState Filter::openStream() {
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
-    stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // beyond this point.
+      ASSERT(stream_ == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    stats_.streams_started_.inc();
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc()) {

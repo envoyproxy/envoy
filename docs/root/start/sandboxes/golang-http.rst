@@ -1,7 +1,7 @@
-.. _install_sandboxes_golang:
+.. _install_sandboxes_golang_http:
 
-Golang filter
-=============
+Golang HTTP filter
+==================
 
 .. sidebar:: Requirements
 
@@ -97,5 +97,5 @@ The output from the ``curl`` command below should include the body that contains
       Further information about the Envoy Go filter.
    :ref:`Go extension API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`
       The Go extension filter API.
-   :repo:`Go plugin API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+   :repo:`Go plugin API <contrib/golang/common/go/api/filter.go>`
       Overview of Envoy's Go plugin APIs.

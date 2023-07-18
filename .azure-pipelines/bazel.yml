@@ -180,17 +180,14 @@ steps:
   workingDirectory: $(Build.SourcesDirectory)
   env:
     ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-    SLACK_TOKEN: $(SLACK_TOKEN)
-    REPO_URI: $(Build.Repository.Uri)
-    BUILD_URI: $(Build.BuildUri)
     ENVOY_BUILD_FILTER_EXAMPLE: ${{ parameters.envoyBuildFilterExample }}
     GITHUB_TOKEN: "${{ parameters.authGithub }}"
     ${{ if ne(parameters['cacheTestResults'], true) }}:
       BAZEL_NO_CACHE_TEST_RESULTS: 1
     ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-      AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+      CI_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
     ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-      AZP_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
+      CI_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
     # Any PR or CI run in envoy-presubmit uses the fake SCM hash
     ${{ if or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.DefinitionName'], 'envoy-presubmit')) }}:
       # sha1sum of `ENVOY_PULL_REQUEST`
@@ -204,10 +201,6 @@ steps:
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
-      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
     ${{ each var in parameters.env }}:
       ${{ var.key }}: ${{ var.value }}
   displayName: "Run CI script ${{ parameters.ciTarget }}"

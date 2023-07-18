@@ -28,9 +28,11 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_cache=${BAZEL_REMOTE_CACHE}"
     echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
 
-    if [[ -n "${BAZEL_REMOTE_INSTANCE_BRANCH}" ]]; then
+    if [[ -z "${ENVOY_RBE}" ]]; then
+        export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
+        echo "using local build cache."
         # Normalize branches - `release/vX.xx`, `vX.xx`, `vX.xx.x` -> `vX.xx`
-        BRANCH_NAME="$(echo "${BAZEL_REMOTE_INSTANCE_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
+        BRANCH_NAME="$(echo "${CI_TARGET_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
         if [[ "$BRANCH_NAME" == "merge" ]]; then
             # Manually run PR commit - there is no easy way of telling which branch
             # it is, so just set it to `main` - otherwise it tries to cache as `branch/merge`
@@ -42,11 +44,6 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
         export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
         echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
-    fi
-
-    if [[ -z "${ENVOY_RBE}" ]]; then
-        export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
-        echo "using local build cache."
     fi
 else
     echo "No remote cache is set, skipping setup remote cache."
