@@ -74,9 +74,23 @@ class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
 public:
   ~UpstreamLocalAddressSelectorFactory() override = default;
 
-  virtual UpstreamLocalAddressSelectorPtr createLocalAddressSelector(
-      const envoy::config::cluster::v3::Cluster& cluster_config,
-      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) const PURE;
+  /**
+   * \param bind_config is the :ref:`upstream_bind_config
+   *   <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` if specified, else
+   *   :ref:`upstream_bind_config
+   *   <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config>` if specified,
+   *   else is unset.
+   * \param base_socket_options is the base socket options.
+   * \param cluster_socket_options is the cluster socket options.
+   * \param cluster_name is set to the name of the cluster if ``bind_config`` is
+   *   from cluster config. If the bind config from the cluster manager, the param
+   *   is empty.
+   */
+  virtual UpstreamLocalAddressSelectorPtr
+  createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                             Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
+                             Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
+                             absl::optional<std::string> cluster_name) const PURE;
 
   std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };

@@ -15,10 +15,12 @@ std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
 
 UpstreamLocalAddressSelectorPtr
 DefaultUpstreamLocalAddressSelectorFactory::createLocalAddressSelector(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) const {
-  return std::make_shared<DefaultUpstreamLocalAddressSelector>(cluster_config,
-                                                               bootstrap_bind_config);
+    ::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+    Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
+    Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
+    absl::optional<std::string> cluster_name) const {
+  return std::make_shared<DefaultUpstreamLocalAddressSelector>(
+      bind_config, base_socket_options, cluster_socket_options, cluster_name);
 }
 
 /**

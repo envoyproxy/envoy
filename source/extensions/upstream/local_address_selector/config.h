@@ -14,9 +14,10 @@ public:
   std::string name() const override;
 
   UpstreamLocalAddressSelectorPtr
-  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
-                             const absl::optional<envoy::config::core::v3::BindConfig>&
-                                 bootstrap_bind_config) const override;
+  createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                             Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
+                             Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
+                             absl::optional<std::string> cluster_name) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

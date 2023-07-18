@@ -69,6 +69,16 @@ std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   return address->asString();
 }
 
+Network::TcpKeepaliveConfig
+parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
+  const envoy::config::core::v3::TcpKeepalive& options =
+      config.upstream_connection_options().tcp_keepalive();
+  return Network::TcpKeepaliveConfig{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
+}
+
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
@@ -165,22 +175,73 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
 
+Network::ConnectionSocket::OptionsSharedPtr
+buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                       const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
+  Network::ConnectionSocket::OptionsSharedPtr base_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
+
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    Network::Socket::appendOptions(base_options,
+                                   Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+  }
+  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
+  if ((bootstrap_bind_config.freebind().value() &&
+       !cluster_config.upstream_bind_config().has_freebind()) ||
+      cluster_config.upstream_bind_config().freebind().value()) {
+    Network::Socket::appendOptions(base_options,
+                                   Network::SocketOptionFactory::buildIpFreebindOptions());
+  }
+  if (cluster_config.upstream_connection_options().has_tcp_keepalive()) {
+    Network::Socket::appendOptions(base_options,
+                                   Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+                                       parseTcpKeepaliveConfig(cluster_config)));
+  }
+
+  return base_options;
+}
+
+Network::ConnectionSocket::OptionsSharedPtr
+buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                          const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
+  Network::ConnectionSocket::OptionsSharedPtr cluster_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
+  // Cluster socket_options trump cluster manager wide.
+  if (bootstrap_bind_config.socket_options().size() +
+          cluster_config.upstream_bind_config().socket_options().size() >
+      0) {
+    auto socket_options = !cluster_config.upstream_bind_config().socket_options().empty()
+                              ? cluster_config.upstream_bind_config().socket_options()
+                              : bootstrap_bind_config.socket_options();
+    Network::Socket::appendOptions(
+        cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
+  }
+  return cluster_options;
+}
+
 Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelector(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
-  const std::string empty;
+
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
+  // The ``upstream_bind_config`` field on Cluster overrides the ``bootstrap_bind_config``
+  // entirely. Thus we ignore the ``local_address_selector`` on the bootstrap bind config if
+  // ``upstream_bind_config`` is specified without a ``local_address_selector``.
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
-      cluster_config.has_upstream_bind_config() &&
-              cluster_config.upstream_bind_config().has_local_address_selector()
-          ? &cluster_config.upstream_bind_config().local_address_selector()
-      : bootstrap_bind_config.has_value() && bootstrap_bind_config->has_local_address_selector()
-          ? &bootstrap_bind_config->local_address_selector()
-          : nullptr;
+      cluster_config.has_upstream_bind_config()
+          ? (cluster_config.upstream_bind_config().has_local_address_selector()
+                 ? &cluster_config.upstream_bind_config().local_address_selector()
+                 : nullptr)
+          : (bootstrap_bind_config.has_value() &&
+                     bootstrap_bind_config->has_local_address_selector()
+                 ? &bootstrap_bind_config->local_address_selector()
+                 : nullptr);
   if (local_address_selector_config) {
     local_address_selector_factory =
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(
-            *local_address_selector_config, true);
+            *local_address_selector_config, false);
   } else {
     envoy::extensions::upstream::local_address_selector::v3::DefaultLocalAddressSelector
         default_config;
@@ -188,15 +249,22 @@ Envoy::Upstream::UpstreamLocalAddressSelectorPtr createUpstreamLocalAddressSelec
     typed_extension.mutable_typed_config()->PackFrom(default_config);
     local_address_selector_factory =
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
-                                                                                 true);
+                                                                                 false);
   }
-  if (local_address_selector_factory == nullptr) {
-    throw EnvoyException(fmt::format(
-        "Unknown local address selector: {}",
-        local_address_selector_config ? local_address_selector_config->DebugString() : ""));
+  OptRef<const envoy::config::core::v3::BindConfig> bind_config_to_use;
+  if (cluster_config.has_upstream_bind_config()) {
+    bind_config_to_use.emplace(cluster_config.upstream_bind_config());
+  } else if (bootstrap_bind_config.has_value()) {
+    bind_config_to_use.emplace(*bootstrap_bind_config);
   }
-  return local_address_selector_factory->createLocalAddressSelector(cluster_config,
-                                                                    bootstrap_bind_config);
+  return local_address_selector_factory->createLocalAddressSelector(
+      bind_config_to_use,
+      buildBaseSocketOptions(cluster_config,
+                             bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{})),
+      buildClusterSocketOptions(
+          cluster_config, bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{})),
+      cluster_config.has_upstream_bind_config() ? absl::optional<std::string>(cluster_config.name())
+                                                : absl::nullopt);
 }
 
 } // namespace

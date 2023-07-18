@@ -153,15 +153,7 @@ message BindConfig {
 
   // Extra source addresses appended to the address specified in the `source_address`
   // field. This enables to specify multiple source addresses.
-  // When :ref:`local_address_selector
-  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>` is not
-  // specified, only one extra address can be supported, and the extra address should have a different
-  // IP version with the address in the `source_address` field. The address which has the same IP
-  // version with the target host's address IP version will be used as bind address. If more
-  // than one extra address specified, only the first address matched IP version will be
-  // returned. If there is no same IP version address found, the address in the `source_address`
-  // will be returned.
-  // This behavior can be overridden by specifying :ref:`local_address_selector
+  // The source address selection is determined by :ref:`local_address_selector
   // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
   repeated ExtraSourceAddress extra_source_addresses = 5;
 
@@ -171,9 +163,10 @@ message BindConfig {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The name of the custom local address selector. This must have been
-  // registered with Envoy. If this is empty, the default applies. See
-  // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
-  // for an explanation of the behavior of the default selector.
+  // registered with Envoy. If this is empty, the default (i.e.
+  // :ref:`DefaultLocalAddressSelector
+  // <envoy_v3_api_field_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`)
+  // applies.
   // [#extension-category: envoy.upstream.local_address_selector]
   TypedExtensionConfig local_address_selector = 6;
 }

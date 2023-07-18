@@ -3176,25 +3176,7 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
 class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 
 public:
-  TestUpstreamLocalAddressSelector(
-      const envoy::config::cluster::v3::Cluster& cluster_config,
-      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
-    if (cluster_config.has_upstream_bind_config()) {
-      parseBindConfig(cluster_config.upstream_bind_config());
-    } else if (bootstrap_bind_config.has_value()) {
-      parseBindConfig(*bootstrap_bind_config);
-    }
-  }
-
-  UpstreamLocalAddress
-  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
-                          const Network::ConnectionSocket::OptionsSharedPtr&) const override {
-    current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
-    return upstream_local_addresses_[current_idx_];
-  }
-
-private:
-  void parseBindConfig(const envoy::config::core::v3::BindConfig& bind_config) {
+  TestUpstreamLocalAddressSelector(const envoy::config::core::v3::BindConfig& bind_config) {
     UpstreamLocalAddress upstream_local_address;
     upstream_local_address.address_ =
         ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config.source_address());
@@ -3211,18 +3193,27 @@ private:
     }
   }
 
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr&) const override {
+    current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
+    return upstream_local_addresses_[current_idx_];
+  }
+
+private:
   std::vector<UpstreamLocalAddress> upstream_local_addresses_;
   mutable size_t current_idx_ = 0;
 };
 
 class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
   UpstreamLocalAddressSelectorPtr
-  createLocalAddressSelector(const envoy::config::cluster::v3::Cluster& cluster_config,
-                             const absl::optional<envoy::config::core::v3::BindConfig>&
-                                 bootstrap_bind_config) const override {
-    return std::make_shared<TestUpstreamLocalAddressSelector>(cluster_config,
-                                                              bootstrap_bind_config);
+  createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                             Network::ConnectionSocket::OptionsSharedPtr,
+                             Network::ConnectionSocket::OptionsSharedPtr,
+                             absl::optional<std::string>) const override {
+    return std::make_shared<TestUpstreamLocalAddressSelector>(*bind_config);
   }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Empty>();
   }
