@@ -31,6 +31,12 @@ public:
     init(context_, grpc_service_);
   }
 
+  RateLimitTestClient(bool start_failed) : start_failed_(start_failed) {
+    // Initialize with own mock objects.
+    grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
+    init(context_, grpc_service_);
+  }
+
   RateLimitTestClient(NiceMock<MockFactoryContext>& context,
                       envoy::config::core::v3::GrpcService& grpc_service) {
     // Initialize with mock objects that are passed in externally.
@@ -68,6 +74,9 @@ public:
 
   Grpc::RawAsyncStream* mockStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
                                      const Http::AsyncClient::StreamOptions&) {
+    if (start_failed_) {
+      return nullptr;
+    }
     stream_callbacks_ = &callbacks;
     return &stream_;
   }
@@ -83,8 +92,8 @@ public:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
   MockRateLimitQuotaCallbacks callbacks_;
-  bool grpc_closed_ = false;
   bool external_inited_ = false;
+  bool start_failed_ = false;
   RateLimitQuotaUsageReports reports_;
   BucketsContainer bucket_cache_;
 };

@@ -26,18 +26,19 @@ constexpr char MultipleBukcetId[] = R"EOF(
       "test"
 )EOF";
 
-struct RateLimitStreamTest : public testing::Test {
+class RateLimitClientTest : public testing::Test {
+public:
   RateLimitTestClient test_client{};
 };
 
-TEST_F(RateLimitStreamTest, OpenAndCloseStream) {
+TEST_F(RateLimitClientTest, OpenAndCloseStream) {
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   EXPECT_CALL(test_client.stream_, closeStream());
   EXPECT_CALL(test_client.stream_, resetStream());
   test_client.client_->closeStream();
 }
 
-TEST_F(RateLimitStreamTest, SendUsageReport) {
+TEST_F(RateLimitClientTest, SendUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
@@ -51,7 +52,7 @@ TEST_F(RateLimitStreamTest, SendUsageReport) {
 }
 
 // TODO(tyxia) Test more in this sub-test!!!
-TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
+TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   ASSERT_NE(test_client.stream_callbacks_, nullptr);
 
@@ -80,7 +81,7 @@ TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
 }
 
 // TODO(tyxia) Update allowed/denied check
-TEST_F(RateLimitStreamTest, BuildUsageReport) {
+TEST_F(RateLimitClientTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   std::string domain = "cloud_12345_67890_td_rlqs";
@@ -93,7 +94,7 @@ TEST_F(RateLimitStreamTest, BuildUsageReport) {
   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 }
 
-TEST_F(RateLimitStreamTest, BuildMultipleReports) {
+TEST_F(RateLimitClientTest, BuildMultipleReports) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   std::string domain = "cloud_12345_67890_td_rlqs";
@@ -126,6 +127,24 @@ TEST_F(RateLimitStreamTest, BuildMultipleReports) {
   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 3);
   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 }
+
+// class FailedClientTest {
+// public:
+//   void initialize() {
+//     client_ = std::make_unique<MockRateLimitClient>();
+//     EXPECT_CALL(*client_, startStream(_)).WillOnce(Invoke(this,
+//     &FailedClientTest::doStartStream));
+//   }
+
+//   absl::Status doStartStream(const StreamInfo::StreamInfo&) {
+//     return absl::InternalError("Failed to start the stream");
+//   }
+//   std::unique_ptr<MockRateLimitClient> client_;
+// };
+
+// TEST_F(FailedClientTest, StartStreamFailure) {
+//   initialize();
+// }
 
 } // namespace
 } // namespace RateLimitQuota

@@ -94,6 +94,7 @@ void RateLimitClientImpl::closeStream() {
   if (stream_ != nullptr && !stream_closed_) {
     stream_->closeStream();
     stream_closed_ = true;
+    // TODO(tyxia) Reset pointer
     stream_->resetStream();
   }
 }
@@ -113,7 +114,8 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
         Http::AsyncClient::RequestOptions().setParentContext(
             Http::AsyncClient::ParentContext{&stream_info}));
   }
-  return absl::OkStatus();
+
+  return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
 }
 
 // TODO(tyxia) Remove??? sendUsageReport() did the work of rateLimit();

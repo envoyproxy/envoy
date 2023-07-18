@@ -70,23 +70,19 @@ public:
 
   // Return the buckets. Buckets are returned by reference so that caller site can modify its
   // content.
-  BucketsContainer& buckets() { return buckets_; }
+  BucketsContainer& quotaBuckets() { return quota_buckets_; }
   // Return the quota usage reports.
   RateLimitQuotaUsageReports& quotaUsageReports() { return quota_usage_reports_; }
 
 private:
   // Thread local storage for bucket container and quota usage report.
-  BucketsContainer buckets_;
+  BucketsContainer quota_buckets_;
   RateLimitQuotaUsageReports quota_usage_reports_;
 };
 
 struct BucketCache {
   BucketCache(Envoy::Server::Configuration::FactoryContext& context) : tls(context.threadLocal()) {
-    tls.set([](Envoy::Event::Dispatcher&) {
-      // Unused
-      // dispatcher.timeSource()
-      return std::make_shared<ThreadLocalBucket>();
-    });
+    tls.set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalBucket>(); });
   }
   Envoy::ThreadLocal::TypedSlot<ThreadLocalBucket> tls;
 };

@@ -53,7 +53,7 @@ public:
   // RateLimitClient
   void rateLimit(RateLimitQuotaCallbacks& callbacks) override;
 
-  absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
+  absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream();
 
   // Build the usage report (i.e., the request sent to RLQS server).

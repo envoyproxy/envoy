@@ -484,7 +484,6 @@ TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
   buildCustomHeader(custom_value_pairs);
 
   RateLimitTestClient test_client(context_, *config_.mutable_rlqs_server());
-  // test_client.init(context_, *config_.mutable_rlqs_server());
   EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
   // Send quota usage report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
@@ -541,6 +540,68 @@ TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
+
+// TEST_F(FilterTest, StartFailed) {
+//   addMatcherConfig(MatcherConfigType::Valid);
+//   createFilter();
+
+//   // Define the key value pairs that is used to build the bucket_id dynamically via
+//   `custom_value`
+//   // in the config.
+//   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+//                                                                       {"group", "envoy"}};
+//   buildCustomHeader(custom_value_pairs);
+//   RateLimitTestClient test_client(/*start_failed=*/true);
+//   EXPECT_FALSE(test_client.client_->startStream(decoder_callbacks_.stream_info_).ok());
+//   // // Send quota usage report and ensure that we get it.
+//   // EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
+//   // EXPECT_CALL(test_client.stream_, closeStream());
+//   // EXPECT_CALL(test_client.stream_, resetStream());
+//   // test_client.client_->closeStream();
+
+//   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+//   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+// }
+
+// class FailedTestClient : public FilterTest {
+// public:
+//   FailedTestClient() = default;
+//   void mockStartFailure() {
+//     // client_ = std::make_unique<MockRateLimitClient>();
+//     EXPECT_CALL(client_, startStream(_)).WillOnce(Invoke(this,
+//     &FailedTestClient::doStartStream));
+//   }
+
+//   absl::Status doStartStream(const StreamInfo::StreamInfo&) {
+//     return absl::InternalError("Failed to start the stream");
+//   }
+//   MockRateLimitClient client_ = {};
+// };
+
+// TEST_F(FailedTestClient, StartFailed) {
+//   addMatcherConfig(MatcherConfigType::Valid);
+//   createFilter();
+
+//   // Define the key value pairs that is used to build the bucket_id dynamically via
+//   `custom_value`
+//   // in the config.
+//   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+//                                                                       {"group", "envoy"}};
+//   buildCustomHeader(custom_value_pairs);
+//   // mockStartFailure();
+//   // FailedTestClient test_client = {};
+//   EXPECT_CALL(client_, startStream(_)).WillOnce(Invoke(this, &FailedTestClient::doStartStream));
+//   // test_client.initialize();
+//   // EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
+//   // // Send quota usage report and ensure that we get it.
+//   // EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
+//   // EXPECT_CALL(test_client.stream_, closeStream());
+//   // EXPECT_CALL(test_client.stream_, resetStream());
+//   // test_client.client_->closeStream();
+
+//   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+//   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+// }
 
 } // namespace
 } // namespace RateLimitQuota

@@ -32,6 +32,8 @@ public:
   virtual ~RateLimitClient() = default;
 
   virtual void rateLimit(RateLimitQuotaCallbacks& callbacks) PURE;
+
+  virtual absl::Status startStream(const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 } // namespace RateLimitQuota

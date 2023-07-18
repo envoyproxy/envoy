@@ -39,10 +39,10 @@ RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
 
   // Start the streaming on the first request.
   auto status = new_bucket.rate_limit_client->startStream(callbacks_->streamInfo());
-  if (!status.ok()) {
-    ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
+  // if (!status.ok()) {
+  //   ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
+  //   return Envoy::Http::FilterHeadersStatus::Continue;
+  // }
 
   initiating_call_ = true;
   // Send the usage report to RLQS server immediately on the first time when the request is
