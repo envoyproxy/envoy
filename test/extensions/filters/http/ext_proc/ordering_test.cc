@@ -215,17 +215,14 @@ protected:
 };
 
 // A base class for tests that will check that gRPC streams fail while being created
-
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const envoy::config::core::v3::GrpcService&,
                                      const StreamInfo::StreamInfo&) override {
-    auto stream = std::make_unique<MockStream>();
-    EXPECT_CALL(*stream, close());
-    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     callbacks.onGrpcError(Grpc::Status::Internal);
-    return stream;
+    // Returns nullptr on start stream failure.
+    return nullptr;
   }
 };
 
