@@ -162,8 +162,8 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
 
-  constexpr uint start_data_size = 3;
-  constexpr uint middle_data_size = 4;
+  const uint start_data_size = 3;
+  const uint middle_data_size = 4;
 
   CreateApiKeyRequest request = MakeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
