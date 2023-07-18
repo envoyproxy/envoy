@@ -42,7 +42,7 @@ private:
   const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
       field_extractions_;
 
-  absl::flat_hash_map<absl::string_view, FieldValueExtractorPtr> per_field_extractors;
+  absl::flat_hash_map<absl::string_view, FieldValueExtractorPtr> per_field_extractors_;
 };
 
 class ExtractorFactoryImpl : public ExtractorFactory {

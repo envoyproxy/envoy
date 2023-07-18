@@ -30,7 +30,7 @@ absl::Status ExtractorImpl::init() {
       return extractor.status();
     }
 
-    per_field_extractors.emplace(it.first, std::move(extractor.value()));
+    per_field_extractors_.emplace(it.first, std::move(extractor.value()));
   }
   return absl::OkStatus();
 }
@@ -39,7 +39,7 @@ absl::StatusOr<ExtractionResult>
 ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) const {
 
   ExtractionResult result;
-  for (const auto& it : per_field_extractors) {
+  for (const auto& it : per_field_extractors_) {
     auto extracted_values = it.second->Extract(message);
     if (!extracted_values.ok()) {
       return extracted_values.status();

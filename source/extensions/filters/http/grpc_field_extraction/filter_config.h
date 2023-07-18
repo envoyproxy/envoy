@@ -37,7 +37,10 @@ public:
   const Extractor* FindExtractor(absl::string_view proto_path) const;
 
 private:
-  void initDescriptorPool(Api::Api&);
+  void initDescriptorPool(Api::Api& api);
+
+  void initExtractors(ExtractorFactory& extractor_factory);
+
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;
   absl::flat_hash_map<std::string, std::unique_ptr<Extractor>> proto_path_to_extractor_;
@@ -45,7 +48,7 @@ private:
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

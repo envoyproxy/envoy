@@ -17,7 +17,10 @@ FilterConfig::FilterConfig(
                                                        &descriptor_pool_));
 
   initDescriptorPool(api);
+  initExtractors(*extractor_factory);
+}
 
+void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
   for (const auto& it : proto_config_.extractions_by_method()) {
     auto* method = descriptor_pool_.FindMethodByName(it.first);
     if (method == nullptr) {
@@ -25,7 +28,7 @@ FilterConfig::FilterConfig(
           "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
 
-    auto extractor = extractor_factory->CreateExtractor(
+    auto extractor = extractor_factory.CreateExtractor(
         [this](absl::string_view type_url) -> const Protobuf::Type* {
           return type_helper_->Info()->GetTypeByTypeUrl(type_url);
         },
