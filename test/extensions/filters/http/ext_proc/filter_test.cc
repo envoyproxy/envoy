@@ -250,6 +250,7 @@ protected:
     if (!buffering_data) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
+    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -269,13 +270,15 @@ protected:
     if (!buffering_data) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
+    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
   // Expect a request_body request, and send back a valid response
   void processRequestBody(
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
-      bool should_continue = true) {
+      bool should_continue = true,
+      const std::chrono::microseconds latency = std::chrono::microseconds(10)) {
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_request_body());
     const auto& body = last_request_.request_body();
@@ -287,6 +290,7 @@ protected:
     if (should_continue) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
+    test_time_->advanceTimeWait(latency);
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -305,6 +309,7 @@ protected:
     if (should_continue) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
+    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -324,6 +329,7 @@ protected:
     if (should_continue) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
+    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -343,6 +349,7 @@ protected:
     if (should_continue) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
+    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -424,12 +431,8 @@ protected:
   void sendChunkRequestData(const uint32_t chunk_number, const bool send_grpc) {
     for (uint32_t i = 0; i < chunk_number; i++) {
       Buffer::OwnedImpl req_data("foo");
-      test_time_->timeSystem().setMonotonicTime(
-          MonotonicTime(std::chrono::microseconds(1000 + 20 * i)));
       EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
       if (send_grpc) {
-        test_time_->timeSystem().setMonotonicTime(
-            MonotonicTime(std::chrono::microseconds(1010 + 20 * i)));
         processRequestBody(absl::nullopt, false);
       }
     }
@@ -438,12 +441,8 @@ protected:
   void sendChunkResponseData(const uint32_t chunk_number, const bool send_grpc) {
     for (uint32_t i = 0; i < chunk_number; i++) {
       Buffer::OwnedImpl resp_data("bar");
-      test_time_->timeSystem().setMonotonicTime(
-          MonotonicTime(std::chrono::microseconds(5000 + 20 * i)));
       EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
       if (send_grpc) {
-        test_time_->timeSystem().setMonotonicTime(
-            MonotonicTime(std::chrono::microseconds(5010 + 20 * i)));
         processResponseBody(absl::nullopt, false);
       }
     }
@@ -506,10 +505,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   request_headers_.addCopy(LowerCaseString("content-length"), 10);
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
   processRequestHeaders(false,
                         [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
                           EXPECT_FALSE(header_req.end_of_stream());
@@ -531,10 +527,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(30)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(40)));
   processResponseHeaders(
       false, [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
         EXPECT_FALSE(header_resp.end_of_stream());
@@ -655,10 +648,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
                                                  Eq(absl::nullopt), "Got_a_bad_request"))
@@ -692,7 +683,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -1350,28 +1340,22 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   HttpTestUtility::addDefaultHeaders(request_headers_);
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
   processRequestHeaders(false, absl::nullopt);
+
   const uint32_t chunk_number = 100;
   sendChunkRequestData(chunk_number, true);
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4000)));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4010)));
   processRequestTrailers(absl::nullopt, true);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4020)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4030)));
   processResponseHeaders(true, absl::nullopt);
   sendChunkResponseData(chunk_number * 2, true);
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(12000)));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(12010)));
   processResponseTrailers(absl::nullopt, false);
   filter_->onDestroy();
+
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   // Total gRPC messages include two headers and two trailers on top of the req/resp chunk data.
   uint32_t total_msg = 3 * chunk_number + 4;
@@ -1390,20 +1374,15 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   HttpTestUtility::addDefaultHeaders(request_headers_);
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
   processRequestHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl req_data("foo");
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
-
   // When sends one more chunk of data, gRPC call fails.
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4000)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4010)));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
@@ -1421,9 +1400,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-
   sendChunkResponseData(chunk_number * 2, false);
-
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(immediate_response_headers.empty());
@@ -1447,31 +1424,22 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   HttpTestUtility::addDefaultHeaders(request_headers_);
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
   processRequestHeaders(false, absl::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4000)));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4010)));
   processRequestTrailers(absl::nullopt, true);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4020)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(4030)));
   processResponseHeaders(true, absl::nullopt);
   sendChunkResponseData(chunk_number / 2, true);
   // When sends one more chunk of data, gRPC call fails.
   Buffer::OwnedImpl resp_data("foo");
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(8000)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(8010)));
-  // Oh no! The remote server had a failure!
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
                                                  Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
@@ -1519,9 +1487,8 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
                                                  Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
@@ -1572,30 +1539,20 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   const uint32_t chunk_number = 5;
   Buffer::OwnedImpl req_data("foo");
   // Latency 50 80 60 30 100.
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(60)));
-  processRequestBody(absl::nullopt, false);
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(70)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(150)));
-  processRequestBody(absl::nullopt, false);
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(160)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(220)));
-  processRequestBody(absl::nullopt, false);
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(230)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(260)));
-  processRequestBody(absl::nullopt, false);
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(270)));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(370)));
-  processRequestBody(absl::nullopt, false);
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   response_headers_.addCopy(LowerCaseString(":status"), "200");
@@ -1632,12 +1589,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "STREAMED"
-    request_trailer_mode: "SKIP"
-    response_trailer_mode: "SKIP"
   )EOF");
 
   // Create synthetic HTTP request
@@ -1647,9 +1600,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
   processRequestHeaders(false, absl::nullopt);
 
   bool decoding_watermarked = false;
@@ -1664,10 +1615,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   Buffer::OwnedImpl req_chunk_1;
   TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
   want_request_body.add(req_chunk_1.toString());
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(30)));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk_1, true));
   got_request_body.move(req_chunk_1);
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(40)));
   processRequestBody(absl::nullopt);
   EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
   EXPECT_FALSE(decoding_watermarked);
@@ -1679,9 +1628,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(100)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(110)));
   processResponseHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl want_response_body;
@@ -1694,19 +1641,13 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
-    test_time_->timeSystem().setMonotonicTime(
-        MonotonicTime(std::chrono::microseconds(200 + i * 20)));
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
-    test_time_->timeSystem().setMonotonicTime(
-        MonotonicTime(std::chrono::microseconds(210 + i * 20)));
     processResponseBody(absl::nullopt, false);
   }
 
   Buffer::OwnedImpl last_resp_chunk;
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(1000)));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(1010)));
   processResponseBody(absl::nullopt, true);
 
   // At this point, since we injected the data from each chunk after the "encodeData"
@@ -2090,10 +2031,8 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_FALSE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
@@ -2108,7 +2047,6 @@ TEST_F(HttpFilterTest, PostAndFail) {
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -2139,25 +2077,15 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_FALSE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(10)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(20)));
-  EXPECT_FALSE(last_request_.async_mode());
-  ASSERT_TRUE(last_request_.has_request_headers());
-
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
-  resp1->mutable_request_headers();
-  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  processRequestHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(30)));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  test_time_->timeSystem().setMonotonicTime(MonotonicTime(std::chrono::microseconds(40)));
-  // Oh no! The remote server had a failure!
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
                                                  Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
@@ -2309,14 +2237,7 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  EXPECT_FALSE(last_request_.async_mode());
-  ASSERT_TRUE(last_request_.has_request_headers());
-
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
-  resp1->mutable_request_headers();
-  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  processRequestHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl first_chunk("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
