@@ -6,7 +6,7 @@ on:
   # Do not run untrusted code here
   workflow_run:
     workflows:
-    - Verify/examples
+    - Publish & verify
     types:
     - completed
 
@@ -52,7 +52,7 @@ jobs:
         echo "state=${STATE}" >> "$GITHUB_OUTPUT"
       id: job
     - name: Complete status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.5
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.7
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: ${{ github.event.workflow.name }}
