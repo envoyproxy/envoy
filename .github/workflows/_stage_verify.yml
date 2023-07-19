@@ -19,12 +19,13 @@ concurrency:
 
 jobs:
   verify:
-    name: "Verify (${{ matrix.target }}) ${{ inputs.trusted && 'postsubmit' || 'pr' }}:${{ github.ref_name }}"
+    name: ${{ matrix.name || matrix.target }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - target: verify_examples
+          name: examples
           rbe: false
           managed: true
           cache_build_image: ""
