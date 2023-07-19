@@ -52,7 +52,7 @@ std::string generateRcDetails(absl::string_view filter_name, absl::string_view e
   return absl::StrCat(filter_name, "_", error_type, "{", error_detail, "}");
 }
 
-// Turns a '/package.service/method' to 'package.Service.method' which is
+// Turns a '/package.service/method' to 'package.service.method' which is
 // the form suitable for the proto db lookup.
 absl::StatusOr<std::string> grpcPathToProtoPath(absl::string_view grpc_path) {
   if (grpc_path.empty() || grpc_path.at(0) != '/' ||
