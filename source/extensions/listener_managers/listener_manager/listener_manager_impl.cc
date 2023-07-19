@@ -77,11 +77,11 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 }
 } // namespace
 
-std::vector<Network::FilterFactoryCb>
-ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
+Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
-  std::vector<Network::FilterFactoryCb> ret;
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context,
+    Filter::NetworkFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::NetworkFilterFactoriesList ret;
   ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
@@ -105,7 +105,8 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(std::move(callback));
+    ret.push_back(
+        config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }
   return ret;
 }

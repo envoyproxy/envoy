@@ -113,6 +113,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+// TODO(wbpcode) complete remove this feature is no one use it.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(adip) this will be enabled by default once the work on the feature is
 // done in EdsClusterImpl.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
