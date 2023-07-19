@@ -884,9 +884,11 @@ void ConfigHelper::applyConfigModifiers() {
 void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
     absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-        alternate_protocol_cache_config) {
-  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
-                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        alternate_protocol_cache_config,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        configure_tls_context) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config,
+                     configure_tls_context](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -929,6 +931,9 @@ void ConfigHelper::configureUpstreamTls(
               .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    if (configure_tls_context != nullptr) {
+      configure_tls_context(*tls_context.mutable_common_tls_context());
+    }
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
@@ -1488,6 +1493,9 @@ void ConfigHelper::initializeTls(
   common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
       options.tlsv1_3_ ? envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3
                        : envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  for (const auto& curve : options.curves_) {
+    common_tls_context.mutable_tls_params()->add_ecdh_curves(curve);
+  }
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(

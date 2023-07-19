@@ -29,10 +29,14 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     const RouteSharedPtr& route, const std::string& command, const std::string& key,
     Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks,
     Common::Redis::Client::Transaction& transaction) {
+  // If a transaction is active, clients_[0] is the primary connection to the cluster.
+  // The subsequent clients in the array are used for mirroring.
+  transaction.current_client_idx_ = 0;
   auto handler = route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                 callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
+      transaction.current_client_idx_++;
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                null_pool_callbacks, transaction);
@@ -504,6 +508,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
   // key, and then send a MULTI command to the node that handles that key.
   // The response for the MULTI command will be discarded since we pass the null_pool_callbacks
   // to the handler.
+
   RouteSharedPtr route;
   if (transaction.key_.empty()) {
     transaction.key_ = incoming_request->asArray()[1].asString();
@@ -511,8 +516,11 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     Common::Redis::RespValueSharedPtr multi_request =
         std::make_shared<Common::Redis::Client::MultiRequest>();
     if (route) {
+      // We reserve a client for the main connection and for each mirror connection.
+      transaction.clients_.resize(1 + route->mirrorPolicies().size());
       makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, null_pool_callbacks,
                               callbacks.transaction());
+      transaction.connection_established_ = true;
     }
   } else {
     route = router.upstreamPool(transaction.key_);
@@ -520,6 +528,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   std::unique_ptr<TransactionRequest> request_ptr{
       new TransactionRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
     request_ptr->handle_ =

@@ -273,6 +273,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
+        ENVOY_LOG(debug, "state query param does not exist: \n{}", query_parameters);
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -286,11 +287,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       }
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
+        ENVOY_LOG(debug, "state url {} can not be initialized", state_url.toString());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
+        ENVOY_LOG(debug, "state url query params {} does not match redirect config",
+                  state_url.pathAndQueryParams());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -313,6 +317,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
   if (!config_->redirectPathMatcher().match(path_str)) {
+    ENVOY_LOG(debug, "path {} does not match with redirect matcher. redirecting to OAuth server.",
+              path_str);
     redirectToOAuthServer(headers);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -369,15 +375,18 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
+    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
     return true;
   }
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
     for (const auto& matcher : config_->passThroughMatchers()) {
       if (matcher.matchesHeaders(headers)) {
+        ENVOY_LOG(debug, "skipping oauth flow due to passthrough matcher match");
         return true;
       }
     }
   }
+  ENVOY_LOG(debug, "can not skip oauth flow");
   return false;
 }
 

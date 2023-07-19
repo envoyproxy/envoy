@@ -67,7 +67,7 @@ RUNTIME_GUARD(envoy_reloadable_features_prohibit_route_refresh_after_response_he
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 RUNTIME_GUARD(envoy_reloadable_features_reject_require_client_certificate_with_quic);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_original_path);
-RUNTIME_GUARD(envoy_reloadable_features_send_header_value_in_bytes);
+RUNTIME_GUARD(envoy_reloadable_features_send_header_raw_value);
 RUNTIME_GUARD(envoy_reloadable_features_service_sanitize_non_utf8_strings);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_stateful_session_encode_ttl_in_cookie);
@@ -113,6 +113,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+// TODO(wbpcode) complete remove this feature is no one use it.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

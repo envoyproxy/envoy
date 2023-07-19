@@ -40,6 +40,24 @@ absl::string_view stringViewFromGoSlice(void* slice) {
   return {static_cast<const char*>(go_slice->data), static_cast<size_t>(go_slice->len)};
 }
 
+std::vector<std::string> stringsFromGoSlice(void* slice) {
+  std::vector<std::string> list;
+  if (slice == nullptr) {
+    return list;
+  }
+  auto go_slice = reinterpret_cast<GoSlice*>(slice);
+  auto str = reinterpret_cast<GoString*>(go_slice->data);
+  for (auto i = 0; i < go_slice->len; i += 2) {
+    auto key = std::string(static_cast<const char*>(str->p), str->n);
+    str++;
+    auto value = std::string(static_cast<const char*>(str->p), str->n);
+    str++;
+    list.push_back(key);
+    list.push_back(value);
+  }
+  return list;
+}
+
 const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
 
 #ifdef __cplusplus
@@ -69,13 +87,23 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
       r,
       [response_code, body_text, headers, grpc_status,
        details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        UNREFERENCED_PARAMETER(headers);
+        auto header_values = stringsFromGoSlice(headers);
+        std::function<void(Http::ResponseHeaderMap&)> modify_headers =
+            [header_values](Http::ResponseHeaderMap& headers) -> void {
+          for (size_t i = 0; i < header_values.size(); i += 2) {
+            const auto& key = header_values[i];
+            const auto& value = header_values[i + 1];
+            if (value.length() > 0) {
+              headers.setCopy(Http::LowerCaseString(key), value);
+            }
+          }
+        };
         auto status = static_cast<Grpc::Status::GrpcStatus>(grpc_status);
 
         // Deep clone the GoString into C++, since the GoString may be freed after the function
         // returns, while they may still be used in the callback.
         return filter->sendLocalReply(static_cast<Http::Code>(response_code),
-                                      copyGoString(body_text), nullptr, status,
+                                      copyGoString(body_text), modify_headers, status,
                                       copyGoString(details));
       });
 }

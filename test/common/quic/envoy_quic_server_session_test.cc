@@ -1077,5 +1077,19 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
 }
 
+class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
+  void SetUp() override {}
+  void TearDown() override {
+    EnvoyQuicServerSessionTest::SetUp();
+    installReadFilter();
+    EnvoyQuicServerSessionTest::TearDown();
+  }
+};
+
+TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
+  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), absl::nullopt);
+  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), absl::nullopt);
+}
+
 } // namespace Quic
 } // namespace Envoy

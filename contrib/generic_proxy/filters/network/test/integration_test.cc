@@ -198,6 +198,8 @@ public:
   void waitForUpstreamRequestForTest(uint64_t num_bytes, std::string* data) {
     auto result = upstream_connection_->waitForData(num_bytes, data);
     RELEASE_ASSERT(result, result.failure_message());
+    // Clear data for next test.
+    upstream_connection_->clearData();
   }
 
   // Send upstream response.
@@ -379,8 +381,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   cleanup();
 }
 
-// https://github.com/envoyproxy/envoy/issues/27842
-TEST_P(IntegrationTest, DISABLED_MultipleRequests) {
+TEST_P(IntegrationTest, MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
   codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
