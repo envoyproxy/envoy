@@ -45,7 +45,8 @@ message JsonToMetadata {
       // The value to pair with the given key.
       //
       // When used for on_present case, if value is non-empty it'll be used instead
-      // of the attribute value. If both are empty, the attribute value is used as-is.
+      // of the the value of the JSON key. If both are empty, the the value of the
+      // JSON key is used as-is.
       //
       // When used for on_missing/on_error case, a non-empty value
       // must be provided.
@@ -94,7 +95,7 @@ message JsonToMetadata {
     KeyValuePair on_error = 4;
   }
 
-  // the list of rules to apply to requests
+  // The list of rules to apply to requests.
   repeated Rule request_rules = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // Soft limit on size of the read buffers.
@@ -107,15 +108,15 @@ message JsonToMetadata {
   // filters get chance to manipulate.
   google.protobuf.UInt32Value request_buffer_limit_bytes = 2;
 
-  // allowed content-type for json to metadata transformation
-  // default to {"application/json"}
+  // Allowed content-type for json to metadata transformation.
+  // Default to {"application/json"}.
   //
   // Set `request_allow_empty_content_type` if empty/missing content-type header
   // is allowed.
   repeated string request_allow_content_types = 3
       [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
-  // allowed empty content-type for json to metadata transformation
-  // default to false
+  // Allowed empty content-type for json to metadata transformation.
+  // Default to false.
   bool request_allow_empty_content_type = 4;
 }

@@ -38,13 +38,8 @@ using KeyValuePair =
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::KeyValuePair;
 using ValueType = envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::ValueType;
 
-class Rule {
-public:
+struct Rule {
   Rule(const ProtoRule& rule);
-  const ProtoRule& rule() const { return rule_; }
-  const std::vector<std::string>& keys() const { return keys_; }
-
-private:
   const ProtoRule rule_;
   std::vector<std::string> keys_;
 };
@@ -66,10 +61,14 @@ public:
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
+  Rules generateRequestRules(
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config);
+  absl::flat_hash_set<std::string> generateRequestAllowContentTypes(
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config);
   JsonToMetadataStats stats_;
   const uint32_t request_buffer_limit_bytes_;
-  Rules request_rules_;
-  absl::flat_hash_set<std::string> request_allow_content_types_;
+  const Rules request_rules_;
+  const absl::flat_hash_set<std::string> request_allow_content_types_;
   const bool request_allow_empty_content_type_;
 };
 
@@ -101,7 +100,7 @@ private:
   bool addMetadata(const std::string& meta_namespace, const std::string& key,
                    ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
                    StructMap& struct_map);
-  void applyKeyValue(std::string value, const KeyValuePair& keyval, StructMap& struct_map);
+  void applyKeyValue(const std::string& value, const KeyValuePair& keyval, StructMap& struct_map);
   void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map);
   void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,

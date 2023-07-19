@@ -78,7 +78,7 @@ request_rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context), EnvoyException,
-      "json to metadata filter: cannot specify on_missing rule without non-empty value");
+      "json to metadata filter: cannot specify on_missing rule with empty value");
 }
 
 TEST(Factory, NoValueIntOnError) {
@@ -100,7 +100,7 @@ request_rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context), EnvoyException,
-      "json to metadata filter: cannot specify on_error rule without non-empty value");
+      "json to metadata filter: cannot specify on_error rule with empty value");
 }
 
 } // namespace JsonToMetadata

@@ -16,7 +16,7 @@ on missing case is triggered and the value specified is used for adding metadata
 The metadata can then be used for load balancing decisions, consumed from logs, etc.
 
 A typical use case for this filter is to dynamically match a specified json attribute of requests
-with rate limit. For this, a given json payload attribute's value would be extracted and attached
+with rate limit. For this, a given value of the JSON keys would be extracted and attached
 to the request as dynamic metadata which would then be used to match a rate limit action on metadata.
 
 The Json to metadata filter stops iterating to next filter until we have the whole payload to extract

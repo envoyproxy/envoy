@@ -11,6 +11,57 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
 
+namespace {
+
+struct JsonValueToStringConverter {
+  std::string operator()(bool&& val) { return std::to_string(val); }
+  std::string operator()(int64_t&& val) { return std::to_string(val); }
+  std::string operator()(double&& val) { return std::to_string(val); }
+  std::string operator()(std::string&& val) { return std::move(val); }
+};
+
+struct JsonValueToDoubleConverter {
+  absl::StatusOr<double> operator()(bool&& val) { return static_cast<double>(val); }
+  absl::StatusOr<double> operator()(int64_t&& val) { return static_cast<double>(val); }
+  absl::StatusOr<double> operator()(double&& val) { return val; }
+  absl::StatusOr<double> operator()(std::string&& val) {
+    double dval;
+    if (absl::SimpleAtod(StringUtil::trim(val), &dval)) {
+      return dval;
+    }
+    return absl::InternalError(fmt::format("value {} to number conversion failed", val));
+  }
+};
+
+struct JsonValueToProtobufValueConverter {
+  absl::StatusOr<ProtobufWkt::Value> operator()(bool&& val) {
+    ProtobufWkt::Value protobuf_value;
+    protobuf_value.set_bool_value(val);
+    return protobuf_value;
+  }
+  absl::StatusOr<ProtobufWkt::Value> operator()(int64_t&& val) {
+    ProtobufWkt::Value protobuf_value;
+    protobuf_value.set_number_value(val);
+    return protobuf_value;
+  }
+  absl::StatusOr<ProtobufWkt::Value> operator()(double&& val) {
+    ProtobufWkt::Value protobuf_value;
+    protobuf_value.set_number_value(val);
+    return protobuf_value;
+  }
+  absl::StatusOr<ProtobufWkt::Value> operator()(std::string&& val) {
+    if (val.size() > MAX_PAYLOAD_VALUE_LEN) {
+      return absl::InternalError(
+          fmt::format("metadata value is too long. value.length: {}", val.size()));
+    }
+    ProtobufWkt::Value protobuf_value;
+    protobuf_value.set_string_value(std::move(val));
+    return protobuf_value;
+  }
+};
+
+} // anonymous namespace
+
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("json to metadata filter: neither `on_present` nor `on_missing` set");
@@ -18,12 +69,11 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
   if (rule_.has_on_missing() && !rule_.on_missing().has_value()) {
     throw EnvoyException(
-        "json to metadata filter: cannot specify on_missing rule without non-empty value");
+        "json to metadata filter: cannot specify on_missing rule with empty value");
   }
 
   if (rule_.has_on_error() && !rule_.on_error().has_value()) {
-    throw EnvoyException(
-        "json to metadata filter: cannot specify on_error rule without non-empty value");
+    throw EnvoyException("json to metadata filter: cannot specify on_error rule with empty value");
   }
 
   // Support key selectors only.
@@ -38,22 +88,33 @@ FilterConfig::FilterConfig(
     : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
       request_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, request_buffer_limit_bytes, 1024 * 1024)),
-      request_allow_empty_content_type_(proto_config.request_allow_empty_content_type()) {
-  for (const auto& rule : proto_config.request_rules()) {
-    request_rules_.emplace_back(rule);
-  }
-
-  if (proto_config.request_allow_content_types().empty()) {
-    request_allow_content_types_ = {Http::Headers::get().ContentTypeValues.Json};
-    return;
-  }
-
-  for (const auto& request_allowed_content_type : proto_config.request_allow_content_types()) {
-    request_allow_content_types_.insert(request_allowed_content_type);
-  }
-}
+      request_rules_(generateRequestRules(proto_config)),
+      request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
+      request_allow_empty_content_type_(proto_config.request_allow_empty_content_type()) {}
 
 Filter::~Filter() = default;
+
+Rules FilterConfig::generateRequestRules(
+    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
+  Rules rules;
+  for (const auto& rule : proto_config.request_rules()) {
+    rules.emplace_back(rule);
+  }
+  return rules;
+}
+
+absl::flat_hash_set<std::string> FilterConfig::generateRequestAllowContentTypes(
+    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
+  if (proto_config.request_allow_content_types().empty()) {
+    return {Http::Headers::get().ContentTypeValues.Json};
+  }
+
+  absl::flat_hash_set<std::string> allow_content_types;
+  for (const auto& request_allowed_content_type : proto_config.request_allow_content_types()) {
+    allow_content_types.insert(request_allowed_content_type);
+  }
+  return allow_content_types;
+}
 
 bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
@@ -63,7 +124,8 @@ bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) con
   return request_allow_content_types_.contains(content_type);
 }
 
-void Filter::applyKeyValue(std::string value, const KeyValuePair& keyval, StructMap& struct_map) {
+void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
+                           StructMap& struct_map) {
   ASSERT(!value.empty());
 
   ProtobufWkt::Value val;
@@ -137,8 +199,8 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
 void Filter::handleAllOnMissing(const Rules& rules, bool& reported_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
-    if (rule.rule().has_on_missing()) {
-      applyKeyValue(rule.rule().on_missing().value(), rule.rule().on_missing(), struct_map);
+    if (rule.rule_.has_on_missing()) {
+      applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
     }
   }
 
@@ -146,75 +208,28 @@ void Filter::handleAllOnMissing(const Rules& rules, bool& reported_flag) {
 }
 
 void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
-  if (rule.rule().has_on_missing()) {
-    applyKeyValue(rule.rule().on_missing().value(), rule.rule().on_missing(), struct_map);
+  if (rule.rule_.has_on_missing()) {
+    applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
   }
 }
 
 void Filter::handleAllOnError(const Rules& rules, bool& reported_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
-    if (rule.rule().has_on_error()) {
-      applyKeyValue(rule.rule().on_error().value(), rule.rule().on_error(), struct_map);
+    if (rule.rule_.has_on_error()) {
+      applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map);
     }
   }
   finalizeDynamicMetadata(*decoder_callbacks_, struct_map, reported_flag);
 }
 
-struct JsonValueToStringConverter {
-  std::string operator()(bool&& val) { return std::to_string(val); }
-  std::string operator()(int64_t&& val) { return std::to_string(val); }
-  std::string operator()(double&& val) { return std::to_string(val); }
-  std::string operator()(std::string&& val) { return std::move(val); }
-};
-
-struct JsonValueToDoubleConverter {
-  absl::StatusOr<double> operator()(bool&& val) { return static_cast<double>(val); }
-  absl::StatusOr<double> operator()(int64_t&& val) { return static_cast<double>(val); }
-  absl::StatusOr<double> operator()(double&& val) { return val; }
-  absl::StatusOr<double> operator()(std::string&& val) {
-    double dval;
-    if (absl::SimpleAtod(StringUtil::trim(val), &dval)) {
-      return dval;
-    }
-    return absl::InternalError(fmt::format("value {} to number conversion failed", val));
-  }
-};
-
-struct JsonValueToProtobufValueConverter {
-  absl::StatusOr<ProtobufWkt::Value> operator()(bool&& val) {
-    ProtobufWkt::Value protobuf_value;
-    protobuf_value.set_bool_value(val);
-    return protobuf_value;
-  }
-  absl::StatusOr<ProtobufWkt::Value> operator()(int64_t&& val) {
-    ProtobufWkt::Value protobuf_value;
-    protobuf_value.set_number_value(val);
-    return protobuf_value;
-  }
-  absl::StatusOr<ProtobufWkt::Value> operator()(double&& val) {
-    ProtobufWkt::Value protobuf_value;
-    protobuf_value.set_number_value(val);
-    return protobuf_value;
-  }
-  absl::StatusOr<ProtobufWkt::Value> operator()(std::string&& val) {
-    if (val.size() > MAX_PAYLOAD_VALUE_LEN) {
-      return absl::InternalError(
-          fmt::format("metadata value is too long. value.length: {}", val.size()));
-    }
-    ProtobufWkt::Value protobuf_value;
-    protobuf_value.set_string_value(std::move(val));
-    return protobuf_value;
-  }
-};
-
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
                                      const Rule& rule, StructMap& struct_map) {
-  if (!rule.rule().has_on_present()) {
+  if (!rule.rule_.has_on_present()) {
     return absl::OkStatus();
   }
 
-  auto& on_present_keyval = rule.rule().on_present();
+  auto& on_present_keyval = rule.rule_.on_present();
   if (on_present_keyval.has_value()) {
     applyKeyValue(on_present_keyval.value(), on_present_keyval, struct_map);
     return absl::OkStatus();
@@ -285,7 +300,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
   Json::ObjectSharedPtr body_json = std::move(result.value());
   StructMap struct_map;
   for (const auto& rule : rules) {
-    const auto& keys = rule.keys();
+    const auto& keys = rule.keys_;
     Json::ObjectSharedPtr node = body_json;
     bool on_missing = false;
     for (unsigned long i = 0; i < keys.size() - 1; i++) {
