@@ -77,7 +77,7 @@ namespace protobuf {
 namespace reflection {
 namespace %s {
 
-extern const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescriptorInfo ABSL_CONST_INIT;
+extern const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescriptorInfo;
 } // namespace %s
 } // namespace reflection
 } // namespace protobuf
