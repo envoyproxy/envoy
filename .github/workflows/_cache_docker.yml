@@ -1,10 +1,10 @@
 name: Cache (docker)
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
-    inputs:
-      image_tag:
-        type: string
 
 concurrency:
   group: cache_docker-${{ inputs.image_tag }}
@@ -26,6 +26,11 @@ jobs:
   docker:
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.5
+    - uses: actions/checkout@v3
+    - uses: ./.github/actions/env
+      id: env
       with:
-        image_tag: "${{ inputs.image_tag }}"
+        check_mobile_run: false
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.10
+      with:
+        image_tag: "${{ steps.env.outputs.build_image_ubuntu }}"

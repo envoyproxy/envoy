@@ -945,8 +945,7 @@ bool PerListenerFactoryContextImpl::isQuicListener() const {
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
-    Network::Connection& connection,
-    const std::vector<Network::FilterFactoryCb>& filter_factories) {
+    Network::Connection& connection, const Filter::NetworkFilterFactoriesList& filter_factories) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
 }
 
