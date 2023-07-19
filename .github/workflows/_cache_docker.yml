@@ -26,6 +26,6 @@ jobs:
   docker:
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.7
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.10
       with:
         image_tag: "${{ inputs.image_tag }}"

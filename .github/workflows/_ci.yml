@@ -79,7 +79,7 @@ jobs:
     name: do_ci.sh ${{ inputs.target }}
     steps:
     - if: ${{ inputs.cache_build_image }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.8
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
       with:
         image_tag: ${{ inputs.cache_build_image }}
     - uses: actions/checkout@v3
@@ -107,7 +107,7 @@ jobs:
       name: "Check disk space at beginning"
 
     - if: ${{ inputs.run_pre }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.8
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
@@ -129,7 +129,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - if: ${{ inputs.run_post }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.8
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}
