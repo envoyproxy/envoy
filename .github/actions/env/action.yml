@@ -14,7 +14,7 @@ inputs:
 
   repo_ref_sha:
     type: string
-  repo_name:
+  repo_ref_name:
     type: string
 
   trusted_bots:
@@ -64,6 +64,8 @@ outputs:
     value: ${{ steps.context.outputs.repo_ref_sha }}
   repo_ref_sha_short:
     value: ${{ steps.context.outputs.repo_ref_sha_short }}
+  repo_ref_title:
+    value: ${{ steps.context.outputs.repo_ref_title }}
   trusted:
     value: ${{ steps.trusted.outputs.trusted }}
   version_dev:
@@ -79,23 +81,6 @@ runs:
     id: should_run
     name: 'Check what to run'
     run: ./mobile/tools/what_to_run.sh
-    shell: bash
-
-  - id: context
-    name: 'CI context'
-    run: |
-      VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
-      VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
-      # TODO: strip merge from pr names
-      REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}
-      REF_SHA=${{ inputs.repo_ref_sha || github.sha }}
-      {
-          echo "repo_ref_name=$REF_NAME"
-          echo "repo_ref_sha=$REF_SHA"
-          echo "repo_ref_sha_short=${REF_SHA:0:7}"
-          echo "version_dev=$VERSION_DEV"
-          echo "version_patch=$VERSION_PATCH"
-      } >> "$GITHUB_OUTPUT"
     shell: bash
 
   - id: trusted
@@ -122,7 +107,39 @@ runs:
           echo "Not trusted pull_request event"
           TRUSTED=
       fi
-      echo "trusted=$TRUSTED" >> "$GITHUB_OUTPUT"
+      if [[ -n "$TRUSTED" ]]; then
+          echo "trusted=true" >> "$GITHUB_OUTPUT"
+      else
+          echo "trusted=false" >> "$GITHUB_OUTPUT"
+      fi
+    shell: bash
+
+  - id: context
+    name: 'CI context'
+    run: |
+      VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+      VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
+      # TODO: strip merge from pr names
+      REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}
+      if [[ "$REF_NAME" =~ ^refs/pull/ ]]; then
+          REF_NAME="${REF_NAME:10}"
+      fi
+
+      REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
+      REF_SHA_SHORT="${REF_SHA:0:7}"
+      REF_TITLE=(
+          "${{ steps.trusted.outputs.trusted == 'true' && 'postsubmit' || 'pr' }}/"
+          "${REF_NAME}"
+          "@${REF_SHA_SHORT}")
+      REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
+      {
+          echo "repo_ref_name=$REF_NAME"
+          echo "repo_ref_sha=$REF_SHA"
+          echo "repo_ref_title=$REF_TITLE"
+          echo "repo_ref_sha_short=$REF_SHA_SHORT"
+          echo "version_dev=$VERSION_DEV"
+          echo "version_patch=$VERSION_PATCH"
+      } >> "$GITHUB_OUTPUT"
     shell: bash
 
   - id: build
