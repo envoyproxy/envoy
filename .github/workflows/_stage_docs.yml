@@ -1,0 +1,48 @@
+name: Docs
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      trusted:
+        type: boolean
+        default: false
+      build_image_ubuntu:
+        type: string
+        default: ''
+      version_dev:
+        type: string
+        default: ''
+      head_ref:
+        type: string
+        default: ''
+      repo_ref:
+        type: string
+      given_ref:
+        type: string
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-docs
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: ${{ matrix.name || matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: docs
+          rbe: false
+          managed: true
+
+    uses: ./.github/workflows/_ci.yml
+    with:
+      target: ${{ matrix.target }}
+      rbe: ${{ matrix.rbe }}
+      managed: ${{ matrix.managed }}
+      cache_build_image: ${{ inputs.build_image_ubuntu }}
+      trusted: ${{ inputs.trusted }}
+      repo_ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
