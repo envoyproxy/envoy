@@ -171,15 +171,7 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
   }
 
   ENVOY_LOG(trace, "add metadata ns:{} key:{}", meta_namespace, key);
-
-  // Have we seen this namespace before?
-  auto namespace_iter = struct_map.find(meta_namespace);
-  if (namespace_iter == struct_map.end()) {
-    struct_map[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = struct_map.find(meta_namespace);
-  }
-
-  auto& keyval = namespace_iter->second;
+  auto& keyval = struct_map[meta_namespace];
   (*keyval.mutable_fields())[key] = std::move(val);
 
   return true;
