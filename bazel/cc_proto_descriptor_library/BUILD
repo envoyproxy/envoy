@@ -44,7 +44,6 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":file_descriptor_generator_lib",
-        "@com_google_protobuf//:compiled_protoc",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//:protoc_lib",
         "@com_google_protobuf//src/google/protobuf/compiler:code_generator",
