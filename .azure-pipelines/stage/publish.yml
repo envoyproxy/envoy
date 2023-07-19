@@ -172,11 +172,12 @@ jobs:
       - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify.trigger'
         # Please see `ci/do_ci.sh` for notes on required vars.
         env:
-          ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
           ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+            ENVOY_HEAD_REF: "$(Build.SourceBranch)"
             ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
             ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
           ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+            ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
             ENVOY_BRANCH: "$(Build.SourceBranch)"
           # github auth
           GITHUB_TOKEN: "$(key.value)"
