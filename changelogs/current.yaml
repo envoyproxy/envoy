@@ -219,6 +219,12 @@ bug_fixes:
   change: |
     Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
     upstream service.
+- area: subset load balancer
+  change: |
+    Fixed a bug where
+    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>` and
+    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
+    values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
