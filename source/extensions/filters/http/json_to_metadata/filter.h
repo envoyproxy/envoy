@@ -107,7 +107,7 @@ private:
                                const StructMap& struct_map, bool& reported_flag);
 
   std::shared_ptr<FilterConfig> config_;
-  bool is_request_reported_{false};
+  bool request_processing_finished_{false};
 };
 
 } // namespace JsonToMetadata

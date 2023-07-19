@@ -275,7 +275,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
                          Stats::Counter& success, Stats::Counter& no_body,
                          Stats::Counter& non_json) {
   if (!body) {
-    handleAllOnMissing(rules, is_request_reported_);
+    handleAllOnMissing(rules, request_processing_finished_);
     no_body.inc();
     return;
   }
@@ -320,7 +320,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
 }
 
 void Filter::processRequestBody() {
-  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), is_request_reported_,
+  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), request_processing_finished_,
               config_->stats().rq_success_, config_->stats().rq_no_body_,
               config_->stats().rq_invalid_json_body_);
 }
@@ -328,13 +328,13 @@ void Filter::processRequestBody() {
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   ASSERT(config_->doRequest());
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
-    is_request_reported_ = true;
+    request_processing_finished_ = true;
     config_->stats().rq_mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), is_request_reported_);
+    handleAllOnMissing(config_->requestRules(), request_processing_finished_);
     config_->stats().rq_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -343,14 +343,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   ASSERT(config_->doRequest());
-  if (is_request_reported_) {
+  if (request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
 
   if (end_stream) {
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), is_request_reported_);
+      handleAllOnMissing(config_->requestRules(), request_processing_finished_);
       config_->stats().rq_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
@@ -360,7 +360,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
 
   if (decoder_callbacks_->decodingBuffer() &&
       decoder_callbacks_->decodingBuffer()->length() > config_->requestBufferLimitBytes()) {
-    handleAllOnError(config_->requestRules(), is_request_reported_);
+    handleAllOnError(config_->requestRules(), request_processing_finished_);
     ENVOY_LOG(debug, "Request body is too large. buffer_size {} buffer_limit {}",
               decoder_callbacks_->decodingBuffer()->length(), config_->requestBufferLimitBytes());
     config_->stats().rq_too_large_body_.inc();
@@ -371,7 +371,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ASSERT(config_->doRequest());
-  if (!is_request_reported_) {
+  if (!request_processing_finished_) {
     processRequestBody();
   }
   return Http::FilterTrailersStatus::Continue;
