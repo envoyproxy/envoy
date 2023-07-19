@@ -48,8 +48,9 @@ runs:
   - id: do_ci
     name: 'Run CI target ${{ inputs.target }}'
     run: |
-      if [[ -n "${{ inputs.env }}" ]]; then
+      if [[ "${#INPUT_ENV}" -ne 0 ]]; then
           SOURCETMP="$(mktemp)"
+          # TODO(phlax): Fix escaping
           echo "${{ inputs.env }}" > "$SOURCETMP"
           . "$SOURCETMP"
           rm -rf "$SOURCETMP"
@@ -86,3 +87,4 @@ runs:
     env:
       GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
       ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
+      INPUT_ENV: ${{ inputs.env }}

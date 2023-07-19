@@ -1009,6 +1009,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
+  case EnvoyValue::VirtualClusterName:
+    if (!state.streamInfo().virtualClusterName().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = state.streamInfo().virtualClusterName().value();
+    break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }

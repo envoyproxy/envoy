@@ -1,5 +1,8 @@
 name: Envoy/prechecks
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -18,23 +21,19 @@ concurrency:
   group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
-  cache:
-    needs:
-    - env
-    uses: ./.github/workflows/_cache_docker.yml
     with:
-      image_tag: "${{ needs.env.outputs.build_image_ubuntu }}"
+      prime_build_image: true
+      check_mobile_run: false
+    permissions:
+      contents: read
+      statuses: write
 
   prechecks:
     needs:
     - env
-    - cache
     strategy:
       fail-fast: false
       matrix:
