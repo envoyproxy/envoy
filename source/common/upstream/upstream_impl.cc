@@ -1346,7 +1346,7 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
   for (const auto& filter_config_provider : filter_factories_) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
-      auto factory = config.value();
+      Network::FilterFactoryCb& factory = config.value();
       factory(connection);
     }
   }

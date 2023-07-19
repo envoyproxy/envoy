@@ -37,7 +37,7 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
       return false;
     }
 
-    auto factory = config.value();
+    Network::FilterFactoryCb& factory = config.value();
     factory(filter_manager);
   }
 
