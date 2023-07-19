@@ -29,6 +29,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,8 +48,10 @@ using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::HttpBody;
 using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::TrailersResponse;
 
 using Http::Filter1xxHeadersStatus;
 using Http::FilterDataStatus;
@@ -74,6 +77,7 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -285,6 +289,25 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
+  void processResponseTrailers(
+      absl::optional<
+          std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
+          cb,
+      bool should_continue = true) {
+    EXPECT_FALSE(last_request_.async_mode());
+    ASSERT_TRUE(last_request_.has_response_trailers());
+    const auto& trailers = last_request_.response_trailers();
+    auto response = std::make_unique<ProcessingResponse>();
+    auto* trailers_response = response->mutable_response_trailers();
+    if (cb) {
+      (*cb)(trailers, *response, *trailers_response);
+    }
+    if (should_continue) {
+      EXPECT_CALL(encoder_callbacks_, continueEncoding());
+    }
+    stream_callbacks_->onReceiveMessage(std::move(response));
+  }
+
   // The number of processor grpc calls made in the encoding and decoding path.
   void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
                        const Grpc::Status::GrpcStatus status, const int expected_calls_count) {
@@ -333,6 +356,7 @@ protected:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -2512,6 +2536,54 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   stream_callbacks_->onGrpcClose();
 
   filter_->onDestroy();
+}
+
+// Set the HCM max request headers size limit to be 2kb. Test the
+// header mutation end result size check works for the trailer response.
+TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
+  Http::TestResponseTrailerMapImpl resp_trailers_({}, 2, 100);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+  // Construct a large trailer message to be close to the HCM size limit.
+  resp_trailers_.addCopy(LowerCaseString("x-some-trailer"), std::string(1950, 'a'));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(resp_trailers_));
+  processResponseTrailers(
+      [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailer_resp) {
+        auto headers_mut = trailer_resp.mutable_header_mutation();
+        // The trailer mutation in the response does not exceed the count limit 100 or the
+        // size limit 2kb. But the result header map size exceeds the count limit 2kb.
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header-0123456789");
+        add1->mutable_header()->set_value("new-header-0123456789");
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header-0123456789");
+        add2->mutable_header()->set_value("some-new-header-0123456789");
+      },
+      false);
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  // The header mutation rejection counter increments.
+  EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
 class HttpFilter2Test : public HttpFilterTest, public Http::HttpConnectionManagerImplMixin {};

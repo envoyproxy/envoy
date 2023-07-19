@@ -47,6 +47,8 @@ private:
                     time_source_);
     }
 
+    bool recreateOnHostChange() const override { return false; }
+
   public:
     OptRef<const ProtoType> proto_config_;
     const Upstream::ClusterInfo& cluster_info_;

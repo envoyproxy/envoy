@@ -1,0 +1,165 @@
+name: Environment
+
+on:
+  workflow_call:
+    inputs:
+      check_mobile_run:
+        type: boolean
+        default: true
+      prime_build_image:
+        type: boolean
+        default: false
+
+      trusted_bots:
+        type: string
+        default: |
+          trigger-release-envoy[bot]
+
+    outputs:
+      agent_ubuntu:
+        value: ubuntu-22.04
+      build_image_ubuntu:
+        value: ${{ jobs.repo.outputs.build_image_ubuntu }}
+      build_image_ubuntu_mobile:
+        value: ${{ jobs.repo.outputs.build_image_ubuntu_mobile }}
+      mobile_android_build:
+        value: ${{ jobs.repo.outputs.mobile_android_build }}
+      mobile_android_build_all:
+        value: ${{ jobs.repo.outputs.mobile_android_build_all }}
+      mobile_android_tests:
+        value: ${{ jobs.repo.outputs.mobile_android_tests }}
+      mobile_asan:
+        value: ${{ jobs.repo.outputs.mobile_asan }}
+      mobile_cc_tests:
+        value: ${{ jobs.repo.outputs.mobile_cc_tests }}
+      mobile_compile_time_options:
+        value: ${{ jobs.repo.outputs.mobile_compile_time_options }}
+      mobile_coverage:
+        value: ${{ jobs.repo.outputs.mobile_coverage }}
+      mobile_formatting:
+        value: ${{ jobs.repo.outputs.mobile_formatting }}
+      mobile_ios_build:
+        value: ${{ jobs.repo.outputs.mobile_ios_build }}
+      mobile_ios_build_all:
+        value: ${{ jobs.repo.outputs.mobile_ios_build_all }}
+      mobile_ios_tests:
+        value: ${{ jobs.repo.outputs.mobile_ios_tests }}
+      mobile_release_validation:
+        value: ${{ jobs.repo.outputs.mobile_release_validation }}
+      mobile_tsan:
+        value: ${{ jobs.repo.outputs.mobile_tsan }}
+
+      trusted:
+        value: ${{ jobs.repo.outputs.trusted }}
+
+      version_dev:
+        value: ${{ jobs.repo.outputs.version_dev }}
+      version_patch:
+        value: ${{ jobs.repo.outputs.version_patch }}
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-env
+  cancel-in-progress: true
+
+jobs:
+  repo:
+    if: github.repository == 'envoyproxy/envoy'
+    runs-on: ubuntu-22.04
+    outputs:
+      build_image_ubuntu: ${{ steps.build_image.outputs.build_image_ubuntu }}
+      build_image_ubuntu_mobile: ${{ steps.build_image.outputs.build_image_ubuntu_mobile }}
+      mobile_android_build: ${{ steps.should_run.outputs.mobile_android_build }}
+      mobile_android_build_all: ${{ steps.should_run.outputs.mobile_android_build_all }}
+      mobile_android_tests: ${{ steps.should_run.outputs.mobile_android_tests }}
+      mobile_asan: ${{ steps.should_run.outputs.mobile_asan }}
+      mobile_cc_tests: ${{ steps.should_run.outputs.mobile_cc_tests }}
+      mobile_compile_time_options: ${{ steps.should_run.outputs.mobile_compile_time_options }}
+      mobile_coverage: ${{ steps.should_run.outputs.mobile_coverage }}
+      mobile_formatting: ${{ steps.should_run.outputs.mobile_formatting }}
+      mobile_ios_build: ${{ steps.should_run.outputs.mobile_ios_build }}
+      mobile_ios_build_all: ${{ steps.should_run.outputs.mobile_ios_build_all }}
+      mobile_ios_tests: ${{ steps.should_run.outputs.mobile_ios_tests }}
+      mobile_release_validation: ${{ steps.should_run.outputs.mobile_release_validation }}
+      mobile_tsan: ${{ steps.should_run.outputs.mobile_tsan }}
+      trusted: ${{ steps.trusted.outputs.trusted }}
+      version_dev: ${{ steps.context.outputs.version_dev }}
+      version_patch: ${{ steps.context.outputs.version_patch }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+
+    - id: build_image
+      name: 'Check current build images'
+      run: |
+        {
+            echo "build_image_ubuntu=${BUILD_IMAGE_UBUNTU_REPO}:${BUILD_IMAGE_UBUNTU}@sha256:${BUILD_IMAGE_UBUNTU_SHA}"
+            echo "build_image_ubuntu_mobile=${BUILD_IMAGE_UBUNTU_REPO}:mobile-${BUILD_IMAGE_UBUNTU}@sha256:${BUILD_IMAGE_UBUNTU_MOBILE_SHA}"
+        } >> "$GITHUB_OUTPUT"
+      env:
+        # TODO(phlax): derive these from a config file
+        BUILD_IMAGE_UBUNTU_REPO: envoyproxy/envoy-build-ubuntu
+        BUILD_IMAGE_UBUNTU: 41c5a05d708972d703661b702a63ef5060125c33
+        BUILD_IMAGE_UBUNTU_SHA: 50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
+        BUILD_IMAGE_UBUNTU_MOBILE_SHA: ca26ff05bd3f3a09468242faaf38ae48315e57f0a87c102352162f95ac620e6f
+
+    - if: ${{ inputs.check_mobile_run }}
+      id: should_run
+      name: 'Check what to run'
+      run: |
+        ./mobile/tools/what_to_run.sh
+
+    - id: context
+      name: 'CI context'
+      run: |
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
+        {
+            echo "version_dev=$VERSION_DEV"
+            echo "version_patch=$VERSION_PATCH"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: trusted
+      name: 'Check if its a trusted run'
+      run: |
+        TRUSTED=1
+        ACTOR="${{ github.actor }}"
+        if [[ "$ACTOR" =~ \[bot\] ]]; then
+            TRUSTED_BOT=
+            TRUSTED_BOTS=(${{ inputs.trusted_bots }})
+            for bot in ${TRUSTED_BOTS[@]}; do
+                if [[ "$bot" == "$ACTOR" ]]; then
+                    # Trusted bot account, ie non-PR
+                    TRUSTED_BOT=1
+                    break
+                fi
+            done
+            if [[ -z "$TRUSTED_BOT" ]]; then
+                echo "Not trusted bot account"
+                TRUSTED=
+            fi
+        fi
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Not trusted pull_request event"
+            TRUSTED=
+        fi
+        echo "trusted=$TRUSTED" >> "$GITHUB_OUTPUT"
+
+    - name: 'Print env'
+      run: |
+        echo "version_dev=${{ steps.context.outputs.version_dev }}"
+        echo "version_patch=${{ steps.context.outputs.version_patch }}"
+        echo "build_image_ubuntu=${{ steps.build_image.outputs.build_image_ubuntu }}"
+        echo "build_image_ubuntu_mobile=${{ steps.build_image.outputs.build_image_ubuntu_mobile }}"
+        echo "trusted=${{ steps.trusted.outputs.trusted }}"
+
+  cache:
+    if: ${{ inputs.prime_build_image }}
+    needs:
+    - repo
+    # This uses a separate job to ensure correct concurrency
+    uses: ./.github/workflows/_cache_docker.yml
+    with:
+      image_tag: "${{ needs.repo.outputs.build_image_ubuntu }}"

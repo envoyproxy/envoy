@@ -199,7 +199,6 @@ message Bootstrap {
   repeated metrics.v3.StatsSink stats_sinks = 6;
 
   // Options to control behaviors of deferred creation compatible stats.
-  // [#not-implemented-hide:]
   DeferredStatOptions deferred_stat_options = 39;
 
   // Configuration for internal processing of stats.

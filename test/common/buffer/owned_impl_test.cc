@@ -1385,6 +1385,10 @@ TYPED_TEST(OwnedImplTypedTest, ReadReserveAndCommit) {
   std::string data = "e";
   const ssize_t rc = os_sys_calls.write(fds[1], data.data(), data.size()).return_value_;
   ASSERT_GT(rc, 0);
+
+  // The remainder of this test flakes under Windows.
+  // See https://github.com/envoyproxy/envoy/issues/28177.
+  DISABLE_UNDER_WINDOWS;
   Api::IoCallUint64Result result = io_handle.read(buf, read_length);
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(fds[1]).return_value_, 0);

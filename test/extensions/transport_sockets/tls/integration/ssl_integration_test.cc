@@ -56,6 +56,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
+                                  .setCurves(server_curves_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_)
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,
@@ -230,6 +231,85 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
   connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+// Test that stats produced by the tls transport socket have correct tag extraction.
+TEST_P(SslIntegrationTest, StatsTagExtraction) {
+  // Configure TLS to use specific parameters so the exact metrics the test expects are created.
+  // TLSv1.3 doesn't allow specifying the cipher suites, so use TLSv1.2 to force a specific cipher
+  // suite to simplify the test.
+  // Use P-256 to test the regex on a curve containing a hyphen (instead of X25519).
+
+  // Configure test-client to Envoy connection.
+  server_curves_.push_back("P-256");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(
+        ClientSslTransportOptions{}
+            .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+            .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"})
+            .setSigningAlgorithms({"rsa_pss_rsae_sha256"}));
+  };
+
+  // Configure Envoy to fake-upstream connection.
+  upstream_tls_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.configureUpstreamTls(
+      false, false, absl::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
+        auto& params = *ctx.mutable_tls_params();
+        params.set_tls_minimum_protocol_version(
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+        params.set_tls_maximum_protocol_version(
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+        params.add_ecdh_curves("P-256");
+        params.add_signature_algorithms("rsa_pss_rsae_sha256");
+        params.add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+      });
+
+  testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
+  checkStats();
+
+  using ExpectedResultsMap =
+      absl::node_hash_map<std::string, std::pair<std::string, Stats::TagVector>>;
+  ExpectedResultsMap base_expected_counters = {
+      {"ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+       {"ssl.ciphers", {{"envoy.ssl_cipher", "ECDHE-RSA-AES128-GCM-SHA256"}}}},
+      {"ssl.versions.TLSv1.2", {"ssl.versions", {{"envoy.ssl_version", "TLSv1.2"}}}},
+      {"ssl.curves.P-256", {"ssl.curves", {{"envoy.ssl_curve", "P-256"}}}},
+      {"ssl.sigalgs.rsa_pss_rsae_sha256",
+       {"ssl.sigalgs", {{"envoy.ssl_sigalg", "rsa_pss_rsae_sha256"}}}},
+  };
+
+  // Expect all the stats for both listeners and clusters.
+  ExpectedResultsMap expected_counters;
+  for (const auto& entry : base_expected_counters) {
+    expected_counters[listenerStatPrefix(entry.first)] = {
+        absl::StrCat("listener.", entry.second.first), entry.second.second};
+    expected_counters[absl::StrCat("cluster.cluster_0.", entry.first)] = {
+        absl::StrCat("cluster.", entry.second.first), entry.second.second};
+  }
+
+  // The cipher suite extractor is written as two rules for listener and cluster, and they don't
+  // match unfortunately, but it's left this way for backwards compatibility.
+  expected_counters["cluster.cluster_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"].second = {
+      {"cipher_suite", "ECDHE-RSA-AES128-GCM-SHA256"}};
+
+  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+    // Useful for debugging when the test is failing.
+    if (counter->name().find("ssl") != std::string::npos) {
+      ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
+    }
+    auto it = expected_counters.find(counter->name());
+    if (it != expected_counters.end()) {
+      EXPECT_EQ(counter->tagExtractedName(), it->second.first);
+
+      // There are other extracted tags such as listener and cluster name, hence ``IsSupersetOf``.
+      EXPECT_THAT(counter->tags(), ::testing::IsSupersetOf(it->second.second));
+      expected_counters.erase(it);
+    }
+  }
+
+  EXPECT_THAT(expected_counters, ::testing::IsEmpty());
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {

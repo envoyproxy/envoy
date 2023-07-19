@@ -17,7 +17,6 @@ envoy_cc_library(
     external_deps = ["grpc"],
     # Legacy test use.
     visibility = [
-        "//source/extensions:__subpackages__",
         "//test/common/grpc:__subpackages__",
         "//test/extensions:__subpackages__",
     ],

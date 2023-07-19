@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
 import org.chromium.net.InlineExecutionProhibitedException;
-import org.chromium.net.NetworkException;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.RequestFinishedInfo.Metrics;
 import org.chromium.net.UploadDataProvider;
@@ -541,7 +540,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
                                  mCurrentUrl, mRequestContext.getBuilder().quicEnabled());
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
-                                                             /* explicitFlowCrontrol= */ true,
+                                                             /* explicitFlowCrontrol */ true,
                                                              /* minDeliverySize */ 0));
     mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
@@ -864,10 +863,18 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       mEndStream = endStream;
       @State int originalState;
       @State int updatedState;
+
+      // When endStream with no data is read, there will be no more calls to read().
+      boolean isFinalRead = endStream && !data.hasRemaining();
       do {
         originalState = mState.get();
-        updatedState = determineNextState(endStream, originalState, State.AWAITING_READ);
+        updatedState = determineNextState(endStream, originalState,
+                                          isFinalRead ? State.COMPLETE : State.AWAITING_READ);
       } while (!mState.compareAndSet(originalState, updatedState));
+      if (isFinalRead) {
+        // onComplete still needs to be called - this always returns false.
+        mSucceededState.hasReachedFinalState(SucceededState.FINAL_READ_DONE);
+      }
       if (completeAbandonIfAny(originalState, updatedState)) {
         return;
       }
@@ -882,9 +889,12 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
           try {
             ByteBuffer userBuffer = mUserCurrentReadBuffer;
             mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
+            int dataRead = data.remaining();
             userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
-            mWaitingOnRead.set(true);
-            mCallback.onReadCompleted(CronvoyUrlRequest.this, mUrlResponseInfo, userBuffer);
+            if (dataRead > 0 || !endStream) {
+              mWaitingOnRead.set(true);
+              mCallback.onReadCompleted(CronvoyUrlRequest.this, mUrlResponseInfo, userBuffer);
+            }
           } catch (Throwable t) {
             onCallbackException(t);
           }
