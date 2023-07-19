@@ -1540,7 +1540,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "network_extension_discovery_integration_test",
-    size = "small",
+    size = "large",
     srcs = ["network_extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
