@@ -211,7 +211,7 @@ message BufferSettings {
   //
   // This field only affects configurations using a :ref:`grpc_service
   // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`. In configurations that use
-  // an :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`, this
+  // an :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.http_service>`, this
   // has no effect.
   bool pack_as_bytes = 3;
 }
