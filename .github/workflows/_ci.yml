@@ -84,7 +84,7 @@ jobs:
   do_ci:
     if: ${{ ! inputs.skip }}
     runs-on: ubuntu-22.04
-    name: do_ci.sh ${{ inputs.target }}
+    name: ${{ inputs.command_ci }} (${{ inputs.target }})
     steps:
     - if: ${{ inputs.cache_build_image }}
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
