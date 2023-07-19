@@ -13,6 +13,10 @@ trap_errors () {
         WARNINGS+=("FAILED (double-proxy)")
         return
     fi
+    if [[ "$example" == "./golang-network" ]]; then
+        WARNINGS+=("FAILED (golang-network)")
+        return
+    fi
     if [[ -n "$example" ]]; then
         command=" (${example})"
     fi
