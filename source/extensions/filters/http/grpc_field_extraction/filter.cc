@@ -174,10 +174,9 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 
       auto result = extractor_->processRequest(*message_data->message());
       if (!result.ok()) {
-        const absl::Status& status = result.status();
-        rejectRequest(status.raw_code(), status.message(),
+        rejectRequest(result.status().raw_code(), result.status().message(),
                       generateRcDetails(kRcDetailFilterGrpcFieldExtraction,
-                                        absl::StatusCodeToString(status.code()),
+                                        absl::StatusCodeToString(result.status().code()),
                                         kRcDetailErrorRequestFieldExtractionFailed));
         return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }

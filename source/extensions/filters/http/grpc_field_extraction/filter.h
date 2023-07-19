@@ -56,18 +56,6 @@ private:
   bool extraction_done_ = false;
 };
 
-class FilterFactory
-    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-          envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig> {
-public:
-  FilterFactory() : FactoryBase("envoy.filters.http.grpc_field_extraction") {}
-
-private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-          proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
-};
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters
 } // namespace Extensions

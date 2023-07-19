@@ -222,16 +222,17 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
                                      *api_),
-      EnvoyException, testing::HasSubstr("Unable to parse proto descriptor from inline bytes: "));
+      EnvoyException, testing::HasSubstr("Unable to parse proto descriptor from inline bytes:"));
 }
 
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("wrong-file-path");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem");
   EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
                                  proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
-                             EnvoyException, testing::HasSubstr("Invalid path: "));
+                             EnvoyException,
+                             testing::HasSubstr("Unable to parse proto descriptor from file"));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceTyep) {
