@@ -50,7 +50,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "extension_config_provider_interface",
     hdrs = ["extension_config_provider.h"],
+)
+
+envoy_cc_library(
+    name = "dynamic_extension_config_provider_interface",
+    hdrs = ["dynamic_extension_config_provider.h"],
     deps = [
+        ":extension_config_provider_interface",
         "//envoy/network:filter_interface",
         "//source/common/protobuf",
     ],

@@ -254,11 +254,6 @@ const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) cons
   return names_.at(symbol.index());
 }
 
-bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
-                const NamedOverloadActionSymbolTable::Symbol& rhs) {
-  return lhs.index() == rhs.index();
-}
-
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
     : state_(OverloadActionState::inactive()),

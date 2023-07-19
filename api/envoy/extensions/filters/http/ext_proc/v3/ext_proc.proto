@@ -204,9 +204,25 @@ message ExternalProcessor {
 
 // The HeaderForwardingRules structure specifies what headers are
 // allowed to be forwarded to the external processing server.
+//
+// This works as below:
+//
+//   1. If neither ``allowed_headers`` nor ``disallowed_headers`` is set, all headers are forwarded.
+//   2. If both ``allowed_headers`` and ``disallowed_headers`` are set, only headers in the
+//      ``allowed_headers`` but not in the ``disallowed_headers`` are forwarded.
+//   3. If ``allowed_headers`` is set, and ``disallowed_headers`` is not set, only headers in
+//      the ``allowed_headers`` are forwarded.
+//   4. If ``disallowed_headers`` is set, and ``allowed_headers`` is not set, all headers except
+//      headers in the ``disallowed_headers`` are forwarded.
 message HeaderForwardingRules {
-  // If not set, all headers are forwarded to the external processing server.
+  // If set, specifically allow any header in this list to be forwarded to the external
+  // processing server. This can be overridden by the below ``disallowed_headers``.
   type.matcher.v3.ListStringMatcher allowed_headers = 1;
+
+  // If set, specifically disallow any header in this list to be forwarded to the external
+  // processing server. This overrides the above ``allowed_headers`` if a header matches both.
+  // [#not-implemented-hide:]
+  type.matcher.v3.ListStringMatcher disallowed_headers = 2;
 }
 
 // Extra settings that may be added to per-route configuration for a
