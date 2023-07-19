@@ -542,6 +542,32 @@ Host::CreateConnectionData HostImpl::createConnection(
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
+void HostsPerLocalityImpl::assertLocalityOrderingInvariant() {
+  absl::optional<uint64_t> last_non_empty = absl::nullopt;
+  bool has_non_empty_local = local_ && !hosts_per_locality_[0].empty();
+  for (uint64_t i = 0; i < hosts_per_locality_.size(); ++i) {
+    if (hosts_per_locality_[i].empty()) {
+      continue;
+    }
+
+    auto bucket_locality = hosts_per_locality_[i][0]->locality();
+    if (i > 0 && has_non_empty_local) {
+      // This condition is sufficient to ensure there are no duplicate buckets
+      ASSERT(!LocalityEqualTo()(hosts_per_locality_[0][0]->locality(), bucket_locality));
+    }
+    if (last_non_empty && (!local_ || last_non_empty.value() > 0)) {
+      ASSERT(LocalityLess()(hosts_per_locality_[last_non_empty.value()][0]->locality(),
+                            bucket_locality));
+    }
+
+    for (const auto& host : hosts_per_locality_[i]) {
+      ASSERT(LocalityEqualTo()(host->locality(), bucket_locality));
+    }
+
+    last_non_empty = i;
+  }
+}
+
 std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
     const std::vector<std::function<bool(const Host&)>>& predicates) const {
   // We keep two lists: one for being able to mutate the clone and one for returning to the
