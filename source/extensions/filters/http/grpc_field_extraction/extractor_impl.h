@@ -50,7 +50,7 @@ public:
   absl::StatusOr<ExtractorPtr> CreateExtractor(
       TypeFinder type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
-          field_extractions) const {
+          field_extractions) const override {
     auto extractor =
         std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
     auto status = extractor->init();

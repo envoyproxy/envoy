@@ -14,7 +14,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
-using ::apikeys::ApiKey;
 using ::apikeys::CreateApiKeyRequest;
 
 class IntegrationTest : public HttpProtocolIntegrationTest {
@@ -58,7 +57,7 @@ typed_config:
   }
 };
 
-CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
+CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
       parent: "project-id"
     )pb") {
   CreateApiKeyRequest request;
@@ -68,7 +67,7 @@ CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
 
 TEST_P(IntegrationTest, Unary) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto request = MakeCreateApiKeyRequest();
+  auto request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                         {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -98,17 +97,17 @@ TEST_P(IntegrationTest, Streaming) {
                                      {":authority", "host"},
                                      {":scheme", "http"}};
 
-  CreateApiKeyRequest request1 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request1 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req1"
 )pb");
   Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
-  CreateApiKeyRequest request2 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request2 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req2"
 )pb");
   Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
-  CreateApiKeyRequest request3 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request3 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req3"
 )pb");

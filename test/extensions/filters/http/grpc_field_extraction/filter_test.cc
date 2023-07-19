@@ -17,15 +17,11 @@ namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
 
-using ::apikeys::ApiKey;
 using ::apikeys::CreateApiKeyRequest;
-using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
-using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
-using ::Envoy::Server::Configuration::FactoryContext;
 using ::testing::Eq;
 
 constexpr absl::string_view expected_metadata = R"pb(
@@ -85,7 +81,7 @@ extractions_by_method: {
   std::unique_ptr<Filter> filter_;
 };
 
-CreateApiKeyRequest MakeCreateApiKeyRequest(absl::string_view pb = R"pb(
+CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
       parent: "project-id"
     )pb") {
   CreateApiKeyRequest request;
@@ -111,7 +107,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest();
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
@@ -133,7 +129,7 @@ TEST_F(FilterTestExtractOk, EmptyFields) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest("");
+  CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
@@ -165,7 +161,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   const uint32_t start_data_size = 3;
   const uint32_t middle_data_size = 4;
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest();
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
   // Split into multiple buffers.
@@ -215,14 +211,14 @@ extractions_by_method: {
                                {"content-type", "application/grpc"}};
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
-  CreateApiKeyRequest request1 = MakeCreateApiKeyRequest();
+  CreateApiKeyRequest request1 = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
-  CreateApiKeyRequest request2 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request2 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req2"
 )pb");
   Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
-  CreateApiKeyRequest request3 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request3 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req3"
 )pb");
@@ -248,7 +244,7 @@ extractions_by_method: {
   checkSerializedData<CreateApiKeyRequest>(request_data, {request1, request2, request3});
 
   // No op for the following messages.
-  CreateApiKeyRequest request4 = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request4 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req4"
 )pb");
@@ -337,7 +333,7 @@ extractions_by_method: {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, false));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
       R"pb(
 supported_types: {
   string: "1"
@@ -515,7 +511,7 @@ extractions_by_method: {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, false));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
       R"pb(
 repeated_intermediate: {
   values: {
@@ -651,7 +647,7 @@ extractions_by_method: {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, false));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest(
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
       R"pb(
 repeated_supported_types: {
   string: "1"
@@ -876,7 +872,7 @@ TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, true));
 
-  CreateApiKeyRequest request = MakeCreateApiKeyRequest();
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
   EXPECT_CALL(mock_decoder_callbacks_,

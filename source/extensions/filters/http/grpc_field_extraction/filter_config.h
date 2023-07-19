@@ -34,7 +34,7 @@ public:
           proto_config,
       std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api);
 
-  const Extractor* FindExtractor(absl::string_view proto_path) const;
+  const Extractor* findExtractor(absl::string_view proto_path) const;
 
 private:
   void initDescriptorPool(Api::Api& api);

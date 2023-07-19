@@ -18,7 +18,6 @@ namespace GrpcFieldExtraction {
 namespace {
 
 using Protobuf::field_extraction::FieldValueExtractorFactory;
-using Protobuf::field_extraction::FieldValueExtractorInterface;
 
 } // namespace
 

@@ -16,14 +16,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
-using ::apikeys::CreateApiKeyRequest;
-using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
 using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
-using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
-using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
-using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
-using ::Envoy::Server::Configuration::FactoryContext;
 
 class FilterConfigTestBase : public ::testing::Test {
 protected:

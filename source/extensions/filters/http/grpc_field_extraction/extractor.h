@@ -45,8 +45,8 @@ class ExtractorFactory {
 public:
   virtual ~ExtractorFactory() = default;
 
-  virtual absl::StatusOr<ExtractorPtr> CreateExtractor(
-      TypeFinder type_finder_, absl::string_view request_type_url,
+  virtual absl::StatusOr<ExtractorPtr> createExtractor(
+      TypeFinder type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const = 0;
 };

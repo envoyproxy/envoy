@@ -33,8 +33,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
-using ::envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions;
-using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Grpc::Utility;
 
@@ -58,8 +56,8 @@ std::string generateRcDetails(absl::string_view filter_name, absl::string_view e
 
 // Turns a '/package.Service/method' to 'package.Service.method' which is
 // the form suitable for the proto db lookup.
-absl::StatusOr<std::string> GrpcPathToProtoPath(absl::string_view grpc_path) {
-  if (grpc_path.size() == 0 || grpc_path.at(0) != '/' ||
+absl::StatusOr<std::string> grpcPathToProtoPath(absl::string_view grpc_path) {
+  if (grpc_path.empty() || grpc_path.at(0) != '/' ||
       std::count(grpc_path.begin(), grpc_path.end(), '/') != 2) {
     return absl::InvalidArgumentError(
         absl::StrFormat(":path `%s` should be in form of `/package.Service/method`", grpc_path));
@@ -93,7 +91,7 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   }
 
   // Grpc::Common::isGrpcRequestHeaders above already ensures the existence of ":path" header.
-  auto proto_path = GrpcPathToProtoPath(headers.Path()->value().getStringView());
+  auto proto_path = grpcPathToProtoPath(headers.Path()->value().getStringView());
   if (!proto_path.ok()) {
     ENVOY_STREAM_LOG(info, "failed to convert gRPC path to protobuf path: {}", *decoder_callbacks_,
                      proto_path.status().ToString());
@@ -202,7 +200,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                                     kRcDetailErrorRequestOutOfData));
     return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
-  return HandleDecodeDataStatus();
+  return {};
 }
 
 void Filter::handleExtractionResult(const ExtractionResult& result) {
