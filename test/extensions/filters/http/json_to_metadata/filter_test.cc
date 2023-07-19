@@ -49,6 +49,7 @@ public:
 
   const std::string request_config_yaml_ = R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -64,7 +65,7 @@ request_rules:
       key: version
       value: 'error'
       preserve_existing_metadata_value: true
-request_buffer_limit_bytes: 200
+  buffer_limit_bytes: 200
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
@@ -216,6 +217,7 @@ TEST_F(FilterTest, BasicDoubleMatch) {
 TEST_F(FilterTest, TrailerSupport) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -248,6 +250,7 @@ request_rules:
 TEST_F(FilterTest, StringToString) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -275,6 +278,7 @@ request_rules:
 TEST_F(FilterTest, StringToNumber) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -306,6 +310,7 @@ request_rules:
 TEST_F(FilterTest, BadStringToNumber) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -341,6 +346,7 @@ request_rules:
 TEST_F(FilterTest, NumberToString) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -368,6 +374,7 @@ request_rules:
 TEST_F(FilterTest, NumberToNumber) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -399,6 +406,7 @@ request_rules:
 TEST_F(FilterTest, IntegerToString) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -426,6 +434,7 @@ request_rules:
 TEST_F(FilterTest, IntegerToNumber) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -457,6 +466,7 @@ request_rules:
 TEST_F(FilterTest, BoolToString) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -484,6 +494,7 @@ request_rules:
 TEST_F(FilterTest, BoolToNumber) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -515,6 +526,7 @@ request_rules:
 TEST_F(FilterTest, OnPresentWithValueSet) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -542,6 +554,7 @@ request_rules:
 TEST_F(FilterTest, NoApplyOnMissingWhenPayloadIsPresent) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_missing:
@@ -574,6 +587,7 @@ request_rules:
 TEST_F(FilterTest, DefaultNamespaceTest) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -632,6 +646,7 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
 TEST_F(FilterTest, SecondLayerMatch) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: foo
     - key: bar
@@ -664,6 +679,7 @@ request_rules:
 TEST_F(FilterTest, OnMissingFirstLayer) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: foo
     - key: bar
@@ -697,6 +713,7 @@ request_rules:
 TEST_F(FilterTest, OnMissingSecondLayer) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: foo
     - key: bar
@@ -730,6 +747,7 @@ request_rules:
 TEST_F(FilterTest, OnMissingForArray) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: foo
     - key: bar
@@ -873,6 +891,7 @@ TEST_F(FilterTest, InvalidJsonForAdditionalPrefixSuffix) {
 TEST_F(FilterTest, EmptyStringValue) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -904,6 +923,7 @@ request_rules:
 TEST_F(FilterTest, PayloadValueTooLong) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -937,6 +957,7 @@ request_rules:
 TEST_F(FilterTest, PayloadValueTooLongValueTypeString) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -996,6 +1017,7 @@ TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
 TEST_F(FilterTest, MissingMetadataKeyWithNoFallbackValue) {
   const std::string yaml = R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1077,6 +1099,7 @@ TEST_F(FilterTest, TooLargeRequestBody) {
 TEST_F(FilterTest, DefaultBufferLimitAccepted) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1109,6 +1132,7 @@ request_rules:
 TEST_F(FilterTest, DefaultBufferLimitRejected) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1138,6 +1162,7 @@ request_rules:
 TEST_F(FilterTest, MultipleRules) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1170,6 +1195,7 @@ request_rules:
 TEST_F(FilterTest, MultipleRulesInSamePath) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1202,6 +1228,7 @@ request_rules:
 TEST_F(FilterTest, MultipleRulesSecondLayer) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
@@ -1245,12 +1272,13 @@ request_rules:
 TEST_F(FilterTest, CustomRequestAllowContentTypeAccepted) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
       metadata_namespace: envoy.lb
       key: version
-request_allow_content_types:
+  allow_content_types:
   - "application/better-json"
 )EOF");
   std::string request_body = R"delimiter({"version":"good version"})delimiter";
@@ -1275,12 +1303,13 @@ request_allow_content_types:
 TEST_F(FilterTest, CustomRequestAllowContentTypeRejected) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
       metadata_namespace: envoy.lb
       key: version
-request_allow_content_types:
+  allow_content_types:
   - "application/non-json"
 )EOF");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, false));
@@ -1297,12 +1326,13 @@ request_allow_content_types:
 TEST_F(FilterTest, RequestAllowEmptyContentType) {
   initializeFilter(R"EOF(
 request_rules:
+  rules:
   - selectors:
     - key: version
     on_present:
       metadata_namespace: envoy.lb
       key: version
-request_allow_empty_content_type: true
+  allow_empty_content_type: true
 )EOF");
   std::string request_body = R"delimiter({"version":"good version"})delimiter";
   std::map<std::string, std::string> expected = {{"version", "good version"}};

@@ -13,22 +13,23 @@ namespace JsonToMetadata {
 TEST(Factory, Basic) {
   const std::string yaml = R"(
 request_rules:
-- selectors:
-  - key: version
-  on_present:
-    metadata_namespace: envoy.lb
-    key: version
-  on_missing:
-    metadata_namespace: envoy.lb
-    key: version
-    value: 'unknown'
-    preserve_existing_metadata_value: true
-  on_error:
-    metadata_namespace: envoy.lb
-    key: version
-    value: 'error'
-    preserve_existing_metadata_value: true
-request_buffer_limit_bytes: 16384
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+      preserve_existing_metadata_value: true
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
+      preserve_existing_metadata_value: true
+  buffer_limit_bytes: 16384
   )";
 
   JsonToMetadataConfig factory;
@@ -46,8 +47,9 @@ request_buffer_limit_bytes: 16384
 TEST(Factory, NoOnPresentOnMissing) {
   const std::string yaml = R"(
 request_rules:
-- selectors:
-  - key: version
+  rules:
+  - selectors:
+    - key: version
   )";
 
   JsonToMetadataConfig factory;
@@ -62,14 +64,15 @@ request_rules:
 TEST(Factory, NoValueIntOnMissing) {
   const std::string yaml = R"(
 request_rules:
-- selectors:
-  - key: version
-  on_present:
-    metadata_namespace: envoy.lb
-    key: version
-  on_missing:
-    metadata_namespace: envoy.lb
-    key: version
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
   )";
 
   JsonToMetadataConfig factory;
@@ -84,14 +87,15 @@ request_rules:
 TEST(Factory, NoValueIntOnError) {
   const std::string yaml = R"(
 request_rules:
-- selectors:
-  - key: version
-  on_present:
-    metadata_namespace: envoy.lb
-    key: version
-  on_error:
-    metadata_namespace: envoy.lb
-    key: version
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
   )";
 
   JsonToMetadataConfig factory;

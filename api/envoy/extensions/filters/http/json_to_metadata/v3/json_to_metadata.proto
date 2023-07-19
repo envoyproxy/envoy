@@ -95,28 +95,33 @@ message JsonToMetadata {
     KeyValuePair on_error = 4;
   }
 
-  // The list of rules to apply to requests.
-  repeated Rule request_rules = 1 [(validate.rules).repeated = {min_items: 1}];
+  message MatchRules {
+    // The list of rules to apply.
+    repeated Rule rules = 1 [(validate.rules).repeated = {min_items: 1}];
 
-  // Soft limit on size of the read buffers.
-  // If the body larger than the limit, simply do not parse the body and apply on_error policy.
-  //
-  // The limit is bounds by
-  // ref:`per_connection_buffer_limit_bytes <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>`
-  // That is, if the body buffer size is larger than the connection limit,
-  // the listener manager would reply 413 for requests and 500 for responses before
-  // filters get chance to manipulate.
-  google.protobuf.UInt32Value request_buffer_limit_bytes = 2;
+    // Soft limit on size of the read buffers.
+    // If the body larger than the limit, simply do not parse the body and apply on_error policy.
+    //
+    // The limit is bounds by
+    // ref:`per_connection_buffer_limit_bytes <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>`
+    // That is, if the body buffer size is larger than the connection limit,
+    // the listener manager would reply 413 for requests and 500 for responses before
+    // filters get chance to manipulate.
+    google.protobuf.UInt32Value buffer_limit_bytes = 2;
 
-  // Allowed content-type for json to metadata transformation.
-  // Default to {"application/json"}.
-  //
-  // Set `request_allow_empty_content_type` if empty/missing content-type header
-  // is allowed.
-  repeated string request_allow_content_types = 3
-      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+    // Allowed content-type for json to metadata transformation.
+    // Default to {"application/json"}.
+    //
+    // Set `allow_empty_content_type` if empty/missing content-type header
+    // is allowed.
+    repeated string allow_content_types = 3
+        [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
-  // Allowed empty content-type for json to metadata transformation.
-  // Default to false.
-  bool request_allow_empty_content_type = 4;
+    // Allowed empty content-type for json to metadata transformation.
+    // Default to false.
+    bool allow_empty_content_type = 4;
+  }
+
+  // Rules to match json body of requests
+  MatchRules request_rules = 1 [(validate.rules).message = {required: true}];
 }

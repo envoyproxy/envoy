@@ -86,18 +86,18 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope)
     : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
-      request_buffer_limit_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, request_buffer_limit_bytes, 1024 * 1024)),
+      request_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.request_rules(),
+                                                                  buffer_limit_bytes, 1024 * 1024)),
       request_rules_(generateRequestRules(proto_config)),
       request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
-      request_allow_empty_content_type_(proto_config.request_allow_empty_content_type()) {}
+      request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()) {}
 
 Filter::~Filter() = default;
 
 Rules FilterConfig::generateRequestRules(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
   Rules rules;
-  for (const auto& rule : proto_config.request_rules()) {
+  for (const auto& rule : proto_config.request_rules().rules()) {
     rules.emplace_back(rule);
   }
   return rules;
@@ -105,12 +105,13 @@ Rules FilterConfig::generateRequestRules(
 
 absl::flat_hash_set<std::string> FilterConfig::generateRequestAllowContentTypes(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
-  if (proto_config.request_allow_content_types().empty()) {
+  if (proto_config.request_rules().allow_content_types().empty()) {
     return {Http::Headers::get().ContentTypeValues.Json};
   }
 
   absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type : proto_config.request_allow_content_types()) {
+  for (const auto& request_allowed_content_type :
+       proto_config.request_rules().allow_content_types()) {
     allow_content_types.insert(request_allowed_content_type);
   }
   return allow_content_types;
@@ -320,9 +321,9 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
 }
 
 void Filter::processRequestBody() {
-  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), request_processing_finished_,
-              config_->stats().rq_success_, config_->stats().rq_no_body_,
-              config_->stats().rq_invalid_json_body_);
+  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(),
+              request_processing_finished_, config_->stats().rq_success_,
+              config_->stats().rq_no_body_, config_->stats().rq_invalid_json_body_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
