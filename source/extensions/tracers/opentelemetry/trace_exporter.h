@@ -1,5 +1,7 @@
 #pragma once
 
+#include "source/common/common/logger.h"
+
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;

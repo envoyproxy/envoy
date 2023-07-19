@@ -25,7 +25,7 @@ using testing::ReturnRef;
 
 class OpenTelemetryHttpTraceExporterTest : public testing::Test {
 public:
-  OpenTelemetryHttpTraceExporterTest() {}
+  OpenTelemetryHttpTraceExporterTest() = default;
 
   void setup(envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "fake_collector";
