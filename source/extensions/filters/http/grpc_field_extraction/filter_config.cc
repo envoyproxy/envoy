@@ -15,6 +15,10 @@ FilterConfig::FilterConfig(
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
       Protobuf::util::NewTypeResolverForDescriptorPool(Envoy::Grpc::Common::typeUrlPrefix(),
                                                        &descriptor_pool_));
+  type_finder_ =
+      std::make_unique<TypeFinder>([this](absl::string_view type_url) -> const Protobuf::Type* {
+        return type_helper_->Info()->GetTypeByTypeUrl(type_url);
+      });
 
   initDescriptorPool(api);
   initExtractors(*extractor_factory);
@@ -29,9 +33,7 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
     }
 
     auto extractor = extractor_factory.createExtractor(
-        [this](absl::string_view type_url) -> const Protobuf::Type* {
-          return type_helper_->Info()->GetTypeByTypeUrl(type_url);
-        },
+        *type_finder_,
         Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->input_type()->full_name(), it.second);
     if (!extractor.ok()) {
       throw EnvoyException(fmt::format("couldn't init extractor for method `{}`: {}", it.first,

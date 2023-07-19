@@ -48,6 +48,7 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<Extractor>> proto_path_to_extractor_;
   Protobuf::DescriptorPool descriptor_pool_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
+  std::unique_ptr<TypeFinder> type_finder_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
