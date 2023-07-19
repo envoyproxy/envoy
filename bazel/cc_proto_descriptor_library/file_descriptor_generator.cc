@@ -156,7 +156,7 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
 }
 } // namespace
 
-bool ProtoDescriptorGenerator::Generate(
+bool ProtoDescriptorGenerator::Generate(  // NOLINT(readability-identifier-naming)
     const google::protobuf::FileDescriptor* file, const std::string& parameter,
     google::protobuf::compiler::GeneratorContext* generator_context, std::string* error) const {
   std::string header_path = getDescriptorHeaderName(file);
