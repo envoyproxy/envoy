@@ -11,7 +11,8 @@ on:
         default: false
       repo_ref:
         type: string
-        default:
+      given_ref:
+        type: string
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-verify
@@ -34,7 +35,7 @@ jobs:
           run_pre: ./.github/actions/verify/examples/setup
           run_pre_with: |
             bucket: envoy-${{ inputs.trusted && 'postsubmit' || 'pr' }}
-            ref: ${{ inputs.ref }}
+            ref: ${{ inputs.given_ref }}
           env: |
             export NO_BUILD_SETUP=1
     uses: ./.github/workflows/_ci.yml
