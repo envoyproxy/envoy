@@ -534,11 +534,16 @@ resource_spans:
 }
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
-  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "opentelemetry_collector";
-  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"opentelemetry_collector"});
-  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
-      .WillByDefault(ReturnRef(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
-  context_.server_factory_context_.cluster_manager_.initializeClusters({"opentelemetry_collector"}, {});
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
+      "opentelemetry_collector";
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"opentelemetry_collector"});
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+          httpAsyncClient())
+      .WillByDefault(ReturnRef(
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"opentelemetry_collector"},
+                                                                       {});
   setupValidDriverWithHttpExporter();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -552,9 +557,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
       .Times(1)
       .WillRepeatedly(Return(1));
   // We should see a call to the async client to export that single span.
-  EXPECT_CALL(
-      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
-      send_(_, _, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _));
 
   span->finishSpan();
 
