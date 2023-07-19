@@ -103,7 +103,7 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  auto* extractor = filter_config_.FindExtractor(*proto_path);
+  auto* extractor = filter_config_.findExtractor(*proto_path);
   if (!extractor) {
     ENVOY_STREAM_LOG(debug, "gRPC method `{}` isn't configured for field extraction",
                      *decoder_callbacks_, *proto_path);

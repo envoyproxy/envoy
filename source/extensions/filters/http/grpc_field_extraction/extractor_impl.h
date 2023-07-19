@@ -47,7 +47,7 @@ private:
 
 class ExtractorFactoryImpl : public ExtractorFactory {
 public:
-  absl::StatusOr<ExtractorPtr> CreateExtractor(
+  absl::StatusOr<ExtractorPtr> createExtractor(
       TypeFinder type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const override {

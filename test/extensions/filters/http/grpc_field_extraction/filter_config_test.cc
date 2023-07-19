@@ -55,8 +55,8 @@ TEST_F(FilterConfigTestOk, DescriptorInline) {
           TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
-  EXPECT_EQ(filter_config_->FindExtractor("undefined"), nullptr);
-  EXPECT_NE(filter_config_->FindExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
 TEST_F(FilterConfigTestOk, DescriptorFromFile) {
@@ -65,8 +65,8 @@ TEST_F(FilterConfigTestOk, DescriptorFromFile) {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
-  EXPECT_EQ(filter_config_->FindExtractor("undefined"), nullptr);
-  EXPECT_NE(filter_config_->FindExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
 TEST_F(FilterConfigTestOk, AllSupportedTypes) {
@@ -135,8 +135,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
-  EXPECT_EQ(filter_config_->FindExtractor("undefined"), nullptr);
-  EXPECT_NE(filter_config_->FindExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
 TEST_F(FilterConfigTestOk, RepeatedField) {
@@ -205,8 +205,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
-  EXPECT_EQ(filter_config_->FindExtractor("undefined"), nullptr);
-  EXPECT_NE(filter_config_->FindExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
 using FilterConfigTestException = FilterConfigTestBase;
