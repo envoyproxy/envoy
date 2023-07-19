@@ -78,6 +78,8 @@ on:
         value: ${{ jobs.repo.outputs.repo_ref_sha }}
       repo_ref_sha_short:
         value: ${{ jobs.repo.outputs.repo_ref_sha_short }}
+      repo_ref_title:
+        value: ${{ jobs.repo.outputs.repo_ref_title }}
 
       trusted:
         value: ${{ jobs.repo.outputs.trusted }}
@@ -114,6 +116,7 @@ jobs:
       repo_ref_name: ${{ steps.env.outputs.repo_ref_name }}
       repo_ref_sha: ${{ steps.env.outputs.repo_ref_sha }}
       repo_ref_sha_short: ${{ steps.env.outputs.repo_ref_sha_short }}
+      repo_ref_title: ${{ steps.env.outputs.repo_ref_title }}
       trusted: ${{ steps.env.outputs.trusted }}
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
@@ -125,6 +128,7 @@ jobs:
       id: env
       with:
         check_mobile_run: ${{ inputs.check_mobile_run }}
+        repo_ref_name: ${{ inputs.repo_ref_name }}
         repo_ref_sha: ${{ inputs.repo_ref_sha }}
         build_image_repo: ${{ inputs.build_image_repo }}
         build_image_tag: ${{ inputs.build_image_tag }}
@@ -136,6 +140,10 @@ jobs:
         echo "version_dev=${{ steps.env.outputs.version_dev }}"
         echo "version_patch=${{ steps.env.outputs.version_patch }}"
         echo "trusted=${{ steps.env.outputs.trusted }}"
+        echo "repo_ref_name=${{ steps.env.outputs.repo_ref_name }}"
+        echo "repo_ref_sha=${{ steps.env.outputs.repo_ref_sha }}"
+        echo "repo_ref_sha_short=${{ steps.env.outputs.repo_ref_sha_short }}"
+        echo "repo_ref_title=${{ steps.env.outputs.repo_ref_title }}"
         echo "build_image_ubuntu=${{ steps.env.outputs.build_image_ubuntu }}"
         echo "build_image_ubuntu_mobile=${{ steps.env.outputs.build_image_ubuntu_mobile }}"
 
