@@ -832,8 +832,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
       HostSetImpl::updateHostsParams(
           hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
           degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed, absl::nullopt,
-      original_host_set_.overprovisioningFactor());
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
+      original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
