@@ -131,13 +131,13 @@ Http2HeaderValidator::validatePathHeaderWithAdditionalCharacters(
   };
 
   // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
-  // allowed " < > [ ] ^ ` { } \ | SPACE TAB and all extended ASCII This table is used when the
+  // allowed " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII This table is used when the
   // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
   static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
       // control characters
       0b00000000010000000000000000000000,
       // !"#$%&'()*+,-./0123456789:;<=>?
-      0b11101111111111111111111111111111,
+      0b11111111111111111111111111111111,
       //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
       0b11111111111111111111111111111111,
       //`abcdefghijklmnopqrstuvwxyz{|}~

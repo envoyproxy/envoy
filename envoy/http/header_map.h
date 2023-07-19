@@ -101,7 +101,11 @@ using LowerCaseStrPairVector =
 
 class HeaderStringValidator {
 public:
-  bool operator()(absl::string_view view) { return validHeaderString(view); }
+  bool operator()(absl::string_view view) {
+    return disable_validation_for_tests_ ? true : validHeaderString(view);
+  }
+
+  static bool disable_validation_for_tests_;
 };
 
 class HeaderString : public UnionStringBase<HeaderStringValidator> {

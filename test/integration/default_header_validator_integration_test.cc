@@ -127,39 +127,6 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
 }
-// By default the `envoy.uhv.allow_extended_ascii_in_path_for_http2` == true and UHV behaves just
-// like legacy path normalization for H/2.
-TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathAllowedInHttp2) {
-  disable_client_header_validation_ = true;
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with/\xA7_extended/\xFE_ascii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    // All codecs, except H/2 reject unencoded extended ASCII in URL path
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    if (downstream_protocol_ == Http::CodecType::HTTP1) {
-      EXPECT_EQ("400", response->headers().getStatusValue());
-    } else {
-      EXPECT_TRUE(response->reset());
-    }
-  } else {
-    waitForNextUpstreamRequest();
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with/%A7_extended/%FE_ascii");
-
-    // Send a headers only response.
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
-  }
-}
 
 namespace {
 std::string generateExtendedAsciiString() {
@@ -169,27 +136,51 @@ std::string generateExtendedAsciiString() {
   }
   return extended_ascii_string;
 }
+
+std::map<char, std::string> generateExtendedAsciiPercentEncoding() {
+  std::map<char, std::string> encoding;
+  for (uint32_t ascii = 0x80; ascii <= 0xff; ++ascii) {
+    encoding.insert(
+        {static_cast<char>(ascii), fmt::format("%{:02X}", static_cast<unsigned char>(ascii))});
+  }
+  return encoding;
+}
 } // namespace
 
-TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
+// This test shows validation of character sets in URL path for all codecs.
+// It also shows that UHV in compatibility mode has the same validation.
+TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormalization) {
+  // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
   disable_client_header_validation_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "true");
   initialize();
-  std::string additionally_allowed_characters("\"<>[]^`{}\\|");
+  // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
+  std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In addition H/3 allows TAB and SPACE in path
     additionally_allowed_characters += +"\t ";
   } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
     if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      // In addition H/2 oghttp2 allows TAB and SPACE in path
       additionally_allowed_characters += +"\t ";
     }
+    // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
     additionally_allowed_characters += generateExtendedAsciiString();
   }
 
   std::vector<FakeStreamPtr> upstream_requests;
-  for (uint32_t ascii = 0x0; ascii <= 0x20; ++ascii) {
-    if (downstream_protocol_ == Http::CodecType::HTTP3 && ascii == 0) {
+  for (uint32_t ascii = 0x0; ascii <= 0xFF; ++ascii) {
+    if (ascii == '?' || ascii == '#') {
+      // These characters will just cause path to be interpreted with query or fragment
+      continue;
+    } else if ((downstream_protocol_ == Http::CodecType::HTTP3 ||
+                (downstream_protocol_ == Http::CodecType::HTTP2 &&
+                 GetParam().http2_implementation == Http2Impl::Oghttp2)) &&
+               ascii == 0) {
       // QUIC client does weird things when a header contains nul character
+      // oghttp2 concatenates path values when 0 is in the path
       continue;
     } else if (downstream_protocol_ == Http::CodecType::HTTP1 && (ascii == '\r' || ascii == '\n')) {
       // \r and \n will produce invalid HTTP/1 request on the wire
@@ -204,9 +195,10 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
     Http::TestRequestHeaderMapImpl headers{
         {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
     headers.addViaMove(Http::HeaderString(absl::string_view(":path")), std::move(invalid_value));
-    std::cout << "Sending " << ascii << std::endl;
     auto response = client->makeHeaderOnlyRequest(headers);
 
+    // Workaround the case that nghttp2 fake upstream will reject TAB or SPACE in path that was
+    // allowed by the H/3 downstream codec
     bool expect_upstream_reject = GetParam().http2_implementation == Http2Impl::Nghttp2 &&
                                   downstream_protocol_ == Http::CodecType::HTTP3 &&
                                   (ascii == 0x9 || ascii == 0x20);
@@ -215,11 +207,6 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
             Extensions::Http::HeaderValidators::EnvoyDefault::kPathHeaderCharTable,
             static_cast<char>(ascii)) ||
         absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
-      // Envoy does not URL encode extended ASCII in HTTP/2 URL query by default.
-      /*
-      EXPECT_EQ(upstream_request_->headers().getPathValue(),
-                "/path/with/extended/ascii?in=que\xB6ry");
-      */
       if (expect_upstream_reject) {
         if (!fake_upstream_connection_) {
           waitForNextUpstreamConnection({0}, TestUtility::DefaultTimeout,
@@ -231,6 +218,7 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
         EXPECT_EQ("503", response->headers().getStatusValue());
       } else {
         waitForNextUpstreamRequest();
+        EXPECT_EQ(upstream_request_->headers().getPathValue(), path);
         // Send a headers only response.
         upstream_request_->encodeHeaders(default_response_headers_, true);
         ASSERT_TRUE(response->waitForEndStream());
@@ -248,173 +236,245 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPath) {
   }
 }
 
-// Envoy does not URL encode extended ASCII in query by default in HTTP/2.
-TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiInUriQueryAllowedInHttp2) {
+TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalization) {
+  // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
+  disable_client_header_validation_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "true");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with/extended/ascii?in=que\xB6ry"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    // All codecs, except H/2 reject unencoded extended ASCII in URL query
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    if (downstream_protocol_ == Http::CodecType::HTTP1) {
-      EXPECT_EQ("400", response->headers().getStatusValue());
-    } else {
-      EXPECT_TRUE(response->reset());
+  // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
+  std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In addition H/3 allows TAB and SPACE in path
+    additionally_allowed_characters += +"\t ";
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      // In addition H/2 oghttp2 allows TAB and SPACE in path
+      additionally_allowed_characters += +"\t ";
     }
-  } else {
-    waitForNextUpstreamRequest();
-    // Envoy does not URL encode extended ASCII in HTTP/2 URL query by default.
-    EXPECT_EQ(upstream_request_->headers().getPathValue(),
-              "/path/with/extended/ascii?in=que\xB6ry");
-
-    // Send a headers only response.
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
+    // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
+    additionally_allowed_characters += generateExtendedAsciiString();
   }
-}
 
-TEST_P(DownstreamUhvIntegrationTest, ControlAsciiInUriPathRejected) {
-  // Prevent test client codec from rejecting invalid request headers.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with/con\x09trol/asc\x20ii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    EXPECT_TRUE(response->reset());
-  }
-}
-
-TEST_P(DownstreamUhvIntegrationTest, ControlAsciiInUriQueryRejected) {
-  // Prevent test client codec from rejecting invalid request headers.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with?con\x01trol=asc\x1Fii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    EXPECT_TRUE(response->reset());
-  }
-}
-
-TEST_P(DownstreamUhvIntegrationTest, DelInUriPathRejected) {
-  // Prevent test client codec from rejecting invalid request headers.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with/del\x7F/ascii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    EXPECT_TRUE(response->reset());
-  }
-}
-
-TEST_P(DownstreamUhvIntegrationTest, DelInUriQueryRejected) {
-  // Prevent test client codec from rejecting invalid request headers.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with?de\x7Fl=ascii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    EXPECT_TRUE(response->reset());
-  }
-}
-
-// Without the `allow_non_compliant_characters_in_path` override UHV rejects extended ASCII
-// for all codecs.
-TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathRejectedWithOverride) {
-  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "false");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start the request.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path/with/\xA7_extended/\xFE_ascii"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
-#ifdef ENVOY_ENABLE_UHV
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    EXPECT_TRUE(response->reset());
-  }
-#else
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    // All codecs, except H/2 reject unencoded extended ASCII in URL path
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    if (downstream_protocol_ == Http::CodecType::HTTP1) {
-      EXPECT_EQ("400", response->headers().getStatusValue());
-    } else {
-      EXPECT_TRUE(response->reset());
+  std::map<char, std::string> percent_encoded_characters{
+      {'\t', "%09"}, {' ', "%20"}, {'"', "%22"}, {'<', "%3C"}, {'>', "%3E"}, {'\\', "/"},
+      {'^', "%5E"},  {'`', "%60"}, {'{', "%7B"}, {'|', "%7C"}, {'}', "%7D"}};
+  std::map<char, std::string> percent_encoded_extende_ascii =
+      generateExtendedAsciiPercentEncoding();
+  percent_encoded_characters.merge(percent_encoded_extende_ascii);
+  std::vector<FakeStreamPtr> upstream_requests;
+  for (uint32_t ascii = 0x0; ascii <= 0xFF; ++ascii) {
+    if (ascii == '?' || ascii == '#') {
+      // These characters will just cause path to be interpreted with query or fragment
+      continue;
+    } else if ((downstream_protocol_ == Http::CodecType::HTTP3 ||
+                (downstream_protocol_ == Http::CodecType::HTTP2 &&
+                 GetParam().http2_implementation == Http2Impl::Oghttp2)) &&
+               ascii == 0) {
+      // QUIC client does weird things when a header contains nul character
+      // oghttp2 concatenates path values when 0 is in the path
+      continue;
+    } else if (downstream_protocol_ == Http::CodecType::HTTP1 && (ascii == '\r' || ascii == '\n')) {
+      // \r and \n will produce invalid HTTP/1 request on the wire
+      continue;
     }
-  } else {
-    waitForNextUpstreamRequest();
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with/%A7_extended/%FE_ascii");
+    auto client = makeHttpConnection(lookupPort("http"));
 
-    // Send a headers only response.
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
+    std::string path("/path/with/additional/characters");
+    path[12] = static_cast<char>(ascii);
+    Http::HeaderString invalid_value{};
+    invalid_value.setCopyUnvalidatedForTestOnly(path);
+    Http::TestRequestHeaderMapImpl headers{
+        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+    headers.addViaMove(Http::HeaderString(absl::string_view(":path")), std::move(invalid_value));
+    auto response = client->makeHeaderOnlyRequest(headers);
+
+    if (Http::testCharInTable(
+            Extensions::Http::HeaderValidators::EnvoyDefault::kPathHeaderCharTable,
+            static_cast<char>(ascii)) ||
+        absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
+      waitForNextUpstreamRequest();
+      auto encoding = percent_encoded_characters.find(static_cast<char>(ascii));
+      if (encoding != percent_encoded_characters.end()) {
+        path = absl::StrCat("/path/with/a", encoding->second, "ditional/characters");
+      }
+      EXPECT_EQ(upstream_request_->headers().getPathValue(), path);
+      // Send a headers only response.
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+      ASSERT_TRUE(response->waitForEndStream());
+      upstream_requests.emplace_back(std::move(upstream_request_));
+    } else {
+      ASSERT_TRUE(client->waitForDisconnect());
+      if (downstream_protocol_ == Http::CodecType::HTTP1) {
+        EXPECT_EQ("400", response->headers().getStatusValue());
+      } else {
+        EXPECT_TRUE(response->reset());
+      }
+    }
+    client->close();
   }
-#endif
+}
+
+TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
+  // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
+  disable_client_header_validation_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "true");
+  // Path normalization should not affect query, however enable it to make sure it is so.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
+  std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In addition H/3 allows TAB and SPACE in path
+    additionally_allowed_characters += +"\t ";
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      // In addition H/2 oghttp2 allows TAB and SPACE in path
+      additionally_allowed_characters += +"\t ";
+    }
+    // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
+    additionally_allowed_characters += generateExtendedAsciiString();
+  }
+
+  std::vector<FakeStreamPtr> upstream_requests;
+  for (uint32_t ascii = 0x0; ascii <= 0xFF; ++ascii) {
+    if (ascii == '#') {
+      // This character will just cause path to be interpreted as having a fragment
+      continue;
+    } else if ((downstream_protocol_ == Http::CodecType::HTTP3 ||
+                (downstream_protocol_ == Http::CodecType::HTTP2 &&
+                 GetParam().http2_implementation == Http2Impl::Oghttp2)) &&
+               ascii == 0) {
+      // QUIC client does weird things when a header contains nul character
+      // oghttp2 concatenates path values when 0 is in the path
+      continue;
+    } else if (downstream_protocol_ == Http::CodecType::HTTP1 && (ascii == '\r' || ascii == '\n')) {
+      // \r and \n will produce invalid HTTP/1 request on the wire
+      continue;
+    }
+    auto client = makeHttpConnection(lookupPort("http"));
+
+    std::string path("/query?with=additional&characters");
+    path[12] = static_cast<char>(ascii);
+    Http::HeaderString invalid_value{};
+    invalid_value.setCopyUnvalidatedForTestOnly(path);
+    Http::TestRequestHeaderMapImpl headers{
+        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+    headers.addViaMove(Http::HeaderString(absl::string_view(":path")), std::move(invalid_value));
+    auto response = client->makeHeaderOnlyRequest(headers);
+
+    // Workaround the case that nghttp2 fake upstream will reject TAB or SPACE in path that was
+    // allowed by the H/3 downstream codec
+    bool expect_upstream_reject = GetParam().http2_implementation == Http2Impl::Nghttp2 &&
+                                  downstream_protocol_ == Http::CodecType::HTTP3 &&
+                                  (ascii == 0x9 || ascii == 0x20);
+
+    if (Http::testCharInTable(Http::kUriQueryAndFragmentCharTable, static_cast<char>(ascii)) ||
+        absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
+      if (expect_upstream_reject) {
+        if (!fake_upstream_connection_) {
+          waitForNextUpstreamConnection({0}, TestUtility::DefaultTimeout,
+                                        fake_upstream_connection_);
+          EXPECT_TRUE(fake_upstream_connection_->waitForDisconnect());
+          fake_upstream_connection_.reset();
+        }
+        EXPECT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("503", response->headers().getStatusValue());
+      } else {
+        waitForNextUpstreamRequest();
+        EXPECT_EQ(upstream_request_->headers().getPathValue(), path);
+        // Send a headers only response.
+        upstream_request_->encodeHeaders(default_response_headers_, true);
+        ASSERT_TRUE(response->waitForEndStream());
+        upstream_requests.emplace_back(std::move(upstream_request_));
+      }
+    } else {
+      ASSERT_TRUE(client->waitForDisconnect());
+      if (downstream_protocol_ == Http::CodecType::HTTP1) {
+        EXPECT_EQ("400", response->headers().getStatusValue());
+      } else {
+        EXPECT_TRUE(response->reset());
+      }
+    }
+    client->close();
+  }
+}
+
+TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInFragment) {
+  // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
+  disable_client_header_validation_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.allow_non_compliant_characters_in_path", "true");
+  // By default path with fragment is rejected, disable it for the test
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
+                                    "false");
+  initialize();
+  // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|#
+  std::string additionally_allowed_characters(R"--("<>[]^`{}\|#)--");
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In addition H/3 allows TAB and SPACE in path
+    additionally_allowed_characters += +"\t ";
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      // In addition H/2 oghttp2 allows TAB and SPACE in path
+      additionally_allowed_characters += +"\t ";
+    }
+    // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
+    additionally_allowed_characters += generateExtendedAsciiString();
+  }
+
+  std::vector<FakeStreamPtr> upstream_requests;
+  for (uint32_t ascii = 0x0; ascii <= 0xFF; ++ascii) {
+    if ((downstream_protocol_ == Http::CodecType::HTTP3 ||
+         (downstream_protocol_ == Http::CodecType::HTTP2 &&
+          GetParam().http2_implementation == Http2Impl::Oghttp2)) &&
+        ascii == 0) {
+      // QUIC client does weird things when a header contains nul character
+      // oghttp2 concatenates path values when 0 is in the path
+      continue;
+    } else if (downstream_protocol_ == Http::CodecType::HTTP1 && (ascii == '\r' || ascii == '\n')) {
+      // \r and \n will produce invalid HTTP/1 request on the wire
+      continue;
+    }
+    auto client = makeHttpConnection(lookupPort("http"));
+
+    std::cout << "Sending " << ascii << std::endl;
+    std::string path("/q?with=a#fragment");
+    path[12] = static_cast<char>(ascii);
+    Http::HeaderString invalid_value{};
+    invalid_value.setCopyUnvalidatedForTestOnly(path);
+    Http::TestRequestHeaderMapImpl headers{
+        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+    headers.addViaMove(Http::HeaderString(absl::string_view(":path")), std::move(invalid_value));
+    auto response = client->makeHeaderOnlyRequest(headers);
+
+    if (Http::testCharInTable(Http::kUriQueryAndFragmentCharTable, static_cast<char>(ascii)) ||
+        absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
+      waitForNextUpstreamRequest();
+      EXPECT_EQ(upstream_request_->headers().getPathValue(), "/q?with=a");
+      // Send a headers only response.
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+      ASSERT_TRUE(response->waitForEndStream());
+      upstream_requests.emplace_back(std::move(upstream_request_));
+    } else {
+      ASSERT_TRUE(client->waitForDisconnect());
+      if (downstream_protocol_ == Http::CodecType::HTTP1) {
+        EXPECT_EQ("400", response->headers().getStatusValue());
+      } else {
+        EXPECT_TRUE(response->reset());
+      }
+    }
+    client->close();
+  }
 }
 
 // Without the `uhv_allow_malformed_url_encoding` override UHV rejects requests with malformed

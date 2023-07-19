@@ -17,7 +17,7 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 struct HeaderValidatorConfigOverrides {
-  // This flag enables validation of the :path header compatibile with legacy Envoy codecs.
+  // This flag enables validation of the :path header compatible with legacy Envoy codecs.
   // When this flag is false header validator checks the URL path in accordance with
   // the https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
   //
@@ -26,20 +26,20 @@ struct HeaderValidatorConfigOverrides {
   // will be changed to `false` in the future to make Envoy behavior standard compliant and
   // consistent across all HTTP protocol versions.
   //
-  // In the relaxed mode header validator allows the folloiwng additional characters:
-  // HTTP/1 protocol: " < > [ ] ^ ` { } \ |
+  // In the relaxed mode header validator allows the following additional characters:
+  // HTTP/1 protocol: " < > [ ] ^ ` { } \ | #
   // HTTP/2 and HTTP/3 protocols: all characters allowed for HTTP/1, space, TAB, all extended ASCII
   // (>= 0x80)
   //
-  // In addition when this flag is true AND path normaliztion is enabled, Envoy will do the
+  // In addition when this flag is true AND path normalization is enabled, Envoy will do the
   // following:
   // 1. all additionally allowed characters with the exception of the [] and \ characters are URL
   // encoded in path
-  //    segment or URL only. These characters in query or fragment will remain unecoded.
+  //    segment or URL only. These characters in query or fragment will remain unencoded.
   // 2. \ character is translated to / in path segment.
   //
   // This option provides backward compatibility with the existing (pre header validator) Envoy
-  // behavior. Envoy's lageacy codecs were not compliant with the
+  // behavior. Envoy's legacy codecs were not compliant with the
   // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
   //
   // With the `envoy.uhv.allow_non_compliant_characters_in_path` set to false the header validator

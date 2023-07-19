@@ -53,10 +53,10 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
-  // This method validites :path header value using character set that includes characters
+  // This method validates :path header value using character set that includes characters
   // prohibited by https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
   //
-  // " < > [ ] ^ ` { } \ | SPACE TAB and all extended ASCII
+  // " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII
   //
   // This method is called iff `envoy.uhv.allow_non_compliant_characters_in_path` is
   // `true`, which is the default value. Note the default will be switched to `false` in the future

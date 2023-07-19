@@ -151,7 +151,7 @@ TEST_P(HttpCommonValidationTest, BackslashInPathIsRejectedWithOverride) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
 }
 
-// With the allow_non_compliant_characters_in_path set to false a requerst with URL path containing
+// With the allow_non_compliant_characters_in_path set to false a request with URL path containing
 // characters not allowed in https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC is
 // rejected.
 TEST_P(HttpCommonValidationTest, PathCharacterSetValidation) {
@@ -248,7 +248,7 @@ TEST_P(HttpCommonValidationTest, AdditionalCharactersInFragmentAllowed) {
   EXPECT_EQ(headers.path(), "/some/path/with?value=aaa#\"<>[]^`{}\\|/characters");
 }
 
-// With the allow_non_compliant_characters_in_path set to false a requerst with URL path with the
+// With the allow_non_compliant_characters_in_path set to false a request with URL path with the
 // "<>[]^`{}\| additional characters is rejected.
 TEST_P(HttpCommonValidationTest, AdditionalCharactersInPathRejected) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
