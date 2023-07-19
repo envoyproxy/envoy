@@ -60,6 +60,23 @@ public:
     setup(opentelemetry_config);
   }
 
+  void setupValidDriverWithHttpExporter() {
+    const std::string yaml_string = R"EOF(
+    http_config:
+      http_uri:
+        uri: "https://www.example.com/v1/traces"
+        cluster: opentelemetry_collector
+        timeout: 0.250s
+      http_format: BINARY_PROTOBUF
+      collector_path: "/v1/traces"
+      collector_hostname: "example.com"
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
 protected:
   const std::string operation_name_{"test"};
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -77,6 +94,11 @@ protected:
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
   setupValidDriver();
+  EXPECT_NE(driver_, nullptr);
+}
+
+TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
+  setupValidDriverWithHttpExporter();
   EXPECT_NE(driver_, nullptr);
 }
 
@@ -508,6 +530,34 @@ resource_spans:
   EXPECT_CALL(*mock_stream_ptr_,
               sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _));
   span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "opentelemetry_collector";
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"opentelemetry_collector"});
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillByDefault(ReturnRef(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"opentelemetry_collector"}, {});
+  setupValidDriverWithHttpExporter();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to the async client to export that single span.
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _, _));
+
+  span->finishSpan();
+
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
