@@ -68,7 +68,8 @@ public:
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
 };
 
-using UpstreamLocalAddressSelectorConstSharedPtr = std::shared_ptr<const UpstreamLocalAddressSelector>;
+using UpstreamLocalAddressSelectorConstSharedPtr =
+    std::shared_ptr<const UpstreamLocalAddressSelector>;
 
 class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
 public:
@@ -1147,8 +1148,7 @@ public:
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual UpstreamLocalAddressSelectorConstSharedPtr
-  getUpstreamLocalAddressSelector() const PURE;
+  virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.

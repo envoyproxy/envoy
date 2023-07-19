@@ -13,14 +13,15 @@ namespace Network {
 class HappyEyeballsConnectionProvider : public ConnectionProvider,
                                         Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
-  HappyEyeballsConnectionProvider(Event::Dispatcher& dispatcher,
-                                  const std::vector<Address::InstanceConstSharedPtr>& address_list,
-                                  const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
-                                      upstream_local_address_selector,
-                                  UpstreamTransportSocketFactory& socket_factory,
-                                  TransportSocketOptionsConstSharedPtr transport_socket_options,
-                                  const Upstream::HostDescriptionConstSharedPtr& host,
-                                  const ConnectionSocket::OptionsSharedPtr options);
+  HappyEyeballsConnectionProvider(
+      Event::Dispatcher& dispatcher,
+      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
+          upstream_local_address_selector,
+      UpstreamTransportSocketFactory& socket_factory,
+      TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const Upstream::HostDescriptionConstSharedPtr& host,
+      const ConnectionSocket::OptionsSharedPtr options);
   bool hasNextConnection() override;
   ClientConnectionPtr createNextConnection(const uint64_t id) override;
   size_t nextConnection() override;
@@ -37,7 +38,8 @@ private:
   Event::Dispatcher& dispatcher_;
   // List of addresses to attempt to connect to.
   const std::vector<Address::InstanceConstSharedPtr> address_list_;
-  const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector> upstream_local_address_selector_;
+  const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>
+      upstream_local_address_selector_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
   const Upstream::HostDescriptionConstSharedPtr host_;
