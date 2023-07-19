@@ -150,7 +150,7 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const std::vector<Matchers::StringMatcherPtr>
-  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher header_list) {
+  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
     std::vector<Matchers::StringMatcherPtr> header_matchers;
     for (const auto& matcher : header_list.patterns()) {
       header_matchers.push_back(
