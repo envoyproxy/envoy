@@ -30,8 +30,14 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::vector<Network::FilterFactoryCb>& factories) {
-  for (const Network::FilterFactoryCb& factory : factories) {
+                                          const Filter::NetworkFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+
+    Network::FilterFactoryCb& factory = config.value();
     factory(filter_manager);
   }
 

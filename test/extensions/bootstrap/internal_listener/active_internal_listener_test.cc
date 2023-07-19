@@ -163,7 +163,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(*test_listener_filter, destroy_());
-  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
 
@@ -209,7 +209,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   expectFilterChainFactory();
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
 
-  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
 
@@ -246,7 +246,7 @@ public:
         .WillByDefault(ReturnPointee(std::shared_ptr<Network::DownstreamTransportSocketFactory>{
             Network::Test::createRawBufferDownstreamSocketFactory()}));
     ON_CALL(*filter_chain_, networkFilterFactories)
-        .WillByDefault(ReturnPointee(std::make_shared<std::vector<Network::FilterFactoryCb>>()));
+        .WillByDefault(ReturnPointee(std::make_shared<Filter::NetworkFilterFactoriesList>()));
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));
   }
 

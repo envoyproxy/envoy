@@ -154,7 +154,7 @@ public:
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
-                               const std::vector<Network::FilterFactoryCb>&) -> bool {
+                               const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
@@ -2021,7 +2021,7 @@ public:
     read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([&](Network::Connection& connection,
-                             const std::vector<Network::FilterFactoryCb>&) -> bool {
+                             const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
           connection.addReadFilter(read_filter_);
