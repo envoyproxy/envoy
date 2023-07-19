@@ -70,12 +70,23 @@ jobs:
     permissions:
       contents: write
 
-  verify:
-    uses: ./.github/workflows/_stage_verify.yml
-    name: Verify ${{ needs.env.outputs.repo_ref_title }}
+  docker:
+    uses: ./.github/workflows/_stage_docker.yml
+    name: Docker ${{ needs.env.outputs.repo_ref_title }}
     needs:
     - env
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
       repo_ref: ${{ needs.env.outputs.trusted != 'true' && needs.env.outputs.repo_ref || '' }}
+
+  verify:
+    uses: ./.github/workflows/_stage_verify.yml
+    name: Verify ${{ needs.env.outputs.repo_ref_title }}
+    needs:
+    - env
+    - docker
+    with:
+      trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
+      given_ref: ${{ inputs.ref }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
